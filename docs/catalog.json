@@ -1,5 +1,27 @@
 [
   {
+    "id": "33",
+    "name": "33",
+    "specGroup": "unknown",
+    "categories": [
+      "minimal"
+    ],
+    "hashtags": [
+      "dark",
+      "scary",
+      "skull",
+      "gothic",
+      "metal"
+    ],
+    "price": 0,
+    "stripeLink": null,
+    "createdAt": "2026-04-20T23:17:24.444Z",
+    "downloads": 0,
+    "zpkPath": "zpk/3/face.zpk",
+    "previewPath": "zpk/3/preview.png",
+    "qrPath": "zpk/3/qr.png"
+  },
+  {
     "id": "classic",
     "name": "Classic",
     "specGroup": "unknown",
