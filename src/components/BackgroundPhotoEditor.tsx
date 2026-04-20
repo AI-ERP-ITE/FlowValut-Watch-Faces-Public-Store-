@@ -53,10 +53,13 @@ interface SliderProps {
   value: number;
   defaultValue?: number;
   unit?: string;
+  safeMin?: number;  // values outside [safeMin, safeMax] show a flicker warning
+  safeMax?: number;
   onChange: (v: number) => void;
 }
 
-function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit = '', onChange }: SliderProps) {
+function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit = '', safeMin, safeMax, onChange }: SliderProps) {
+  const isUnsafe = (safeMin !== undefined && value < safeMin) || (safeMax !== undefined && value > safeMax);
   return (
     <div className="flex items-center gap-3 py-1">
       <span className="text-zinc-400 text-xs w-24 flex-shrink-0">{label}</span>
@@ -71,8 +74,8 @@ function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit
       />
       {/* T032: double-click value badge to reset single param */}
       <span
-        className="text-xs w-10 text-right flex-shrink-0 select-none cursor-pointer text-zinc-300 hover:text-cyan-400 transition-colors"
-        title="Double-click to reset"
+        className={`text-xs w-10 text-right flex-shrink-0 select-none cursor-pointer transition-colors hover:text-cyan-400 ${isUnsafe ? 'text-amber-400 font-semibold' : 'text-zinc-300'}`}
+        title={isUnsafe ? `⚠ May cause display flicker on watch. Safe range: ${safeMin ?? min} to ${safeMax ?? max}` : 'Double-click to reset'}
         onDoubleClick={() => onChange(defaultValue)}
       >
         {value > 0 && min < 0 ? `+${value}` : `${value}`}{unit}
@@ -544,15 +547,15 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
 
             {/* T021: Light section */}
             <SectionHeading>Light</SectionHeading>
-            <EditorSlider label="Exposure"   min={-100} max={100} value={editParams.exposure}
+            <EditorSlider label="Exposure"   min={-100} max={100} safeMin={-40} safeMax={40} value={editParams.exposure}
               onChange={(v) => setEditParams((p) => ({ ...p, exposure: v }))} />
             <EditorSlider label="Brightness" min={-100} max={100} value={editParams.brightness}
               onChange={(v) => setEditParams((p) => ({ ...p, brightness: v }))} />
             <EditorSlider label="Contrast"   min={-100} max={100} value={editParams.contrast}
               onChange={(v) => setEditParams((p) => ({ ...p, contrast: v }))} />
-            <EditorSlider label="Highlights" min={-100} max={100} value={editParams.highlights}
+            <EditorSlider label="Highlights" min={-100} max={100} safeMin={-65} safeMax={65} value={editParams.highlights}
               onChange={(v) => setEditParams((p) => ({ ...p, highlights: v }))} />
-            <EditorSlider label="Shadows"    min={-100} max={100} value={editParams.shadows}
+            <EditorSlider label="Shadows"    min={-100} max={100} safeMin={-65} safeMax={65} value={editParams.shadows}
               onChange={(v) => setEditParams((p) => ({ ...p, shadows: v }))} />
 
             {/* T022: Colour section */}

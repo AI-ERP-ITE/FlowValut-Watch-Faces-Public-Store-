@@ -294,14 +294,7 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
     if (element.name.toLowerCase().includes('month')) {
       continue;
     }
-    // Skip in AOD mode: BUTTON (no touch), IMG_ANIM (animation), IMG (icons/photos too bright),
-    // FILL_RECT/STROKE_RECT (decorative blocks violate 10% luminance), IMG_LEVEL (weather icons)
-    if (element.type === 'BUTTON' ||
-        element.type === 'IMG_ANIM' ||
-        element.type === 'IMG_LEVEL' ||
-        element.type === 'FILL_RECT' ||
-        element.type === 'STROKE_RECT' ||
-        (element.type === 'IMG' && !element.name.toLowerCase().includes('hand'))) {
+    if (element.type === 'BUTTON') {
       continue;
     }
     const code = generateWidgetCodeV2(element, aodWidgetCounter, true);
@@ -353,18 +346,6 @@ try {
                 
                 // ========== NORMAL MODE WIDGETS ==========
 ${normalWidgetsCode}
-                
-                // ========== AOD MODE BACKGROUND ==========
-                // AOD spec: background MUST be absolute black — never use the color background here.
-                // Illuminated pixels must not exceed 10% of screen area (Zepp OS hardware requirement).
-                let widget_aod_bg = hmUI.createWidget(hmUI.widget.FILL_RECT, {
-                    x: px(0),
-                    y: px(0),
-                    w: px(${config.resolution.width}),
-                    h: px(${config.resolution.height}),
-                    color: 0x000000,
-                    show_level: hmUI.show_level.ONLY_AOD
-                });
                 
                 // ========== AOD MODE WIDGETS ==========
 ${aodWidgetsCode}
@@ -612,15 +593,12 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
 // Pattern from Zepp OS v1.0 docs + ZeppPlayer engine
 // ============================================================
 function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  const isAod = showLevel === 'ONLY_AOD';
   const centerX = element.center?.x ?? (element.bounds.x + (element.bounds.width || 100) / 2);
   const centerY = element.center?.y ?? (element.bounds.y + (element.bounds.height || 100) / 2);
   const radius = element.radius ?? Math.min(element.bounds.width || 100, element.bounds.height || 100) / 2;
   const startAngle = element.startAngle ?? -90;
   const endAngle = element.endAngle ?? 270;
-  // AOD spec §9: illuminated pixels ≤10% of screen — cap arc line_width to 4px in AOD mode
-  const rawLineWidth = element.lineWidth ?? 8;
-  const lineWidth = isAod ? Math.min(rawLineWidth, 4) : rawLineWidth;
+  const lineWidth = element.lineWidth ?? 8;
   const color = element.color ?? '0x00FF00';
   const colorValue = color.startsWith('0x') ? color : `0x${color.replace('#', '')}`;
 
@@ -843,12 +821,9 @@ function generateImgStatusWidget(element: WatchFaceElement, widgetIndex: number,
 // Pattern from Zepp OS v1.0 docs
 // ============================================================
 function generateCircleWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  const isAod = showLevel === 'ONLY_AOD';
   const centerX = element.center?.x ?? (element.bounds.x + (element.bounds.width || 50) / 2);
   const centerY = element.center?.y ?? (element.bounds.y + (element.bounds.height || 50) / 2);
-  const rawRadius = element.radius ?? Math.min(element.bounds.width || 50, element.bounds.height || 50) / 2;
-  // AOD spec §9: CIRCLE area must stay within 10% luminance budget — cap radius to 15px in AOD
-  const radius = isAod ? Math.min(rawRadius, 15) : rawRadius;
+  const radius = element.radius ?? Math.min(element.bounds.width || 50, element.bounds.height || 50) / 2;
   const colorHex = element.color ?? '0xFFFFFF';
   const colorValue = colorHex.startsWith('0x') ? colorHex : `0x${colorHex.replace('#', '')}`;
   const alphaLine = element.alpha !== undefined ? `\n                    alpha: ${element.alpha},` : '';
