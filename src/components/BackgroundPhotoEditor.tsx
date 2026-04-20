@@ -61,26 +61,36 @@ interface SliderProps {
 function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit = '', safeMin, safeMax, onChange }: SliderProps) {
   const isUnsafe = (safeMin !== undefined && value < safeMin) || (safeMax !== undefined && value > safeMax);
   return (
-    <div className="flex items-center gap-3 py-1">
-      <span className="text-zinc-400 text-xs w-24 flex-shrink-0">{label}</span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="flex-1 accent-cyan-500 cursor-pointer"
-      />
-      {/* T032: double-click value badge to reset single param */}
-      <span
-        className={`text-xs w-10 text-right flex-shrink-0 select-none cursor-pointer transition-colors hover:text-cyan-400 ${isUnsafe ? 'text-amber-400 font-semibold' : 'text-zinc-300'}`}
-        title={isUnsafe ? `⚠ May cause display flicker on watch. Safe range: ${safeMin ?? min} to ${safeMax ?? max}` : 'Double-click to reset'}
-        onDoubleClick={() => onChange(defaultValue)}
-      >
-        {value > 0 && min < 0 ? `+${value}` : `${value}`}{unit}
-      </span>
-    </div>
+    <>
+      <div className="flex items-center gap-3 py-1">
+        <span className="text-zinc-400 text-xs w-24 flex-shrink-0">{label}</span>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="flex-1 accent-cyan-500 cursor-pointer"
+        />
+        {/* T032: double-click value badge to reset single param */}
+        <span
+          className={`text-xs w-10 text-right flex-shrink-0 select-none cursor-pointer transition-colors hover:text-cyan-400 ${isUnsafe ? 'text-amber-400 font-semibold' : 'text-zinc-300'}`}
+          title={isUnsafe ? `⚠ May cause display flicker on watch. Safe range: ${safeMin ?? min} to ${safeMax ?? max}` : 'Double-click to reset'}
+          onDoubleClick={() => onChange(defaultValue)}
+        >
+          {value > 0 && min < 0 ? `+${value}` : `${value}`}{unit}
+        </span>
+      </div>
+      {isUnsafe && (
+        <div className="flex items-center gap-1.5 mt-0.5 mb-1 px-1 py-1 rounded bg-amber-500/10 border border-amber-500/30">
+          <span className="text-amber-400 text-xs">⚠</span>
+          <span className="text-amber-300 text-[10px]">
+            May flicker on device — safe range: {safeMin ?? min} to {safeMax ?? max}
+          </span>
+        </div>
+      )}
+    </>
   );
 }
 

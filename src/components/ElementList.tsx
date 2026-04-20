@@ -21,8 +21,9 @@ export function ElementList({
   onSelectElement,
   className,
 }: ElementListProps) {
-  const getElementIcon = (type: string) => {
-    switch (type) {
+  const getElementIcon = (element: WatchFaceElement) => {
+    if (element.engraveFrame) return '⬚';
+    switch (element.type) {
       case 'TIME_POINTER':
         return '🕐';
       case 'IMG_LEVEL':
@@ -33,6 +34,8 @@ export function ElementList({
         return '🖼️';
       case 'ARC_PROGRESS':
         return '⭕';
+      case 'FILL_RECT':
+        return '▬';
       default:
         return '⚙️';
     }
@@ -51,9 +54,13 @@ export function ElementList({
             onClick={() => onSelectElement?.(element.id)}
             className={cn(
               'group flex items-center gap-3 p-2.5 rounded-lg border transition-all',
-              selectedElementId === element.id
-                ? 'bg-cyan-500/10 border-cyan-500 cursor-default'
-                : 'bg-[#1A1A1A] border-zinc-800 hover:border-zinc-700',
+              element.engraveFrame
+                ? selectedElementId === element.id
+                  ? 'bg-amber-500/10 border-amber-500 border-l-[3px] cursor-default'
+                  : 'bg-[#1A1A1A] border-zinc-800 border-l-[3px] border-l-amber-500/60 hover:border-zinc-700'
+                : selectedElementId === element.id
+                  ? 'bg-cyan-500/10 border-cyan-500 cursor-default'
+                  : 'bg-[#1A1A1A] border-zinc-800 hover:border-zinc-700',
               onSelectElement && 'cursor-pointer'
             )}
           >
@@ -65,11 +72,12 @@ export function ElementList({
             )}
 
             {/* Element icon */}
-            <span className="text-lg">{getElementIcon(element.type)}</span>
+            <span className="text-lg">{getElementIcon(element)}</span>
 
             {/* Element info */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white truncate">
+                {element.engraveFrame && <span className="text-amber-400 mr-1">🔗</span>}
                 {element.name}
               </p>
               <p className="text-xs text-zinc-500">

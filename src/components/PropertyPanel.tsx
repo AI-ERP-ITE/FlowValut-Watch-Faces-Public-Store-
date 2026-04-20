@@ -6,10 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { WatchFaceElement } from '@/types';
 import { getIconLibrary, getFullIconLibrary } from '@/lib/iconLibrary';
 import type { IconEntry } from '@/lib/iconLibrary';
-import { loadCustomIcons, deleteCustomIcon } from '@/lib/customIconStore';
-import type { CustomIconRecord } from '@/lib/customIconStore';
 import { cn } from '@/lib/utils';
-import { FONT_STYLES, getFontStyle, getCustomFontStyles } from '@/lib/fontLibrary';
+import { FONT_STYLES, getFontStyle } from '@/lib/fontLibrary';
 import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
@@ -19,6 +17,9 @@ export interface PropertyPanelProps {
   element: WatchFaceElement | null;
   onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
   className?: string;
+  elements?: WatchFaceElement[];
+  onAddFrame?: (parent: WatchFaceElement) => void;
+  onRemoveFrame?: (parent: WatchFaceElement) => void;
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -78,11 +79,9 @@ interface StyleClipboard {
 }
 let _styleClipboard: StyleClipboard | null = null;
 
-export function PropertyPanel({ element, onUpdateElement, className }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
-  const [iconsLoading, setIconsLoading] = useState(false);
   const [iconSearch, setIconSearch] = useState('');
-  const [customIcons, setCustomIcons] = useState<CustomIconRecord[]>([]);
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
   const tablerLoadedRef = useRef(false);
 
@@ -90,21 +89,8 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
   useEffect(() => {
     if (element?.type !== 'IMG' || tablerLoadedRef.current) return;
     tablerLoadedRef.current = true;
-    setIconsLoading(true);
-    getFullIconLibrary().then(icons => {
-      setAllIcons(icons);
-      setIconsLoading(false);
-    });
+    getFullIconLibrary().then(setAllIcons);
   }, [element?.type]);
-
-  // Load custom icons whenever panel is showing an IMG element
-  useEffect(() => {
-    if (element?.type !== 'IMG') return;
-    loadCustomIcons().then(setCustomIcons);
-  }, [element?.type]);
-
-  // Derive current custom font styles (registered from IndexedDB at startup)
-  const customFontStyles = getCustomFontStyles();
 
   if (!element) {
     return (
@@ -115,6 +101,102 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
   }
 
   const update = (changes: Partial<WatchFaceElement>) => onUpdateElement?.(element.id, changes);
+
+  // ── Frame element: show dedicated controls ──────────────────────────────
+  if (element.engraveFrame) {
+    const parentName = elements?.find(e => e.id === element.engraveFrame!.frameOf)?.name ?? 'element';
+    const ef = element.engraveFrame;
+    const updateFrame = (patch: Partial<WatchFaceElement['engraveFrame'] & object>) =>
+      update({ engraveFrame: { ...ef, ...patch } });
+    return (
+      <div className={`rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-4 ${className ?? ''}`}>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">⬚ Frame Effect</span>
+          <span className="text-[10px] text-white/40">🔗 {parentName}</span>
+        </div>
+
+        {/* Mode */}
+        <Section label="Mode">
+          <div className="flex gap-1.5">
+            {(['inner', 'outer'] as const).map(m => (
+              <button key={m} onClick={() => updateFrame({ mode: m })}
+                className={cn('flex-1 h-7 rounded border text-[11px] transition-colors',
+                  ef.mode === m ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                )}>
+                {m === 'inner' ? 'Engrave' : 'Emboss'}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-white/30 mt-1">{ef.mode === 'inner' ? 'Inset — sunken into surface' : 'Raised — lifted out of surface'}</p>
+        </Section>
+
+        {/* Depth */}
+        <Section label="Depth">
+          <div className="flex gap-1.5">
+            {(['low', 'high'] as const).map(d => (
+              <button key={d} onClick={() => updateFrame({ depth: d })}
+                className={cn('flex-1 h-7 rounded border text-[11px] transition-colors capitalize',
+                  ef.depth === d ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                )}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Fill */}
+        <Section label="Fill">
+          <div className="flex gap-1.5 mb-2">
+            {(['none', 'color'] as const).map(fm => (
+              <button key={fm} onClick={() => updateFrame({ fillMode: fm })}
+                className={cn('flex-1 h-7 rounded border text-[11px] transition-colors capitalize',
+                  ef.fillMode === fm ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                )}>
+                {fm === 'none' ? 'None' : 'Color'}
+              </button>
+            ))}
+          </div>
+          {ef.fillMode === 'color' && (
+            <div className="flex items-center gap-2">
+              <input type="color" value={ef.fillColor}
+                onChange={e => updateFrame({ fillColor: e.target.value })}
+                className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
+              <Input value={ef.fillColor}
+                onChange={e => updateFrame({ fillColor: e.target.value })}
+                className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white" />
+            </div>
+          )}
+        </Section>
+
+        {/* Padding */}
+        <Section label="Padding">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-white/40 w-6 shrink-0">Pad</span>
+            <Input type="number" value={ef.padding}
+              onChange={e => updateFrame({ padding: Math.max(-20, Math.min(40, Number(e.target.value))) })}
+              className="h-7 text-xs bg-white/5 border-white/10 text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+            <span className="text-[10px] text-white/30">px</span>
+          </div>
+        </Section>
+
+        {/* Layer */}
+        <Section label="Layer">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Switch checked={element.visible} onCheckedChange={v => update({ visible: v })} id={`vis-frame-${element.id}`} />
+              <Label htmlFor={`vis-frame-${element.id}`} className="text-xs text-white/60">Visible</Label>
+            </div>
+            <div className="flex items-center gap-1 w-24">
+              <span className="text-[10px] text-white/40 w-4 shrink-0">Z</span>
+              <Input type="number" value={Math.round(element.zIndex)} onChange={e => update({ zIndex: Number(e.target.value) })}
+                className="h-7 text-xs bg-white/5 border-white/10 text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+            </div>
+          </div>
+        </Section>
+      </div>
+    );
+  }
 
   const handleTypeChange = (newType: WatchFaceElement['type']) => {
     if (newType === element.type) return;
@@ -477,59 +559,6 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
               value={element.handShadow ?? 0}
               onChange={e => update({ handShadow: Number(e.target.value) })}
               className="w-full accent-cyan-400 h-1" />
-            {/* Expanded shadow controls — shown when shadow > 0 */}
-            {(element.handShadow ?? 0) > 0 && (
-              <div className="mt-2 pl-2 border-l border-white/10 space-y-2">
-                {/* Opacity / Density */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-white/30 w-14 shrink-0">Density</span>
-                  <input type="range" min="0" max="1" step="0.05"
-                    value={element.handShadowOpacity ?? (0.3 + (element.handShadow ?? 0) * 0.6)}
-                    onChange={e => update({ handShadowOpacity: Number(e.target.value) })}
-                    className="flex-1 accent-cyan-400 h-1" />
-                  <span className="text-[9px] font-mono text-white/40 w-8 text-right">
-                    {Math.round((element.handShadowOpacity ?? (0.3 + (element.handShadow ?? 0) * 0.6)) * 100)}%
-                  </span>
-                </div>
-                {/* Blur / Spread */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-white/30 w-14 shrink-0">Blur</span>
-                  <input type="range" min="0" max="30" step="1"
-                    value={element.handShadowBlur ?? Math.round(4 + (element.handShadow ?? 0) * 20)}
-                    onChange={e => update({ handShadowBlur: Number(e.target.value) })}
-                    className="flex-1 accent-cyan-400 h-1" />
-                  <span className="text-[9px] font-mono text-white/40 w-8 text-right">
-                    {element.handShadowBlur ?? Math.round(4 + (element.handShadow ?? 0) * 20)}px
-                  </span>
-                </div>
-                {/* Distance */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-white/30 w-14 shrink-0">Distance</span>
-                  <input type="range" min="0" max="30" step="1"
-                    value={element.handShadowDistance ?? Math.round((element.handShadow ?? 0) * 6)}
-                    onChange={e => update({ handShadowDistance: Number(e.target.value) })}
-                    className="flex-1 accent-cyan-400 h-1" />
-                  <span className="text-[9px] font-mono text-white/40 w-8 text-right">
-                    {element.handShadowDistance ?? Math.round((element.handShadow ?? 0) * 6)}px
-                  </span>
-                </div>
-                {/* Direction */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] text-white/30">Direction</span>
-                    <span className="text-[9px] font-mono text-white/40">{element.handShadowAngle ?? 135}°</span>
-                  </div>
-                  <input type="range" min="0" max="360" step="5"
-                    value={element.handShadowAngle ?? 135}
-                    onChange={e => update({ handShadowAngle: Number(e.target.value) })}
-                    className="w-full accent-cyan-400 h-1" />
-                  {/* Direction compass hint */}
-                  <div className="flex justify-between text-[8px] text-white/20 px-0.5">
-                    <span>→ 0</span><span>↓ 90</span><span>← 180</span><span>↑ 270</span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
           {/* Glow */}
           <div className="space-y-1 mt-2">
@@ -574,78 +603,6 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
             </div>
           </div>
         </Section>
-      )}
-
-      {/* Frame controls — FILL_RECT with isFrame */}
-      {element.isFrame && (
-        <>
-          <Section label="Frame Style">
-            <div className="flex gap-1.5">
-              {(['engraved', 'embossed', 'flat'] as const).map(s => (
-                <button
-                  key={s}
-                  onClick={() => update({ frameStyle: s })}
-                  className={cn(
-                    'flex-1 h-7 rounded border text-[10px] capitalize transition-colors',
-                    (element.frameStyle ?? 'engraved') === s
-                      ? 'border-cyan-500 bg-cyan-500/20 text-white'
-                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
-                  )}
-                >{s}</button>
-              ))}
-            </div>
-          </Section>
-          <Section label="Frame Depth">
-            <div className="flex items-center gap-2">
-              <input
-                type="range" min="0" max="1" step="0.05"
-                value={element.frameIntensity ?? 0.6}
-                onChange={e => update({ frameIntensity: Number(e.target.value) })}
-                className="flex-1 accent-cyan-400 h-1"
-              />
-              <span className="text-[10px] font-mono text-cyan-400 w-8 text-right">
-                {Math.round((element.frameIntensity ?? 0.6) * 100)}%
-              </span>
-            </div>
-          </Section>
-          <Section label="Corner Radius">
-            <div className="flex items-center gap-2">
-              <input
-                type="range" min="0" max="40" step="1"
-                value={element.frameCornerRadius ?? 6}
-                onChange={e => update({ frameCornerRadius: Number(e.target.value) })}
-                className="flex-1 accent-cyan-400 h-1"
-              />
-              <span className="text-[10px] font-mono text-cyan-400 w-8 text-right">
-                {element.frameCornerRadius ?? 6}px
-              </span>
-            </div>
-          </Section>
-          <Section label="Frame Fill">
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={element.frameFill ?? '#1a1a2e'}
-                onChange={e => update({ frameFill: e.target.value })}
-                className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent"
-              />
-              <button
-                onClick={() => update({ frameFill: undefined })}
-                className={cn(
-                  'text-[9px] border rounded px-2 h-6 transition-colors',
-                  !element.frameFill
-                    ? 'border-cyan-500/50 bg-cyan-500/15 text-cyan-400'
-                    : 'border-white/10 text-white/30 hover:text-white/60'
-                )}
-              >
-                Transparent
-              </button>
-              {element.frameFill && (
-                <span className="text-[9px] font-mono text-white/50">{element.frameFill}</span>
-              )}
-            </div>
-          </Section>
-        </>
       )}
 
       {/* Weather style picker — IMG_LEVEL + WEATHER_CURRENT */}
@@ -697,10 +654,7 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
               None
             </button>
             <div className="max-h-56 overflow-y-auto pr-1 space-y-2">
-              {iconsLoading && (
-                <p className="text-[10px] text-white/40 text-center py-4 animate-pulse">Loading icons…</p>
-              )}
-              {!iconsLoading && (['health', 'fitness', 'weather', 'system', 'time'] as const).map(cat => {
+              {(['health', 'fitness', 'weather', 'system', 'time'] as const).map(cat => {
                 const q = iconSearch.trim().toLowerCase();
                 const icons = allIcons.filter(i =>
                   i.category === cat &&
@@ -731,178 +685,14 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
                   </div>
                 );
               })}
-              {/* Custom icons grouped by user category */}
-              {(() => {
-                const q = iconSearch.trim().toLowerCase();
-                const filtered = customIcons.filter(i =>
-                  q === '' || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
-                );
-                if (filtered.length === 0) return null;
-                const cats = Array.from(new Set(filtered.map(i => i.category)));
-                return cats.map(cat => (
-                  <div key={`custom:${cat}`}>
-                    <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <span className="text-violet-400">✦</span>{cat}
-                    </p>
-                    <div className="grid grid-cols-6 gap-1">
-                      {filtered.filter(i => i.category === cat).map(icon => (
-                        <div key={icon.key} className="relative group">
-                          <button
-                            onClick={() => update({ iconKey: icon.key })}
-                            className={cn(
-                              'relative p-1 rounded border w-full',
-                              element.iconKey === icon.key ? 'border-cyan-500 bg-cyan-500/20' : 'border-violet-500/30 bg-violet-500/10 hover:border-violet-400/60'
-                            )}
-                            title={`${icon.name} (custom)`}
-                          >
-                            <img src={icon.dataUrl} alt={icon.name} className="w-6 h-6 object-contain" />
-                            <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-violet-600" />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              await deleteCustomIcon(icon.key);
-                              setCustomIcons(prev => prev.filter(i => i.key !== icon.key));
-                            }}
-                            className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-3.5 h-3.5 bg-red-600 rounded-full text-white z-10"
-                            title="Delete custom icon"
-                          >
-                            <span className="text-[8px] leading-none">✕</span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ));
-              })()}
             </div>
             <p className="text-[9px] text-white/25">
-              {iconsLoading
-                ? 'Loading icons…'
-                : allIcons.filter(i => i.source === 'tabler').length > 0
-                  ? `${allIcons.length} icons — violet dot = Tabler`
-                  : `${allIcons.length} icons`}
+              {allIcons.filter(i => i.source === 'tabler').length > 0
+                ? `${allIcons.length} icons — violet dot = Tabler`
+                : 'Loading Tabler icons…'}
             </p>
           </div>
         </Section>
-      )}
-
-      {/* Icon Color & Shadow — IMG elements with an icon selected */}
-      {element.type === 'IMG' && element.iconKey && (
-        <>
-          <Section label="Icon Color">
-            {/* Hue rotation */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-white/50">Hue Shift</span>
-                <span className="text-[10px] text-white/40 font-mono">{element.iconHue ?? 0}°</span>
-              </div>
-              <input type="range" min="0" max="360" step="1"
-                value={element.iconHue ?? 0}
-                onChange={e => update({ iconHue: Number(e.target.value) })}
-                className="w-full accent-cyan-400 h-1" />
-            </div>
-            {/* Saturation */}
-            <div className="space-y-1 mt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-white/50">Saturation</span>
-                <span className="text-[10px] text-white/40 font-mono">{element.iconSaturation ?? 100}%</span>
-              </div>
-              <input type="range" min="0" max="200" step="5"
-                value={element.iconSaturation ?? 100}
-                onChange={e => update({ iconSaturation: Number(e.target.value) })}
-                className="w-full accent-cyan-400 h-1" />
-            </div>
-            {/* Colorize (fill tint) */}
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-white/50">Colorize</span>
-                <div className="flex items-center gap-1.5">
-                  {element.iconColorize && (
-                    <button
-                      onClick={() => update({ iconColorize: undefined })}
-                      className="text-[9px] text-white/30 hover:text-white/60">✕</button>
-                  )}
-                  <input type="color"
-                    value={element.iconColorize ?? '#ffffff'}
-                    onChange={e => update({ iconColorize: e.target.value })}
-                    className="w-6 h-6 rounded cursor-pointer border border-white/20 bg-transparent p-0" />
-                </div>
-              </div>
-              {element.iconColorize && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-white/30 w-14 shrink-0">Blend</span>
-                  <input type="range" min="0" max="1" step="0.05"
-                    value={element.iconColorizeOpacity ?? 1.0}
-                    onChange={e => update({ iconColorizeOpacity: Number(e.target.value) })}
-                    className="flex-1 accent-cyan-400 h-1" />
-                  <span className="text-[9px] font-mono text-white/40 w-8 text-right">
-                    {Math.round((element.iconColorizeOpacity ?? 1.0) * 100)}%
-                  </span>
-                </div>
-              )}
-            </div>
-          </Section>
-
-          <Section label="Icon Shadow">
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-white/50">Shadow</span>
-                <span className="text-[10px] text-white/40 font-mono w-8 text-right">{Math.round((element.iconShadow ?? 0) * 100)}%</span>
-              </div>
-              <input type="range" min="0" max="1" step="0.05"
-                value={element.iconShadow ?? 0}
-                onChange={e => update({ iconShadow: Number(e.target.value) })}
-                className="w-full accent-cyan-400 h-1" />
-              {(element.iconShadow ?? 0) > 0 && (
-                <div className="mt-2 pl-2 border-l border-white/10 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-white/30 w-14 shrink-0">Density</span>
-                    <input type="range" min="0" max="1" step="0.05"
-                      value={element.iconShadowOpacity ?? (0.3 + (element.iconShadow ?? 0) * 0.6)}
-                      onChange={e => update({ iconShadowOpacity: Number(e.target.value) })}
-                      className="flex-1 accent-cyan-400 h-1" />
-                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">
-                      {Math.round((element.iconShadowOpacity ?? (0.3 + (element.iconShadow ?? 0) * 0.6)) * 100)}%
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-white/30 w-14 shrink-0">Blur</span>
-                    <input type="range" min="0" max="30" step="1"
-                      value={element.iconShadowBlur ?? Math.round(4 + (element.iconShadow ?? 0) * 20)}
-                      onChange={e => update({ iconShadowBlur: Number(e.target.value) })}
-                      className="flex-1 accent-cyan-400 h-1" />
-                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">
-                      {element.iconShadowBlur ?? Math.round(4 + (element.iconShadow ?? 0) * 20)}px
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-white/30 w-14 shrink-0">Distance</span>
-                    <input type="range" min="0" max="30" step="1"
-                      value={element.iconShadowDistance ?? Math.round((element.iconShadow ?? 0) * 6)}
-                      onChange={e => update({ iconShadowDistance: Number(e.target.value) })}
-                      className="flex-1 accent-cyan-400 h-1" />
-                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">
-                      {element.iconShadowDistance ?? Math.round((element.iconShadow ?? 0) * 6)}px
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] text-white/30">Direction</span>
-                      <span className="text-[9px] font-mono text-white/40">{element.iconShadowAngle ?? 135}°</span>
-                    </div>
-                    <input type="range" min="0" max="360" step="5"
-                      value={element.iconShadowAngle ?? 135}
-                      onChange={e => update({ iconShadowAngle: Number(e.target.value) })}
-                      className="w-full accent-cyan-400 h-1" />
-                    <div className="flex justify-between text-[8px] text-white/20 px-0.5">
-                      <span>→ 0</span><span>↓ 90</span><span>← 180</span><span>↑ 270</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Section>
-        </>
       )}
 
       {/* Font style picker — text/digit elements */}
@@ -951,33 +741,6 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
                   </span>
                 </button>
               ))}
-              {customFontStyles.length > 0 && (
-                <>
-                  <div className="px-3 py-1 bg-violet-500/10 border-t border-violet-500/20">
-                    <span className="text-[9px] text-violet-400 uppercase tracking-wider">✦ Custom Fonts</span>
-                  </div>
-                  {customFontStyles.map(style => (
-                    <button
-                      key={style.key}
-                      onClick={() => update({ fontStyle: style.key })}
-                      className={cn(
-                        'w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors',
-                        (element.fontStyle ?? 'bold-white') === style.key
-                          ? 'bg-violet-500/20 border-l-2 border-violet-500'
-                          : 'border-l-2 border-transparent hover:bg-white/5'
-                      )}
-                    >
-                      <span style={{ fontFamily: style.fontFamily, fontWeight: '400', color: '#fff', fontSize: '18px' }}>
-                        12:34
-                      </span>
-                      <span className="flex items-center gap-1 shrink-0 ml-2">
-                        <span className="text-[10px] text-violet-300">{style.label}</span>
-                        <span className="text-[9px] bg-violet-500/20 text-violet-400 border border-violet-500/30 rounded px-1 leading-4">custom</span>
-                      </span>
-                    </button>
-                  ))}
-                </>
-              )}
             </div>
           </div>
         </Section>
@@ -1011,6 +774,26 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
                 <NumField label="End°" value={element.curvedText.endAngle} onChange={v => update({ curvedText: { ...element.curvedText!, endAngle: v } })} />
               </FieldRow>
             </div>
+          )}
+        </Section>
+      )}
+
+      {/* Element Frame toggle — hidden for ARC_PROGRESS, TIME_POINTER, and frame elements */}
+      {!['ARC_PROGRESS', 'TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
+        <Section label="Element Frame">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-white/60">Add 3D engrave / emboss frame</span>
+            <Switch
+              checked={!!element.frameElementId}
+              onCheckedChange={checked => {
+                if (checked) onAddFrame?.(element);
+                else onRemoveFrame?.(element);
+              }}
+              id={`frame-${element.id}`}
+            />
+          </div>
+          {element.frameElementId && (
+            <p className="text-[9px] text-amber-400/70 mt-1">Frame element created — select it in the list to edit.</p>
           )}
         </Section>
       )}

@@ -1051,6 +1051,52 @@ function regenerateDigitFilesFromElements(
   return results;
 }
 
+/** Renders a FILL_RECT element with engraveFrame effect to a PNG data URL (for ZPK export). */
+function renderEngraveFrameToPng(el: WatchFaceElement): string {
+  const w = el.bounds?.width ?? 100;
+  const h = el.bounds?.height ?? 100;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, w, h);
+
+  const ef = el.engraveFrame!;
+  // Fill
+  if (ef.fillMode === 'color' && ef.fillColor) {
+    ctx.fillStyle = ef.fillColor;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  const isEngrave = ef.mode === 'inner';
+  const blur = ef.depth === 'high' ? 14 : 6;
+  const offset = ef.depth === 'high' ? 5 : 2;
+  const lightColor = 'rgba(255,255,255,0.6)';
+  const darkColor = 'rgba(0,0,0,0.6)';
+
+  // Top-left edges
+  ctx.save();
+  ctx.shadowColor = isEngrave ? darkColor : lightColor;
+  ctx.shadowBlur = blur;
+  ctx.shadowOffsetX = offset;
+  ctx.shadowOffsetY = offset;
+  ctx.strokeStyle = 'transparent';
+  ctx.strokeRect(0, 0, w, h);
+  ctx.restore();
+
+  // Bottom-right edges
+  ctx.save();
+  ctx.shadowColor = isEngrave ? lightColor : darkColor;
+  ctx.shadowBlur = blur;
+  ctx.shadowOffsetX = -offset;
+  ctx.shadowOffsetY = -offset;
+  ctx.strokeStyle = 'transparent';
+  ctx.strokeRect(0, 0, w, h);
+  ctx.restore();
+
+  return canvas.toDataURL('image/png');
+}
+
 function StudioApp() {
   const { state, dispatch } = useApp();
   const [watchModel, setWatchModel] = useState('Balance 2');
@@ -1130,6 +1176,44 @@ function StudioApp() {
     setSelectedElementId(newEl.id);
     setShowAddElement(false);
     toast.success(`Added ${newEl.name}`);
+  };
+
+  const handleAddFrame = (parent: WatchFaceElement) => {
+    if (!state.watchFaceConfig) return;
+    const frameId = generateId();
+    const pad = 0;
+    const frameEl: WatchFaceElement = {
+      id: frameId,
+      type: 'FILL_RECT',
+      name: `${parent.name} Frame`,
+      bounds: {
+        x: parent.bounds.x - pad,
+        y: parent.bounds.y - pad,
+        width: parent.bounds.width + pad * 2,
+        height: parent.bounds.height + pad * 2,
+      },
+      visible: true,
+      zIndex: parent.zIndex - 1,
+      engraveFrame: {
+        frameOf: parent.id,
+        mode: 'inner',
+        depth: 'low',
+        fillMode: 'none',
+        fillColor: '#1A1A2E',
+        padding: pad,
+      },
+    };
+    dispatch({ type: 'ADD_ELEMENT', payload: frameEl });
+    dispatch({ type: 'UPDATE_ELEMENT', payload: { id: parent.id, changes: { frameElementId: frameId } } });
+    setSelectedElementId(frameId);
+    toast.success('Frame added');
+  };
+
+  const handleRemoveFrame = (parent: WatchFaceElement) => {
+    if (!parent.frameElementId) return;
+    dispatch({ type: 'DELETE_ELEMENT', payload: parent.frameElementId });
+    dispatch({ type: 'UPDATE_ELEMENT', payload: { id: parent.id, changes: { frameElementId: undefined } } });
+    toast.success('Frame removed');
   };
 
   // Lazy-load editor fonts (30+ families) — only on /studio, not on storefront
@@ -1542,6 +1626,20 @@ function StudioApp() {
         }
       }
 
+      // Inject engrave/emboss frame PNGs for FILL_RECT elements with engraveFrame
+      for (const el of state.watchFaceConfig.elements) {
+        if (el.type === 'FILL_RECT' && el.engraveFrame) {
+          const safeName = el.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+          const filename = `frame_${safeName}.png`;
+          const dataUrl = renderEngraveFrameToPng(el);
+          const pf = dataUrl.split(',');
+          const bf = atob(pf[1]);
+          const uf = new Uint8Array(bf.length);
+          for (let i = 0; i < bf.length; i++) uf[i] = bf.charCodeAt(i);
+          elementFiles.push({ src: filename, file: new File([uf], filename, { type: 'image/png' }) });
+        }
+      }
+
       const zpkResult = await buildZPK({
         config: state.watchFaceConfig,
         backgroundFile: state.backgroundFile,
@@ -1924,6 +2022,9 @@ function StudioApp() {
                     <PropertyPanel
                       element={state.watchFaceConfig.elements.find(el => el.id === selectedElementId) ?? null}
                       onUpdateElement={(id, changes) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id, changes } })}
+                      elements={state.watchFaceConfig.elements}
+                      onAddFrame={handleAddFrame}
+                      onRemoveFrame={handleRemoveFrame}
                     />
                     <div className="flex items-center justify-between mt-4">
                       <h4 className="text-sm font-medium text-zinc-400">Elements</h4>

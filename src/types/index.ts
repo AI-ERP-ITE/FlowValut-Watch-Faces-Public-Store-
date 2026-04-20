@@ -70,16 +70,11 @@ export interface WatchFaceElement {
   // Icon library
   iconKey?: string;
 
-  // ── Icon appearance (IMG elements with iconKey) ──────────────────────────
-  iconHue?: number;           // 0–360°: hue rotation shift
-  iconSaturation?: number;    // 0–200%: 100 = normal, 0 = greyscale, 200 = vivid
-  iconColorize?: string;      // hex color overlay (e.g. '#FF4444') for solid-color tint
-  iconColorizeOpacity?: number; // 0–1: strength of colorize overlay, default 0.7
-  iconShadow?: number;        // 0–1: master shadow on/off
-  iconShadowOpacity?: number; // 0–1: darkness
-  iconShadowBlur?: number;    // 0–30px
-  iconShadowDistance?: number;// 0–30px
-  iconShadowAngle?: number;   // 0–360°
+  // Icon color effects (preview + ZPK bake)
+  iconHue?: number;           // hue-rotate degrees
+  iconSaturation?: number;    // saturation % (100 = normal)
+  iconColorize?: string;      // CSS color overlay (source-in blend)
+  iconColorizeOpacity?: number; // 0–1 opacity for colorize layer
 
   // Weather IMG_LEVEL style
   weatherStyle?: string;
@@ -102,11 +97,7 @@ export interface WatchFaceElement {
   handSecondWidth?: number;
 
   // ── Hand effects (preview only — visual on canvas) ───────────────────────
-  handShadow?: number;   // 0–1: master on/off + quick intensity
-  handShadowOpacity?: number;  // 0–1: darkness/density (overrides auto when set)
-  handShadowBlur?: number;     // 0–30px: spread / softness
-  handShadowDistance?: number; // 0–30px: distance from hand
-  handShadowAngle?: number;    // 0–360°: direction (0=right, 90=down, 180=left, 270=up)
+  handShadow?: number;   // 0–1: shadow intensity/size
   handGlow?: number;     // 0–1: neon glow brightness
   handTrail?: number;    // 0–1: speed-blur ghost opacity
   handTint?: string;     // CSS color — accent tint blended on hands (e.g. '#4488FF')
@@ -121,12 +112,19 @@ export interface WatchFaceElement {
     endAngle: number;    // End angle in degrees
   };
 
-  // ── Decorative Frame (FILL_RECT with 3D engraving/emboss effect) ─────────
-  isFrame?: boolean;                               // marks this rect as a styled frame
-  frameStyle?: 'engraved' | 'embossed' | 'flat';  // default 'engraved'
-  frameIntensity?: number;                         // 0–1, bevel depth, default 0.6
-  frameCornerRadius?: number;                      // 0–40 px, default 6
-  frameFill?: string;                              // hex color, or undefined = transparent
+  // ── Engrave / Emboss frame ────────────────────────────────────────────────
+  // Set on the PARENT element — holds the ID of its linked FILL_RECT frame
+  frameElementId?: string;
+
+  // Set on the FILL_RECT frame element itself
+  engraveFrame?: {
+    frameOf: string;            // ID of the parent element
+    mode: 'inner' | 'outer';   // inner = engrave/inset, outer = emboss/raised
+    depth: 'low' | 'high';
+    fillMode: 'none' | 'color';
+    fillColor: string;          // CSS hex e.g. '#1A1A2E'
+    padding: number;            // px — positive expands frame beyond parent bounds
+  };
 }
 
 export interface WatchFaceConfig {

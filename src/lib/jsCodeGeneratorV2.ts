@@ -294,6 +294,7 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
     if (element.name.toLowerCase().includes('month')) {
       continue;
     }
+    // Skip BUTTON in AOD mode - no touch interaction on AOD screen
     if (element.type === 'BUTTON') {
       continue;
     }
@@ -346,6 +347,17 @@ try {
                 
                 // ========== NORMAL MODE WIDGETS ==========
 ${normalWidgetsCode}
+                
+                // ========== AOD MODE BACKGROUND ==========
+                let widget_aod_bg = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(0),
+                    y: px(0),
+                    w: px(${config.resolution.width}),
+                    h: px(${config.resolution.height}),
+                    src: '${backgroundSrc}',
+                    alpha: 255,
+                    show_level: hmUI.show_level.ONLY_AOD
+                });
                 
                 // ========== AOD MODE WIDGETS ==========
 ${aodWidgetsCode}
@@ -536,7 +548,7 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
     case 'TEXT_IMG':
       return generateTextImgWidget(element, widgetIndex, showLevel);
     case 'TIME_POINTER':
-      return generateTimePointerWidget(element, widgetIndex, showLevel, isAod);
+      return generateTimePointerWidget(element, widgetIndex, showLevel);
     case 'TEXT':
       return generateTextWidget(element, widgetIndex, showLevel);
     case 'BUTTON':
@@ -547,8 +559,24 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
       return generateCircleWidget(element, widgetIndex, showLevel);
     case 'IMG_LEVEL':
       return generateImgLevelWidget(element, widgetIndex, showLevel);
-    case 'FILL_RECT':
+    case 'FILL_RECT': {
+      // If this is an engrave/emboss frame element, bake it as a pre-rendered PNG (IMG widget)
+      if (element.engraveFrame) {
+        const safeName = element.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `frame_${safeName}.png`;
+        return `
+                // ${element.name} - Engrave Frame (pre-rendered IMG)
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    w: px(${element.bounds.width}),
+                    h: px(${element.bounds.height}),
+                    src: 'assets/${filename}',
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+      }
       return generateFillRectWidget(element, widgetIndex, showLevel);
+    }
     case 'STROKE_RECT':
       return generateStrokeRectWidget(element, widgetIndex, showLevel);
     case 'IMG_ANIM':
@@ -613,8 +641,8 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
                     radius: px(${radius}),
-                    start_angle: ${startAngle + 90},
-                    end_angle: ${endAngle + 90},
+                    start_angle: ${startAngle},
+                    end_angle: ${endAngle},
                     color: ${colorValue},
                     line_width: px(${lineWidth}),${typeParam}
                     show_level: hmUI.show_level.${showLevel}
@@ -680,7 +708,7 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
 // TIME_POINTER - Analog clock hands (hour/minute/second in ONE widget)
 // Pattern from Zepp OS watchface docs + reference watchfaces
 // ============================================================
-function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string, isAod: boolean = false): string {
+function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const centerX = element.center?.x ?? 240;
   const centerY = element.center?.y ?? 240;
   const hourPosX = element.hourPos?.x ?? 11;
@@ -693,8 +721,7 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
   const minuteSrc = element.minuteHandSrc || 'minute_hand.png';
   const secondSrc = element.secondHandSrc || 'second_hand.png';
   const coverSrc = element.coverSrc;
-  // AOD spec: second hands are forbidden in AOD mode (Manual Guide §9)
-  const hasSeconds = !element.hideSeconds && !isAod;
+  const hasSeconds = !element.hideSeconds;
 
   let coverParams = '';
   if (coverSrc) {

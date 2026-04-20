@@ -34,7 +34,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   selectedElementId,
   onSelectElement,
   onUpdateElement,
-  onAddElement,
+  onAddElement: _onAddElement,
   showGrid,
   className,
 }, forwardedRef) {
@@ -57,61 +57,6 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   // handImageCache: style key → { hour, minute, second, cover } images
   const handImageCache = useRef(new Map<string, Map<string, HTMLImageElement>>());
   useState(0); // reserved for future forced re-renders
-
-  // Context menu state (right-click → "Add Frame")
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: string } | null>(null);
-
-  // Dismiss context menu on any outside click
-  useEffect(() => {
-    if (!contextMenu) return;
-    const dismiss = () => setContextMenu(null);
-    document.addEventListener('click', dismiss);
-    document.addEventListener('contextmenu', dismiss);
-    return () => {
-      document.removeEventListener('click', dismiss);
-      document.removeEventListener('contextmenu', dismiss);
-    };
-  }, [contextMenu]);
-
-  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const { x: cx, y: cy } = getCanvasPos(e, canvas);
-    const visible = [...elementsRef.current].filter(el => el.visible).sort((a, b) => b.zIndex - a.zIndex);
-    const hitId = hitTest(cx, cy, visible);
-    if (!hitId) return;
-    onSelectElement?.(hitId);
-    // Position relative to canvas element in CSS pixels
-    const rect = canvas.getBoundingClientRect();
-    setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, elementId: hitId });
-  }, [onSelectElement]);
-
-  const handleAddFrame = useCallback(() => {
-    if (!contextMenu) return;
-    const el = elementsRef.current.find(e => e.id === contextMenu.elementId);
-    if (!el) { setContextMenu(null); return; }
-    const pad = 6;
-    const frameEl: WatchFaceElement = {
-      id: `frame-${Date.now().toString(36)}`,
-      type: 'FILL_RECT',
-      name: `${el.name} Frame`,
-      bounds: {
-        x: Math.max(0, el.bounds.x - pad),
-        y: Math.max(0, el.bounds.y - pad),
-        width: el.bounds.width + pad * 2,
-        height: el.bounds.height + pad * 2,
-      },
-      visible: true,
-      zIndex: el.zIndex - 1,
-      isFrame: true,
-      frameStyle: 'engraved',
-      frameIntensity: 0.6,
-      frameCornerRadius: 6,
-    };
-    onAddElement?.(frameEl);
-    setContextMenu(null);
-  }, [contextMenu, onAddElement]);
 
   // Draw everything to canvas
   const draw = useCallback(() => {
@@ -346,59 +291,30 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   }, [draw]);
 
   return (
-    <div className={cn('relative inline-block', className)}>
-      <canvas
-        ref={(node) => {
-          (canvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = node;
-          if (typeof forwardedRef === 'function') forwardedRef(node);
-          else if (forwardedRef) forwardedRef.current = node;
-        }}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        className="rounded-full shadow-2xl cursor-pointer select-none"
-        style={{
-          width: '100%',
-          height: 'auto',
-          display: 'block',
-          touchAction: 'none',
-          boxShadow: '0 0 60px rgba(0, 212, 255, 0.15), inset 0 0 30px rgba(0, 0, 0, 0.5)',
-        }}
-        onClick={handleCanvasClick}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onContextMenu={handleContextMenu}
-      />
-      {/* Right-click context menu */}
-      {contextMenu && (
-        <div
-          style={{ position: 'absolute', left: contextMenu.x, top: contextMenu.y }}
-          className="z-50 bg-zinc-900/95 border border-white/15 rounded-lg shadow-2xl py-1 min-w-[148px] text-xs backdrop-blur-sm"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="px-3 py-1 text-[10px] text-white/30 uppercase tracking-wider border-b border-white/10 mb-1">
-            {elementsRef.current.find(e => e.id === contextMenu.elementId)?.name ?? 'Element'}
-          </div>
-          <button
-            onClick={handleAddFrame}
-            className="w-full text-left px-3 py-1.5 hover:bg-white/10 text-white/80 hover:text-white flex items-center gap-2 transition-colors"
-          >
-            <span className="text-[13px]">⬛</span>
-            <span>Add Frame</span>
-          </button>
-          <button
-            onClick={() => setContextMenu(null)}
-            className="w-full text-left px-3 py-1.5 hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-    </div>
+    <canvas
+      ref={(node) => {
+        (canvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = node;
+        if (typeof forwardedRef === 'function') forwardedRef(node);
+        else if (forwardedRef) forwardedRef.current = node;
+      }}
+      width={CANVAS_SIZE}
+      height={CANVAS_SIZE}
+      className={cn('rounded-full shadow-2xl cursor-pointer select-none', className)}
+      style={{
+        maxWidth: '100%',
+        height: 'auto',
+        touchAction: 'none',
+        boxShadow: '0 0 60px rgba(0, 212, 255, 0.15), inset 0 0 30px rgba(0, 0, 0, 0.5)',
+      }}
+      onClick={handleCanvasClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    />
   );
 });
 
@@ -753,17 +669,10 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           drawPlaceholder(ctx, el);
         }
         break;
-      case 'FILL_RECT':
-      case 'STROKE_RECT':
-        drawFrame(ctx, el);
-        break;
-      case 'IMG': {
-        // ── Resolve icon image ─────────────────────────────────────────────
-        let iconImg: HTMLImageElement | null = null;
-        if (el.iconKey && iconCache) {
-          const cached = iconCache.get(el.iconKey);
+      case 'IMG':
+        if (el.iconKey && iconCache) {          const cached = iconCache.get(el.iconKey);
           if (cached) {
-            iconImg = cached;
+            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
           } else {
             const entry = getIconByKey(el.iconKey);
             if (entry) {
@@ -771,6 +680,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
               img.onload = () => { iconCache.set(el.iconKey!, img); onIconLoaded?.(); };
               img.src = entry.dataUrl;
             } else if (el.iconKey.startsWith('tabler:')) {
+              // Tabler icon not yet in cache — trigger async render
               import('@/lib/iconLibrary').then(({ getIconByKeyAsync }) =>
                 getIconByKeyAsync(el.iconKey!).then(asyncEntry => {
                   if (asyncEntry) {
@@ -781,66 +691,22 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
                 })
               );
             }
+            drawPlaceholder(ctx, el);
           }
-        }
-
-        if (iconImg) {
-          const { x, y, width: w, height: h } = el.bounds;
-
-          // ── Build CSS filter string ────────────────────────────────────
-          const hue  = el.iconHue ?? 0;
-          const sat  = el.iconSaturation ?? 100;
-          const filterParts: string[] = [];
-          if (hue !== 0)   filterParts.push(`hue-rotate(${hue}deg)`);
-          if (sat !== 100) filterParts.push(`saturate(${sat}%)`);
-          const filterStr = filterParts.join(' ');
-
-          // ── Shadow ────────────────────────────────────────────────────
-          const iShadow = el.iconShadow ?? 0;
-          if (iShadow > 0) {
-            const iOp   = el.iconShadowOpacity  ?? (0.3 + iShadow * 0.6);
-            const iBlur = el.iconShadowBlur     ?? (4 + iShadow * 20);
-            const iDist = el.iconShadowDistance ?? (iShadow * 6);
-            const iAng  = (el.iconShadowAngle ?? 135) * Math.PI / 180;
-            ctx.save();
-            ctx.shadowColor   = `rgba(0,0,0,${iOp})`;
-            ctx.shadowBlur    = iBlur;
-            ctx.shadowOffsetX = iDist * Math.cos(iAng);
-            ctx.shadowOffsetY = iDist * Math.sin(iAng);
-            if (filterStr) ctx.filter = filterStr;
-            ctx.drawImage(iconImg, x, y, w, h);
-            ctx.restore();
-          } else {
-            ctx.save();
-            if (filterStr) ctx.filter = filterStr;
-            ctx.drawImage(iconImg, x, y, w, h);
-            ctx.restore();
-          }
-
-          // ── Colorize: paint solid color through icon's alpha mask ────────
-          if (el.iconColorize) {
-            // 1. Draw icon into offscreen canvas
-            const offscreen = document.createElement('canvas');
-            offscreen.width = w; offscreen.height = h;
-            const octx = offscreen.getContext('2d')!;
-            octx.drawImage(iconImg, 0, 0, w, h);
-            // 2. Paint the chosen color only where icon pixels exist (source-in)
-            octx.globalCompositeOperation = 'source-in';
-            octx.fillStyle = el.iconColorize;
-            octx.fillRect(0, 0, w, h);
-            // 3. Blend result back onto main canvas
-            ctx.save();
-            ctx.globalAlpha = el.iconColorizeOpacity ?? 1.0;
-            ctx.drawImage(offscreen, x, y, w, h);
-            ctx.restore();
-          }
-        } else if (el.iconKey) {
-          drawPlaceholder(ctx, el);
         } else {
           drawPlaceholder(ctx, el);
         }
         break;
-      }
+      case 'FILL_RECT':
+        if (el.engraveFrame) {
+          drawEngraveFrame(ctx, el);
+        } else {
+          ctx.save();
+          ctx.fillStyle = el.color ? parseZeppColor(el.color) : 'rgba(80,80,80,0.5)';
+          ctx.fillRect(el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+          ctx.restore();
+        }
+        break;
       default:
         drawPlaceholder(ctx, el);
         break;
@@ -848,80 +714,50 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
   }
 }
 
-// ─── FILL_RECT / Decorative Frame ───────────────────────────────────────────────
+// ─── Engrave / Emboss frame ────────────────────────────────────────────────────
 
-function rrPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  const cr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + cr, y);
-  ctx.lineTo(x + w - cr, y);
-  ctx.arcTo(x + w, y, x + w, y + cr, cr);
-  ctx.lineTo(x + w, y + h - cr);
-  ctx.arcTo(x + w, y + h, x + w - cr, y + h, cr);
-  ctx.lineTo(x + cr, y + h);
-  ctx.arcTo(x, y + h, x, y + h - cr, cr);
-  ctx.lineTo(x, y + cr);
-  ctx.arcTo(x, y, x + cr, y, cr);
-  ctx.closePath();
-}
-
-function drawFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
+function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const { x, y, width: w, height: h } = el.bounds;
-  const r = el.frameCornerRadius ?? 6;
-  const intensity = el.frameIntensity ?? 0.6;
-  const style = el.frameStyle ?? 'engraved';
-  const fill = el.frameFill;
+  const cfg = el.engraveFrame!;
+  const blur   = cfg.depth === 'high' ? 14 : 6;
+  const offset = cfg.depth === 'high' ? 5  : 2;
 
-  const isEngraved = style !== 'embossed';
-  const bev = Math.max(2, 2 + intensity * 10);
-
-  // 1. Optional fill
-  ctx.save();
-  if (fill) {
-    rrPath(ctx, x, y, w, h, r);
-    ctx.fillStyle = fill;
-    ctx.fill();
+  // Optional solid fill first
+  if (cfg.fillMode === 'color') {
+    ctx.save();
+    ctx.fillStyle = cfg.fillColor;
+    ctx.fillRect(x, y, w, h);
+    ctx.restore();
   }
 
-  // 2. Clip to shape boundary for inner shadow gradients
-  rrPath(ctx, x, y, w, h, r);
-  ctx.clip();
+  // Engrave (inner): top-left dark, bottom-right light
+  // Emboss  (outer): top-left light, bottom-right dark
+  const [tlColor, brColor] = cfg.mode === 'outer'
+    ? ['rgba(255,255,255,0.55)', 'rgba(0,0,0,0.65)']
+    : ['rgba(0,0,0,0.65)',       'rgba(255,255,255,0.40)'];
 
-  const topLeftAlpha  = isEngraved ? 0.12 + intensity * 0.48 : 0.04 + intensity * 0.22;
-  const botRightAlpha = isEngraved ? 0.08 + intensity * 0.32 : 0.12 + intensity * 0.42;
-  const topLeftRgba   = isEngraved ? `rgba(0,0,0,${topLeftAlpha})`     : `rgba(255,255,255,${topLeftAlpha})`;
-  const botRightRgba  = isEngraved ? `rgba(255,255,255,${botRightAlpha})` : `rgba(0,0,0,${botRightAlpha})`;
-  const transparent   = 'rgba(0,0,0,0)';
-
-  // Top edge shadow (engraved) / highlight (embossed)
-  const topG = ctx.createLinearGradient(0, y, 0, y + bev);
-  topG.addColorStop(0, topLeftRgba); topG.addColorStop(1, transparent);
-  ctx.fillStyle = topG; ctx.fillRect(x, y, w, bev);
-
-  // Left edge
-  const leftG = ctx.createLinearGradient(x, 0, x + bev, 0);
-  leftG.addColorStop(0, topLeftRgba); leftG.addColorStop(1, transparent);
-  ctx.fillStyle = leftG; ctx.fillRect(x, y, bev, h);
-
-  // Bottom edge highlight (engraved) / shadow (embossed)
-  const botG = ctx.createLinearGradient(0, y + h, 0, y + h - bev);
-  botG.addColorStop(0, botRightRgba); botG.addColorStop(1, transparent);
-  ctx.fillStyle = botG; ctx.fillRect(x, y + h - bev, w, bev);
-
-  // Right edge
-  const rightG = ctx.createLinearGradient(x + w, 0, x + w - bev, 0);
-  rightG.addColorStop(0, botRightRgba); rightG.addColorStop(1, transparent);
-  ctx.fillStyle = rightG; ctx.fillRect(x + w - bev, y, bev, h);
-
-  ctx.restore();
-
-  // 3. Outer rim stroke (dark for engraved, light for embossed)
   ctx.save();
-  rrPath(ctx, x, y, w, h, r);
-  ctx.strokeStyle = isEngraved
-    ? `rgba(0,0,0,${0.18 + intensity * 0.32})`
-    : `rgba(255,255,255,${0.12 + intensity * 0.28})`;
-  ctx.lineWidth = 1.5;
+  // Top-left edges
+  ctx.shadowColor  = tlColor;
+  ctx.shadowBlur   = blur;
+  ctx.shadowOffsetX = offset;
+  ctx.shadowOffsetY = offset;
+  ctx.strokeStyle  = tlColor;
+  ctx.lineWidth    = offset * 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.stroke();
+  // Bottom-right edges
+  ctx.shadowColor  = brColor;
+  ctx.shadowOffsetX = -offset;
+  ctx.shadowOffsetY = -offset;
+  ctx.strokeStyle  = brColor;
+  ctx.beginPath();
+  ctx.moveTo(x + w, y);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
   ctx.stroke();
   ctx.restore();
 }
@@ -1098,12 +934,6 @@ function drawTimePointer(
 
   // ── Effects ──────────────────────────────────────────────────────────────
   const shadowIntensity = el.handShadow ?? 0;
-  const shadowOpacity   = el.handShadowOpacity  ?? (0.3 + shadowIntensity * 0.6);
-  const shadowBlur      = el.handShadowBlur     ?? (4 + shadowIntensity * 20);
-  const shadowDistance  = el.handShadowDistance ?? (shadowIntensity * 6);
-  const shadowAngleDeg  = el.handShadowAngle    ?? 135; // 135° = bottom-right classic
-  const shadowOffsetX   = shadowDistance * Math.cos(shadowAngleDeg * Math.PI / 180);
-  const shadowOffsetY   = shadowDistance * Math.sin(shadowAngleDeg * Math.PI / 180);
   const glowIntensity   = el.handGlow   ?? 0;
   const trailIntensity  = el.handTrail  ?? 0;
   const tintColor       = el.handTint;  // e.g. '#4488FF' or undefined
@@ -1150,10 +980,10 @@ function drawTimePointer(
 
       // ── Shadow ────────────────────────────────────────────────
       if (shadowIntensity > 0) {
-        ctx.shadowColor   = `rgba(0,0,0,${shadowOpacity})`;
-        ctx.shadowBlur    = shadowBlur;
-        ctx.shadowOffsetX = shadowOffsetX;
-        ctx.shadowOffsetY = shadowOffsetY;
+        ctx.shadowColor = `rgba(0,0,0,${0.3 + shadowIntensity * 0.6})`;
+        ctx.shadowBlur = 4 + shadowIntensity * 20;
+        ctx.shadowOffsetX = shadowIntensity * 4;
+        ctx.shadowOffsetY = shadowIntensity * 4;
       }
 
       ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);

@@ -791,69 +791,20 @@ export function getIconLibrary(): IconEntry[] {
   return _cache;
 }
 
-// ── Custom icon registry (IndexedDB-loaded icons registered at runtime) ───────
-const _customRegistry = new Map<string, IconEntry>();
-
-/** Register user-created custom icons so getIconByKey() can resolve them synchronously. */
-export function registerCustomIconsInLibrary(icons: { key: string; name?: string; label?: string; dataUrl: string; width: number; height: number; category: string }[]): void {
-  for (const ic of icons) {
-    _customRegistry.set(ic.key, {
-      key: ic.key,
-      label: ic.label ?? ic.name ?? ic.key,
-      category: ic.category as IconEntry['category'],
-      source: 'custom',
-      dataUrl: ic.dataUrl,
-      width: ic.width,
-      height: ic.height,
-    });
-  }
-}
-
-/**
-/**
- * Sanitize an icon key for use as a filename (removes characters invalid on Windows/ZeppOS).
- * e.g. 'tabler:heart' → 'tabler_heart'
- */
-export function sanitizeIconKey(key: string): string {
-  return key.replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-/**
- * Look up an icon by its sanitized key (as used in asset filenames).
- * Searches full library (custom + Tabler cache).
- */
-export function getIconBySafeKey(safeKey: string): IconEntry | undefined {
-  const allCustom = getIconLibrary();
-  // Try direct match first (custom keys never contain ':')
-  const direct = allCustom.find(i => i.key === safeKey);
-  if (direct) return direct;
-  // Search by sanitized key match across all known icons
-  const match = allCustom.find(i => sanitizeIconKey(i.key) === safeKey);
-  if (match) return match;
-  // Search Tabler cache by sanitized key
-  const { getTablerIconByKey } = require('./tablerIconRenderer') as typeof import('./tablerIconRenderer');
-  // Tabler keys look like 'tabler:heart' → sanitized 'tabler_heart'
-  // Re-construct original key: 'tabler_heart' → 'tabler:heart'
-  if (safeKey.startsWith('tabler_')) {
-    const originalKey = 'tabler:' + safeKey.slice('tabler_'.length);
-    return getTablerIconByKey(originalKey);
-  }
-  return undefined;
-}
-
 /**
  * Look up an icon by key — checks custom library first, then the Tabler cache.
  * For Tabler icons that haven't been rendered yet, returns undefined synchronously.
  * Use getIconByKeyAsync() to guarantee a result for Tabler keys.
  */
 export function getIconByKey(key: string): IconEntry | undefined {
-  // Custom user icons (registered from IndexedDB at startup)
-  if (_customRegistry.has(key)) return _customRegistry.get(key);
-  // Built-in hand-drawn icons (fast path)
+  // Custom icons (fast path)
   const custom = getIconLibrary().find(i => i.key === key);
   if (custom) return custom;
-  // Tabler icons: we cannot use require() in Vite/ESM — return undefined so the
-  // canvas async path (getIconByKeyAsync) handles rendering on demand.
+  // Tabler icons (from cache, already rendered)
+  if (key.startsWith('tabler:')) {
+    const { getTablerIconByKey } = require('./tablerIconRenderer') as typeof import('./tablerIconRenderer');
+    return getTablerIconByKey(key);
+  }
   return undefined;
 }
 
@@ -878,4 +829,36 @@ export async function getFullIconLibrary(): Promise<IconEntry[]> {
   const { buildTablerLibrary } = await import('./tablerIconRenderer');
   const [custom, tabler] = await Promise.all([getIconLibrary(), buildTablerLibrary()]);
   return [...custom, ...tabler];
+}
+
+/**
+ * Merge extra icon entries (e.g. from IndexedDB custom icons) into the in-memory cache.
+ * Called at app startup so custom icons appear in the picker immediately.
+ */
+export function registerCustomIconsInLibrary(icons: Array<{
+  key: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  label?: string;
+  name?: string;
+  category?: string;
+}>): void {
+  if (!_cache) _cache = generateAllIcons();
+  // Avoid duplicates by key
+  const existingKeys = new Set(_cache.map(i => i.key));
+  for (const icon of icons) {
+    if (!existingKeys.has(icon.key)) {
+      _cache.push({
+        key: icon.key,
+        label: icon.label ?? icon.name ?? icon.key,
+        category: (icon.category as IconEntry['category']) ?? 'system',
+        source: 'custom',
+        dataUrl: icon.dataUrl,
+        width: icon.width,
+        height: icon.height,
+      });
+      existingKeys.add(icon.key);
+    }
+  }
 }

@@ -102,9 +102,18 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'DELETE_ELEMENT': {
       if (!state.watchFaceConfig) return state;
       const newUndoForDel = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
+      const deletedEl = state.watchFaceConfig.elements.find(e => e.id === action.payload);
+      // Build set of IDs to remove: the target + its linked frame (if any)
+      const toDelete = new Set([action.payload]);
+      if (deletedEl?.frameElementId) toDelete.add(deletedEl.frameElementId);
+      // If deleting a frame element, find the parent and clear its frameElementId reference
+      const parentOfFrame = state.watchFaceConfig.elements.find(e => e.frameElementId === action.payload);
+      const afterDelete = state.watchFaceConfig.elements
+        .filter(e => !toDelete.has(e.id))
+        .map(e => e.id === parentOfFrame?.id ? { ...e, frameElementId: undefined } : e);
       return {
         ...state,
-        watchFaceConfig: { ...state.watchFaceConfig, elements: state.watchFaceConfig.elements.filter(e => e.id !== action.payload) },
+        watchFaceConfig: { ...state.watchFaceConfig, elements: afterDelete },
         undoStack: newUndoForDel,
         redoStack: [],
       };
@@ -112,9 +121,26 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'UPDATE_ELEMENT': {
       if (!state.watchFaceConfig) return state;
       const newUndoStack = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
-      const updatedElements = state.watchFaceConfig.elements.map(el =>
+      // First pass: apply the requested change
+      let updatedElements = state.watchFaceConfig.elements.map(el =>
         el.id === action.payload.id ? { ...el, ...action.payload.changes } : el
       );
+      // Second pass: if bounds changed on a parent that has a linked frame, sync the frame bounds
+      if (action.payload.changes.bounds) {
+        const updatedParent = updatedElements.find(el => el.id === action.payload.id);
+        if (updatedParent?.frameElementId) {
+          const frameEl = updatedElements.find(el => el.id === updatedParent.frameElementId);
+          if (frameEl?.engraveFrame) {
+            const pad = frameEl.engraveFrame.padding;
+            const nb = action.payload.changes.bounds;
+            updatedElements = updatedElements.map(el =>
+              el.id === updatedParent.frameElementId
+                ? { ...el, bounds: { x: nb.x - pad, y: nb.y - pad, width: nb.width + pad * 2, height: nb.height + pad * 2 } }
+                : el
+            );
+          }
+        }
+      }
       return {
         ...state,
         watchFaceConfig: { ...state.watchFaceConfig, elements: updatedElements },
