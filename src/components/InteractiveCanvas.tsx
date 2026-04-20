@@ -911,9 +911,12 @@ function getPlaceholderText(el: WatchFaceElement): string {
     if (el.subtype === 'seconds') return '36';
     return '10'; // hours or legacy single element
   }
-  if (name.includes('date')) return '24';
+  // Check type before name so toggling Date→Week works even if name still says "date"
+  if (el.type === 'IMG_WEEK') return 'WED';
+  if (el.type === 'IMG_DATE') return '24';
   if (name.includes('month')) return 'APR';
-  if (el.type === 'IMG_WEEK' || name.includes('week')) return 'WED';
+  if (name.includes('week')) return 'WED';
+  if (name.includes('date')) return '24';
   if (el.dataType === 'BATTERY') return '85%';
   if (el.dataType === 'STEP') return '8432';
   if (el.dataType === 'HEART') return '72';
