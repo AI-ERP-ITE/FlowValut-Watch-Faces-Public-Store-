@@ -1165,29 +1165,60 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   }
 
   const isEngrave = ef.mode === 'inner';
-  const blur = ef.depth === 'high' ? 14 : 6;
-  const offset = ef.depth === 'high' ? 5 : 2;
-  const lightColor = 'rgba(255,255,255,0.6)';
-  const darkColor = 'rgba(0,0,0,0.6)';
+  const depth = typeof ef.depth === 'number' ? ef.depth : (ef.depth === 'high' ? 12 : 6);
+  const blur = depth * 1.2;
+  const baseOffset = Math.max(1, depth * 0.6);
+  const angle = ((ef.lightAngle ?? 135) * Math.PI) / 180;
+  const offX = Math.cos(angle) * baseOffset;
+  const offY = Math.sin(angle) * baseOffset;
+  const hiC = ef.highlightColor ?? '#FFFFFF';
+  const hiO = ef.highlightOpacity ?? 0.6;
+  const shC = ef.shadowColor ?? '#000000';
+  const shO = ef.shadowOpacity ?? 0.6;
+  const hexToRgba = (hex: string, alpha: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  };
+  const lightColor = hexToRgba(isEngrave ? shC : hiC, isEngrave ? shO : hiO);
+  const darkColor  = hexToRgba(isEngrave ? hiC : shC, isEngrave ? hiO : shO);
 
-  // Top-left edges
+  // Shape clip
+  const shape = ef.shape ?? 'rect';
+  const cr = ef.cornerRadius ?? 12;
+  const clipShape = () => {
+    ctx.beginPath();
+    if (shape === 'circle') {
+      ctx.arc(w / 2, h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+    } else if (shape === 'rounded') {
+      ctx.roundRect(0, 0, w, h, cr);
+    } else {
+      ctx.rect(0, 0, w, h);
+    }
+    ctx.clip();
+  };
+
   ctx.save();
-  ctx.shadowColor = isEngrave ? darkColor : lightColor;
+  clipShape();
+  // Shadow edge (opposite light direction)
+  ctx.shadowColor = lightColor;
   ctx.shadowBlur = blur;
-  ctx.shadowOffsetX = offset;
-  ctx.shadowOffsetY = offset;
+  ctx.shadowOffsetX = offX;
+  ctx.shadowOffsetY = offY;
   ctx.strokeStyle = 'transparent';
-  ctx.strokeRect(0, 0, w, h);
+  ctx.strokeRect(-1, -1, w + 2, h + 2);
   ctx.restore();
 
-  // Bottom-right edges
   ctx.save();
-  ctx.shadowColor = isEngrave ? lightColor : darkColor;
+  clipShape();
+  // Highlight edge (light direction)
+  ctx.shadowColor = darkColor;
   ctx.shadowBlur = blur;
-  ctx.shadowOffsetX = -offset;
-  ctx.shadowOffsetY = -offset;
+  ctx.shadowOffsetX = -offX;
+  ctx.shadowOffsetY = -offY;
   ctx.strokeStyle = 'transparent';
-  ctx.strokeRect(0, 0, w, h);
+  ctx.strokeRect(-1, -1, w + 2, h + 2);
   ctx.restore();
 
   return canvas.toDataURL('image/png');
@@ -1205,6 +1236,7 @@ function StudioApp() {
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
+  const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Load custom icons + fonts from IndexedDB on startup and register them
@@ -1251,7 +1283,8 @@ function StudioApp() {
     const { w = 120, h = 60 } = defaults[addElType] ?? {};
     const x = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : cx - Math.floor(w / 2);
     const y = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : Math.floor(canvas * 0.4) - Math.floor(h / 2);
-    const needsDataType = addElType === 'ARC_PROGRESS' || addElType === 'TEXT_IMG' || addElType === 'IMG_LEVEL' || addElType === 'IMG_STATUS';
+    const needsDataType = addElType === 'ARC_PROGRESS' || addElType === 'TEXT_IMG' || addElType === 'IMG_LEVEL';
+    const isStatus = addElType === 'IMG_STATUS';
     const isArc = addElType === 'ARC_PROGRESS';
     const newEl: WatchFaceElement = {
       id: generateId(),
@@ -1259,14 +1292,16 @@ function StudioApp() {
       ...(addElSubtype ? { subtype: addElSubtype } : {}),
       name: addElSubtype
         ? addElSubtype.charAt(0).toUpperCase() + addElSubtype.slice(1)
-        : (needsDataType ? addElDataType.charAt(0) + addElDataType.slice(1).toLowerCase() : addElType),
+        : (needsDataType || isStatus ? addElDataType.charAt(0) + addElDataType.slice(1).toLowerCase() : addElType),
       bounds: { x, y, width: w, height: h },
       visible: true,
       zIndex: maxZ + 1,
       ...(needsDataType ? { dataType: addElDataType } : {}),
+      ...(isStatus ? { statusType: addElDataType } : {}),
       ...(isArc ? { startAngle: -90, endAngle: 270, radius: 190, lineWidth: 10, color: '#00CC88' } : {}),
       ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cx } } : {}),
       ...(addElType === 'TEXT' ? { text: 'Text', fontSize: 36, color: '#FFFFFF' } : {}),
+      ...(addElType === 'CIRCLE' ? { shapeType: addElShapeType, color: '0xFFFFFF', ...(addElShapeType === 'rounded_rect' ? { shapeCornerRadius: 12 } : {}) } : {}),
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newEl });
     setSelectedElementId(newEl.id);
@@ -1293,7 +1328,14 @@ function StudioApp() {
       engraveFrame: {
         frameOf: parent.id,
         mode: 'inner',
-        depth: 'low',
+        depth: 6,
+        lightAngle: 135,
+        highlightColor: '#FFFFFF',
+        highlightOpacity: 0.6,
+        shadowColor: '#000000',
+        shadowOpacity: 0.6,
+        shape: 'rect',
+        cornerRadius: 12,
         fillMode: 'none',
         fillColor: '#1A1A2E',
         padding: pad,
@@ -2204,25 +2246,27 @@ function StudioApp() {
                         <div className="grid grid-cols-3 gap-2">
                           {(
                             [
-                              { type: 'TEXT' as const, label: 'Text', icon: '📝' },
-                              { type: 'IMG_TIME' as const, label: 'Hours', icon: '⏰', sub: 'hours' },
-                              { type: 'IMG_TIME' as const, label: 'Minutes', icon: '⏱️', sub: 'minutes' },
-                              { type: 'ARC_PROGRESS' as const, label: 'Arc', icon: '⭕' },
-                              { type: 'TEXT_IMG' as const, label: 'Digits', icon: '🔢' },
-                              { type: 'IMG_DATE' as const, label: 'Date', icon: '📅' },
-                              { type: 'IMG_WEEK' as const, label: 'Weekday', icon: '📆' },
-                              { type: 'IMG_LEVEL' as const, label: 'Level', icon: '📊' },
-                              { type: 'IMG_STATUS' as const, label: 'Status', icon: '🔵' },
-                              { type: 'IMG' as const, label: 'Image', icon: '🖼️' },
-                              { type: 'CIRCLE' as const, label: 'Circle', icon: '⚪' },
-                              { type: 'TIME_POINTER' as const, label: 'Analog', icon: '🕐' },
-                            ] as { type: WatchFaceElement['type']; label: string; icon: string; sub?: string }[]
+                              { type: 'TEXT' as const, label: 'Text', icon: '📝', desc: 'Freeform text label with font styling and data binding' },
+                              { type: 'IMG_TIME' as const, label: 'Digital Hours', icon: '⏰', sub: 'hours', desc: 'Image-based digit display for the current hour' },
+                              { type: 'IMG_TIME' as const, label: 'Digital Minutes', icon: '⏱️', sub: 'minutes', desc: 'Image-based digit display for the current minute' },
+                              { type: 'IMG_TIME' as const, label: 'Digital Seconds', icon: '⏳', sub: 'seconds', desc: 'Image-based digit display for the current second' },
+                              { type: 'ARC_PROGRESS' as const, label: 'Arc Progress', icon: '⭕', desc: 'Curved arc bar for displaying health or battery metrics' },
+                              { type: 'TEXT_IMG' as const, label: 'Numeric Display', icon: '🔢', desc: 'Image-based number display for any data type (battery, steps, etc.)' },
+                              { type: 'IMG_DATE' as const, label: 'Date Digit', icon: '📅', desc: 'Image-based digit display for the current day-of-month' },
+                              { type: 'IMG_WEEK' as const, label: 'Weekday Name', icon: '📆', desc: 'Image-based label showing the current day of the week' },
+                              { type: 'IMG_LEVEL' as const, label: 'Image Switcher', icon: '📊', desc: 'Swaps between a set of images based on a data value level' },
+                              { type: 'IMG_STATUS' as const, label: 'Status Indicator', icon: '🔵', desc: 'Shows/hides an icon based on a system status (Bluetooth, alarm, DND, lock)' },
+                              { type: 'IMG' as const, label: 'Static Image', icon: '🖼️', desc: 'A static image or icon from your library' },
+                              { type: 'CIRCLE' as const, label: 'Shape', icon: '⚪', desc: 'Circle, filled rect, stroke rect or rounded rect shape' },
+                              { type: 'TIME_POINTER' as const, label: 'Analog Clock', icon: '🕐', desc: 'Analog clock with rotating hour, minute and second hands' },
+                            ] as { type: WatchFaceElement['type']; label: string; icon: string; sub?: string; desc: string }[]
                           ).map((opt) => {
                             const isSelected = addElType === opt.type && (addElSubtype || '') === (opt.sub || '');
                             return (
                               <button
                                 key={opt.label}
-                                onClick={() => { setAddElType(opt.type); setAddElSubtype(opt.sub ?? ''); }}
+                                title={opt.desc}
+                                onClick={() => { setAddElType(opt.type); setAddElSubtype(opt.sub ?? ''); if (opt.type === 'IMG_STATUS') setAddElDataType('DISCONNECT'); }}
                                 className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-xs transition-all ${
                                   isSelected
                                     ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
@@ -2238,7 +2282,7 @@ function StudioApp() {
                       </div>
 
                       {/* Data type selector — shown for relevant widget types */}
-                      {(addElType === 'ARC_PROGRESS' || addElType === 'TEXT_IMG' || addElType === 'IMG_LEVEL' || addElType === 'IMG_STATUS') && (
+                      {(addElType === 'ARC_PROGRESS' || addElType === 'TEXT_IMG' || addElType === 'IMG_LEVEL') && (
                         <div>
                           <p className="text-xs text-zinc-400 mb-2">Data type</p>
                           <select
@@ -2246,10 +2290,81 @@ function StudioApp() {
                             onChange={(e) => setAddElDataType(e.target.value)}
                             className="w-full bg-zinc-900 border border-zinc-700 text-white text-sm rounded px-2 py-1.5"
                           >
-                            {['BATTERY','STEP','HEART','SPO2','CAL','DISTANCE','STRESS','PAI','SLEEP','STAND','FAT_BURN','UVI','AQI','HUMIDITY','WEATHER_CURRENT'].map(dt => (
-                              <option key={dt} value={dt}>{dt}</option>
+                            {[
+                              { value: 'BATTERY',        label: 'Battery %'              },
+                              { value: 'STEP',           label: 'Step Count'             },
+                              { value: 'HEART',          label: 'Heart Rate'             },
+                              { value: 'SPO2',           label: 'Blood Oxygen'           },
+                              { value: 'CAL',            label: 'Calories'               },
+                              { value: 'DISTANCE',       label: 'Distance'               },
+                              { value: 'STRESS',         label: 'Stress Level'           },
+                              { value: 'PAI_WEEKLY',     label: 'PAI (Weekly)'           },
+                              { value: 'SLEEP',          label: 'Sleep Duration'         },
+                              { value: 'TRAINING_LOAD',  label: 'Training Load'          },
+                              { value: 'VO2MAX',         label: 'VO2 Max'                },
+                              { value: 'ALTIMETER',      label: 'Altitude'               },
+                              { value: 'UVI',            label: 'UV Index'               },
+                              { value: 'AQI',            label: 'Air Quality'            },
+                              { value: 'SUN_RISE',       label: 'Sunrise Time'           },
+                              { value: 'WEATHER_CURRENT',label: 'Weather (preview only)' },
+                            ].map(dt => (
+                              <option key={dt.value} value={dt.value}>{dt.label}</option>
                             ))}
                           </select>
+                        </div>
+                      )}
+
+                      {/* Shape sub-type selector — CIRCLE only */}
+                      {addElType === 'CIRCLE' && (
+                        <div>
+                          <p className="text-xs text-zinc-400 mb-2">Shape type</p>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {([
+                              { value: 'circle'      as const, label: 'Circle' },
+                              { value: 'fill_rect'   as const, label: 'Filled Rect' },
+                              { value: 'stroke_rect' as const, label: 'Stroke Rect' },
+                              { value: 'rounded_rect'as const, label: 'Rounded Rect' },
+                            ]).map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setAddElShapeType(opt.value)}
+                                className={`py-1.5 px-2 rounded border text-xs transition-colors ${
+                                  addElShapeType === opt.value
+                                    ? 'border-cyan-500 bg-cyan-500/20 text-white'
+                                    : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Status type selector — IMG_STATUS only (4 official Zepp OS values) */}
+                      {addElType === 'IMG_STATUS' && (
+                        <div>
+                          <p className="text-xs text-zinc-400 mb-2">Status type</p>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {[
+                              { value: 'DISCONNECT', label: 'Bluetooth Off' },
+                              { value: 'CLOCK',      label: 'Alarm Active' },
+                              { value: 'DISTURB',    label: 'Do Not Disturb' },
+                              { value: 'LOCK',       label: 'Screen Locked' },
+                            ].map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setAddElDataType(opt.value)}
+                                className={`py-1.5 px-2 rounded border text-xs transition-colors ${
+                                  addElDataType === opt.value
+                                    ? 'border-cyan-500 bg-cyan-500/20 text-white'
+                                    : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
 

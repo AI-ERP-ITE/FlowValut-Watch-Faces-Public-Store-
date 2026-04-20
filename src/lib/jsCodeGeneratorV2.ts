@@ -255,7 +255,8 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   const hoursElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'hours')
     ?? elements.find(e => e.type === 'IMG_TIME' && !e.subtype);
   const minutesElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'minutes');
-  const hasTimeWidget = !!(hoursElement || minutesElement);
+  const secondsElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'seconds');
+  const hasTimeWidget = !!(hoursElement || minutesElement || secondsElement);
   const dateElement = elements.find(e => e.type === 'IMG_DATE' && e.subtype !== 'month') 
     ?? elements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
   const monthElement = elements.find(e => e.type === 'IMG_DATE' && e.subtype === 'month')
@@ -265,7 +266,7 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   
   // Add IMG_TIME widget if time element exists
   if (hasTimeWidget) {
-    normalWidgetsCode += generateIMGTimeWidget(hoursElement, minutesElement, normalWidgetCounter++, 'ONLY_NORMAL');
+    normalWidgetsCode += generateIMGTimeWidget(hoursElement, minutesElement, secondsElement, normalWidgetCounter++, 'ONLY_NORMAL');
   }
   
   // Add IMG_DATE widget if date element exists
@@ -303,7 +304,7 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   let aodWidgetCounter = 100;
   
   if (hasTimeWidget) {
-    aodWidgetsCode += generateIMGTimeWidget(hoursElement, minutesElement, aodWidgetCounter++, 'ONLY_AOD');
+    aodWidgetsCode += generateIMGTimeWidget(hoursElement, minutesElement, secondsElement, aodWidgetCounter++, 'ONLY_AOD');
   }
   
   if (dateElement) {
@@ -432,10 +433,10 @@ ${aodWidgetsCode}
   return finalCode;
 }
 
-// Generate IMG_TIME widget with separate hour and minute elements
+// Generate IMG_TIME widget with separate hour, minute and optional second elements
 // hoursEl defines hour position/size; minutesEl defines minute position (or derived from hoursEl)
-function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl: WatchFaceElement | undefined, widgetIndex: number, showLevel: string): string {
-  const refEl = hoursEl ?? minutesEl;
+function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl: WatchFaceElement | undefined, secondsEl: WatchFaceElement | undefined, widgetIndex: number, showLevel: string): string {
+  const refEl = hoursEl ?? minutesEl ?? secondsEl;
   if (!refEl) return '';
 
   // Hour position: from hoursEl, or fallback
@@ -449,6 +450,11 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
   const mx = minutesEl ? minutesEl.bounds.x : (hx + hW + Math.max(4, digitW));
   const my = minutesEl ? minutesEl.bounds.y : hy;
 
+  // Second position: from secondsEl if present
+  const hasSeconds = !!secondsEl;
+  const sx = secondsEl ? secondsEl.bounds.x : 0;
+  const sy = secondsEl ? secondsEl.bounds.y : 0;
+
   // Use time_digit_N.png naming — must match what assetImageGenerator generates
   const digitArray = [];
   for (let i = 0; i < 10; i++) {
@@ -456,8 +462,16 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
   }
   const digitArrayStr = `[${digitArray.join(', ')}]`;
   
+  const secondParams = hasSeconds ? `
+                    second_zero: 1,
+                    second_startX: px(${sx}),
+                    second_startY: px(${sy}),
+                    second_array: ${digitArrayStr},
+                    second_space: 0,
+                    second_align: hmUI.align.LEFT,` : '';
+
   return `
-                // IMG_TIME Widget (Hours @ ${hx},${hy} | Minutes @ ${mx},${my})
+                // IMG_TIME Widget (Hours @ ${hx},${hy} | Minutes @ ${mx},${my}${hasSeconds ? ` | Seconds @ ${sx},${sy}` : ''})
                 let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_TIME, {
                     hour_zero: 1,
                     hour_startX: px(${hx}),
@@ -471,7 +485,7 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
                     minute_array: ${digitArrayStr},
                     minute_space: 0,
                     minute_align: hmUI.align.LEFT,
-                    minute_follow: 0,
+                    minute_follow: 0,${secondParams}
                     show_level: hmUI.show_level.${showLevel}
                 });`;
 }
@@ -589,6 +603,9 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
       return generateImgStatusWidget(element, widgetIndex, showLevel);
     case 'CIRCLE':
       if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'Circle');
+      if (element.shapeType === 'fill_rect') return generateFillRectWidget(element, widgetIndex, showLevel);
+      if (element.shapeType === 'stroke_rect') return generateStrokeRectWidget(element, widgetIndex, showLevel);
+      if (element.shapeType === 'rounded_rect') return generateFillRectWidget(element, widgetIndex, showLevel); // baked as PNG
       return generateCircleWidget(element, widgetIndex, showLevel);
     case 'IMG_LEVEL':
       return generateImgLevelWidget(element, widgetIndex, showLevel);
@@ -801,7 +818,6 @@ function generateTextWidget(element: WatchFaceElement, widgetIndex: number, show
   const textSize = element.fontSize ?? 20;
   const colorHex = element.color ?? '0xFFFFFFFF';
   const colorValue = colorHex.startsWith('0x') ? colorHex : `0x${colorHex.replace('#', '')}`;
-  const textContent = element.text ?? '';
 
   // Check if selected font is embeddable
   const fontEntry = element.fontStyle ? FONT_STYLES.find(f => f.key === element.fontStyle) : undefined;
@@ -809,6 +825,48 @@ function generateTextWidget(element: WatchFaceElement, widgetIndex: number, show
     ? `\n                    font: 'fonts/${fontEntry.fontFile}',`
     : '';
 
+  // Date format mode: build a getText callback from the format string
+  if (element.dateFormat) {
+    const fmt = element.dateFormat;
+    // Map format tokens to gettext_by_id / manual date construction
+    let textExpr: string;
+    if (fmt === 'DD/MM') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")}/${String(hmSensor.time.month).padStart(2,"0")}`';
+    } else if (fmt === 'MM/DD') {
+      textExpr = '`${String(hmSensor.time.month).padStart(2,"0")}/${String(hmSensor.time.day).padStart(2,"0")}`';
+    } else if (fmt === 'DD/MM/YYYY') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")}/${String(hmSensor.time.month).padStart(2,"0")}/${hmSensor.time.year}`';
+    } else if (fmt === 'MM/DD/YYYY') {
+      textExpr = '`${String(hmSensor.time.month).padStart(2,"0")}/${String(hmSensor.time.day).padStart(2,"0")}/${hmSensor.time.year}`';
+    } else if (fmt === 'DD-MM-YYYY') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")}-${String(hmSensor.time.month).padStart(2,"0")}-${hmSensor.time.year}`';
+    } else if (fmt === 'DD MMM') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][hmSensor.time.month-1]}`';
+    } else if (fmt === 'MMM DD') {
+      textExpr = '`${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][hmSensor.time.month-1]} ${String(hmSensor.time.day).padStart(2,"0")}`';
+    } else {
+      textExpr = '`${hmSensor.time.day}/${hmSensor.time.month}`';
+    }
+    return `
+                // ${element.name} - TEXT Widget (date format: ${fmt})
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TEXT, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    w: px(${element.bounds.width || 100}),
+                    h: px(${element.bounds.height || 40}),
+                    text_size: px(${textSize}),
+                    char_space: 0,
+                    color: ${colorValue},
+                    line_space: 0,
+                    align_v: hmUI.align.CENTER_V,
+                    text_style: hmUI.text_style.ELLIPSIS,
+                    align_h: hmUI.align.CENTER_H,
+                    text: ${textExpr},${fontLine}
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+  }
+
+  const textContent = element.text ?? '';
   return `
                 // ${element.name} - TEXT Widget
                 let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TEXT, {

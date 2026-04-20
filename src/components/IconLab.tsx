@@ -214,10 +214,21 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
         });
       }
       setAiRetryStatus('');
-      // Extract just the SVG tag if there's extra text
-      const svgMatch = result.match(/<svg[\s\S]*<\/svg>/i);
-      setCodeMode('svg');
-      setCode(svgMatch ? svgMatch[0] : result);
+      // Detect whether the response is SVG or full HTML and set mode accordingly
+      const trimmed = result.trim();
+      const svgMatch = trimmed.match(/<svg[\s\S]*<\/svg>/i);
+      const isFullHtml = /^<!doctype|^<html/i.test(trimmed);
+      if (svgMatch) {
+        setCodeMode('svg');
+        setCode(svgMatch[0]);
+      } else if (isFullHtml) {
+        setCodeMode('html');
+        setCode(trimmed);
+      } else {
+        // Fallback: treat as SVG (AI may have omitted wrapper)
+        setCodeMode('svg');
+        setCode(trimmed);
+      }
     } catch (err) {
       setAiRetryStatus('');
       const msg = (err as Error).message;

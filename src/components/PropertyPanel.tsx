@@ -28,12 +28,23 @@ const WIDGET_TYPES: WatchFaceElement['type'][] = [
   'IMG_LEVEL', 'IMG_STATUS', 'CIRCLE', 'BUTTON',
 ];
 
-const DATA_TYPES = [
-  'BATTERY', 'STEP', 'HEART', 'SPO2', 'CAL', 'DISTANCE',
-  'STRESS', 'PAI', 'SLEEP', 'STAND', 'FAT_BURN',
-  'UVI', 'AQI', 'HUMIDITY', 'SUN_RISE', 'SUN_SET',
-  'WIND', 'ALARM', 'NOTIFICATION', 'MOON',
-  'WEATHER_CURRENT',
+const DATA_TYPES: { value: string; label: string }[] = [
+  { value: 'BATTERY',       label: 'Battery %'        },
+  { value: 'STEP',          label: 'Step Count'        },
+  { value: 'HEART',         label: 'Heart Rate'        },
+  { value: 'SPO2',          label: 'Blood Oxygen'      },
+  { value: 'CAL',           label: 'Calories'          },
+  { value: 'DISTANCE',      label: 'Distance'          },
+  { value: 'STRESS',        label: 'Stress Level'      },
+  { value: 'PAI_WEEKLY',    label: 'PAI (Weekly)'      },
+  { value: 'SLEEP',         label: 'Sleep Duration'    },
+  { value: 'TRAINING_LOAD', label: 'Training Load'     },
+  { value: 'VO2MAX',        label: 'VO2 Max'           },
+  { value: 'ALTIMETER',     label: 'Altitude'          },
+  { value: 'UVI',           label: 'UV Index'          },
+  { value: 'AQI',           label: 'Air Quality'       },
+  { value: 'SUN_RISE',      label: 'Sunrise Time'      },
+  { value: 'WEATHER_CURRENT', label: 'Weather (preview only)' },
 ];
 
 const APP_SHORTCUTS = [
@@ -165,17 +176,86 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
 
         {/* Depth */}
-        <Section label="Depth">
-          <div className="flex gap-1.5">
-            {(['low', 'high'] as const).map(d => (
-              <button key={d} onClick={() => updateFrame({ depth: d })}
-                className={cn('flex-1 h-7 rounded border text-[11px] transition-colors capitalize',
-                  ef.depth === d ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+        <Section label={`Depth (${typeof ef.depth === 'number' ? ef.depth : 6})`}>
+          <input
+            type="range" min={1} max={20}
+            value={typeof ef.depth === 'number' ? ef.depth : 6}
+            onChange={e => updateFrame({ depth: Number(e.target.value) })}
+            className="w-full accent-amber-500"
+          />
+          <div className="flex justify-between text-[9px] text-white/25 mt-0.5"><span>Subtle</span><span>Deep</span></div>
+        </Section>
+
+        {/* Light Direction */}
+        <Section label={`Light Direction (${ef.lightAngle ?? 135}°)`}>
+          <input
+            type="range" min={0} max={359}
+            value={ef.lightAngle ?? 135}
+            onChange={e => updateFrame({ lightAngle: Number(e.target.value) })}
+            className="w-full accent-amber-500"
+          />
+          <div className="grid grid-cols-4 gap-1 mt-1.5">
+            {[{label:'↖ TL', v:225},{label:'↗ TR', v:315},{label:'↙ BL', v:135},{label:'↘ BR', v:45}].map(p => (
+              <button key={p.v} onClick={() => updateFrame({ lightAngle: p.v })}
+                className={cn('h-6 rounded border text-[10px] transition-colors',
+                  (ef.lightAngle ?? 135) === p.v ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/40 hover:border-white/30'
+                )}>{p.label}</button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Highlight / Shadow Colors */}
+        <Section label="Highlight Color">
+          <div className="flex items-center gap-2">
+            <input type="color" value={ef.highlightColor ?? '#FFFFFF'}
+              onChange={e => updateFrame({ highlightColor: e.target.value })}
+              className="w-8 h-7 rounded cursor-pointer border-0 bg-transparent" />
+            <div className="flex-1">
+              <input type="range" min={0} max={100}
+                value={Math.round((ef.highlightOpacity ?? 0.6) * 100)}
+                onChange={e => updateFrame({ highlightOpacity: Number(e.target.value) / 100 })}
+                className="w-full accent-amber-500" />
+              <div className="text-[9px] text-white/30 text-right">{Math.round((ef.highlightOpacity ?? 0.6) * 100)}%</div>
+            </div>
+          </div>
+        </Section>
+
+        <Section label="Shadow Color">
+          <div className="flex items-center gap-2">
+            <input type="color" value={ef.shadowColor ?? '#000000'}
+              onChange={e => updateFrame({ shadowColor: e.target.value })}
+              className="w-8 h-7 rounded cursor-pointer border-0 bg-transparent" />
+            <div className="flex-1">
+              <input type="range" min={0} max={100}
+                value={Math.round((ef.shadowOpacity ?? 0.6) * 100)}
+                onChange={e => updateFrame({ shadowOpacity: Number(e.target.value) / 100 })}
+                className="w-full accent-amber-500" />
+              <div className="text-[9px] text-white/30 text-right">{Math.round((ef.shadowOpacity ?? 0.6) * 100)}%</div>
+            </div>
+          </div>
+        </Section>
+
+        {/* Shape */}
+        <Section label="Shape">
+          <div className="grid grid-cols-3 gap-1">
+            {(['rect', 'circle', 'rounded'] as const).map(s => (
+              <button key={s} onClick={() => updateFrame({ shape: s })}
+                className={cn('h-7 rounded border text-[11px] transition-colors capitalize',
+                  (ef.shape ?? 'rect') === s ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
                 )}>
-                {d}
+                {s === 'rect' ? 'Rectangle' : s === 'circle' ? 'Circle' : 'Rounded'}
               </button>
             ))}
           </div>
+          {(ef.shape === 'rounded') && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[10px] text-white/40 w-16 shrink-0">Corner R</span>
+              <Input type="number" value={ef.cornerRadius ?? 12}
+                onChange={e => updateFrame({ cornerRadius: Math.max(0, Math.min(100, Number(e.target.value))) })}
+                className="h-7 text-xs bg-white/5 border-white/10 text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <span className="text-[10px] text-white/30">px</span>
+            </div>
+          )}
         </Section>
 
         {/* Fill */}
@@ -373,6 +453,44 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* Shape Type — CIRCLE elements only */}
+      {element.type === 'CIRCLE' && (
+        <Section label="Shape Type">
+          <div className="grid grid-cols-2 gap-1.5">
+            {([
+              { value: 'circle',       label: 'Circle'      },
+              { value: 'fill_rect',    label: 'Filled Rect' },
+              { value: 'stroke_rect',  label: 'Stroke Rect' },
+              { value: 'rounded_rect', label: 'Rounded Rect'},
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => update({ shapeType: opt.value })}
+                className={`py-1.5 px-2 rounded border text-xs transition-colors ${
+                  (element.shapeType ?? 'circle') === opt.value
+                    ? 'border-cyan-500 bg-cyan-500/20 text-white'
+                    : 'border-white/10 bg-white/5 text-zinc-400 hover:border-zinc-500'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {(element.shapeType === 'rounded_rect') && (
+            <div className="mt-2">
+              <label className="block text-[10px] text-zinc-400 mb-1">Corner Radius</label>
+              <input
+                type="range" min={0} max={60} step={1}
+                value={element.shapeCornerRadius ?? 12}
+                onChange={e => update({ shapeCornerRadius: Number(e.target.value) })}
+                className="w-full accent-cyan-400"
+              />
+              <span className="text-[10px] text-zinc-400">{element.shapeCornerRadius ?? 12}px</span>
+            </div>
+          )}
+        </Section>
+      )}
+
       {/* Color */}
       {(element.color !== undefined || element.type === 'ARC_PROGRESS' || element.type === 'CIRCLE') && (
         <Section label="Color">
@@ -415,8 +533,56 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* Date Format — TEXT elements with dateFormat set, or enabled via toggle */}
+      {element.type === 'TEXT' && (() => {
+        const DATE_FORMATS = [
+          { value: 'DD/MM',       label: 'DD/MM',        sample: '21/04' },
+          { value: 'MM/DD',       label: 'MM/DD',        sample: '04/21' },
+          { value: 'DD/MM/YYYY',  label: 'DD/MM/YYYY',   sample: '21/04/2026' },
+          { value: 'MM/DD/YYYY',  label: 'MM/DD/YYYY',   sample: '04/21/2026' },
+          { value: 'DD-MM-YYYY',  label: 'DD-MM-YYYY',   sample: '21-04-2026' },
+          { value: 'DD MMM',      label: 'DD MMM',       sample: '21 Apr' },
+          { value: 'MMM DD',      label: 'MMM DD',       sample: 'Apr 21' },
+        ] as const;
+        const isDateMode = !!element.dateFormat;
+        return (
+          <Section label="Date Format">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => update({ dateFormat: isDateMode ? undefined : 'DD/MM' })}
+                className={`flex-1 py-1 rounded border text-[11px] transition-colors ${
+                  isDateMode
+                    ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300'
+                    : 'border-white/10 bg-white/5 text-zinc-500 hover:border-zinc-500'
+                }`}
+              >
+                {isDateMode ? 'Date mode: ON' : 'Enable date mode'}
+              </button>
+            </div>
+            {isDateMode && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {DATE_FORMATS.map(fmt => (
+                  <button
+                    key={fmt.value}
+                    onClick={() => update({ dateFormat: fmt.value })}
+                    className={`py-1.5 px-2 rounded border text-left transition-colors ${
+                      element.dateFormat === fmt.value
+                        ? 'border-cyan-500 bg-cyan-500/20 text-white'
+                        : 'border-white/10 bg-white/5 text-zinc-400 hover:border-zinc-500'
+                    }`}
+                  >
+                    <span className="block text-[11px] font-mono">{fmt.label}</span>
+                    <span className="block text-[9px] text-zinc-500">{fmt.sample}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Section>
+        );
+      })()}
+
       {/* DataType — shown for all data-bindable elements */}
-      {['ARC_PROGRESS', 'TEXT_IMG', 'IMG', 'IMG_LEVEL', 'TEXT', 'CIRCLE', 'IMG_STATUS'].includes(element.type) && (
+      {['ARC_PROGRESS', 'TEXT_IMG', 'IMG', 'IMG_LEVEL', 'TEXT', 'CIRCLE'].includes(element.type) && (
         <Section label="Data Type">
           <Select value={element.dataType ?? '__none__'} onValueChange={v => update({ dataType: v === '__none__' ? undefined : v })}>
             <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
@@ -425,12 +591,44 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
             <SelectContent>
               <SelectItem value="__none__">— none —</SelectItem>
               {DATA_TYPES.map(dt => (
-                <SelectItem key={dt} value={dt}>{dt}</SelectItem>
+                <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Section>
       )}
+
+      {/* Status type picker — IMG_STATUS only (4 official Zepp OS system_status values) */}
+      {element.type === 'IMG_STATUS' && (() => {
+        const STATUS_OPTIONS = [
+          { value: 'DISCONNECT', label: 'Bluetooth Off', desc: 'Shows when Bluetooth is disconnected' },
+          { value: 'CLOCK',      label: 'Alarm Active',  desc: 'Shows when an alarm is set' },
+          { value: 'DISTURB',    label: 'Do Not Disturb', desc: 'Shows when DND mode is on' },
+          { value: 'LOCK',       label: 'Screen Locked',  desc: 'Shows when screen lock is on' },
+        ] as const;
+        const current = element.statusType ?? 'DISCONNECT';
+        return (
+          <Section label="Status Type">
+            <div className="space-y-1">
+              {STATUS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => update({ statusType: opt.value })}
+                  className={cn(
+                    'w-full text-left px-2.5 py-1.5 rounded border text-[11px] transition-colors',
+                    current === opt.value
+                      ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                      : 'border-white/10 bg-white/5 text-white/60 hover:border-white/30'
+                  )}
+                >
+                  <span className="font-medium">{opt.label}</span>
+                  <span className="block text-[9px] text-white/35 mt-0.5">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        );
+      })()}
 
       {/* ARC-specific fields */}
       {element.type === 'ARC_PROGRESS' && (
@@ -728,6 +926,121 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* Icon Effects — only for IMG elements that have an icon selected */}
+      {element.type === 'IMG' && element.iconKey && (() => {
+        const updateEffect = (patch: Partial<Pick<WatchFaceElement, 'iconHue' | 'iconSaturation' | 'iconColorize' | 'iconColorizeOpacity'>>) =>
+          update(patch);
+        const hue = element.iconHue ?? 0;
+        const sat = element.iconSaturation ?? 100;
+        const colorize = element.iconColorize ?? '';
+        const colorizeOpacity = element.iconColorizeOpacity ?? 0.8;
+        const hasEffects = hue !== 0 || sat !== 100 || !!colorize;
+        return (
+          <Section label="Icon Effects">
+            <div className="space-y-2">
+              {/* Hue rotate */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/40 w-14 shrink-0">Hue</span>
+                <input type="range" min={-180} max={180} value={hue}
+                  onChange={e => updateEffect({ iconHue: Number(e.target.value) })}
+                  className="flex-1 accent-cyan-500 h-1" />
+                <span className="text-[10px] text-white/30 w-10 text-right">{hue > 0 ? `+${hue}` : hue}°</span>
+              </div>
+              {/* Saturation */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/40 w-14 shrink-0">Saturation</span>
+                <input type="range" min={0} max={200} value={sat}
+                  onChange={e => updateEffect({ iconSaturation: Number(e.target.value) })}
+                  className="flex-1 accent-cyan-500 h-1" />
+                <span className="text-[10px] text-white/30 w-10 text-right">{sat}%</span>
+              </div>
+              {/* Color fill overlay */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/40 w-14 shrink-0">Color fill</span>
+                <input type="color" value={colorize || '#ffffff'}
+                  onChange={e => updateEffect({ iconColorize: e.target.value })}
+                  className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent shrink-0" />
+                {colorize && (
+                  <>
+                    <input type="range" min={0} max={100} value={Math.round(colorizeOpacity * 100)}
+                      onChange={e => updateEffect({ iconColorizeOpacity: Number(e.target.value) / 100 })}
+                      className="flex-1 accent-cyan-500 h-1" />
+                    <span className="text-[10px] text-white/30 w-8 text-right">{Math.round(colorizeOpacity * 100)}%</span>
+                  </>
+                )}
+                {!colorize && <span className="text-[10px] text-white/25 flex-1">None — click to enable</span>}
+              </div>
+              {colorize && (
+                <button
+                  onClick={() => updateEffect({ iconColorize: undefined })}
+                  className="text-[10px] text-red-400/70 hover:text-red-400 transition-colors"
+                >
+                  Remove color fill
+                </button>
+              )}
+              {hasEffects && (
+                <button
+                  onClick={() => updateEffect({ iconHue: 0, iconSaturation: 100, iconColorize: undefined })}
+                  className="w-full h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/50 hover:text-white hover:border-white/30 transition-colors"
+                >
+                  Reset all effects
+                </button>
+              )}
+              <p className="text-[9px] text-amber-500/60">Effects are baked into ZPK export</p>
+            </div>
+          </Section>
+        );
+      })()}
+
+      {/* Widget type toggle — DATE/WEEKDAY conversion */}
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') && (
+        <Section label="Widget Type">
+          <div className="grid grid-cols-2 gap-1">
+            {(['IMG_DATE', 'IMG_WEEK'] as const).map(wt => (
+              <button
+                key={wt}
+                onClick={() => update({ type: wt })}
+                className={cn(
+                  'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                  element.type === wt
+                    ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                    : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                )}
+              >
+                {wt === 'IMG_DATE' ? 'Date Digit' : 'Weekday Name'}
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Name format — IMG_WEEK only */}
+      {element.type === 'IMG_WEEK' && (
+        <Section label="Name Format">
+          <div className="space-y-1">
+            {([
+              { value: 'full',    label: 'Full',    example: 'Monday' },
+              { value: 'short',   label: 'Short',   example: 'Mon' },
+              { value: 'initial', label: 'Initial', example: 'Mo.' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => update({ weekFormat: opt.value })}
+                className={cn(
+                  'w-full flex items-center justify-between px-2.5 py-1.5 rounded border text-[11px] transition-colors',
+                  (element.weekFormat ?? 'full') === opt.value
+                    ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                    : 'border-white/10 bg-white/5 text-white/60 hover:border-white/30'
+                )}
+              >
+                <span className="font-medium">{opt.label}</span>
+                <span className="text-white/35">{opt.example}</span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* Font style picker — text/digit elements */}
       {['IMG_TIME', 'TEXT_IMG', 'TEXT', 'IMG_DATE'].includes(element.type) && (
         <Section label="Font Style">
@@ -808,80 +1121,6 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               </FieldRow>
             </div>
           )}
-        </Section>
-      )}
-
-      {/* Drop Shadow — all types except TIME_POINTER (has handShadow) and engraveFrame elements */}
-      {!['TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
-        <Section label="Drop Shadow">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] text-white/60">Enable shadow</span>
-            <Switch
-              checked={!!element.dropShadow}
-              onCheckedChange={checked => {
-                if (checked) {
-                  update({ dropShadow: { color: '#000000', opacity: 0.6, blur: 8, offsetX: 3, offsetY: 3 } });
-                } else {
-                  update({ dropShadow: undefined });
-                }
-              }}
-              id={`shadow-${element.id}`}
-            />
-          </div>
-          {element.dropShadow && (() => {
-            const ds = element.dropShadow;
-            const updateShadow = (patch: Partial<NonNullable<typeof element.dropShadow>>) =>
-              update({ dropShadow: { ...ds, ...patch } });
-            const previewOnly = ['TEXT', 'ARC_PROGRESS', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK', 'TEXT_IMG', 'IMG_STATUS', 'IMG_LEVEL', 'IMG_PROGRESS', 'IMG_ANIM'].includes(element.type);
-            return (
-              <div className="space-y-2">
-                {/* Color */}
-                <div className="flex items-center gap-2">
-                  <input type="color" value={ds.color}
-                    onChange={e => updateShadow({ color: e.target.value })}
-                    className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent" />
-                  <Input value={ds.color}
-                    onChange={e => updateShadow({ color: e.target.value })}
-                    className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white flex-1" />
-                  <span className="text-[10px] text-white/30 shrink-0">{Math.round(ds.opacity * 100)}%</span>
-                </div>
-                {/* Opacity */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/40 w-12 shrink-0">Opacity</span>
-                  <input type="range" min={0} max={100} value={Math.round(ds.opacity * 100)}
-                    onChange={e => updateShadow({ opacity: Number(e.target.value) / 100 })}
-                    className="flex-1 accent-cyan-500 h-1" />
-                </div>
-                {/* Blur */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/40 w-12 shrink-0">Blur</span>
-                  <input type="range" min={0} max={40} value={ds.blur}
-                    onChange={e => updateShadow({ blur: Number(e.target.value) })}
-                    className="flex-1 accent-cyan-500 h-1" />
-                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.blur}px</span>
-                </div>
-                {/* Offset X */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/40 w-12 shrink-0">X offset</span>
-                  <input type="range" min={-30} max={30} value={ds.offsetX}
-                    onChange={e => updateShadow({ offsetX: Number(e.target.value) })}
-                    className="flex-1 accent-cyan-500 h-1" />
-                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetX}px</span>
-                </div>
-                {/* Offset Y */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/40 w-12 shrink-0">Y offset</span>
-                  <input type="range" min={-30} max={30} value={ds.offsetY}
-                    onChange={e => updateShadow({ offsetY: Number(e.target.value) })}
-                    className="flex-1 accent-cyan-500 h-1" />
-                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetY}px</span>
-                </div>
-                {previewOnly && (
-                  <p className="text-[9px] text-yellow-500/70 mt-1">⚠ Preview only — shadow not baked into .zpk for this element type</p>
-                )}
-              </div>
-            );
-          })()}
         </Section>
       )}
 

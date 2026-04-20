@@ -51,6 +51,10 @@ export interface WatchFaceElement {
   // IMG / CIRCLE specific
   alpha?: number;
 
+  // CIRCLE / Shape specific
+  shapeType?: 'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect';
+  shapeCornerRadius?: number; // px, for rounded_rect, default 12
+
   // IMG_ANIM specific
   animPath?: string;    // folder path for animation frames (e.g. 'anim/rain')
   animFps?: number;     // frames per second
@@ -61,6 +65,12 @@ export interface WatchFaceElement {
 
   // IMG_STATUS specific
   statusType?: string;
+
+  // IMG_WEEK specific
+  weekFormat?: 'full' | 'short' | 'initial';
+
+  // TEXT date-format mode (TEXT elements bound to date)
+  dateFormat?: string; // e.g. 'DD/MM', 'MM/DD', 'DD/MM/YYYY', 'DD MMM', 'MMM DD'
 
   // TEXT_IMG specific
   fontArray?: string[];
@@ -118,13 +128,20 @@ export interface WatchFaceElement {
 
   // Set on the FILL_RECT frame element itself
   engraveFrame?: {
-    frameOf: string;            // ID of the parent element
-    mode: 'inner' | 'outer';   // inner = engrave/inset, outer = emboss/raised
-    depth: 'low' | 'high';
+    frameOf: string;              // ID of the parent element
+    mode: 'inner' | 'outer';     // inner = engrave/inset, outer = emboss/raised
+    depth: number;                // 1–20, default 6
+    lightAngle: number;           // degrees 0–360, default 135 (top-left)
+    highlightColor: string;       // CSS hex, default '#FFFFFF'
+    highlightOpacity: number;     // 0–1, default 0.6
+    shadowColor: string;          // CSS hex, default '#000000'
+    shadowOpacity: number;        // 0–1, default 0.6
+    shape: 'rect' | 'circle' | 'rounded'; // default 'rect'
+    cornerRadius: number;         // px for rounded shape, default 12
     fillMode: 'none' | 'color';
-    fillColor: string;          // CSS hex e.g. '#1A1A2E'
-    padding: number;            // px — positive expands frame beyond parent bounds
-    linked?: boolean;           // true (default) = auto-sync to parent bounds; false = independent
+    fillColor: string;            // CSS hex e.g. '#1A1A2E'
+    padding: number;              // px — positive expands frame beyond parent bounds
+    linked?: boolean;             // true (default) = auto-sync to parent bounds; false = independent
   };
 
   // Universal drop shadow (canvas preview + ZPK PNG baking for simple elements)

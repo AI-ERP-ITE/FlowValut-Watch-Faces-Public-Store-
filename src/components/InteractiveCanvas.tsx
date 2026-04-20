@@ -399,15 +399,30 @@ function hitTestArcHandle(x: number, y: number, el: WatchFaceElement): string | 
   return null;
 }
 
+function hitTestOne(x: number, y: number, el: WatchFaceElement): boolean {
+  if (el.type === 'ARC_PROGRESS') return hitTestArc(x, y, el);
+  return hitTestRect(x, y, el.bounds);
+}
+
 function hitTest(x: number, y: number, elements: WatchFaceElement[]): string | null {
+  // First pass: non-TIME_POINTER elements (sorted highest z first).
+  // TIME_POINTER covers the full canvas so it would block everything beneath it.
+  // If an engrave frame (FILL_RECT with engraveFrame) is hit, prefer its parent element.
   for (const el of elements) {
-    if (el.type === 'ARC_PROGRESS') {
-      if (hitTestArc(x, y, el)) return el.id;
-    } else if (el.type === 'TIME_POINTER') {
-      if (hitTestRect(x, y, el.bounds)) return el.id;
-    } else {
-      if (hitTestRect(x, y, el.bounds)) return el.id;
+    if (el.type === 'TIME_POINTER') continue;
+    if (hitTestOne(x, y, el)) {
+      // If this is an engrave frame, redirect selection to its parent if parent is in the list
+      if (el.engraveFrame) {
+        const parent = elements.find(e => e.id === el.engraveFrame!.frameOf);
+        return parent ? parent.id : el.id;
+      }
+      return el.id;
     }
+  }
+  // Second pass: allow TIME_POINTER only if nothing else was hit.
+  for (const el of elements) {
+    if (el.type !== 'TIME_POINTER') continue;
+    if (hitTestOne(x, y, el)) return el.id;
   }
   return null;
 }
@@ -464,8 +479,8 @@ function drawRectSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) 
   const { x, y, width, height } = el.bounds;
 
   ctx.save();
-  ctx.strokeStyle = SEL_COLOR;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(0,212,255,0.35)';
+  ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(x - 1, y - 1, width + 2, height + 2);
   ctx.setLineDash([]);
@@ -671,7 +686,20 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         break;
       case 'TEXT': {
         const { x, y, width, height } = el.bounds;
-        const text = el.text || el.name;
+        // If dateFormat is set, derive a preview string from today's date
+        let text: string;
+        if (el.dateFormat) {
+          const now = new Date();
+          const dd = String(now.getDate()).padStart(2, '0');
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const yyyy = String(now.getFullYear());
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const mmm = months[now.getMonth()];
+          text = el.dateFormat
+            .replace('DD', dd).replace('MM', mm).replace('YYYY', yyyy).replace('MMM', mmm);
+        } else {
+          text = el.text || el.name;
+        }
         const fontSize = el.fontSize ?? 16;
         const color = el.color ? parseZeppColor(el.color) : '#FFFFFF';
         const style = el.fontStyle ? getFontStyle(el.fontStyle) : undefined;
@@ -741,6 +769,35 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         clearShadow(ctx);
         ctx.restore();
         break;
+      case 'CIRCLE': {
+        const { x, y, width: cw, height: ch } = el.bounds;
+        const color = el.color ? parseZeppColor(el.color) : 'rgba(200,200,200,0.8)';
+        const stype = el.shapeType ?? 'circle';
+        ctx.save();
+        applyShadow(ctx, el);
+        if (stype === 'circle') {
+          ctx.beginPath();
+          ctx.ellipse(x + cw / 2, y + ch / 2, cw / 2, ch / 2, 0, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        } else if (stype === 'fill_rect') {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, cw, ch);
+        } else if (stype === 'stroke_rect') {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = el.lineWidth ?? 2;
+          ctx.strokeRect(x, y, cw, ch);
+        } else if (stype === 'rounded_rect') {
+          const cr = el.shapeCornerRadius ?? 12;
+          ctx.beginPath();
+          ctx.roundRect(x, y, cw, ch, cr);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+        clearShadow(ctx);
+        ctx.restore();
+        break;
+      }
       case 'FILL_RECT':
         if (el.engraveFrame) {
           drawEngraveFrame(ctx, el);
@@ -769,46 +826,66 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
 function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const { x, y, width: w, height: h } = el.bounds;
   const cfg = el.engraveFrame!;
-  const blur   = cfg.depth === 'high' ? 14 : 6;
-  const offset = cfg.depth === 'high' ? 5  : 2;
+  const depth = typeof cfg.depth === 'number' ? cfg.depth : (cfg.depth === 'high' ? 12 : 6);
+  const blur = depth * 1.2;
+  const baseOffset = Math.max(1, depth * 0.6);
+  const angle = ((cfg.lightAngle ?? 135) * Math.PI) / 180;
+  const offX = Math.cos(angle) * baseOffset;
+  const offY = Math.sin(angle) * baseOffset;
+  const hiC = cfg.highlightColor ?? '#FFFFFF';
+  const hiO = cfg.highlightOpacity ?? 0.6;
+  const shC = cfg.shadowColor ?? '#000000';
+  const shO = cfg.shadowOpacity ?? 0.6;
+  const hC = hexToRgba(hiC, hiO);
+  const sC = hexToRgba(shC, shO);
+  const isEngrave = cfg.mode === 'inner';
+  const lightEdge = isEngrave ? sC : hC;
+  const darkEdge  = isEngrave ? hC : sC;
+
+  const shape = cfg.shape ?? 'rect';
+  const cr = cfg.cornerRadius ?? 12;
+  const makeClipPath = () => {
+    ctx.beginPath();
+    if (shape === 'circle') {
+      ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+    } else if (shape === 'rounded') {
+      ctx.roundRect(x, y, w, h, cr);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+  };
 
   // Optional solid fill first
   if (cfg.fillMode === 'color') {
     ctx.save();
+    makeClipPath();
     ctx.fillStyle = cfg.fillColor;
-    ctx.fillRect(x, y, w, h);
+    ctx.fill();
     ctx.restore();
   }
 
-  // Engrave (inner): top-left dark, bottom-right light
-  // Emboss  (outer): top-left light, bottom-right dark
-  const [tlColor, brColor] = cfg.mode === 'outer'
-    ? ['rgba(255,255,255,0.55)', 'rgba(0,0,0,0.65)']
-    : ['rgba(0,0,0,0.65)',       'rgba(255,255,255,0.40)'];
-
+  // Shadow edge (cast from light direction)
   ctx.save();
-  // Top-left edges
-  ctx.shadowColor  = tlColor;
-  ctx.shadowBlur   = blur;
-  ctx.shadowOffsetX = offset;
-  ctx.shadowOffsetY = offset;
-  ctx.strokeStyle  = tlColor;
-  ctx.lineWidth    = offset * 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x, y + h);
-  ctx.lineTo(x, y);
-  ctx.lineTo(x + w, y);
-  ctx.stroke();
-  // Bottom-right edges
-  ctx.shadowColor  = brColor;
-  ctx.shadowOffsetX = -offset;
-  ctx.shadowOffsetY = -offset;
-  ctx.strokeStyle  = brColor;
-  ctx.beginPath();
-  ctx.moveTo(x + w, y);
-  ctx.lineTo(x + w, y + h);
-  ctx.lineTo(x, y + h);
-  ctx.stroke();
+  makeClipPath();
+  ctx.clip();
+  ctx.shadowColor   = lightEdge;
+  ctx.shadowBlur    = blur;
+  ctx.shadowOffsetX = offX;
+  ctx.shadowOffsetY = offY;
+  ctx.strokeStyle   = 'transparent';
+  ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+  ctx.restore();
+
+  // Highlight edge (away from light)
+  ctx.save();
+  makeClipPath();
+  ctx.clip();
+  ctx.shadowColor   = darkEdge;
+  ctx.shadowBlur    = blur;
+  ctx.shadowOffsetX = -offX;
+  ctx.shadowOffsetY = -offY;
+  ctx.strokeStyle   = 'transparent';
+  ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
   ctx.restore();
 }
 
@@ -827,6 +904,7 @@ function getPlaceholderText(el: WatchFaceElement): string {
   const name = el.name.toLowerCase();
   if (el.type === 'IMG_TIME') {
     if (el.subtype === 'minutes') return '28';
+    if (el.subtype === 'seconds') return '36';
     return '10'; // hours or legacy single element
   }
   if (name.includes('date')) return '24';
