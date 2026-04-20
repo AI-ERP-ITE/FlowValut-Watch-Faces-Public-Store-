@@ -158,6 +158,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
   // ── Iframe ref ─────────────────────────────────────────────────────────────
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track whether user manually picked a mode so generation doesn't override it
+  const userPickedModeRef = useRef(false);
 
   // ── Load persisted data on open ────────────────────────────────────────────
   useEffect(() => {
@@ -214,19 +216,23 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
         });
       }
       setAiRetryStatus('');
-      // Detect whether the response is SVG or full HTML and set mode accordingly
+      // Only auto-switch mode if the response is unambiguously full HTML.
+      // If the user manually chose HTML mode, keep it even when AI returns SVG.
       const trimmed = result.trim();
       const svgMatch = trimmed.match(/<svg[\s\S]*<\/svg>/i);
       const isFullHtml = /^<!doctype|^<html/i.test(trimmed);
-      if (svgMatch) {
-        setCodeMode('svg');
-        setCode(svgMatch[0]);
-      } else if (isFullHtml) {
+      if (isFullHtml) {
         setCodeMode('html');
         setCode(trimmed);
-      } else {
-        // Fallback: treat as SVG (AI may have omitted wrapper)
+      } else if (svgMatch && !userPickedModeRef.current) {
+        // AI returned SVG and user hasn't manually chosen a mode — auto-set to svg
         setCodeMode('svg');
+        setCode(svgMatch[0]);
+      } else if (svgMatch) {
+        // User manually picked a mode — just update the code, respect their choice
+        setCode(svgMatch[0]);
+      } else {
+        // Unknown content — just set code, keep current mode
         setCode(trimmed);
       }
     } catch (err) {
@@ -392,7 +398,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
                   {(['svg', 'html'] as CodeMode[]).map(m => (
                     <button
                       key={m}
-                      onClick={() => setCodeMode(m)}
+                      onClick={() => { userPickedModeRef.current = true; setCodeMode(m); }}
                       className={`px-3 py-1 text-xs rounded font-mono transition-colors ${
                         codeMode === m ? 'bg-zinc-700 text-white' : 'text-white/40 hover:text-white/70'
                       }`}
