@@ -738,6 +738,53 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         clearShadow(ctx);
         ctx.restore();
         break;
+      case 'IMG_STATUS': {
+        // Render selected icon if set, otherwise draw a generic bluetooth placeholder
+        ctx.save();
+        applyShadow(ctx, el);
+        if (el.iconKey && iconCache) {
+          const cached = iconCache.get(el.iconKey);
+          if (cached) {
+            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+          } else {
+            const entry = getIconByKey(el.iconKey);
+            if (entry) {
+              const img = new Image();
+              img.onload = () => { iconCache.set(el.iconKey!, img); onIconLoaded?.(); };
+              img.src = entry.dataUrl;
+            } else if (el.iconKey.startsWith('tabler:')) {
+              import('@/lib/iconLibrary').then(({ getIconByKeyAsync }) =>
+                getIconByKeyAsync(el.iconKey!).then(asyncEntry => {
+                  if (asyncEntry) {
+                    const img = new Image();
+                    img.onload = () => { iconCache.set(el.iconKey!, img); onIconLoaded?.(); };
+                    img.src = asyncEntry.dataUrl;
+                  }
+                })
+              );
+            }
+            drawPlaceholder(ctx, el);
+          }
+        } else {
+          // Default: draw a simple bluetooth symbol as placeholder
+          const { x, y, width: w, height: h } = el.bounds;
+          ctx.strokeStyle = '#4488FF';
+          ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.07);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(x + w * 0.35, y + h * 0.2);
+          ctx.lineTo(x + w * 0.65, y + h * 0.4);
+          ctx.lineTo(x + w * 0.5, y + h * 0.5);
+          ctx.lineTo(x + w * 0.65, y + h * 0.6);
+          ctx.lineTo(x + w * 0.35, y + h * 0.8);
+          ctx.moveTo(x + w * 0.5, y + h * 0.2);
+          ctx.lineTo(x + w * 0.5, y + h * 0.8);
+          ctx.stroke();
+        }
+        clearShadow(ctx);
+        ctx.restore();
+        break;
+      }
       case 'IMG':
         ctx.save();
         applyShadow(ctx, el);

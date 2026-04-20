@@ -926,7 +926,10 @@ function generateButtonWidget(element: WatchFaceElement, widgetIndex: number, sh
 // ============================================================
 function generateImgStatusWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const statusType = element.statusType || 'DISCONNECT';
-  const src = element.src || 'bluetooth_5_b_30x30.png';
+  // If user picked a custom icon via iconKey, use that PNG; else fall back to built-in asset
+  const src = element.iconKey
+    ? `icon_${element.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`
+    : (element.src || 'bluetooth_5_b_30x30.png');
 
   return `
                 // ${element.name} - IMG_STATUS Widget

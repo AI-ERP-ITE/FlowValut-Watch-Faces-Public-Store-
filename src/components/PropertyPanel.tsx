@@ -869,9 +869,14 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
-      {/* Icon picker — IMG elements only */}
-      {element.type === 'IMG' && (
-        <Section label="Icon">
+      {/* Icon picker — IMG and IMG_STATUS elements */}
+      {(element.type === 'IMG' || element.type === 'IMG_STATUS') && (
+        <Section label={element.type === 'IMG_STATUS' ? 'Disconnect Icon' : 'Icon'}>
+          {element.type === 'IMG_STATUS' && (
+            <p className="text-[9px] text-amber-400/80 mb-1.5 leading-tight">
+              This icon shows only when the condition is inactive (e.g. Bluetooth OFF). This is official Zepp OS behavior — the widget is a warning indicator.
+            </p>
+          )}
           <div className="space-y-2">
             {/* Search box */}
             <input

@@ -615,7 +615,9 @@ function generateButtonWidgetV3(element: WatchFaceElement): string {
 // IMG_STATUS - System status indicators (bluetooth, DND, lock)
 function generateImgStatusWidgetV3(element: WatchFaceElement): string {
   const statusType = element.statusType || 'DISCONNECT';
-  const src = element.src || 'bluetooth_5_b_30x30.png';
+  const src = element.iconKey
+    ? `icon_${element.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`
+    : (element.src || 'bluetooth_5_b_30x30.png');
 
   return `
                 // ${element.name} - IMG_STATUS Widget
