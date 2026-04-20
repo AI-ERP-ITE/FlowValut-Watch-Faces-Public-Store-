@@ -20,6 +20,7 @@ export interface PropertyPanelProps {
   elements?: WatchFaceElement[];
   onAddFrame?: (parent: WatchFaceElement) => void;
   onRemoveFrame?: (parent: WatchFaceElement) => void;
+  iconLibraryKey?: number; // increment to force icon list refresh
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -90,7 +91,7 @@ interface StyleClipboard {
 }
 let _styleClipboard: StyleClipboard | null = null;
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
@@ -102,6 +103,12 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     tablerLoadedRef.current = true;
     getFullIconLibrary().then(setAllIcons);
   }, [element?.type]);
+
+  // Refresh icon list when new custom icons are saved (iconLibraryKey increments)
+  useEffect(() => {
+    if (!iconLibraryKey) return;
+    getFullIconLibrary().then(setAllIcons);
+  }, [iconLibraryKey]);
 
   if (!element) {
     return (

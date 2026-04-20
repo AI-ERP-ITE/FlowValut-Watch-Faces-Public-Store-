@@ -1234,6 +1234,7 @@ function StudioApp() {
   const [showAddElement, setShowAddElement] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
+  const [iconLibraryKey, setIconLibraryKey] = useState(0);
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
@@ -1250,7 +1251,10 @@ function StudioApp() {
   }, []);
 
   const handleLabIconsSaved = useCallback(() => {
-    loadCustomIcons().then(icons => registerCustomIconsInLibrary(icons));
+    loadCustomIcons().then(icons => {
+      registerCustomIconsInLibrary(icons);
+      setIconLibraryKey(k => k + 1);
+    });
   }, []);
 
   const handleLabFontsSaved = useCallback(() => {
@@ -2200,6 +2204,7 @@ function StudioApp() {
                       elements={state.watchFaceConfig.elements}
                       onAddFrame={handleAddFrame}
                       onRemoveFrame={handleRemoveFrame}
+                      iconLibraryKey={iconLibraryKey}
                     />
                     <div className="flex items-center justify-between mt-4">
                       <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
