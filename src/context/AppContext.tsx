@@ -130,7 +130,7 @@ function appReducer(state: AppState, action: Action): AppState {
         const updatedParent = updatedElements.find(el => el.id === action.payload.id);
         if (updatedParent?.frameElementId) {
           const frameEl = updatedElements.find(el => el.id === updatedParent.frameElementId);
-          if (frameEl?.engraveFrame) {
+          if (frameEl?.engraveFrame && frameEl.engraveFrame.linked !== false) {
             const pad = frameEl.engraveFrame.padding;
             const nb = action.payload.changes.bounds;
             updatedElements = updatedElements.map(el =>

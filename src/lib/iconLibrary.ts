@@ -808,11 +808,6 @@ export function getIconByKey(key: string): IconEntry | undefined {
   if (custom) return custom;
   // Tabler icons (from cache, already rendered)
   if (key.startsWith('tabler:') && _tablerRendererModule) {
-    return _tablerRendererModule. icons (fast path)
-  const custom = getIconLibrary().find(i => i.key === key);
-  if (custom) return custom;
-  // Tabler icons (from cache, already rendered)
-  if (key.startsWith('tabler:') && _tablerRendererModule) {
     return _tablerRendererModule.getTablerIconByKey(key);
   }
   return undefined;

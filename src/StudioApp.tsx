@@ -1201,6 +1201,7 @@ function StudioApp() {
         fillMode: 'none',
         fillColor: '#1A1A2E',
         padding: pad,
+        linked: true,
       },
     };
     dispatch({ type: 'ADD_ELEMENT', payload: frameEl });
@@ -1479,7 +1480,10 @@ function StudioApp() {
 
     // Deselect any selected element so the selection rectangle doesn't appear in the preview
     setSelectedElementId(null);
-    // Wait two animation frames for InteractiveCanvas to redraw without the selection highlight
+    // Temporarily hide grid so it doesn't appear in the preview screenshot
+    const gridWasOn = showGrid;
+    if (gridWasOn) setShowGrid(false);
+    // Wait two animation frames for InteractiveCanvas to redraw without selection + grid
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
     // Capture canvas screenshot FIRST before step change unmounts the canvas
@@ -1496,7 +1500,10 @@ function StudioApp() {
       previewDataUrl = state.backgroundImage;
       if (previewDataUrl) setPreviewImageUrl(previewDataUrl);
     }
-    
+
+    // Restore grid after capture
+    if (gridWasOn) setShowGrid(true);
+
     if (!state.watchFaceConfig) {
       console.log('[App] ERROR: Missing watchFaceConfig');
       toast.error('Missing configuration');
@@ -1888,15 +1895,6 @@ function StudioApp() {
               value={state.backgroundImage}
               onFileChange={(file) => { dispatch(actions.setBackgroundFile(file)); if (file) openCropTool(file); }}
             />
-            {/* T038/T039: Edit Photo button — visible only when a background image is loaded */}
-            {state.backgroundImage && (
-              <button
-                onClick={() => setShowPhotoEditor(true)}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md border border-zinc-600 text-zinc-300 hover:text-white hover:border-cyan-500 hover:bg-zinc-800 text-xs font-medium transition-colors"
-              >
-                ✏ Edit Photo
-              </button>
-            )}
             {/* T038/T039: Edit Photo button — visible only when a background image is loaded */}
             {state.backgroundImage && (
               <button
@@ -2343,15 +2341,6 @@ function StudioApp() {
         isVisible={state.isLoading}
         title={state.loadingMessage || 'Processing...'}
       />
-
-      {/* Spec 023 — Background photo editor modal (T040–T043) */}
-      {showPhotoEditor && state.backgroundImage && (
-        <BackgroundPhotoEditor
-          sourceDataUrl={state.backgroundImage}
-          onSave={handlePhotoEditorSave}
-          onCancel={handlePhotoEditorClose}
-        />
-      )}
 
       {/* Spec 023 — Background photo editor modal (T040–T043) */}
       {showPhotoEditor && state.backgroundImage && (

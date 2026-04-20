@@ -104,16 +104,49 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
 
   // ── Frame element: show dedicated controls ──────────────────────────────
   if (element.engraveFrame) {
-    const parentName = elements?.find(e => e.id === element.engraveFrame!.frameOf)?.name ?? 'element';
+    const parentEl = elements?.find(e => e.id === element.engraveFrame!.frameOf);
+    const parentName = parentEl?.name ?? 'element';
     const ef = element.engraveFrame;
+    const isLinked = ef.linked !== false;
     const updateFrame = (patch: Partial<WatchFaceElement['engraveFrame'] & object>) =>
       update({ engraveFrame: { ...ef, ...patch } });
+
+    const handleLinkToggle = (nowLinked: boolean) => {
+      if (nowLinked && parentEl) {
+        // Re-sync bounds to parent + padding immediately on re-link
+        const pad = ef.padding;
+        onUpdateElement?.(element.id, {
+          engraveFrame: { ...ef, linked: true },
+          bounds: {
+            x: parentEl.bounds.x - pad,
+            y: parentEl.bounds.y - pad,
+            width: parentEl.bounds.width + pad * 2,
+            height: parentEl.bounds.height + pad * 2,
+          },
+        });
+      } else {
+        updateFrame({ linked: false });
+      }
+    };
+
     return (
       <div className={`rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-4 ${className ?? ''}`}>
         {/* Header */}
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">⬚ Frame Effect</span>
-          <span className="text-[10px] text-white/40">🔗 {parentName}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleLinkToggle(!isLinked)}
+              title={isLinked ? 'Unlink from parent (move independently)' : 'Re-link to parent (auto-sync position)'}
+              className={cn('flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border transition-colors',
+                isLinked
+                  ? 'border-amber-500/50 text-amber-400 hover:border-amber-400'
+                  : 'border-white/20 text-white/40 hover:border-white/40 hover:text-white/60'
+              )}
+            >
+              {isLinked ? '🔗' : '⛓️‍💥'} {isLinked ? parentName : 'Unlinked'}
+            </button>
+          </div>
         </div>
 
         {/* Mode */}

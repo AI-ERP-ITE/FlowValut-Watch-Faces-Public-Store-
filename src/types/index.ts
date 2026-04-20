@@ -124,6 +124,7 @@ export interface WatchFaceElement {
     fillMode: 'none' | 'color';
     fillColor: string;          // CSS hex e.g. '#1A1A2E'
     padding: number;            // px — positive expands frame beyond parent bounds
+    linked?: boolean;           // true (default) = auto-sync to parent bounds; false = independent
   };
 }
 

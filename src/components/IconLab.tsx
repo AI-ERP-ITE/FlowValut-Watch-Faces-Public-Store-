@@ -68,24 +68,51 @@ async function generateWithOpenAI(prompt: string, apiKey: string): Promise<strin
   return data.choices?.[0]?.message?.content?.trim() ?? '';
 }
 
-async function generateWithGemini(prompt: string, apiKey: string): Promise<string> {
+// ── Retry helper (for 429 / 503 transient errors) ───────────────────────────
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
+const RETRYABLE_STATUS = new Set([429, 503]);
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  onRetry?: (attempt: number, total: number) => void,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(url, options);
+    if (res.ok || !RETRYABLE_STATUS.has(res.status) || attempt === MAX_RETRIES) return res;
+    onRetry?.(attempt + 1, MAX_RETRIES);
+    await new Promise(r => setTimeout(r, RETRY_BASE_MS * Math.pow(2, attempt)));
+  }
+  throw new Error('Unreachable');
+}
+
+async function generateWithGemini(
+  prompt: string,
+  apiKey: string,
+  onRetry?: (attempt: number, total: number) => void,
+): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: `You are an SVG icon designer. Respond ONLY with a valid SVG element (starting with <svg) for a 64×64 icon. No explanation, no markdown, no backticks.\n\n${prompt}`,
-            },
-          ],
-        },
-      ],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
-    }),
-  });
+  const res = await fetchWithRetry(
+    url,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `You are an SVG icon designer. Respond ONLY with a valid SVG element (starting with <svg) for a 64×64 icon. No explanation, no markdown, no backticks.\n\n${prompt}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+      }),
+    },
+    onRetry,
+  );
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
@@ -115,6 +142,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiRetryStatus, setAiRetryStatus] = useState('');
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('zepp-lab-api-key') ?? '');
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
@@ -175,19 +203,29 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
     if (!apiKey || !aiPrompt.trim()) return;
     setAiGenerating(true);
     setAiError('');
+    setAiRetryStatus('');
     try {
       let result = '';
       if (aiModel === 'gpt-4o') {
         result = await generateWithOpenAI(aiPrompt, apiKey);
       } else {
-        result = await generateWithGemini(aiPrompt, apiKey);
+        result = await generateWithGemini(aiPrompt, apiKey, (attempt, total) => {
+          setAiRetryStatus(`Retrying (${attempt}/${total})…`);
+        });
       }
+      setAiRetryStatus('');
       // Extract just the SVG tag if there's extra text
       const svgMatch = result.match(/<svg[\s\S]*<\/svg>/i);
       setCodeMode('svg');
       setCode(svgMatch ? svgMatch[0] : result);
     } catch (err) {
-      setAiError((err as Error).message);
+      setAiRetryStatus('');
+      const msg = (err as Error).message;
+      if (msg.includes('503') || msg.includes('UNAVAILABLE')) {
+        setAiError('Gemini is experiencing high demand. Please try again in a few minutes.');
+      } else {
+        setAiError(msg);
+      }
     } finally {
       setAiGenerating(false);
     }
@@ -429,14 +467,27 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
                         className="w-full text-[11px] bg-zinc-900 border border-white/10 rounded px-2 py-1.5 text-white/70 resize-none focus:outline-none focus:border-violet-500/50 leading-relaxed"
                         rows={3}
                       />
-                      {aiError && <p className="text-[10px] text-red-400">{aiError}</p>}
+                      {aiRetryStatus && <p className="text-[10px] text-yellow-400">{aiRetryStatus}</p>}
+                      {aiError && (
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-red-400">{aiError}</p>
+                          {(aiError.includes('high demand') || aiError.includes('503')) && (
+                            <button
+                              onClick={handleGenerate}
+                              className="text-[10px] text-violet-400 hover:text-violet-300 underline"
+                            >
+                              Retry
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <button
                         onClick={handleGenerate}
                         disabled={aiGenerating || !apiKey || !aiPrompt.trim()}
                         className="w-full flex items-center justify-center gap-2 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs rounded transition-colors font-medium"
                       >
                         {aiGenerating ? (
-                          <><div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating…</>
+                          <><div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {aiRetryStatus || 'Generating…'}</>
                         ) : (
                           <><Wand2 className="h-3 w-3" /> Generate</>
                         )}

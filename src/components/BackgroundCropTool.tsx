@@ -3,6 +3,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Grid3X3 } from 'lucide-react';
 
 const SIZE = 480; // canvas and output size
 const RADIUS = SIZE / 2; // 240
@@ -25,6 +26,9 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
 
   // Drag state
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
+
+  // Grid overlay (visible canvas only — export is separate offscreen canvas)
+  const [showCropGrid, setShowCropGrid] = useState(false);
 
   // ── T003: Load image ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -79,7 +83,26 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
     ctx.arc(RADIUS, RADIUS, RADIUS - 1, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-  }, [offset, scale]);
+
+    // Alignment grid (clipped to circle, never touches export canvas)
+    if (showCropGrid) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(RADIUS, RADIUS, RADIUS - 1, 0, Math.PI * 2);
+      ctx.clip();
+      const third = SIZE / 3;
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 3; i++) {
+        ctx.beginPath(); ctx.moveTo(third * i, 0); ctx.lineTo(third * i, SIZE); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, third * i); ctx.lineTo(SIZE, third * i); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath(); ctx.moveTo(RADIUS, 0); ctx.lineTo(RADIUS, SIZE); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, RADIUS); ctx.lineTo(SIZE, RADIUS); ctx.stroke();
+      ctx.restore();
+    }
+  }, [offset, scale, showCropGrid]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -169,7 +192,7 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
         onPointerLeave={onPointerUp}
       />
 
-      {/* T012: Scale slider */}
+      {/* T012: Scale slider + grid toggle */}
       <div className="w-full max-w-xs flex items-center gap-3">
         <span className="text-xs text-zinc-400">Zoom</span>
         <input
@@ -181,6 +204,13 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
           onChange={onScaleChange}
           className="flex-1 accent-cyan-500"
         />
+        <button
+          onClick={() => setShowCropGrid(g => !g)}
+          title="Toggle alignment grid"
+          className={`p-1 rounded transition-colors ${showCropGrid ? 'text-cyan-400 bg-cyan-400/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+        >
+          <Grid3X3 className="h-4 w-4" />
+        </button>
       </div>
 
       {/* T019/T020: Reset + Confirm + Cancel */}
