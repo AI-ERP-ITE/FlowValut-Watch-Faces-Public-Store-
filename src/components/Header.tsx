@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Watch, Settings, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Settings, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -50,9 +50,7 @@ export function Header() {
       <div className="flex h-14 items-center justify-between px-4 md:px-6">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
-            <Watch className="h-5 w-5 text-white" />
-          </div>
+          <img src="/Watch-Faces/logo.png" alt="Logo" className="h-9 w-auto" />
           <div className="flex flex-col">
             <span className="text-base font-semibold text-white leading-tight">
               Watch Face Creator

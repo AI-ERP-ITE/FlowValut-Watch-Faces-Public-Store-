@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus } from 'lucide-react';
+import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ import { PropertyPanel } from '@/components/PropertyPanel';
 
 import { useApp, actions } from '@/context/AppContext';
 import { buildZPK } from '@/lib/zpkBuilder';
+import { FONT_STYLES } from '@/lib/fontLibrary';
 import { uploadZPKWithQR, regenerateSingleQR } from '@/lib/githubApi';
 import { generateQRCode } from '@/lib/qrGenerator';
 import { getIconByKey } from '@/lib/iconLibrary';
@@ -37,6 +38,11 @@ import { BackgroundCropTool } from '@/components/BackgroundCropTool';
 import { BackgroundPhotoEditor } from '@/components/BackgroundPhotoEditor';
 import { DesignInput } from '@/components/DesignInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { IconLab } from '@/components/IconLab';
+import { loadCustomIcons } from '@/lib/customIconStore';
+import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
+import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
+import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 
 // Mock Kimi analysis - simulates AI analysis
 async function mockKimiAnalysis(
@@ -901,6 +907,150 @@ async function mockKimiAnalysis(
   return { config, elementImages: elementImages };
 }
 
+// ─── ZPK Build Helpers ────────────────────────────────────────────────────────
+
+/**
+ * Apply icon visual effects (hue, saturation, colorize) to an icon data URL.
+ * Mirrors the same logic in InteractiveCanvas.tsx so what you see = what ships in ZPK.
+ */
+async function applyIconEffectsForZPK(
+  dataUrl: string,
+  el: WatchFaceElement,
+  w: number,
+  h: number,
+): Promise<string> {
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = dataUrl;
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+
+  // Hue-rotate + saturation via canvas filter
+  const hue = el.iconHue ?? 0;
+  const sat = el.iconSaturation ?? 100;
+  const filterParts: string[] = [];
+  if (hue !== 0)   filterParts.push(`hue-rotate(${hue}deg)`);
+  if (sat !== 100) filterParts.push(`saturate(${sat}%)`);
+  ctx.save();
+  if (filterParts.length > 0) ctx.filter = filterParts.join(' ');
+  ctx.drawImage(img, 0, 0, w, h);
+  ctx.restore();
+
+  // Colorize: paint solid color through icon's alpha mask (source-in)
+  if (el.iconColorize) {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const octx = offscreen.getContext('2d')!;
+    octx.drawImage(img, 0, 0, w, h);
+    octx.globalCompositeOperation = 'source-in';
+    octx.fillStyle = el.iconColorize;
+    octx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.globalAlpha = el.iconColorizeOpacity ?? 1.0;
+    ctx.drawImage(offscreen, 0, 0);
+    ctx.restore();
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+/**
+ * Regenerate digit/label PNG images from current element colors + font styles.
+ * Called at ZPK build time so that UI color/font choices actually reach the device.
+ */
+function regenerateDigitFilesFromElements(
+  elements: WatchFaceElement[],
+): { filename: string; dataUrl: string }[] {
+  const results: { filename: string; dataUrl: string }[] = [];
+
+  const DATA_TYPE_PREFIXES: Record<string, string> = {
+    BATTERY: 'batt_digit',   STEP: 'step_digit',      HEART: 'heart_digit',
+    SPO2: 'spo2_digit',      CAL: 'cal_digit',         DISTANCE: 'dist_digit',
+    STRESS: 'stress_digit',  PAI: 'pai_digit',         PAI_WEEKLY: 'pai_digit',
+    SLEEP: 'sleep_digit',    STAND: 'stand_digit',     FAT_BURN: 'fatburn_digit',
+    UVI: 'uvi_digit',        AQI: 'aqi_digit',         HUMIDITY: 'humid_digit',
+    WIND: 'wind_digit',      ALARM: 'alarm_digit',     NOTIFICATION: 'notif_digit',
+    MOON: 'moon_digit',      SUN_RISE: 'sunrise_digit',SUN_SET: 'sunset_digit',
+    VO2MAX: 'vo2_digit',     ALTIMETER: 'alt_digit',   TRAINING_LOAD: 'training_digit',
+  };
+
+  function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = color;
+    ctx.font = `${fontWeight} ${Math.floor(h * 0.75)}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(digit, w / 2, h / 2);
+    return canvas.toDataURL('image/png');
+  }
+
+  function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = color;
+    ctx.font = `${fontWeight} ${Math.floor(h * 0.6)}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, w / 2, h / 2);
+    return canvas.toDataURL('image/png');
+  }
+
+  for (const el of elements) {
+    const rawColor = el.color ?? '#FFFFFF';
+    // Normalise color: strip 0xRRGGBBAA → #RRGGBB
+    const color = rawColor.startsWith('0x') || rawColor.startsWith('0X')
+      ? '#' + rawColor.slice(2, 8)
+      : rawColor.substring(0, 7);
+    const fontEntry = el.fontStyle ? FONT_STYLES.find(f => f.key === el.fontStyle) : undefined;
+    const fontFamily = fontEntry?.fontFamily ?? 'Arial';
+    const fontWeight = fontEntry?.fontWeight ?? 'bold';
+
+    if (el.type === 'IMG_TIME') {
+      const w = Math.max(Math.floor((el.bounds.width || 60) / 2), 12);
+      const h = Math.max(el.bounds.height || 50, 16);
+      for (let i = 0; i < 10; i++) {
+        results.push({ filename: `time_digit_${i}.png`, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+      }
+    } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
+      const w = Math.max(Math.floor((el.bounds.width || 40) / 2), 8);
+      const h = Math.max(el.bounds.height || 30, 12);
+      for (let i = 0; i < 10; i++) {
+        results.push({ filename: `date_digit_${i}.png`, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+      }
+    } else if (el.type === 'IMG_WEEK') {
+      const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+      const w = Math.max(el.bounds.width || 40, 20);
+      const h = Math.max(el.bounds.height || 20, 12);
+      for (let i = 0; i < 7; i++) {
+        results.push({ filename: `week_${i}.png`, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
+      }
+    } else if (el.type === 'TEXT_IMG' && el.dataType) {
+      const prefix = DATA_TYPE_PREFIXES[el.dataType];
+      if (prefix) {
+        const w = Math.max(Math.floor((el.bounds.width || 64) / 4), 8);
+        const h = Math.max(el.bounds.height || 25, 12);
+        for (let i = 0; i < 10; i++) {
+          results.push({ filename: `${prefix}_${i}.png`, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
 function StudioApp() {
   const { state, dispatch } = useApp();
   const [watchModel, setWatchModel] = useState('Balance 2');
@@ -909,10 +1059,32 @@ function StudioApp() {
   const [showGrid, setShowGrid] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showAddElement, setShowAddElement] = useState(false);
+  const [labOpen, setLabOpen] = useState(false);
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Load custom icons + fonts from IndexedDB on startup and register them
+  useEffect(() => {
+    Promise.all([loadCustomIcons(), loadCustomFonts(), registerCustomFonts()]).then(
+      ([icons, , loadedFontNames]) => {
+        if (icons.length > 0) registerCustomIconsInLibrary(icons);
+        if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
+      }
+    );
+  }, []);
+
+  const handleLabIconsSaved = useCallback(() => {
+    loadCustomIcons().then(icons => registerCustomIconsInLibrary(icons));
+  }, []);
+
+  const handleLabFontsSaved = useCallback(() => {
+    loadCustomFonts().then(async (fonts) => {
+      const names = await registerCustomFonts();
+      registerCustomFontsInLibrary(names.length > 0 ? names : fonts.map(f => f.name));
+    });
+  }, []);
 
   const handleAddElement = () => {
     if (!state.watchFaceConfig) return;
@@ -1297,7 +1469,22 @@ function StudioApp() {
       if (elementFiles.length === 0) {
         console.warn('[App] WARNING: No element files were prepared!');
       }
-      
+
+      // Regenerate digit images with current element colors + font styles.
+      // This replaces any stale images from initial generation so UI choices reach the device.
+      const freshDigits = regenerateDigitFilesFromElements(state.watchFaceConfig.elements);
+      for (const { filename, dataUrl } of freshDigits) {
+        const p0 = dataUrl.split(',');
+        const b0 = atob(p0[1]);
+        const u0 = new Uint8Array(b0.length);
+        for (let i = 0; i < b0.length; i++) u0[i] = b0.charCodeAt(i);
+        const existing = elementFiles.findIndex(f => f.src === filename);
+        const newFile = { src: filename, file: new File([u0], filename, { type: 'image/png' }) };
+        if (existing >= 0) elementFiles[existing] = newFile;
+        else elementFiles.push(newFile);
+      }
+      console.log('[App] Digit images regenerated with current colors/fonts:', freshDigits.length, 'files updated');
+
       // Pre-warm Tabler icon cache so getIconByKey works synchronously for tabler:* keys
       if (state.watchFaceConfig.elements.some(el => el.iconKey?.startsWith('tabler:'))) {
         dispatch(actions.setLoadingMessage('Warming icon cache...'));
@@ -1305,14 +1492,19 @@ function StudioApp() {
         await buildTablerLibrary();
       }
 
-      // Inject icon assets for elements with iconKey
+      // Inject icon assets for elements with iconKey.
+      // Apply icon visual effects (hue, saturation, colorize) so what you see = what ships.
       for (const el of state.watchFaceConfig.elements) {
         if (el.iconKey) {
           const iconEntry = getIconByKey(el.iconKey);
           if (iconEntry) {
             const safeKey = el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_');
             const filename = `icon_${safeKey}.png`;
-            const p = iconEntry.dataUrl.split(',');
+            const hasEffects = (el.iconHue ?? 0) !== 0 || (el.iconSaturation ?? 100) !== 100 || !!el.iconColorize;
+            const finalDataUrl = hasEffects
+              ? await applyIconEffectsForZPK(iconEntry.dataUrl, el, el.bounds.width || 48, el.bounds.height || 48)
+              : iconEntry.dataUrl;
+            const p = finalDataUrl.split(',');
             const b = atob(p[1]);
             const u8 = new Uint8Array(b.length);
             for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
@@ -1703,6 +1895,13 @@ function StudioApp() {
                         >
                           <Grid3X3 className="h-4 w-4" />
                         </button>
+                        <button
+                          onClick={() => setLabOpen(true)}
+                          className="p-1.5 rounded-lg border text-xs transition-colors bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20 hover:border-violet-400"
+                          title="Studio Lab — create icons & upload fonts"
+                        >
+                          <FlaskConical className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                     <InteractiveCanvas
@@ -1749,6 +1948,14 @@ function StudioApp() {
                     />
                   </div>
                 </div>
+
+                {/* Studio Lab drawer */}
+                <IconLab
+                  open={labOpen}
+                  onClose={() => setLabOpen(false)}
+                  onIconsSaved={handleLabIconsSaved}
+                  onFontsSaved={handleLabFontsSaved}
+                />
 
                 {/* Add Element Dialog */}
                 <Dialog open={showAddElement} onOpenChange={setShowAddElement}>
@@ -1993,6 +2200,14 @@ function StudioApp() {
             />
           );
         })()}
+
+        {/* Studio Lab drawer — icon & font creator */}
+        <IconLab
+          open={labOpen}
+          onClose={() => setLabOpen(false)}
+          onIconsSaved={handleLabIconsSaved}
+          onFontsSaved={handleLabFontsSaved}
+        />
 
         {/* Tips */}
         {state.currentStep === 'upload' && (

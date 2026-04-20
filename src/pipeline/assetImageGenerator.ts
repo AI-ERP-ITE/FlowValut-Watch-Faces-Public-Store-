@@ -10,6 +10,7 @@ import { generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
+import { FONT_STYLES } from '@/lib/fontLibrary';
 
 // ─── Canvas Utility ─────────────────────────────────────────────────────────────
 
@@ -98,12 +99,15 @@ function generateTextImages(
   width: number,
   height: number,
   color: string,
+  style?: { fontFamily: string; fontWeight: string },
 ): ElementImage[] {
+  const fontFamily = style?.fontFamily ?? 'Arial';
+  const fontWeight = style?.fontWeight ?? 'bold';
   return labels.map((label, i) => ({
     name: `${prefix}_${i}.png`,
     dataUrl: createCanvasImage(width, height, (ctx, w, h) => {
       ctx.fillStyle = color;
-      ctx.font = `bold ${Math.floor(h * 0.6)}px Arial`;
+      ctx.font = `${fontWeight} ${Math.floor(h * 0.6)}px ${fontFamily}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, w / 2, h / 2);
@@ -207,6 +211,15 @@ function getElementColor(el: ResolvedElement): string {
   return '#FFFFFF';
 }
 
+/** Get font style for an element via fontFamily field (matches FONT_STYLES entries). */
+function getElementFont(el: ResolvedElement): { fontFamily: string; fontWeight: string } {
+  if (el.fontFamily) {
+    const match = FONT_STYLES.find(f => f.fontFamily === el.fontFamily || f.key === el.fontFamily);
+    if (match) return { fontFamily: match.fontFamily, fontWeight: match.fontWeight };
+  }
+  return { fontFamily: 'Arial', fontWeight: 'bold' };
+}
+
 const DATA_TYPE_PREFIXES: Record<string, string> = {
   BATTERY:  'batt_digit',
   STEP:     'step_digit',
@@ -244,7 +257,9 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
     switch (el.widget) {
       case 'TIME_POINTER': {
         if (!generatedSets.has('clock_hands')) {
-          images.push(...generateClockHands('silver'));
+          // Use hand style from element if provided (falls back to 'silver')
+          const hStyle = ((el as unknown as { handStyle?: string }).handStyle ?? 'silver') as HandStyleKey;
+          images.push(...generateClockHands(hStyle));
           generatedSets.add('clock_hands');
         }
         break;
@@ -253,14 +268,13 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
       case 'IMG_TIME': {
         if (!generatedSets.has('time_digits')) {
           const color = getElementColor(el);
-          // Hours element: width covers 2 digits, so digit width = width/2
-          // Legacy single element: width covers 4 digits + gap = ~5 slots
+          const font  = getElementFont(el);
           const isHoursEl = (el as unknown as { subtype?: string }).subtype === 'hours';
           const timeDigitW = el.w
             ? (isHoursEl ? Math.floor(el.w / 2) : Math.floor(el.w / 5))
             : TIME_DIGIT.w;
           const timeDigitH = el.h ?? TIME_DIGIT.h;
-          images.push(...generateDigitImages('time_digit', timeDigitW, timeDigitH, color));
+          images.push(...generateDigitImages('time_digit', timeDigitW, timeDigitH, color, font));
           generatedSets.add('time_digits');
         }
         break;
@@ -272,16 +286,17 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
             const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
                             'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
             const monthColor = getElementColor(el);
-            images.push(...generateTextImages('month', months, MONTH_LABEL.w, MONTH_LABEL.h, monthColor));
+            const monthFont  = getElementFont(el);
+            images.push(...generateTextImages('month', months, MONTH_LABEL.w, MONTH_LABEL.h, monthColor, monthFont));
             generatedSets.add('month_images');
           }
         } else {
           if (!generatedSets.has('date_digits')) {
             const dateColor = getElementColor(el);
-            // Derive digit size from element bounds (2 digits)
+            const dateFont  = getElementFont(el);
             const dateDigitW = el.w ? Math.floor(el.w / 2) : DATE_DIGIT.w;
             const dateDigitH = el.h ?? DATE_DIGIT.h;
-            images.push(...generateDigitImages('date_digit', dateDigitW, dateDigitH, dateColor));
+            images.push(...generateDigitImages('date_digit', dateDigitW, dateDigitH, dateColor, dateFont));
             generatedSets.add('date_digits');
           }
         }
@@ -292,9 +307,10 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
         if (!generatedSets.has('week_images')) {
           const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
           const weekColor = getElementColor(el);
+          const weekFont  = getElementFont(el);
           const weekW = el.w ?? WEEK_LABEL.w;
           const weekH = el.h ?? WEEK_LABEL.h;
-          images.push(...generateTextImages('week', days, weekW, weekH, weekColor));
+          images.push(...generateTextImages('week', days, weekW, weekH, weekColor, weekFont));
           generatedSets.add('week_images');
         }
         break;
@@ -309,10 +325,10 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
         const prefix = el.dataType ? DATA_TYPE_PREFIXES[el.dataType] || 'digit' : 'digit';
         if (!generatedSets.has(`textimg_${prefix}`)) {
           const color = getElementColor(el);
-          // Derive digit size from element bounds (estimate ~4 chars)
+          const font  = getElementFont(el);
           const txtDigitW = el.w ? Math.floor(el.w / 4) : TEXT_IMG_DIGIT.w;
           const txtDigitH = el.h ?? TEXT_IMG_DIGIT.h;
-          images.push(...generateDigitImages(prefix, txtDigitW, txtDigitH, color));
+          images.push(...generateDigitImages(prefix, txtDigitW, txtDigitH, color, font));
           generatedSets.add(`textimg_${prefix}`);
         }
         break;

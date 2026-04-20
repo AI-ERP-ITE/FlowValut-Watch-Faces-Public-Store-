@@ -6,8 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { WatchFaceElement } from '@/types';
 import { getIconLibrary, getFullIconLibrary } from '@/lib/iconLibrary';
 import type { IconEntry } from '@/lib/iconLibrary';
+import { loadCustomIcons, deleteCustomIcon } from '@/lib/customIconStore';
+import type { CustomIconRecord } from '@/lib/customIconStore';
 import { cn } from '@/lib/utils';
-import { FONT_STYLES, getFontStyle } from '@/lib/fontLibrary';
+import { FONT_STYLES, getFontStyle, getCustomFontStyles } from '@/lib/fontLibrary';
 import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
@@ -80,6 +82,7 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconsLoading, setIconsLoading] = useState(false);
   const [iconSearch, setIconSearch] = useState('');
+  const [customIcons, setCustomIcons] = useState<CustomIconRecord[]>([]);
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
   const tablerLoadedRef = useRef(false);
 
@@ -93,6 +96,15 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
       setIconsLoading(false);
     });
   }, [element?.type]);
+
+  // Load custom icons whenever panel is showing an IMG element
+  useEffect(() => {
+    if (element?.type !== 'IMG') return;
+    loadCustomIcons().then(setCustomIcons);
+  }, [element?.type]);
+
+  // Derive current custom font styles (registered from IndexedDB at startup)
+  const customFontStyles = getCustomFontStyles();
 
   if (!element) {
     return (
@@ -719,6 +731,49 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
                   </div>
                 );
               })}
+              {/* Custom icons grouped by user category */}
+              {(() => {
+                const q = iconSearch.trim().toLowerCase();
+                const filtered = customIcons.filter(i =>
+                  q === '' || i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
+                );
+                if (filtered.length === 0) return null;
+                const cats = Array.from(new Set(filtered.map(i => i.category)));
+                return cats.map(cat => (
+                  <div key={`custom:${cat}`}>
+                    <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <span className="text-violet-400">✦</span>{cat}
+                    </p>
+                    <div className="grid grid-cols-6 gap-1">
+                      {filtered.filter(i => i.category === cat).map(icon => (
+                        <div key={icon.key} className="relative group">
+                          <button
+                            onClick={() => update({ iconKey: icon.key })}
+                            className={cn(
+                              'relative p-1 rounded border w-full',
+                              element.iconKey === icon.key ? 'border-cyan-500 bg-cyan-500/20' : 'border-violet-500/30 bg-violet-500/10 hover:border-violet-400/60'
+                            )}
+                            title={`${icon.name} (custom)`}
+                          >
+                            <img src={icon.dataUrl} alt={icon.name} className="w-6 h-6 object-contain" />
+                            <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-violet-600" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await deleteCustomIcon(icon.key);
+                              setCustomIcons(prev => prev.filter(i => i.key !== icon.key));
+                            }}
+                            className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-3.5 h-3.5 bg-red-600 rounded-full text-white z-10"
+                            title="Delete custom icon"
+                          >
+                            <span className="text-[8px] leading-none">✕</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
             <p className="text-[9px] text-white/25">
               {iconsLoading
@@ -729,6 +784,125 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
             </p>
           </div>
         </Section>
+      )}
+
+      {/* Icon Color & Shadow — IMG elements with an icon selected */}
+      {element.type === 'IMG' && element.iconKey && (
+        <>
+          <Section label="Icon Color">
+            {/* Hue rotation */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/50">Hue Shift</span>
+                <span className="text-[10px] text-white/40 font-mono">{element.iconHue ?? 0}°</span>
+              </div>
+              <input type="range" min="0" max="360" step="1"
+                value={element.iconHue ?? 0}
+                onChange={e => update({ iconHue: Number(e.target.value) })}
+                className="w-full accent-cyan-400 h-1" />
+            </div>
+            {/* Saturation */}
+            <div className="space-y-1 mt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/50">Saturation</span>
+                <span className="text-[10px] text-white/40 font-mono">{element.iconSaturation ?? 100}%</span>
+              </div>
+              <input type="range" min="0" max="200" step="5"
+                value={element.iconSaturation ?? 100}
+                onChange={e => update({ iconSaturation: Number(e.target.value) })}
+                className="w-full accent-cyan-400 h-1" />
+            </div>
+            {/* Colorize (fill tint) */}
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/50">Colorize</span>
+                <div className="flex items-center gap-1.5">
+                  {element.iconColorize && (
+                    <button
+                      onClick={() => update({ iconColorize: undefined })}
+                      className="text-[9px] text-white/30 hover:text-white/60">✕</button>
+                  )}
+                  <input type="color"
+                    value={element.iconColorize ?? '#ffffff'}
+                    onChange={e => update({ iconColorize: e.target.value })}
+                    className="w-6 h-6 rounded cursor-pointer border border-white/20 bg-transparent p-0" />
+                </div>
+              </div>
+              {element.iconColorize && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-white/30 w-14 shrink-0">Blend</span>
+                  <input type="range" min="0" max="1" step="0.05"
+                    value={element.iconColorizeOpacity ?? 1.0}
+                    onChange={e => update({ iconColorizeOpacity: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-400 h-1" />
+                  <span className="text-[9px] font-mono text-white/40 w-8 text-right">
+                    {Math.round((element.iconColorizeOpacity ?? 1.0) * 100)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <Section label="Icon Shadow">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/50">Shadow</span>
+                <span className="text-[10px] text-white/40 font-mono w-8 text-right">{Math.round((element.iconShadow ?? 0) * 100)}%</span>
+              </div>
+              <input type="range" min="0" max="1" step="0.05"
+                value={element.iconShadow ?? 0}
+                onChange={e => update({ iconShadow: Number(e.target.value) })}
+                className="w-full accent-cyan-400 h-1" />
+              {(element.iconShadow ?? 0) > 0 && (
+                <div className="mt-2 pl-2 border-l border-white/10 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-white/30 w-14 shrink-0">Density</span>
+                    <input type="range" min="0" max="1" step="0.05"
+                      value={element.iconShadowOpacity ?? (0.3 + (element.iconShadow ?? 0) * 0.6)}
+                      onChange={e => update({ iconShadowOpacity: Number(e.target.value) })}
+                      className="flex-1 accent-cyan-400 h-1" />
+                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">
+                      {Math.round((element.iconShadowOpacity ?? (0.3 + (element.iconShadow ?? 0) * 0.6)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-white/30 w-14 shrink-0">Blur</span>
+                    <input type="range" min="0" max="30" step="1"
+                      value={element.iconShadowBlur ?? Math.round(4 + (element.iconShadow ?? 0) * 20)}
+                      onChange={e => update({ iconShadowBlur: Number(e.target.value) })}
+                      className="flex-1 accent-cyan-400 h-1" />
+                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">
+                      {element.iconShadowBlur ?? Math.round(4 + (element.iconShadow ?? 0) * 20)}px
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-white/30 w-14 shrink-0">Distance</span>
+                    <input type="range" min="0" max="30" step="1"
+                      value={element.iconShadowDistance ?? Math.round((element.iconShadow ?? 0) * 6)}
+                      onChange={e => update({ iconShadowDistance: Number(e.target.value) })}
+                      className="flex-1 accent-cyan-400 h-1" />
+                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">
+                      {element.iconShadowDistance ?? Math.round((element.iconShadow ?? 0) * 6)}px
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] text-white/30">Direction</span>
+                      <span className="text-[9px] font-mono text-white/40">{element.iconShadowAngle ?? 135}°</span>
+                    </div>
+                    <input type="range" min="0" max="360" step="5"
+                      value={element.iconShadowAngle ?? 135}
+                      onChange={e => update({ iconShadowAngle: Number(e.target.value) })}
+                      className="w-full accent-cyan-400 h-1" />
+                    <div className="flex justify-between text-[8px] text-white/20 px-0.5">
+                      <span>→ 0</span><span>↓ 90</span><span>← 180</span><span>↑ 270</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Section>
+        </>
       )}
 
       {/* Font style picker — text/digit elements */}
@@ -777,6 +951,33 @@ export function PropertyPanel({ element, onUpdateElement, className }: PropertyP
                   </span>
                 </button>
               ))}
+              {customFontStyles.length > 0 && (
+                <>
+                  <div className="px-3 py-1 bg-violet-500/10 border-t border-violet-500/20">
+                    <span className="text-[9px] text-violet-400 uppercase tracking-wider">✦ Custom Fonts</span>
+                  </div>
+                  {customFontStyles.map(style => (
+                    <button
+                      key={style.key}
+                      onClick={() => update({ fontStyle: style.key })}
+                      className={cn(
+                        'w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors',
+                        (element.fontStyle ?? 'bold-white') === style.key
+                          ? 'bg-violet-500/20 border-l-2 border-violet-500'
+                          : 'border-l-2 border-transparent hover:bg-white/5'
+                      )}
+                    >
+                      <span style={{ fontFamily: style.fontFamily, fontWeight: '400', color: '#fff', fontSize: '18px' }}>
+                        12:34
+                      </span>
+                      <span className="flex items-center gap-1 shrink-0 ml-2">
+                        <span className="text-[10px] text-violet-300">{style.label}</span>
+                        <span className="text-[9px] bg-violet-500/20 text-violet-400 border border-violet-500/30 rounded px-1 leading-4">custom</span>
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </Section>

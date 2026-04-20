@@ -757,11 +757,13 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'STROKE_RECT':
         drawFrame(ctx, el);
         break;
-      case 'IMG':
+      case 'IMG': {
+        // ── Resolve icon image ─────────────────────────────────────────────
+        let iconImg: HTMLImageElement | null = null;
         if (el.iconKey && iconCache) {
           const cached = iconCache.get(el.iconKey);
           if (cached) {
-            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+            iconImg = cached;
           } else {
             const entry = getIconByKey(el.iconKey);
             if (entry) {
@@ -769,7 +771,6 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
               img.onload = () => { iconCache.set(el.iconKey!, img); onIconLoaded?.(); };
               img.src = entry.dataUrl;
             } else if (el.iconKey.startsWith('tabler:')) {
-              // Tabler icon not yet in cache — trigger async render
               import('@/lib/iconLibrary').then(({ getIconByKeyAsync }) =>
                 getIconByKeyAsync(el.iconKey!).then(asyncEntry => {
                   if (asyncEntry) {
@@ -780,12 +781,66 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
                 })
               );
             }
-            drawPlaceholder(ctx, el);
           }
+        }
+
+        if (iconImg) {
+          const { x, y, width: w, height: h } = el.bounds;
+
+          // ── Build CSS filter string ────────────────────────────────────
+          const hue  = el.iconHue ?? 0;
+          const sat  = el.iconSaturation ?? 100;
+          const filterParts: string[] = [];
+          if (hue !== 0)   filterParts.push(`hue-rotate(${hue}deg)`);
+          if (sat !== 100) filterParts.push(`saturate(${sat}%)`);
+          const filterStr = filterParts.join(' ');
+
+          // ── Shadow ────────────────────────────────────────────────────
+          const iShadow = el.iconShadow ?? 0;
+          if (iShadow > 0) {
+            const iOp   = el.iconShadowOpacity  ?? (0.3 + iShadow * 0.6);
+            const iBlur = el.iconShadowBlur     ?? (4 + iShadow * 20);
+            const iDist = el.iconShadowDistance ?? (iShadow * 6);
+            const iAng  = (el.iconShadowAngle ?? 135) * Math.PI / 180;
+            ctx.save();
+            ctx.shadowColor   = `rgba(0,0,0,${iOp})`;
+            ctx.shadowBlur    = iBlur;
+            ctx.shadowOffsetX = iDist * Math.cos(iAng);
+            ctx.shadowOffsetY = iDist * Math.sin(iAng);
+            if (filterStr) ctx.filter = filterStr;
+            ctx.drawImage(iconImg, x, y, w, h);
+            ctx.restore();
+          } else {
+            ctx.save();
+            if (filterStr) ctx.filter = filterStr;
+            ctx.drawImage(iconImg, x, y, w, h);
+            ctx.restore();
+          }
+
+          // ── Colorize: paint solid color through icon's alpha mask ────────
+          if (el.iconColorize) {
+            // 1. Draw icon into offscreen canvas
+            const offscreen = document.createElement('canvas');
+            offscreen.width = w; offscreen.height = h;
+            const octx = offscreen.getContext('2d')!;
+            octx.drawImage(iconImg, 0, 0, w, h);
+            // 2. Paint the chosen color only where icon pixels exist (source-in)
+            octx.globalCompositeOperation = 'source-in';
+            octx.fillStyle = el.iconColorize;
+            octx.fillRect(0, 0, w, h);
+            // 3. Blend result back onto main canvas
+            ctx.save();
+            ctx.globalAlpha = el.iconColorizeOpacity ?? 1.0;
+            ctx.drawImage(offscreen, x, y, w, h);
+            ctx.restore();
+          }
+        } else if (el.iconKey) {
+          drawPlaceholder(ctx, el);
         } else {
           drawPlaceholder(ctx, el);
         }
         break;
+      }
       default:
         drawPlaceholder(ctx, el);
         break;

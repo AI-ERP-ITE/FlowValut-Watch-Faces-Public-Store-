@@ -62,9 +62,12 @@ export function HomePage() {
         className="py-20 px-6 text-center border-b border-[#181A1F]"
         style={{ background: 'radial-gradient(ellipse at center, #181A1F 0%, #101115 70%)' }}
       >
-        <h1 className="font-sans font-light text-4xl tracking-tight text-[#D9DBE0] mb-3">
-          Flowvault
-        </h1>
+        <div className="flex items-center justify-center gap-4 mb-3">
+          <img src="/Watch-Faces/logo.png" alt="Flowvault" className="h-16 w-auto" />
+          <h1 className="font-sans font-light text-4xl tracking-tight text-[#D9DBE0]">
+            Flowvault
+          </h1>
+        </div>
         <p className="font-sans text-lg text-[#8E9196] mb-2">
           Premium Watchfaces for Amazfit
         </p>

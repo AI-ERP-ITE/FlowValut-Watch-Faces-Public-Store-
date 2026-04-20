@@ -86,7 +86,31 @@ export const FONT_STYLES: FontStyle[] = [
 ];
 
 export function getFontStyle(key: string): FontStyle {
-  return FONT_STYLES.find(f => f.key === key) ?? FONT_STYLES[0];
+  const builtin = FONT_STYLES.find(f => f.key === key);
+  if (builtin) return builtin;
+  const custom = _customFontRegistry.find(f => f.key === key);
+  if (custom) return custom;
+  return FONT_STYLES[0];
+}
+
+// ── Custom font registry ───────────────────────────────────────────────────────
+let _customFontRegistry: FontStyle[] = [];
+
+/** Register user-uploaded fonts so they appear in the font picker. */
+export function registerCustomFontsInLibrary(names: string[]): void {
+  _customFontRegistry = names.map(name => ({
+    key: `custom-font:${name}`,
+    label: name,
+    fontFamily: name,
+    fontWeight: '400',
+    color: '#FFFFFF',
+    category: 'display' as FontCategory,
+  }));
+}
+
+/** Get all custom font styles currently registered. */
+export function getCustomFontStyles(): FontStyle[] {
+  return _customFontRegistry;
 }
 
 export function generateFontPreview(style: FontStyle): string {

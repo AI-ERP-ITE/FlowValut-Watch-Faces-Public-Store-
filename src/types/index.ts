@@ -70,6 +70,17 @@ export interface WatchFaceElement {
   // Icon library
   iconKey?: string;
 
+  // ── Icon appearance (IMG elements with iconKey) ──────────────────────────
+  iconHue?: number;           // 0–360°: hue rotation shift
+  iconSaturation?: number;    // 0–200%: 100 = normal, 0 = greyscale, 200 = vivid
+  iconColorize?: string;      // hex color overlay (e.g. '#FF4444') for solid-color tint
+  iconColorizeOpacity?: number; // 0–1: strength of colorize overlay, default 0.7
+  iconShadow?: number;        // 0–1: master shadow on/off
+  iconShadowOpacity?: number; // 0–1: darkness
+  iconShadowBlur?: number;    // 0–30px
+  iconShadowDistance?: number;// 0–30px
+  iconShadowAngle?: number;   // 0–360°
+
   // Weather IMG_LEVEL style
   weatherStyle?: string;
 

@@ -791,6 +791,24 @@ export function getIconLibrary(): IconEntry[] {
   return _cache;
 }
 
+// ── Custom icon registry (IndexedDB-loaded icons registered at runtime) ───────
+const _customRegistry = new Map<string, IconEntry>();
+
+/** Register user-created custom icons so getIconByKey() can resolve them synchronously. */
+export function registerCustomIconsInLibrary(icons: { key: string; name?: string; label?: string; dataUrl: string; width: number; height: number; category: string }[]): void {
+  for (const ic of icons) {
+    _customRegistry.set(ic.key, {
+      key: ic.key,
+      label: ic.label ?? ic.name ?? ic.key,
+      category: ic.category as IconEntry['category'],
+      source: 'custom',
+      dataUrl: ic.dataUrl,
+      width: ic.width,
+      height: ic.height,
+    });
+  }
+}
+
 /**
 /**
  * Sanitize an icon key for use as a filename (removes characters invalid on Windows/ZeppOS).
@@ -829,7 +847,9 @@ export function getIconBySafeKey(safeKey: string): IconEntry | undefined {
  * Use getIconByKeyAsync() to guarantee a result for Tabler keys.
  */
 export function getIconByKey(key: string): IconEntry | undefined {
-  // Custom icons (fast path)
+  // Custom user icons (registered from IndexedDB at startup)
+  if (_customRegistry.has(key)) return _customRegistry.get(key);
+  // Built-in hand-drawn icons (fast path)
   const custom = getIconLibrary().find(i => i.key === key);
   if (custom) return custom;
   // Tabler icons: we cannot use require() in Vite/ESM — return undefined so the
