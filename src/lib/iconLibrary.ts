@@ -796,14 +796,24 @@ export function getIconLibrary(): IconEntry[] {
  * For Tabler icons that haven't been rendered yet, returns undefined synchronously.
  * Use getIconByKeyAsync() to guarantee a result for Tabler keys.
  */
+// Lazy reference to the tabler renderer module (set on first async load)
+let _tablerRendererModule: typeof import('./tablerIconRenderer') | null = null;
+
+// Pre-load the tabler renderer so synchronous lookups work after first async call
+import('./tablerIconRenderer').then(mod => { _tablerRendererModule = mod; });
+
 export function getIconByKey(key: string): IconEntry | undefined {
   // Custom icons (fast path)
   const custom = getIconLibrary().find(i => i.key === key);
   if (custom) return custom;
   // Tabler icons (from cache, already rendered)
-  if (key.startsWith('tabler:')) {
-    const { getTablerIconByKey } = require('./tablerIconRenderer') as typeof import('./tablerIconRenderer');
-    return getTablerIconByKey(key);
+  if (key.startsWith('tabler:') && _tablerRendererModule) {
+    return _tablerRendererModule. icons (fast path)
+  const custom = getIconLibrary().find(i => i.key === key);
+  if (custom) return custom;
+  // Tabler icons (from cache, already rendered)
+  if (key.startsWith('tabler:') && _tablerRendererModule) {
+    return _tablerRendererModule.getTablerIconByKey(key);
   }
   return undefined;
 }
