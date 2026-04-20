@@ -826,26 +826,26 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
 function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const { x, y, width: w, height: h } = el.bounds;
   const cfg = el.engraveFrame!;
-  const depth = typeof cfg.depth === 'number' ? cfg.depth : (cfg.depth === 'high' ? 12 : 6);
-  const blur = depth * 1.2;
-  const baseOffset = Math.max(1, depth * 0.6);
+  const depth = typeof cfg.depth === 'number' ? cfg.depth : 6;
+  const blur = Math.max(2, depth * 1.5);
+  const offsetMag = Math.max(1, depth * 0.5);
   const angle = ((cfg.lightAngle ?? 135) * Math.PI) / 180;
-  const offX = Math.cos(angle) * baseOffset;
-  const offY = Math.sin(angle) * baseOffset;
+  const offX = Math.cos(angle) * offsetMag;
+  const offY = Math.sin(angle) * offsetMag;
+
   const hiC = cfg.highlightColor ?? '#FFFFFF';
   const hiO = cfg.highlightOpacity ?? 0.6;
   const shC = cfg.shadowColor ?? '#000000';
   const shO = cfg.shadowOpacity ?? 0.6;
-  const hC = hexToRgba(hiC, hiO);
-  const sC = hexToRgba(shC, shO);
+
   const isEngrave = cfg.mode === 'inner';
-  const lightEdge = isEngrave ? sC : hC;
-  const darkEdge  = isEngrave ? hC : sC;
+  const lightSideColor = hexToRgba(isEngrave ? shC : hiC, isEngrave ? shO : hiO);
+  const darkSideColor  = hexToRgba(isEngrave ? hiC : shC, isEngrave ? hiO : shO);
 
   const shape = cfg.shape ?? 'rect';
   const cr = cfg.cornerRadius ?? 12;
-  const makeClipPath = () => {
-    ctx.beginPath();
+
+  const makeShapePath = () => {
     if (shape === 'circle') {
       ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
     } else if (shape === 'rounded') {
@@ -855,38 +855,42 @@ function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
     }
   };
 
-  // Optional solid fill first
+  // Optional solid fill
   if (cfg.fillMode === 'color') {
     ctx.save();
-    makeClipPath();
+    ctx.beginPath();
+    makeShapePath();
     ctx.fillStyle = cfg.fillColor;
     ctx.fill();
     ctx.restore();
   }
 
-  // Shadow edge (cast from light direction)
-  ctx.save();
-  makeClipPath();
-  ctx.clip();
-  ctx.shadowColor   = lightEdge;
-  ctx.shadowBlur    = blur;
-  ctx.shadowOffsetX = offX;
-  ctx.shadowOffsetY = offY;
-  ctx.strokeStyle   = 'transparent';
-  ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
-  ctx.restore();
+  // Inner shadow via evenodd donut technique:
+  // 1. Clip to the shape so only the interior is visible.
+  // 2. Draw a "donut": large outer rect minus the shape (evenodd subtracts the hole).
+  // 3. The opaque donut fill gets clipped away, but its SHADOW spills INTO the clip region.
+  // This is the only reliable way to render inset / inner shadows on HTML Canvas.
+  const drawInnerShadow = (shadowCol: string, ox: number, oy: number) => {
+    ctx.save();
+    ctx.beginPath();
+    makeShapePath();
+    ctx.clip();
+    ctx.beginPath();
+    ctx.rect(x - 9999, y - 9999, w + 19998, h + 19998); // large outer rect
+    makeShapePath();                                       // subtract inner shape
+    ctx.shadowColor   = shadowCol;
+    ctx.shadowBlur    = blur;
+    ctx.shadowOffsetX = ox;
+    ctx.shadowOffsetY = oy;
+    ctx.fillStyle     = 'rgba(0,0,0,0.9)'; // opaque so it casts shadow; hidden by clip
+    ctx.fill('evenodd');
+    ctx.restore();
+  };
 
-  // Highlight edge (away from light)
-  ctx.save();
-  makeClipPath();
-  ctx.clip();
-  ctx.shadowColor   = darkEdge;
-  ctx.shadowBlur    = blur;
-  ctx.shadowOffsetX = -offX;
-  ctx.shadowOffsetY = -offY;
-  ctx.strokeStyle   = 'transparent';
-  ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
-  ctx.restore();
+  // Light-side edge shadow
+  drawInnerShadow(lightSideColor,  offX,  offY);
+  // Dark-side edge (opposite light)
+  drawInnerShadow(darkSideColor,  -offX, -offY);
 }
 
 // ─── Digit element: IMG_TIME, IMG_DATE, IMG_WEEK, TEXT_IMG ──────────────────────
