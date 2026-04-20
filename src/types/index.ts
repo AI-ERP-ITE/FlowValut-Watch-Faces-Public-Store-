@@ -126,6 +126,15 @@ export interface WatchFaceElement {
     padding: number;            // px — positive expands frame beyond parent bounds
     linked?: boolean;           // true (default) = auto-sync to parent bounds; false = independent
   };
+
+  // Universal drop shadow (canvas preview + ZPK PNG baking for simple elements)
+  dropShadow?: {
+    color: string;      // CSS hex e.g. '#000000'
+    opacity: number;    // 0–1
+    blur: number;       // px 0–40
+    offsetX: number;    // px -30 to +30
+    offsetY: number;    // px -30 to +30
+  };
 }
 
 export interface WatchFaceConfig {

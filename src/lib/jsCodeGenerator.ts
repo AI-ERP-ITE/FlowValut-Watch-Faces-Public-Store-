@@ -6,6 +6,32 @@ import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import { generateWatchFaceCodeV2 } from './jsCodeGeneratorV2';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 
+/** Compute shadow-bake padding (mirrors V2 helper). */
+function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
+  return ds.blur + Math.max(Math.abs(ds.offsetX), Math.abs(ds.offsetY)) + 4;
+}
+
+function _shadowImgWidgetV3(element: WatchFaceElement, label: string): string {
+  const ds = element.dropShadow!;
+  const pad = _shadowPad(ds);
+  const safeName = element.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `shadow_${safeName}.png`;
+  const x = element.bounds.x - pad;
+  const y = element.bounds.y - pad;
+  const w = (element.bounds.width || 50) + pad * 2;
+  const h = (element.bounds.height || 50) + pad * 2;
+  return `
+                // ${element.name} - ${label} (shadow-baked IMG)
+                hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${x}),
+                    y: px(${y}),
+                    w: px(${w}),
+                    h: px(${h}),
+                    src: 'assets/${filename}',
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
+}
+
 // Device models using V2 format (Balance 2, Balance, Active Max, etc.)
 const V2_DEVICE_MODELS = [
   'Balance 2',
@@ -322,6 +348,7 @@ function generateWidgetCode(element: WatchFaceElement): string {
     case 'IMG_STATUS':
       return generateImgStatusWidgetV3(element);
     case 'CIRCLE':
+      if (element.dropShadow) return _shadowImgWidgetV3(element, 'Circle');
       return generateCircleWidgetV3(element);
     case 'IMG_LEVEL':
       return generateImgLevelWidgetV3(element);
@@ -340,9 +367,11 @@ function generateWidgetCode(element: WatchFaceElement): string {
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
       }
+      if (element.dropShadow) return _shadowImgWidgetV3(element, 'Fill Rect');
       return generateFillRectWidgetV3(element);
     }
     case 'STROKE_RECT':
+      if (element.dropShadow) return _shadowImgWidgetV3(element, 'Stroke Rect');
       return generateStrokeRectWidgetV3(element);
     case 'IMG_ANIM':
       return generateImgAnimWidgetV3(element);
@@ -359,6 +388,8 @@ function generateWidgetCode(element: WatchFaceElement): string {
 
   // Handle IMG elements (static images / icons)
   if (element.type === 'IMG' || !element.type) {
+    if (element.dropShadow) return _shadowImgWidgetV3(element, 'IMG');
+
     const w = element.bounds.width || 50;
     const h = element.bounds.height || 50;
     const imgSrc = element.iconKey

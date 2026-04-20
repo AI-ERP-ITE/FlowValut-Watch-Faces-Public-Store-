@@ -546,6 +546,34 @@ function drawPointerSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElemen
   ctx.restore();
 }
 
+// ─── Universal Drop Shadow helpers ──────────────────────────────────────────
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.substring(0, 2), 16) || 0,
+    g: parseInt(h.substring(2, 4), 16) || 0,
+    b: parseInt(h.substring(4, 6), 16) || 0,
+  };
+}
+
+function applyShadow(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
+  const s = el.dropShadow;
+  if (!s) return;
+  const { r, g, b } = hexToRgb(s.color);
+  ctx.shadowColor = `rgba(${r},${g},${b},${s.opacity})`;
+  ctx.shadowBlur = s.blur;
+  ctx.shadowOffsetX = s.offsetX;
+  ctx.shadowOffsetY = s.offsetY;
+}
+
+function clearShadow(ctx: CanvasRenderingContext2D) {
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+}
+
 // ─── Background ─────────────────────────────────────────────────────────────────
 
 function drawGrid(ctx: CanvasRenderingContext2D) {
@@ -622,7 +650,11 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
 
     switch (el.type) {
       case 'ARC_PROGRESS':
+        ctx.save();
+        applyShadow(ctx, el);
         drawArc(ctx, el);
+        clearShadow(ctx);
+        ctx.restore();
         break;
       case 'TIME_POINTER':
         drawTimePointer(ctx, el, handCache, onIconLoaded);
@@ -631,7 +663,11 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'IMG_DATE':
       case 'IMG_WEEK':
       case 'TEXT_IMG':
+        ctx.save();
+        applyShadow(ctx, el);
         drawDigitElement(ctx, el, digitCache, onIconLoaded);
+        clearShadow(ctx);
+        ctx.restore();
         break;
       case 'TEXT': {
         const { x, y, width, height } = el.bounds;
@@ -642,15 +678,19 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         const fontFamily = style?.fontFamily ?? 'Arial';
         const fontWeight = style?.fontWeight ?? 'bold';
         ctx.save();
+        applyShadow(ctx, el);
         ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
         ctx.fillStyle = color;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, x + width / 2, y + height / 2, width);
+        clearShadow(ctx);
         ctx.restore();
         break;
       }
       case 'IMG_LEVEL':
+        ctx.save();
+        applyShadow(ctx, el);
         if (el.dataType === 'WEATHER_CURRENT' && iconCache) {
           const wStyle = (el.weatherStyle ?? 'flat') as WeatherStyle;
           const cacheKey = `__weather_${wStyle}_2`;
@@ -658,7 +698,6 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           if (cached) {
             ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
           } else {
-            // Generate preview for code=2 (Partly Cloudy) asynchronously
             const dataUrls = generateWeatherSet(wStyle);
             const img = new Image();
             img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
@@ -668,8 +707,12 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         } else {
           drawPlaceholder(ctx, el);
         }
+        clearShadow(ctx);
+        ctx.restore();
         break;
       case 'IMG':
+        ctx.save();
+        applyShadow(ctx, el);
         if (el.iconKey && iconCache) {          const cached = iconCache.get(el.iconKey);
           if (cached) {
             ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
@@ -680,7 +723,6 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
               img.onload = () => { iconCache.set(el.iconKey!, img); onIconLoaded?.(); };
               img.src = entry.dataUrl;
             } else if (el.iconKey.startsWith('tabler:')) {
-              // Tabler icon not yet in cache — trigger async render
               import('@/lib/iconLibrary').then(({ getIconByKeyAsync }) =>
                 getIconByKeyAsync(el.iconKey!).then(asyncEntry => {
                   if (asyncEntry) {
@@ -696,19 +738,27 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         } else {
           drawPlaceholder(ctx, el);
         }
+        clearShadow(ctx);
+        ctx.restore();
         break;
       case 'FILL_RECT':
         if (el.engraveFrame) {
           drawEngraveFrame(ctx, el);
         } else {
           ctx.save();
+          applyShadow(ctx, el);
           ctx.fillStyle = el.color ? parseZeppColor(el.color) : 'rgba(80,80,80,0.5)';
           ctx.fillRect(el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+          clearShadow(ctx);
           ctx.restore();
         }
         break;
       default:
+        ctx.save();
+        applyShadow(ctx, el);
         drawPlaceholder(ctx, el);
+        clearShadow(ctx);
+        ctx.restore();
         break;
     }
   }

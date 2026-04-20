@@ -1051,6 +1051,102 @@ function regenerateDigitFilesFromElements(
   return results;
 }
 
+// ─── Drop-shadow PNG baking helpers ─────────────────────────────────────────
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.substring(0, 2), 16) || 0,
+    g: parseInt(h.substring(2, 4), 16) || 0,
+    b: parseInt(h.substring(4, 6), 16) || 0,
+  };
+}
+
+/** Compute extra canvas padding required to contain a drop shadow. */
+function shadowPadding(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
+  return ds.blur + Math.max(Math.abs(ds.offsetX), Math.abs(ds.offsetY)) + 4;
+}
+
+function applyShadowToCtx(ctx: CanvasRenderingContext2D, ds: NonNullable<WatchFaceElement['dropShadow']>) {
+  const { r, g, b } = hexToRgb(ds.color);
+  ctx.shadowColor = `rgba(${r},${g},${b},${ds.opacity})`;
+  ctx.shadowBlur = ds.blur;
+  ctx.shadowOffsetX = ds.offsetX;
+  ctx.shadowOffsetY = ds.offsetY;
+}
+
+/**
+ * Bake an IMG element (icon) with its drop shadow into a padded PNG.
+ * Returns { dataUrl, pad } where pad is the extra pixels on each side.
+ */
+function renderImgWithShadowToPng(
+  el: WatchFaceElement,
+  imgElement: HTMLImageElement,
+): { dataUrl: string; pad: number } {
+  const ds = el.dropShadow!;
+  const pad = shadowPadding(ds);
+  const w = el.bounds.width || 50;
+  const h = el.bounds.height || 50;
+  const canvas = document.createElement('canvas');
+  canvas.width = w + pad * 2;
+  canvas.height = h + pad * 2;
+  const ctx = canvas.getContext('2d')!;
+  applyShadowToCtx(ctx, ds);
+  ctx.drawImage(imgElement, pad, pad, w, h);
+  return { dataUrl: canvas.toDataURL('image/png'), pad };
+}
+
+/** Bake a FILL_RECT (non-engrave) with its drop shadow. */
+function renderFillRectWithShadowToPng(el: WatchFaceElement): { dataUrl: string; pad: number } {
+  const ds = el.dropShadow!;
+  const pad = shadowPadding(ds);
+  const w = el.bounds.width || 50;
+  const h = el.bounds.height || 50;
+  const canvas = document.createElement('canvas');
+  canvas.width = w + pad * 2;
+  canvas.height = h + pad * 2;
+  const ctx = canvas.getContext('2d')!;
+  applyShadowToCtx(ctx, ds);
+  ctx.fillStyle = el.color ? el.color.replace(/^0x/, '#') : 'rgba(80,80,80,0.5)';
+  ctx.fillRect(pad, pad, w, h);
+  return { dataUrl: canvas.toDataURL('image/png'), pad };
+}
+
+/** Bake a STROKE_RECT with its drop shadow. */
+function renderStrokeRectWithShadowToPng(el: WatchFaceElement): { dataUrl: string; pad: number } {
+  const ds = el.dropShadow!;
+  const pad = shadowPadding(ds);
+  const w = el.bounds.width || 50;
+  const h = el.bounds.height || 50;
+  const canvas = document.createElement('canvas');
+  canvas.width = w + pad * 2;
+  canvas.height = h + pad * 2;
+  const ctx = canvas.getContext('2d')!;
+  applyShadowToCtx(ctx, ds);
+  ctx.strokeStyle = el.color ? el.color.replace(/^0x/, '#') : '#FFFFFF';
+  ctx.lineWidth = el.lineWidth ?? 2;
+  ctx.strokeRect(pad, pad, w, h);
+  return { dataUrl: canvas.toDataURL('image/png'), pad };
+}
+
+/** Bake a CIRCLE with its drop shadow. */
+function renderCircleWithShadowToPng(el: WatchFaceElement): { dataUrl: string; pad: number } {
+  const ds = el.dropShadow!;
+  const pad = shadowPadding(ds);
+  const r = el.radius ?? Math.min(el.bounds.width, el.bounds.height) / 2;
+  const size = r * 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = size + pad * 2;
+  canvas.height = size + pad * 2;
+  const ctx = canvas.getContext('2d')!;
+  applyShadowToCtx(ctx, ds);
+  ctx.fillStyle = el.color ? el.color.replace(/^0x/, '#') : '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(pad + r, pad + r, r, 0, Math.PI * 2);
+  ctx.fill();
+  return { dataUrl: canvas.toDataURL('image/png'), pad };
+}
+
 /** Renders a FILL_RECT element with engraveFrame effect to a PNG data URL (for ZPK export). */
 function renderEngraveFrameToPng(el: WatchFaceElement): string {
   const w = el.bounds?.width ?? 100;
@@ -1640,6 +1736,45 @@ function StudioApp() {
           const filename = `frame_${safeName}.png`;
           const dataUrl = renderEngraveFrameToPng(el);
           const pf = dataUrl.split(',');
+          const bf = atob(pf[1]);
+          const uf = new Uint8Array(bf.length);
+          for (let i = 0; i < bf.length; i++) uf[i] = bf.charCodeAt(i);
+          elementFiles.push({ src: filename, file: new File([uf], filename, { type: 'image/png' }) });
+        }
+      }
+
+      // ── Drop-shadow baking for IMG / FILL_RECT / STROKE_RECT / CIRCLE ──
+      for (const el of state.watchFaceConfig.elements) {
+        if (!el.dropShadow) continue;
+        const safeName = el.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+        let bakeResult: { dataUrl: string; pad: number } | null = null;
+
+        if (el.type === 'IMG' && el.iconKey) {
+          // Load the icon image (use effects-applied version if present in elementFiles)
+          const safeKey = el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+          const existingFile = elementFiles.find(f => f.src === `icon_${safeKey}.png`);
+          if (existingFile) {
+            const imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
+              const img = new Image();
+              img.onload = () => resolve(img);
+              img.onerror = reject;
+              const reader = new FileReader();
+              reader.onload = () => { img.src = reader.result as string; };
+              reader.readAsDataURL(existingFile.file);
+            });
+            bakeResult = renderImgWithShadowToPng(el, imgEl);
+          }
+        } else if (el.type === 'FILL_RECT' && !el.engraveFrame) {
+          bakeResult = renderFillRectWithShadowToPng(el);
+        } else if (el.type === 'STROKE_RECT') {
+          bakeResult = renderStrokeRectWithShadowToPng(el);
+        } else if (el.type === 'CIRCLE') {
+          bakeResult = renderCircleWithShadowToPng(el);
+        }
+
+        if (bakeResult) {
+          const filename = `shadow_${safeName}.png`;
+          const pf = bakeResult.dataUrl.split(',');
           const bf = atob(pf[1]);
           const uf = new Uint8Array(bf.length);
           for (let i = 0; i < bf.length; i++) uf[i] = bf.charCodeAt(i);

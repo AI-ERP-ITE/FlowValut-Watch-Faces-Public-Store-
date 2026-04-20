@@ -5,6 +5,38 @@
 import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 
+/** Compute extra canvas padding required to contain a drop shadow (mirrors StudioApp helper). */
+function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
+  return ds.blur + Math.max(Math.abs(ds.offsetX), Math.abs(ds.offsetY)) + 4;
+}
+
+/** Emit an IMG widget that references a pre-baked shadow PNG with padded bounds. */
+function _shadowImgWidget(
+  element: WatchFaceElement,
+  widgetIndex: number,
+  showLevel: string,
+  label: string,
+): string {
+  const ds = element.dropShadow!;
+  const pad = _shadowPad(ds);
+  const safeName = element.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `shadow_${safeName}.png`;
+  const x = element.bounds.x - pad;
+  const y = element.bounds.y - pad;
+  const w = (element.bounds.width || 50) + pad * 2;
+  const h = (element.bounds.height || 50) + pad * 2;
+  return `
+                // ${element.name} - ${label} (shadow-baked IMG)
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${x}),
+                    y: px(${y}),
+                    w: px(${w}),
+                    h: px(${h}),
+                    src: 'assets/${filename}',
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+}
+
 export function generateWatchFaceCodeV2(config: WatchFaceConfig): GeneratedCode {
   console.log('[JSGenV2] Starting v2 code generation for:', config.name);
   try {
@@ -556,6 +588,7 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
     case 'IMG_STATUS':
       return generateImgStatusWidget(element, widgetIndex, showLevel);
     case 'CIRCLE':
+      if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'Circle');
       return generateCircleWidget(element, widgetIndex, showLevel);
     case 'IMG_LEVEL':
       return generateImgLevelWidget(element, widgetIndex, showLevel);
@@ -575,9 +608,11 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
                     show_level: hmUI.show_level.${showLevel}
                 });`;
       }
+      if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'Fill Rect');
       return generateFillRectWidget(element, widgetIndex, showLevel);
     }
     case 'STROKE_RECT':
+      if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'Stroke Rect');
       return generateStrokeRectWidget(element, widgetIndex, showLevel);
     case 'IMG_ANIM':
       return generateImgAnimWidget(element, widgetIndex, showLevel);
@@ -594,6 +629,9 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
   
   // Handle IMG elements (static images)
   if (element.type === 'IMG') {
+    // Drop-shadow baked → padded shadow PNG
+    if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'IMG');
+
     const w = element.bounds.width || 50;
     const h = element.bounds.height || 50;
     const imgSrc = element.iconKey ? `icon_${element.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png` : (element.src || 'placeholder.png');

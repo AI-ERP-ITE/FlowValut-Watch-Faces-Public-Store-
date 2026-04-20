@@ -811,6 +811,154 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* Drop Shadow — all types except TIME_POINTER (has handShadow) and engraveFrame elements */}
+      {!['TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
+        <Section label="Drop Shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] text-white/60">Enable shadow</span>
+            <Switch
+              checked={!!element.dropShadow}
+              onCheckedChange={checked => {
+                if (checked) {
+                  update({ dropShadow: { color: '#000000', opacity: 0.6, blur: 8, offsetX: 3, offsetY: 3 } });
+                } else {
+                  update({ dropShadow: undefined });
+                }
+              }}
+              id={`shadow-${element.id}`}
+            />
+          </div>
+          {element.dropShadow && (() => {
+            const ds = element.dropShadow;
+            const updateShadow = (patch: Partial<NonNullable<typeof element.dropShadow>>) =>
+              update({ dropShadow: { ...ds, ...patch } });
+            const previewOnly = ['TEXT', 'ARC_PROGRESS', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK', 'TEXT_IMG', 'IMG_STATUS', 'IMG_LEVEL', 'IMG_PROGRESS', 'IMG_ANIM'].includes(element.type);
+            return (
+              <div className="space-y-2">
+                {/* Color */}
+                <div className="flex items-center gap-2">
+                  <input type="color" value={ds.color}
+                    onChange={e => updateShadow({ color: e.target.value })}
+                    className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent" />
+                  <Input value={ds.color}
+                    onChange={e => updateShadow({ color: e.target.value })}
+                    className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white flex-1" />
+                  <span className="text-[10px] text-white/30 shrink-0">{Math.round(ds.opacity * 100)}%</span>
+                </div>
+                {/* Opacity */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Opacity</span>
+                  <input type="range" min={0} max={100} value={Math.round(ds.opacity * 100)}
+                    onChange={e => updateShadow({ opacity: Number(e.target.value) / 100 })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                </div>
+                {/* Blur */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Blur</span>
+                  <input type="range" min={0} max={40} value={ds.blur}
+                    onChange={e => updateShadow({ blur: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.blur}px</span>
+                </div>
+                {/* Offset X */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">X offset</span>
+                  <input type="range" min={-30} max={30} value={ds.offsetX}
+                    onChange={e => updateShadow({ offsetX: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetX}px</span>
+                </div>
+                {/* Offset Y */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Y offset</span>
+                  <input type="range" min={-30} max={30} value={ds.offsetY}
+                    onChange={e => updateShadow({ offsetY: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetY}px</span>
+                </div>
+                {previewOnly && (
+                  <p className="text-[9px] text-yellow-500/70 mt-1">⚠ Preview only — shadow not baked into .zpk for this element type</p>
+                )}
+              </div>
+            );
+          })()}
+        </Section>
+      )}
+
+      {/* Drop Shadow — all types except TIME_POINTER (has handShadow) and engraveFrame elements */}
+      {!['TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
+        <Section label="Drop Shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] text-white/60">Enable shadow</span>
+            <Switch
+              checked={!!element.dropShadow}
+              onCheckedChange={checked => {
+                if (checked) {
+                  update({ dropShadow: { color: '#000000', opacity: 0.6, blur: 8, offsetX: 3, offsetY: 3 } });
+                } else {
+                  update({ dropShadow: undefined });
+                }
+              }}
+              id={`shadow-${element.id}`}
+            />
+          </div>
+          {element.dropShadow && (() => {
+            const ds = element.dropShadow;
+            const updateShadow = (patch: Partial<NonNullable<typeof element.dropShadow>>) =>
+              update({ dropShadow: { ...ds, ...patch } });
+            const previewOnly = ['TEXT', 'ARC_PROGRESS', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK', 'TEXT_IMG', 'IMG_STATUS', 'IMG_LEVEL', 'IMG_PROGRESS', 'IMG_ANIM'].includes(element.type);
+            return (
+              <div className="space-y-2">
+                {/* Color */}
+                <div className="flex items-center gap-2">
+                  <input type="color" value={ds.color}
+                    onChange={e => updateShadow({ color: e.target.value })}
+                    className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent" />
+                  <Input value={ds.color}
+                    onChange={e => updateShadow({ color: e.target.value })}
+                    className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white flex-1" />
+                  <span className="text-[10px] text-white/30 shrink-0">{Math.round(ds.opacity * 100)}%</span>
+                </div>
+                {/* Opacity */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Opacity</span>
+                  <input type="range" min={0} max={100} value={Math.round(ds.opacity * 100)}
+                    onChange={e => updateShadow({ opacity: Number(e.target.value) / 100 })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                </div>
+                {/* Blur */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Blur</span>
+                  <input type="range" min={0} max={40} value={ds.blur}
+                    onChange={e => updateShadow({ blur: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.blur}px</span>
+                </div>
+                {/* Offset X */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">X offset</span>
+                  <input type="range" min={-30} max={30} value={ds.offsetX}
+                    onChange={e => updateShadow({ offsetX: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetX}px</span>
+                </div>
+                {/* Offset Y */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Y offset</span>
+                  <input type="range" min={-30} max={30} value={ds.offsetY}
+                    onChange={e => updateShadow({ offsetY: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetY}px</span>
+                </div>
+                {previewOnly && (
+                  <p className="text-[9px] text-yellow-500/70 mt-1">⚠ Preview only — shadow not baked into .zpk for this element type</p>
+                )}
+              </div>
+            );
+          })()}
+        </Section>
+      )}
+
       {/* Element Frame toggle — hidden for ARC_PROGRESS, TIME_POINTER, and frame elements */}
       {!['ARC_PROGRESS', 'TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
         <Section label="Element Frame">
