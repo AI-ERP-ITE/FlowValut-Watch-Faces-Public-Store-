@@ -1,5 +1,28 @@
 [
   {
+    "id": "classic",
+    "name": "Classic",
+    "specGroup": "unknown",
+    "categories": [
+      "premium",
+      "elegant"
+    ],
+    "hashtags": [
+      "premium",
+      "elegant",
+      "dark",
+      "classic",
+      "analog"
+    ],
+    "price": 0,
+    "stripeLink": null,
+    "createdAt": "2026-04-20T10:31:02.255Z",
+    "downloads": 0,
+    "zpkPath": "zpk/Classic/face.zpk",
+    "previewPath": "zpk/Classic/preview.png",
+    "qrPath": "zpk/Classic/qr.png"
+  },
+  {
     "id": "30-test",
     "name": "30 test",
     "specGroup": "unknown",
