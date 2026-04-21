@@ -1182,11 +1182,6 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   ctx.clearRect(0, 0, w, h);
 
   const ef = el.engraveFrame!;
-  // Fill
-  if (ef.fillMode === 'color' && ef.fillColor) {
-    ctx.fillStyle = ef.fillColor;
-    ctx.fillRect(0, 0, w, h);
-  }
 
   const isEngrave = ef.mode === 'inner';
   const depth = typeof ef.depth === 'number' ? ef.depth : (ef.depth === 'high' ? 12 : 6);
@@ -1222,6 +1217,15 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
     }
     ctx.clip();
   };
+
+  // Fill — clipped to shape so circle/rounded corners stay transparent
+  if (ef.fillMode === 'color' && ef.fillColor) {
+    ctx.save();
+    clipShape();
+    ctx.fillStyle = ef.fillColor;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
 
   ctx.save();
   clipShape();
