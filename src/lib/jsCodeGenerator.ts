@@ -27,7 +27,7 @@ function _shadowImgWidgetV3(element: WatchFaceElement, label: string): string {
                     y: px(${y}),
                     w: px(${w}),
                     h: px(${h}),
-                    src: 'assets/${filename}',
+            src: '${filename}',
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
 }
@@ -373,7 +373,7 @@ function generateWidgetCode(element: WatchFaceElement): string {
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width}),
                     h: px(${element.bounds.height}),
-                    src: 'assets/${filename}',
+                      src: '${filename}',
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
       }
@@ -412,7 +412,7 @@ function generateWidgetCode(element: WatchFaceElement): string {
                     y: px(${element.bounds.y}),
                     w: px(${w}),
                     h: px(${h}),
-                    src: '${imgSrc}',
+                      src: '${imgSrc}',
                     alpha: 255,
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;

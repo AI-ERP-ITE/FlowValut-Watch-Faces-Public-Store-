@@ -32,7 +32,7 @@ function _shadowImgWidget(
                     y: px(${y}),
                     w: px(${w}),
                     h: px(${h}),
-                    src: 'assets/${filename}',
+                  src: '${filename}',
                     show_level: hmUI.show_level.${showLevel}
                 });`;
 }
@@ -634,7 +634,7 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width}),
                     h: px(${element.bounds.height}),
-                    src: 'assets/${filename}',
+                  src: '${filename}',
                     show_level: hmUI.show_level.${showLevel}
                 });`;
       }
