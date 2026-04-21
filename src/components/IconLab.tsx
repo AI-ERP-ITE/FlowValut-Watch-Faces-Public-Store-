@@ -1212,7 +1212,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
           {/* ── POINTERS TAB ───────────────────────────────────────────────── */}
           {activeTab === 'pointers' && (
             <div className="p-4 lg:p-5">
-              <div className="grid grid-cols-1 xl:grid-cols-[1fr_460px] gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr_620px] gap-4">
                 {/* Left: separated layer editors */}
                 <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
                   <div className="flex items-center justify-between">
@@ -1296,11 +1296,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     <p className="text-[10px] text-white/45 mb-2 uppercase tracking-wide">Composed Preview</p>
                     <canvas
                       ref={composerCanvasRef}
-                      width={360}
-                      height={360}
-                      className="mx-auto w-[320px] h-[320px] rounded border border-cyan-400/30 bg-[#0f1115]"
+                      width={480}
+                      height={480}
+                      className="mx-auto w-[480px] h-[480px] max-w-full rounded border border-cyan-400/30 bg-[#0f1115]"
                     />
-                    <div className="mt-2 text-[10px] text-white/35 text-center">Default demo angles: H=2PM, M=10PM mark, S=12AM</div>
+                    <div className="mt-2 text-[10px] text-white/35 text-center">480×480 design-space preview (same reference as background crop). Demo angles: H=2PM, M=10PM mark, S=12AM.</div>
                   </div>
 
                   <div className="rounded-lg border border-white/10 bg-zinc-900/80 p-3 space-y-2">

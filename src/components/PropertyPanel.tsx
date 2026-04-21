@@ -775,7 +775,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               <span className="text-[10px] text-cyan-400 font-mono w-10 text-right">{(element.handLengthScale ?? 1).toFixed(2)}×</span>
             </div>
             <input
-              type="range" min="0.5" max="2.0" step="0.05"
+              type="range" min="0.5" max="3.0" step="0.05"
               value={element.handLengthScale ?? 1}
               onChange={e => update({ handLengthScale: Number(e.target.value) })}
               className="w-full accent-cyan-400 h-1"
@@ -790,7 +790,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 <span className="text-[9px] text-white/40 uppercase tracking-wider">Hour</span>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-[9px] text-white/30 w-10">Length</span>
-                  <input type="range" min="0.5" max="2.0" step="0.05"
+                  <input type="range" min="0.5" max="3.0" step="0.05"
                     value={element.handHourLength ?? (element.handLengthScale ?? 1)}
                     onChange={e => update({ handHourLength: Number(e.target.value) })}
                     className="flex-1 accent-cyan-400 h-1" />
@@ -798,7 +798,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] text-white/30 w-10">Width</span>
-                  <input type="range" min="0.5" max="2.0" step="0.05"
+                  <input type="range" min="0.5" max="3.0" step="0.05"
                     value={element.handHourWidth ?? 1}
                     onChange={e => update({ handHourWidth: Number(e.target.value) })}
                     className="flex-1 accent-cyan-400 h-1" />
@@ -810,7 +810,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 <span className="text-[9px] text-white/40 uppercase tracking-wider">Minute</span>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-[9px] text-white/30 w-10">Length</span>
-                  <input type="range" min="0.5" max="2.0" step="0.05"
+                  <input type="range" min="0.5" max="3.0" step="0.05"
                     value={element.handMinuteLength ?? (element.handLengthScale ?? 1)}
                     onChange={e => update({ handMinuteLength: Number(e.target.value) })}
                     className="flex-1 accent-cyan-400 h-1" />
@@ -818,7 +818,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[9px] text-white/30 w-10">Width</span>
-                  <input type="range" min="0.5" max="2.0" step="0.05"
+                  <input type="range" min="0.5" max="3.0" step="0.05"
                     value={element.handMinuteWidth ?? 1}
                     onChange={e => update({ handMinuteWidth: Number(e.target.value) })}
                     className="flex-1 accent-cyan-400 h-1" />
@@ -831,7 +831,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                   <span className="text-[9px] text-white/40 uppercase tracking-wider">Second</span>
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[9px] text-white/30 w-10">Length</span>
-                    <input type="range" min="0.5" max="2.0" step="0.05"
+                    <input type="range" min="0.5" max="3.0" step="0.05"
                       value={element.handSecondLength ?? (element.handLengthScale ?? 1)}
                       onChange={e => update({ handSecondLength: Number(e.target.value) })}
                       className="flex-1 accent-cyan-400 h-1" />
@@ -839,13 +839,25 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] text-white/30 w-10">Width</span>
-                    <input type="range" min="0.5" max="2.0" step="0.05"
+                    <input type="range" min="0.5" max="3.0" step="0.05"
                       value={element.handSecondWidth ?? 1}
                       onChange={e => update({ handSecondWidth: Number(e.target.value) })}
                       className="flex-1 accent-cyan-400 h-1" />
                     <span className="text-[9px] font-mono text-cyan-400 w-8 text-right">{(element.handSecondWidth ?? 1).toFixed(2)}×</span>
                   </div>
                 </div>
+              )}
+
+              {((element.handLengthScale ?? 1) > 2
+                || (element.handHourLength ?? (element.handLengthScale ?? 1)) > 2
+                || (element.handMinuteLength ?? (element.handLengthScale ?? 1)) > 2
+                || (element.handSecondLength ?? (element.handLengthScale ?? 1)) > 2
+                || (element.handHourWidth ?? 1) > 2
+                || (element.handMinuteWidth ?? 1) > 2
+                || (element.handSecondWidth ?? 1) > 2) && (
+                <p className="text-[9px] text-amber-400/80 leading-snug">
+                  Values above 2.00x can amplify source raster artifacts. Prefer fixing pointer size in HTML when possible.
+                </p>
               )}
             </div>
           </details>
