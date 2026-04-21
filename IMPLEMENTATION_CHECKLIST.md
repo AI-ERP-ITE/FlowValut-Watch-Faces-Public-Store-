@@ -18,6 +18,16 @@ Follow all phases in order — do not skip steps.
 | Live site | https://ai-erp-ite.github.io/Watch-Faces/ |
 | Studio | https://ai-erp-ite.github.io/Watch-Faces/studio/ |
 
+### Repo Guard (Run Before Any Deploy)
+
+```powershell
+# You MUST be in app repo, not workspace-root specs repo
+$repoRoot = git rev-parse --show-toplevel
+if ($repoRoot -notlike "*\app") {
+  throw "Wrong git repo. Switch to ...\\Kimi_Agent_Untitled Chat\\app before build/deploy."
+}
+```
+
 ### Critical Deployment Invariant (Must Always Hold)
 
 - [ ] This repo deploys from `app/docs/` only (there is no `workspace-root/docs/` deploy target)
@@ -87,6 +97,14 @@ Copy-Item "$app\dist\index.html" "$app\docs\studio\index.html" -Force
 # Remove stale hashed assets that no longer exist in dist
 Get-ChildItem "$app\docs\assets\" | Where-Object { -not (Test-Path "$app\dist\assets\$($_.Name)") } | Remove-Item -Force
 
+# Enforce JS hash parity between website and studio entries
+$webJs = (Select-String -Path "$app\docs\index.html" -Pattern "index-[A-Za-z0-9_-]+\.js" | Select-Object -First 1).Matches.Value
+$studioJs = (Select-String -Path "$app\docs\studio\index.html" -Pattern "index-[A-Za-z0-9_-]+\.js" | Select-Object -First 1).Matches.Value
+if ($webJs -ne $studioJs) {
+  throw "Deploy blocked: docs/index.html ($webJs) != docs/studio/index.html ($studioJs)"
+}
+Write-Output "Hash parity OK: $webJs"
+
 # Commit and push
 git -C $app add -A
 git -C $app commit -m "Fix/Feature: <short description>"
@@ -101,6 +119,7 @@ git -C $app push origin main
   Select-String "index-" docs/index.html
   Select-String "index-" docs/studio/index.html
   ```
+- [ ] Hash parity gate passed (same JS hash in website and studio entries)
 - [ ] Verify BOTH live routes after push (not only homepage):
   ```powershell
   # should load homepage
