@@ -58,6 +58,32 @@ interface ParsedPivot {
   sourceH: number;
 }
 
+function parseSvgSize(svg: string): { width: number; height: number } | null {
+  const vb = parseViewBox(svg);
+  if (vb) return { width: vb.width, height: vb.height };
+
+  const tag = svg.match(/<svg\b[^>]*>/i)?.[0] ?? '';
+  const wMatch = tag.match(/\bwidth\s*=\s*["']?([0-9.]+)(?:px)?["']?/i);
+  const hMatch = tag.match(/\bheight\s*=\s*["']?([0-9.]+)(?:px)?["']?/i);
+  const width = Number(wMatch?.[1]);
+  const height = Number(hMatch?.[1]);
+  if (!Number.isNaN(width) && !Number.isNaN(height) && width > 0 && height > 0) {
+    return { width, height };
+  }
+  return null;
+}
+
+function inferCenteredPivot(svg: string): ParsedPivot | null {
+  const size = parseSvgSize(svg);
+  if (!size) return null;
+  return {
+    xRatio: 0.5,
+    yRatio: 0.5,
+    sourceW: size.width,
+    sourceH: size.height,
+  };
+}
+
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
@@ -273,14 +299,18 @@ export async function saveCustomHandStyle(
     ? stripPivotMarkers(extractSvgFromCode(composed!.hubHtml))
     : (extractLayerFromCompositeSvg(cleanedSvg, 'hub') ?? cleanedSvg);
 
+  const hourSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.hourHtml) : sourceSvg;
+  const minuteSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.minuteHtml) : sourceSvg;
+  const secondSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.secondHtml) : sourceSvg;
+
   const hourPivotSource = hasComposedSources
-    ? extractPivotFromSvg(extractSvgFromCode(composed!.hourHtml))
+    ? (extractPivotFromSvg(hourSourceSvg) ?? inferCenteredPivot(hourSourceSvg))
     : parsedPivot;
   const minutePivotSource = hasComposedSources
-    ? extractPivotFromSvg(extractSvgFromCode(composed!.minuteHtml))
+    ? (extractPivotFromSvg(minuteSourceSvg) ?? inferCenteredPivot(minuteSourceSvg))
     : parsedPivot;
   const secondPivotSource = hasComposedSources
-    ? extractPivotFromSvg(extractSvgFromCode(composed!.secondHtml))
+    ? (extractPivotFromSvg(secondSourceSvg) ?? inferCenteredPivot(secondSourceSvg))
     : parsedPivot;
 
   const [hourDataUrl, minuteDataUrl, secondDataUrl, coverDataUrl, swatchDataUrl] =
