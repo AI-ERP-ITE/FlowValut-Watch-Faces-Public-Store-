@@ -16,7 +16,90 @@ export interface CustomHandRecord {
   secondDataUrl: string; // 8×240 PNG data URL
   coverDataUrl: string;  // 30×30 PNG data URL
   swatchDataUrl: string; // 24×24 thumbnail for UI preview
+  // Optional per-hand pivot points (in pixels) derived from marker metadata.
+  // These map directly to TIME_POINTER hour_posX/Y, minute_posX/Y, second_posX/Y.
+  hourPosX?: number;
+  hourPosY?: number;
+  minutePosX?: number;
+  minutePosY?: number;
+  secondPosX?: number;
+  secondPosY?: number;
   createdAt: number;
+}
+
+interface ParsedPivot {
+  xRatio: number;
+  yRatio: number;
+  aspect: number;
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+function extractSvgFromCode(code: string): string {
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  return svgMatch ? svgMatch[0] : code;
+}
+
+function parseViewBox(svg: string): { minX: number; minY: number; width: number; height: number } | null {
+  const tagMatch = svg.match(/<svg\b[^>]*>/i);
+  if (!tagMatch) return null;
+  const vbMatch = tagMatch[0].match(/viewBox\s*=\s*["']([^"']+)["']/i);
+  if (!vbMatch) return null;
+
+  const parts = vbMatch[1].trim().split(/[\s,]+/).map(Number);
+  if (parts.length < 4 || parts.some(Number.isNaN)) return null;
+  const [minX, minY, width, height] = parts;
+  if (width <= 0 || height <= 0) return null;
+  return { minX, minY, width, height };
+}
+
+function extractPivotFromSvg(svg: string): ParsedPivot | null {
+  const vb = parseViewBox(svg);
+  if (!vb) return null;
+
+  // Preferred: explicit marker element with id="pivot" and cx/cy.
+  const pivotEl = svg.match(/<[^>]*\bid\s*=\s*["']pivot["'][^>]*>/i)?.[0] ?? '';
+  const cxMatch = pivotEl.match(/\bcx\s*=\s*["']([^"']+)["']/i);
+  const cyMatch = pivotEl.match(/\bcy\s*=\s*["']([^"']+)["']/i);
+
+  // Secondary option: put data-pivot-x / data-pivot-y on the svg root.
+  const svgTag = svg.match(/<svg\b[^>]*>/i)?.[0] ?? '';
+  const dataX = svgTag.match(/\bdata-pivot-x\s*=\s*["']([^"']+)["']/i);
+  const dataY = svgTag.match(/\bdata-pivot-y\s*=\s*["']([^"']+)["']/i);
+
+  const x = Number(cxMatch?.[1] ?? dataX?.[1]);
+  const y = Number(cyMatch?.[1] ?? dataY?.[1]);
+  if (Number.isNaN(x) || Number.isNaN(y)) return null;
+
+  const xRatio = (x - vb.minX) / vb.width;
+  const yRatio = (y - vb.minY) / vb.height;
+  return {
+    xRatio: clamp(xRatio, 0, 1),
+    yRatio: clamp(yRatio, 0, 1),
+    aspect: vb.width / vb.height,
+  };
+}
+
+function stripPivotMarkers(svg: string): string {
+  // Remove explicit pivot / tip markers so they never appear in the exported PNGs.
+  return svg
+    .replace(/<[^>]*\bid\s*=\s*["']pivot["'][^>]*>\s*<\/[^>]+>\s*/gi, '')
+    .replace(/<[^>]*\bid\s*=\s*["']tip["'][^>]*>\s*<\/[^>]+>\s*/gi, '')
+    .replace(/<[^>]*\bid\s*=\s*["']pivot["'][^>]*\/?>\s*/gi, '')
+    .replace(/<[^>]*\bid\s*=\s*["']tip["'][^>]*\/?>\s*/gi, '');
+}
+
+function computePivotPx(pivot: ParsedPivot, outW: number, outH: number): { x: number; y: number } {
+  const drawW = outH * pivot.aspect;
+  const dx = (outW - drawW) / 2;
+  const x = dx + (pivot.xRatio * drawW);
+  const y = pivot.yRatio * outH;
+  return {
+    x: Math.round(clamp(x, 0, outW)),
+    y: Math.round(clamp(y, 0, outH)),
+  };
 }
 
 // ── DB open ───────────────────────────────────────────────────────────────────
@@ -72,14 +155,22 @@ export async function saveCustomHandStyle(
   name: string,
   svgCode: string,
 ): Promise<CustomHandRecord> {
+  const sourceSvg = extractSvgFromCode(svgCode);
+  const parsedPivot = extractPivotFromSvg(sourceSvg);
+  const cleanedSvg = stripPivotMarkers(sourceSvg);
+
   const [hourDataUrl, minuteDataUrl, secondDataUrl, coverDataUrl, swatchDataUrl] =
     await Promise.all([
-      renderToHandPng(svgCode, 22, 140),
-      renderToHandPng(svgCode, 16, 200),
-      renderToHandPng(svgCode, 8, 240),
-      renderToContainPng(svgCode, 30),  // hub: SVG fitted inside 30×30 square
-      renderToContainPng(svgCode, 24),  // swatch: SVG fitted inside 24×24 square
+      renderToHandPng(cleanedSvg, 22, 140),
+      renderToHandPng(cleanedSvg, 16, 200),
+      renderToHandPng(cleanedSvg, 8, 240),
+      renderToContainPng(cleanedSvg, 30),  // hub: SVG fitted inside 30×30 square
+      renderToContainPng(cleanedSvg, 24),  // swatch: SVG fitted inside 24×24 square
     ]);
+
+  const hourPivot = parsedPivot ? computePivotPx(parsedPivot, 22, 140) : null;
+  const minutePivot = parsedPivot ? computePivotPx(parsedPivot, 16, 200) : null;
+  const secondPivot = parsedPivot ? computePivotPx(parsedPivot, 8, 240) : null;
 
   const record: CustomHandRecord = {
     key: `custom_hand:${slugify(name)}`,
@@ -89,6 +180,9 @@ export async function saveCustomHandStyle(
     secondDataUrl,
     coverDataUrl,
     swatchDataUrl,
+    ...(hourPivot ? { hourPosX: hourPivot.x, hourPosY: hourPivot.y } : {}),
+    ...(minutePivot ? { minutePosX: minutePivot.x, minutePosY: minutePivot.y } : {}),
+    ...(secondPivot ? { secondPosX: secondPivot.x, secondPosY: secondPivot.y } : {}),
     createdAt: Date.now(),
   };
 

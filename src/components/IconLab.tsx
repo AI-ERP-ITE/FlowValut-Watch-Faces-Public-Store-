@@ -335,6 +335,54 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     }
   };
 
+  const handleAddPivotMarker = () => {
+    if (!code.trim()) {
+      setSaveHandMsg('✗ Add or generate SVG/HTML first');
+      return;
+    }
+
+    const hasPivotCircle = /\bid\s*=\s*["']pivot["']/i.test(code);
+    const hasPivotData = /\bdata-pivot-x\s*=\s*["'][^"']+["']/i.test(code)
+      && /\bdata-pivot-y\s*=\s*["'][^"']+["']/i.test(code);
+    if (hasPivotCircle || hasPivotData) {
+      setSaveHandMsg('✓ Pivot marker already exists (skipped)');
+      return;
+    }
+
+    const svgMatch = code.match(/<svg[\s\S]*?<\/svg>/i);
+    if (!svgMatch) {
+      setSaveHandMsg('✗ No <svg> found in current code');
+      return;
+    }
+
+    const svg = svgMatch[0];
+
+    let cx = 11;
+    let cy = 118;
+    let r = 1.2;
+    const vbMatch = svg.match(/viewBox\s*=\s*["']([^"']+)["']/i);
+    if (vbMatch) {
+      const parts = vbMatch[1].trim().split(/[\s,]+/).map(Number);
+      if (parts.length >= 4 && !parts.some(Number.isNaN)) {
+        const minX = parts[0];
+        const minY = parts[1];
+        const w = parts[2];
+        const h = parts[3];
+        if (w > 0 && h > 0) {
+          cx = minX + w / 2;
+          cy = minY + h * 0.85;
+          r = Math.max(0.8, Math.min(w, h) * 0.01);
+        }
+      }
+    }
+
+    const marker = `\n  <!-- Auto-added pivot marker -->\n  <circle id="pivot" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="#ff00ff" opacity="0.85" />\n`;
+    const patchedSvg = svg.replace(/<\/svg>\s*$/i, `${marker}</svg>`);
+    const nextCode = code.replace(svg, patchedSvg);
+    setCode(nextCode);
+    setSaveHandMsg('✓ Pivot marker added (id="pivot")');
+  };
+
   const handleDeleteHand = async (key: string) => {
     await deleteCustomHandStyle(key);
     setSavedHands(prev => prev.filter(h => h.key !== key));
@@ -674,11 +722,18 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     <p className="text-[9px] text-white/40 leading-snug">• Saved as: hour 22×140 · minute 16×200 · second 8×240</p>
                     <p className="text-[9px] text-white/40 leading-snug">• The design scales to fill each hand's height — wider parts clip to fit the narrower canvases</p>
                     <p className="text-[9px] text-white/40 leading-snug">• Hub cap uses your SVG fitted to 30×30</p>
+                    <p className="text-[9px] text-white/40 leading-snug">• Add marker <code className="text-cyan-400/80">id="pivot"</code> to auto-align export pivots</p>
                     <button
                       onClick={() => { setCode('<svg viewBox="0 0 22 140" xmlns="http://www.w3.org/2000/svg">\n  <!-- Tip at top (y=0), pivot at y≈118, tail ends at y=140 -->\n  <polygon points="11,0 15,118 11,140 7,118" fill="#C0C8D8" />\n  <polygon points="11,2 14,118 11,138 8,118" fill="#E8ECF8" />\n</svg>'); setCodeMode('svg'); }}
                       className="mt-1 w-full text-[9px] text-cyan-400/70 hover:text-cyan-400 border border-cyan-500/20 rounded px-2 py-1 transition-colors"
                     >
                       Insert template SVG
+                    </button>
+                    <button
+                      onClick={handleAddPivotMarker}
+                      className="w-full text-[9px] text-cyan-300/80 hover:text-cyan-300 border border-cyan-500/30 rounded px-2 py-1 transition-colors"
+                    >
+                      Add Pivot Marker
                     </button>
                   </div>
                   <input

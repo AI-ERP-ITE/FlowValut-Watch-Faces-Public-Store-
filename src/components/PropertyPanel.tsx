@@ -334,9 +334,9 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         break;
       case 'TIME_POINTER':
         changes.center = { x: 240, y: 240 };
-        changes.hourPos = { x: 11, y: 70 };
-        changes.minutePos = { x: 8, y: 100 };
-        changes.secondPos = { x: 3, y: 120 };
+        changes.hourPos = { x: 11, y: 118 };
+        changes.minutePos = { x: 8, y: 172 };
+        changes.secondPos = { x: 4, y: 180 };
         break;
       case 'TEXT':
         changes.fontSize = element.fontSize ?? 20;
@@ -716,11 +716,21 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               <div className="grid grid-cols-4 gap-1.5">
                 {customHandStyles.map(ch => {
                   const active = element.handStyle === ch.key;
+                  const handChanges: Partial<WatchFaceElement> = { handStyle: ch.key };
+                  if (typeof ch.hourPosX === 'number' && typeof ch.hourPosY === 'number') {
+                    handChanges.hourPos = { x: ch.hourPosX, y: ch.hourPosY };
+                  }
+                  if (typeof ch.minutePosX === 'number' && typeof ch.minutePosY === 'number') {
+                    handChanges.minutePos = { x: ch.minutePosX, y: ch.minutePosY };
+                  }
+                  if (typeof ch.secondPosX === 'number' && typeof ch.secondPosY === 'number') {
+                    handChanges.secondPos = { x: ch.secondPosX, y: ch.secondPosY };
+                  }
                   return (
                     <button
                       key={ch.key}
                       title={`Custom: ${ch.name}`}
-                      onClick={() => update({ handStyle: ch.key })}
+                      onClick={() => update(handChanges)}
                       className={cn(
                         'flex flex-col items-center gap-1 py-2 px-1 rounded border text-[9px] transition-colors',
                         active
