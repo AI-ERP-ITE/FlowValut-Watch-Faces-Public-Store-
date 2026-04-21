@@ -27,6 +27,12 @@ import {
   registerCustomFonts,
   type CustomFontRecord,
 } from '@/lib/customFontStore';
+import {
+  saveCustomHandStyle,
+  deleteCustomHandStyle,
+  loadCustomHandStyles,
+  type CustomHandRecord,
+} from '@/lib/customHandStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,6 +47,8 @@ interface Props {
   onIconsSaved?: () => void;
   /** Called after a new font is saved so the font picker can refresh. */
   onFontsSaved?: () => void;
+  /** Called after a new clock hand style is saved so PropertyPanel can refresh. */
+  onHandsSaved?: () => void;
 }
 
 // ── AI generation helpers ─────────────────────────────────────────────────────
@@ -120,7 +128,7 @@ async function generateWithGemini(
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
+export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSaved }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('icons');
 
   // ── Icon Lab state ─────────────────────────────────────────────────────────
@@ -155,6 +163,12 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
   const fontFileRef = useRef<HTMLInputElement>(null);
   const [pendingFontFile, setPendingFontFile] = useState<File | null>(null);
 
+  // ── Clock hand state ──────────────────────────────────────────────────────
+  const [savedHands, setSavedHands] = useState<CustomHandRecord[]>([]);
+  const [saveHandName, setSaveHandName] = useState('');
+  const [savingHand, setSavingHand] = useState(false);
+  const [saveHandMsg, setSaveHandMsg] = useState('');
+
   // ── Iframe ref ─────────────────────────────────────────────────────────────
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -166,6 +180,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
     if (!open) return;
     loadCustomIcons().then(setSavedIcons);
     loadCustomFonts().then(setSavedFonts);
+    loadCustomHandStyles().then(setSavedHands);
   }, [open]);
 
   // ── Derive unique categories from saved icons ──────────────────────────────
@@ -292,6 +307,32 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
     await deleteCustomIcon(key);
     setSavedIcons(prev => prev.filter(i => i.key !== key));
     onIconsSaved?.();
+  };
+
+  // ── Save as Clock Hand Style ───────────────────────────────────────────────
+  const handleSaveAsHand = async () => {
+    if (!saveHandName.trim() || !code.trim()) return;
+    setSavingHand(true);
+    setSaveHandMsg('');
+    try {
+      const record = await saveCustomHandStyle(saveHandName.trim(), code);
+      setSavedHands(prev => {
+        const filtered = prev.filter(h => h.key !== record.key);
+        return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
+      });
+      setSaveHandMsg('✓ Saved to clock hand styles');
+      onHandsSaved?.();
+    } catch (err) {
+      setSaveHandMsg(`✗ ${(err as Error).message}`);
+    } finally {
+      setSavingHand(false);
+    }
+  };
+
+  const handleDeleteHand = async (key: string) => {
+    await deleteCustomHandStyle(key);
+    setSavedHands(prev => prev.filter(h => h.key !== key));
+    onHandsSaved?.();
   };
 
   // ── Font upload ────────────────────────────────────────────────────────────
@@ -610,6 +651,62 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved }: Props) {
                     {saving ? 'Saving…' : '+ Add to My Library'}
                   </button>
                 </div>
+
+                {/* Save as Clock Hand Style */}
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                  <span className="text-[10px] text-white/40 uppercase tracking-widest">Save as Clock Hand Style</span>
+                  <p className="text-[9px] text-white/30 leading-tight">
+                    Design your hand shape pointing <span className="text-white/50">upward</span> (tip at top). It will appear in the TIME_POINTER hand style selector.
+                  </p>
+                  <input
+                    type="text"
+                    value={saveHandName}
+                    onChange={e => setSaveHandName(e.target.value)}
+                    placeholder="Hand style name…"
+                    className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-cyan-500/50"
+                  />
+                  {saveHandMsg && (
+                    <p className={`text-[10px] ${saveHandMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{saveHandMsg}</p>
+                  )}
+                  <button
+                    onClick={handleSaveAsHand}
+                    disabled={savingHand || !saveHandName.trim() || !code.trim()}
+                    className="w-full py-1.5 bg-cyan-700 hover:bg-cyan-600 disabled:opacity-40 text-white text-xs rounded font-medium transition-colors"
+                  >
+                    {savingHand ? 'Saving…' : '⌚ Save as Clock Hand'}
+                  </button>
+                </div>
+
+                {/* Saved hand styles */}
+                {savedHands.length > 0 && (
+                  <div className="space-y-2 border-t border-white/10 pt-3">
+                    <span className="text-[10px] text-white/40 uppercase tracking-widest">Your Hand Styles ({savedHands.length})</span>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {savedHands.map(hand => (
+                        <div key={hand.key} className="relative group">
+                          <div
+                            className="w-full aspect-square rounded border border-white/10 bg-zinc-800 overflow-hidden flex items-end justify-center pb-0.5"
+                            title={hand.name}
+                          >
+                            <img
+                              src={hand.hourDataUrl}
+                              alt={hand.name}
+                              className="w-3 h-full object-contain"
+                              style={{ maxHeight: '100%' }}
+                            />
+                          </div>
+                          <p className="text-[8px] text-white/40 text-center truncate mt-0.5">{hand.name}</p>
+                          <button
+                            onClick={() => handleDeleteHand(hand.key)}
+                            className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 bg-red-600 rounded-full text-white"
+                          >
+                            <Trash2 className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Saved icons in this session */}
                 {savedIcons.length > 0 && (

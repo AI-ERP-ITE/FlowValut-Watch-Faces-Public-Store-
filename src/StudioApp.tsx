@@ -43,6 +43,7 @@ import { loadCustomIcons } from '@/lib/customIconStore';
 import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
 import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
+import { loadCustomHandStyles, getCustomHandByKey, type CustomHandRecord } from '@/lib/customHandStore';
 
 // Mock Kimi analysis - simulates AI analysis
 async function mockKimiAnalysis(
@@ -752,7 +753,27 @@ async function mockKimiAnalysis(
   });
   elementImages.push({ name: 'alarm_30x30.png', dataUrl: alarmDataUrl, bounds: { x: 0, y: 0, width: alarmSize, height: alarmSize }, type: 'IMG_STATUS' });
 
-  // Generate static label icons for decorative IMG elements
+  // Generate Lock icon for IMG_STATUS (LOCK)
+  const lockSize = 30;
+  const lockDataUrl = createCanvasImage(lockSize, lockSize, (ctx, w) => {
+    ctx.strokeStyle = '#44CC66';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    // Shackle
+    ctx.beginPath();
+    ctx.arc(w / 2, w * 0.43, w * 0.18, Math.PI, 0);
+    ctx.stroke();
+    // Body
+    ctx.beginPath();
+    ctx.roundRect(w * 0.22, w * 0.52, w * 0.56, w * 0.34, 3);
+    ctx.stroke();
+    // Keyhole
+    ctx.fillStyle = '#44CC66';
+    ctx.beginPath();
+    ctx.arc(w / 2, w * 0.67, w * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  elementImages.push({ name: 'lock_30x30.png', dataUrl: lockDataUrl, bounds: { x: 0, y: 0, width: lockSize, height: lockSize }, type: 'IMG_STATUS' });
   // Heart icon (24x20)
   const heartIconDataUrl = createCanvasImage(24, 20, (ctx, w, h) => {
     ctx.fillStyle = '#FF6B6B';
@@ -1235,6 +1256,7 @@ function StudioApp() {
   const [labOpen, setLabOpen] = useState(false);
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
   const [iconLibraryKey, setIconLibraryKey] = useState(0);
+  const [customHandStyles, setCustomHandStyles] = useState<CustomHandRecord[]>([]);
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
@@ -1242,10 +1264,11 @@ function StudioApp() {
 
   // Load custom icons + fonts from IndexedDB on startup and register them
   useEffect(() => {
-    Promise.all([loadCustomIcons(), loadCustomFonts(), registerCustomFonts()]).then(
-      ([icons, , loadedFontNames]) => {
+    Promise.all([loadCustomIcons(), loadCustomFonts(), registerCustomFonts(), loadCustomHandStyles()]).then(
+      ([icons, , loadedFontNames, hands]) => {
         if (icons.length > 0) registerCustomIconsInLibrary(icons);
         if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
+        if (hands.length > 0) setCustomHandStyles(hands);
       }
     );
   }, []);
@@ -1262,6 +1285,10 @@ function StudioApp() {
       const names = await registerCustomFonts();
       registerCustomFontsInLibrary(names.length > 0 ? names : fonts.map(f => f.name));
     });
+  }, []);
+
+  const handleLabHandsSaved = useCallback(() => {
+    loadCustomHandStyles().then(setCustomHandStyles);
   }, []);
 
   const handleAddElement = () => {
@@ -1828,6 +1855,31 @@ function StudioApp() {
         }
       }
 
+      // Inject custom hand images if the TIME_POINTER element uses a custom hand style
+      const timePointerEl = state.watchFaceConfig.elements.find(el => el.type === 'TIME_POINTER');
+      if (timePointerEl?.handStyle?.startsWith('custom_hand:')) {
+        const customHand = await getCustomHandByKey(timePointerEl.handStyle);
+        if (customHand) {
+          const handFiles = [
+            { name: 'hour_hand.png', dataUrl: customHand.hourDataUrl },
+            { name: 'minute_hand.png', dataUrl: customHand.minuteDataUrl },
+            { name: 'second_hand.png', dataUrl: customHand.secondDataUrl },
+            { name: 'hand_cover.png', dataUrl: customHand.coverDataUrl },
+          ];
+          for (const { name, dataUrl } of handFiles) {
+            const p = dataUrl.split(',');
+            const b = atob(p[1]);
+            const u8 = new Uint8Array(b.length);
+            for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
+            const newFile = { src: name, file: new File([u8], name, { type: 'image/png' }) };
+            const idx = elementFiles.findIndex(f => f.src === name);
+            if (idx >= 0) elementFiles[idx] = newFile;
+            else elementFiles.push(newFile);
+          }
+          console.log('[App] Injected custom hand images for style:', timePointerEl.handStyle);
+        }
+      }
+
       const zpkResult = await buildZPK({
         config: state.watchFaceConfig,
         backgroundFile: state.backgroundFile,
@@ -2205,6 +2257,7 @@ function StudioApp() {
                       onAddFrame={handleAddFrame}
                       onRemoveFrame={handleRemoveFrame}
                       iconLibraryKey={iconLibraryKey}
+                      customHandStyles={customHandStyles}
                     />
                     <div className="flex items-center justify-between mt-4">
                       <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
@@ -2236,6 +2289,7 @@ function StudioApp() {
                   onClose={() => setLabOpen(false)}
                   onIconsSaved={handleLabIconsSaved}
                   onFontsSaved={handleLabFontsSaved}
+                  onHandsSaved={handleLabHandsSaved}
                 />
 
                 {/* Add Element Dialog */}

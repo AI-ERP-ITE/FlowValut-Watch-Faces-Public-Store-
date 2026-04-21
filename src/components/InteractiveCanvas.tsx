@@ -739,7 +739,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         ctx.restore();
         break;
       case 'IMG_STATUS': {
-        // Render selected icon if set, otherwise draw a generic bluetooth placeholder
+        // Render selected icon if set, otherwise draw status-type-aware placeholder
         ctx.save();
         applyShadow(ctx, el);
         if (el.iconKey && iconCache) {
@@ -766,20 +766,72 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
             drawPlaceholder(ctx, el);
           }
         } else {
-          // Default: draw a simple bluetooth symbol as placeholder
+          // Draw different placeholder icon depending on statusType
           const { x, y, width: w, height: h } = el.bounds;
-          ctx.strokeStyle = '#4488FF';
-          ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.07);
+          const st = el.statusType ?? 'DISCONNECT';
+          const lw = Math.max(1.5, Math.min(w, h) * 0.07);
+          ctx.lineWidth = lw;
           ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(x + w * 0.35, y + h * 0.2);
-          ctx.lineTo(x + w * 0.65, y + h * 0.4);
-          ctx.lineTo(x + w * 0.5, y + h * 0.5);
-          ctx.lineTo(x + w * 0.65, y + h * 0.6);
-          ctx.lineTo(x + w * 0.35, y + h * 0.8);
-          ctx.moveTo(x + w * 0.5, y + h * 0.2);
-          ctx.lineTo(x + w * 0.5, y + h * 0.8);
-          ctx.stroke();
+          ctx.lineJoin = 'round';
+
+          if (st === 'DISCONNECT') {
+            // Bluetooth symbol
+            ctx.strokeStyle = '#4488FF';
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.35, y + h * 0.2);
+            ctx.lineTo(x + w * 0.65, y + h * 0.4);
+            ctx.lineTo(x + w * 0.5, y + h * 0.5);
+            ctx.lineTo(x + w * 0.65, y + h * 0.6);
+            ctx.lineTo(x + w * 0.35, y + h * 0.8);
+            ctx.moveTo(x + w * 0.5, y + h * 0.2);
+            ctx.lineTo(x + w * 0.5, y + h * 0.8);
+            ctx.stroke();
+          } else if (st === 'CLOCK') {
+            // Alarm clock
+            ctx.strokeStyle = '#FFAA22';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.5, y + h * 0.55, Math.min(w, h) * 0.3, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.5, y + h * 0.35);
+            ctx.lineTo(x + w * 0.5, y + h * 0.55);
+            ctx.lineTo(x + w * 0.63, y + h * 0.63);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x + w * 0.28, y + h * 0.26, Math.min(w, h) * 0.07, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(x + w * 0.72, y + h * 0.26, Math.min(w, h) * 0.07, 0, Math.PI * 2);
+            ctx.stroke();
+          } else if (st === 'DISTURB') {
+            // Moon crescent (do not disturb)
+            ctx.strokeStyle = '#9966FF';
+            ctx.fillStyle = 'rgba(153,102,255,0.15)';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.5, y + h * 0.5, Math.min(w, h) * 0.35, Math.PI * 0.3, Math.PI * 1.7);
+            ctx.arc(x + w * 0.38, y + h * 0.44, Math.min(w, h) * 0.24, Math.PI * 1.7, Math.PI * 0.3, true);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          } else if (st === 'LOCK') {
+            // Padlock
+            ctx.strokeStyle = '#44CC66';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.5, y + h * 0.43, Math.min(w, h) * 0.18, Math.PI, 0);
+            ctx.stroke();
+            const bx = x + w * 0.22, by = y + h * 0.52, bw = w * 0.56, bh = h * 0.34;
+            ctx.beginPath();
+            if (typeof (ctx as CanvasRenderingContext2D).roundRect === 'function') {
+              ctx.roundRect(bx, by, bw, bh, 3);
+            } else {
+              ctx.rect(bx, by, bw, bh);
+            }
+            ctx.stroke();
+            ctx.fillStyle = '#44CC66';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.5, y + h * 0.67, Math.min(w, h) * 0.05, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
         clearShadow(ctx);
         ctx.restore();

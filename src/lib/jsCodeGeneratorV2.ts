@@ -924,12 +924,21 @@ function generateButtonWidget(element: WatchFaceElement, widgetIndex: number, sh
 // IMG_STATUS - System status indicators (bluetooth, DND, lock)
 // Pattern from working Brushed Steel reference
 // ============================================================
+// Per-statusType default image filenames (match StudioApp.tsx buildAssetImages)
+const STATUS_DEFAULT_SRC: Record<string, string> = {
+  DISCONNECT: 'bluetooth_30x30.png',
+  CLOCK:      'alarm_30x30.png',
+  DISTURB:    'dnd_30x30.png',
+  LOCK:       'lock_30x30.png',
+};
+
 function generateImgStatusWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const statusType = element.statusType || 'DISCONNECT';
-  // If user picked a custom icon via iconKey, use that PNG; else fall back to built-in asset
+  const defaultSrc = STATUS_DEFAULT_SRC[statusType] ?? 'bluetooth_30x30.png';
+  // If user picked a custom icon via iconKey, use that PNG; else use per-statusType default
   const src = element.iconKey
     ? `icon_${element.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`
-    : (element.src || 'bluetooth_5_b_30x30.png');
+    : (element.src || defaultSrc);
 
   return `
                 // ${element.name} - IMG_STATUS Widget

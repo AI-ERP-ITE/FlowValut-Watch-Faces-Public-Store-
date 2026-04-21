@@ -11,6 +11,7 @@ import { FONT_STYLES, getFontStyle } from '@/lib/fontLibrary';
 import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
+import type { CustomHandRecord } from '@/lib/customHandStore';
 import { useState, useEffect, useRef } from 'react';
 
 export interface PropertyPanelProps {
@@ -21,6 +22,7 @@ export interface PropertyPanelProps {
   onAddFrame?: (parent: WatchFaceElement) => void;
   onRemoveFrame?: (parent: WatchFaceElement) => void;
   iconLibraryKey?: number; // increment to force icon list refresh
+  customHandStyles?: CustomHandRecord[]; // user-created hand styles from IconLab
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -91,7 +93,7 @@ interface StyleClipboard {
 }
 let _styleClipboard: StyleClipboard | null = null;
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [] }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
@@ -620,7 +622,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               {STATUS_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
-                  onClick={() => update({ statusType: opt.value })}
+                  onClick={() => update({ statusType: opt.value, src: undefined })}
                   className={cn(
                     'w-full text-left px-2.5 py-1.5 rounded border text-[11px] transition-colors',
                     current === opt.value
@@ -679,6 +681,31 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                     }}
                   />
                   <span className="leading-tight text-center px-0.5">{hs.label.split(' ')[0]}</span>
+                </button>
+              );
+            })}
+            {/* Custom hand styles from IconLab */}
+            {customHandStyles.map(ch => {
+              const active = element.handStyle === ch.key;
+              return (
+                <button
+                  key={ch.key}
+                  title={`Custom: ${ch.name}`}
+                  onClick={() => update({ handStyle: ch.key })}
+                  className={cn(
+                    'flex flex-col items-center gap-1 py-1.5 rounded border text-[9px] transition-colors',
+                    active
+                      ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
+                  )}
+                >
+                  <img
+                    src={ch.swatchDataUrl}
+                    alt={ch.name}
+                    className="w-4 h-4 rounded object-contain"
+                    style={{ border: active ? '1px solid #22d3ee' : '1px solid rgba(255,255,255,0.15)' }}
+                  />
+                  <span className="leading-tight text-center px-0.5 truncate w-full">{ch.name.split(' ')[0]}</span>
                 </button>
               );
             })}
