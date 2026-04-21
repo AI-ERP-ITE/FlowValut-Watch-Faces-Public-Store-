@@ -48,10 +48,15 @@ interface PointerComposerDraft {
   hubHtml: string;
 }
 
-interface PointerPivotOffsets {
-  hour: { x: number; y: number };
-  minute: { x: number; y: number };
-  second: { x: number; y: number };
+interface PointerAxisAdjustments {
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+interface PointerLayerAnchor {
+  xRatio: number;
+  yRatio: number;
 }
 
 type ComposerLayerKey = 'hour' | 'minute' | 'second' | 'hub';
@@ -61,7 +66,8 @@ type ComposerLayerValidation = {
 };
 
 const POINTER_COMPOSER_DRAFT_KEY = 'zepp-pointer-composer-draft-v1';
-const POINTER_COMPOSER_PIVOT_KEY = 'zepp-pointer-composer-pivot-v1';
+const POINTER_COMPOSER_AXIS_KEY = 'zepp-pointer-composer-axis-v2';
+const COMPOSER_PREVIEW_RASTER_SIZE = 512;
 
 interface Props {
   open: boolean;
@@ -97,6 +103,39 @@ async function generateWithOpenAI(prompt: string, apiKey: string): Promise<strin
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
   const data = await res.json();
   return data.choices?.[0]?.message?.content?.trim() ?? '';
+}
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
+}
+
+function parseLayerAnchorFromSvg(svgRaw: string): PointerLayerAnchor {
+  const svgMatch = svgRaw.match(/<svg\b[^>]*>/i)?.[0] ?? '';
+  const vbMatch = svgMatch.match(/viewBox\s*=\s*["']([^"']+)["']/i);
+  if (!vbMatch) return { xRatio: 0.5, yRatio: 0.5 };
+
+  const parts = vbMatch[1].trim().split(/[\s,]+/).map(Number);
+  if (parts.length < 4 || parts.some(Number.isNaN)) return { xRatio: 0.5, yRatio: 0.5 };
+  const [minX, minY, width, height] = parts;
+  if (width <= 0 || height <= 0) return { xRatio: 0.5, yRatio: 0.5 };
+
+  const dataX = svgMatch.match(/\bdata-pivot-x\s*=\s*["']([^"']+)["']/i);
+  const dataY = svgMatch.match(/\bdata-pivot-y\s*=\s*["']([^"']+)["']/i);
+  const legacyPivotEl = svgRaw.match(/<circle[^>]*\bid\s*=\s*["']pivot["'][^>]*\bfill\s*=\s*["']#ff00ff["'][^>]*>/i)?.[0] ?? '';
+  const legacyCx = legacyPivotEl.match(/\bcx\s*=\s*["']([^"']+)["']/i);
+  const legacyCy = legacyPivotEl.match(/\bcy\s*=\s*["']([^"']+)["']/i);
+
+  const pivotX = Number(dataX?.[1] ?? legacyCx?.[1]);
+  const pivotY = Number(dataY?.[1] ?? legacyCy?.[1]);
+
+  if (Number.isNaN(pivotX) || Number.isNaN(pivotY)) {
+    return { xRatio: 0.5, yRatio: 0.5 };
+  }
+
+  return {
+    xRatio: clamp01((pivotX - minX) / width),
+    yRatio: clamp01((pivotY - minY) / height),
+  };
 }
 
 // ── Retry helper (for 429 / 503 transient errors) ───────────────────────────
@@ -224,38 +263,26 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   });
   const [validatingComposer, setValidatingComposer] = useState(false);
   const composerCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [composerPivot, setComposerPivot] = useState<PointerPivotOffsets>(() => {
+  const [composerAxis, setComposerAxis] = useState<PointerAxisAdjustments>(() => {
     try {
-      const raw = localStorage.getItem(POINTER_COMPOSER_PIVOT_KEY);
+      const raw = localStorage.getItem(POINTER_COMPOSER_AXIS_KEY);
       if (!raw) {
-        return {
-          hour: { x: 0, y: 0 },
-          minute: { x: 0, y: 0 },
-          second: { x: 0, y: 0 },
-        };
+        return { hour: 0, minute: 0, second: 0 };
       }
-      const parsed = JSON.parse(raw) as Partial<PointerPivotOffsets>;
+      const parsed = JSON.parse(raw) as Partial<PointerAxisAdjustments>;
       return {
-        hour: {
-          x: typeof parsed.hour?.x === 'number' ? parsed.hour.x : 0,
-          y: typeof parsed.hour?.y === 'number' ? parsed.hour.y : 0,
-        },
-        minute: {
-          x: typeof parsed.minute?.x === 'number' ? parsed.minute.x : 0,
-          y: typeof parsed.minute?.y === 'number' ? parsed.minute.y : 0,
-        },
-        second: {
-          x: typeof parsed.second?.x === 'number' ? parsed.second.x : 0,
-          y: typeof parsed.second?.y === 'number' ? parsed.second.y : 0,
-        },
+        hour: typeof parsed.hour === 'number' ? parsed.hour : 0,
+        minute: typeof parsed.minute === 'number' ? parsed.minute : 0,
+        second: typeof parsed.second === 'number' ? parsed.second : 0,
       };
     } catch {
-      return {
-        hour: { x: 0, y: 0 },
-        minute: { x: 0, y: 0 },
-        second: { x: 0, y: 0 },
-      };
+      return { hour: 0, minute: 0, second: 0 };
     }
+  });
+  const [composerLayerAnchor, setComposerLayerAnchor] = useState<Record<'hour' | 'minute' | 'second', PointerLayerAnchor>>({
+    hour: { xRatio: 0.5, yRatio: 0.5 },
+    minute: { xRatio: 0.5, yRatio: 0.5 },
+    second: { xRatio: 0.5, yRatio: 0.5 },
   });
 
   // ── Iframe ref ─────────────────────────────────────────────────────────────
@@ -277,8 +304,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   }, [composerDraft]);
 
   useEffect(() => {
-    localStorage.setItem(POINTER_COMPOSER_PIVOT_KEY, JSON.stringify(composerPivot));
-  }, [composerPivot]);
+    localStorage.setItem(POINTER_COMPOSER_AXIS_KEY, JSON.stringify(composerAxis));
+  }, [composerAxis]);
 
   useEffect(() => {
     if (activeTab !== 'pointers') return;
@@ -294,23 +321,29 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       if (!raw) {
         setLayerValidation(key, { state: 'error', message: 'Empty input' });
         setLayerPng(key, '');
+        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
         return;
       }
       try {
         const hasSvg = /<svg[\s\S]*?<\/svg>/i.test(raw);
         const pngDataUrl = hasSvg
-          ? await renderSvgToDataUrl(raw, 64)
-          : await renderHtmlToDataUrl(raw, 64);
+          ? await renderSvgToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE)
+          : await renderHtmlToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE);
         if (!pngDataUrl || !pngDataUrl.startsWith('data:image/png')) {
           setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
           setLayerPng(key, '');
+          if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
           return;
         }
         setLayerValidation(key, { state: 'valid', message: hasSvg ? 'Valid SVG layer' : 'Valid HTML layer' });
         setLayerPng(key, pngDataUrl);
+        if (key !== 'hub') {
+          setLayerAnchor(key, hasSvg ? parseLayerAnchorFromSvg(raw) : { xRatio: 0.5, yRatio: 0.5 });
+        }
       } catch (err) {
         setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
         setLayerPng(key, '');
+        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
       }
     };
     const t = setTimeout(() => {
@@ -470,6 +503,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavingHand(true);
     setSaveHandMsg('');
     try {
+      const pivotOffsets = {
+        hour: { x: 0, y: Math.round(composerAxis.hour * 140) },
+        minute: { x: 0, y: Math.round(composerAxis.minute * 200) },
+        second: { x: 0, y: Math.round(composerAxis.second * 240) },
+      };
       const seedCode = hasComposedSources ? composerDraft.hourHtml : code;
       const record = await saveCustomHandStyle(
         saveHandName.trim(),
@@ -482,7 +520,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                 secondHtml: composerDraft.secondHtml,
                 hubHtml: composerDraft.hubHtml,
               },
-              pivotOffsets: composerPivot,
+              pivotOffsets,
             }
           : undefined,
       );
@@ -608,30 +646,39 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const setLayerPng = (key: ComposerLayerKey, dataUrl: string) => {
     setComposerLayerPng(prev => ({ ...prev, [key]: dataUrl }));
   };
+  const setLayerAnchor = (key: 'hour' | 'minute' | 'second', next: PointerLayerAnchor) => {
+    setComposerLayerAnchor(prev => ({ ...prev, [key]: next }));
+  };
 
   const validateLayer = async (key: ComposerLayerKey, codeText: string) => {
     const raw = codeText.trim();
     if (!raw) {
       setLayerValidation(key, { state: 'error', message: 'Empty input' });
       setLayerPng(key, '');
+      if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
       return;
     }
 
     try {
       const hasSvg = /<svg[\s\S]*?<\/svg>/i.test(raw);
       const pngDataUrl = hasSvg
-        ? await renderSvgToDataUrl(raw, 64)
-        : await renderHtmlToDataUrl(raw, 64);
+        ? await renderSvgToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE)
+        : await renderHtmlToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE);
       if (!pngDataUrl || !pngDataUrl.startsWith('data:image/png')) {
         setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
         setLayerPng(key, '');
+        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
         return;
       }
       setLayerValidation(key, { state: 'valid', message: hasSvg ? 'Valid SVG layer' : 'Valid HTML layer' });
       setLayerPng(key, pngDataUrl);
+      if (key !== 'hub') {
+        setLayerAnchor(key, hasSvg ? parseLayerAnchorFromSvg(raw) : { xRatio: 0.5, yRatio: 0.5 });
+      }
     } catch (err) {
       setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
       setLayerPng(key, '');
+      if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
     }
   };
 
@@ -646,24 +693,20 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setValidatingComposer(false);
   };
 
-  const updatePivot = (
+  const updateAxisAdjustment = (
     hand: 'hour' | 'minute' | 'second',
-    axis: 'x' | 'y',
     value: number,
   ) => {
-    setComposerPivot(prev => ({
+    setComposerAxis(prev => ({
       ...prev,
-      [hand]: {
-        ...prev[hand],
-        [axis]: value,
-      },
+      [hand]: value,
     }));
   };
 
-  const resetPivot = (hand: 'hour' | 'minute' | 'second') => {
-    setComposerPivot(prev => ({
+  const resetAxisAdjustment = (hand: 'hour' | 'minute' | 'second') => {
+    setComposerAxis(prev => ({
       ...prev,
-      [hand]: { x: 0, y: 0 },
+      [hand]: 0,
     }));
   };
 
@@ -702,17 +745,26 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
 
     drawGuide();
 
-    const drawRotatedLayer = (img: HTMLImageElement, deg: number, ox = 0, oy = 0) => {
+    const drawRotatedLayer = (
+      img: HTMLImageElement,
+      deg: number,
+      anchor: PointerLayerAnchor,
+      axisShiftRatio = 0,
+    ) => {
       const rad = (deg * Math.PI) / 180;
       // Keep layer proportions: fit by height so pointer length remains visible.
       const targetH = size * 0.82;
       const scale = targetH / Math.max(1, img.height);
       const drawW = img.width * scale;
       const drawH = img.height * scale;
+      const anchorX = drawW * anchor.xRatio;
+      const anchorY = drawH * anchor.yRatio;
+      const axisShift = axisShiftRatio * drawH;
       ctx.save();
-      ctx.translate(cx + ox, cy + oy);
+      ctx.translate(cx, cy);
       ctx.rotate(rad);
-      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+      // axisShift moves artwork along the hand direction while keeping pivot fixed at center.
+      ctx.drawImage(img, -anchorX, -anchorY - axisShift, drawW, drawH);
       ctx.restore();
     };
 
@@ -733,20 +785,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       drawGuide();
       // Default angles requested in spec
       // hour=2PM (60deg), minute=10PM mark (300deg), second=12AM (0deg)
-      if (hourImg) drawRotatedLayer(hourImg, 60, composerPivot.hour.x, composerPivot.hour.y);
-      if (minuteImg) drawRotatedLayer(minuteImg, 300, composerPivot.minute.x, composerPivot.minute.y);
-      if (secondImg) drawRotatedLayer(secondImg, 0, composerPivot.second.x, composerPivot.second.y);
-
-      // Hand pivot markers (for tuning offsets relative to hub center)
-      const drawPivotDot = (x: number, y: number, color: string) => {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(cx + x, cy + y, 2, 0, Math.PI * 2);
-        ctx.fill();
-      };
-      drawPivotDot(composerPivot.hour.x, composerPivot.hour.y, 'rgba(248,113,113,0.9)');
-      drawPivotDot(composerPivot.minute.x, composerPivot.minute.y, 'rgba(251,191,36,0.9)');
-      drawPivotDot(composerPivot.second.x, composerPivot.second.y, 'rgba(34,197,94,0.9)');
+      if (hourImg) drawRotatedLayer(hourImg, 60, composerLayerAnchor.hour, composerAxis.hour);
+      if (minuteImg) drawRotatedLayer(minuteImg, 300, composerLayerAnchor.minute, composerAxis.minute);
+      if (secondImg) drawRotatedLayer(secondImg, 0, composerLayerAnchor.second, composerAxis.second);
 
       if (hubImg) {
         const hubSize = size * 0.14;
@@ -758,7 +799,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         ctx.fill();
       }
     });
-  }, [composerLayerPng, composerPivot]);
+  }, [composerLayerPng, composerLayerAnchor, composerAxis]);
 
   if (!open) return null;
 
@@ -1254,7 +1295,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                   </div>
 
                   <div className="rounded-lg border border-white/10 bg-zinc-900/80 p-3 space-y-2">
-                    <p className="text-[10px] text-white/45 uppercase tracking-wide">Pivot Controls (relative to hub center)</p>
+                    <p className="text-[10px] text-white/45 uppercase tracking-wide">Before/After Hub Balance (along each hand axis)</p>
                     {([
                       { key: 'hour', label: 'Hour', color: 'text-red-300' },
                       { key: 'minute', label: 'Minute', color: 'text-amber-300' },
@@ -1263,17 +1304,24 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                       <div key={hand.key} className="rounded border border-white/10 p-2 space-y-1">
                         <div className="flex items-center justify-between">
                           <span className={`text-[10px] ${hand.color}`}>{hand.label}</span>
-                          <button onClick={() => resetPivot(hand.key)} className="text-[10px] text-white/40 hover:text-white/70 border border-white/10 rounded px-2 py-0.5">Reset</button>
+                          <button onClick={() => resetAxisAdjustment(hand.key)} className="text-[10px] text-white/40 hover:text-white/70 border border-white/10 rounded px-2 py-0.5">Reset</button>
                         </div>
-                        <div className="grid grid-cols-[16px_1fr_34px] items-center gap-1.5">
-                          <span className="text-[10px] text-white/35">X</span>
-                          <input type="range" min={-80} max={80} step={1} value={composerPivot[hand.key].x} onChange={e => updatePivot(hand.key, 'x', Number(e.target.value))} className="h-1.5 accent-cyan-400" />
-                          <span className="text-[10px] text-white/45 text-right">{composerPivot[hand.key].x}</span>
+                        <div className="grid grid-cols-[56px_1fr_46px] items-center gap-1.5">
+                          <span className="text-[10px] text-white/35">Tail↔Tip</span>
+                          <input
+                            type="range"
+                            min={-0.45}
+                            max={0.45}
+                            step={0.005}
+                            value={composerAxis[hand.key]}
+                            onChange={e => updateAxisAdjustment(hand.key, Number(e.target.value))}
+                            className="h-1.5 accent-cyan-400"
+                          />
+                          <span className="text-[10px] text-white/45 text-right">{Math.round(composerAxis[hand.key] * 100)}%</span>
                         </div>
-                        <div className="grid grid-cols-[16px_1fr_34px] items-center gap-1.5">
-                          <span className="text-[10px] text-white/35">Y</span>
-                          <input type="range" min={-80} max={80} step={1} value={composerPivot[hand.key].y} onChange={e => updatePivot(hand.key, 'y', Number(e.target.value))} className="h-1.5 accent-cyan-400" />
-                          <span className="text-[10px] text-white/45 text-right">{composerPivot[hand.key].y}</span>
+                        <div className="flex items-center justify-between text-[9px] text-white/35">
+                          <span>- = more tail after hub</span>
+                          <span>+ = more tip before hub</span>
                         </div>
                       </div>
                     ))}
