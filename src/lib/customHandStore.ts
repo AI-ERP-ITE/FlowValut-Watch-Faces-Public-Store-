@@ -24,7 +24,31 @@ export interface CustomHandRecord {
   minutePosY?: number;
   secondPosX?: number;
   secondPosY?: number;
+  // Optional composer metadata for separated HTML workflow.
+  sourceHourHtml?: string;
+  sourceMinuteHtml?: string;
+  sourceSecondHtml?: string;
+  sourceHubHtml?: string;
+  pivotOffsets?: {
+    hour: { x: number; y: number };
+    minute: { x: number; y: number };
+    second: { x: number; y: number };
+  };
   createdAt: number;
+}
+
+export interface SaveCustomHandStyleOptions {
+  composedSources?: {
+    hourHtml: string;
+    minuteHtml: string;
+    secondHtml: string;
+    hubHtml: string;
+  };
+  pivotOffsets?: {
+    hour: { x: number; y: number };
+    minute: { x: number; y: number };
+    second: { x: number; y: number };
+  };
 }
 
 interface ParsedPivot {
@@ -218,18 +242,36 @@ export async function getCustomHandByKey(key: string): Promise<CustomHandRecord 
 export async function saveCustomHandStyle(
   name: string,
   svgCode: string,
+  options?: SaveCustomHandStyleOptions,
 ): Promise<CustomHandRecord> {
   const sourceSvg = extractSvgFromCode(svgCode);
   const parsedPivot = extractPivotFromSvg(sourceSvg);
   const cleanedSvg = stripPivotMarkers(sourceSvg);
 
+  const composed = options?.composedSources;
+  const hasComposedSources = !!(
+    composed
+    && composed.hourHtml.trim()
+    && composed.minuteHtml.trim()
+    && composed.secondHtml.trim()
+    && composed.hubHtml.trim()
+  );
+
   // One-input composite support:
   // if the user provides a stacked SVG with tagged groups (hour/minute/second/hub),
   // extract each layer so exported assets stay clean and don't bleed into each other.
-  const hourSvg = extractLayerFromCompositeSvg(cleanedSvg, 'hour') ?? cleanedSvg;
-  const minuteSvg = extractLayerFromCompositeSvg(cleanedSvg, 'minute') ?? cleanedSvg;
-  const secondSvg = extractLayerFromCompositeSvg(cleanedSvg, 'second') ?? cleanedSvg;
-  const hubSvg = extractLayerFromCompositeSvg(cleanedSvg, 'hub') ?? cleanedSvg;
+  const hourSvg = hasComposedSources
+    ? stripPivotMarkers(extractSvgFromCode(composed!.hourHtml))
+    : (extractLayerFromCompositeSvg(cleanedSvg, 'hour') ?? cleanedSvg);
+  const minuteSvg = hasComposedSources
+    ? stripPivotMarkers(extractSvgFromCode(composed!.minuteHtml))
+    : (extractLayerFromCompositeSvg(cleanedSvg, 'minute') ?? cleanedSvg);
+  const secondSvg = hasComposedSources
+    ? stripPivotMarkers(extractSvgFromCode(composed!.secondHtml))
+    : (extractLayerFromCompositeSvg(cleanedSvg, 'second') ?? cleanedSvg);
+  const hubSvg = hasComposedSources
+    ? stripPivotMarkers(extractSvgFromCode(composed!.hubHtml))
+    : (extractLayerFromCompositeSvg(cleanedSvg, 'hub') ?? cleanedSvg);
 
   const [hourDataUrl, minuteDataUrl, secondDataUrl, coverDataUrl, swatchDataUrl] =
     await Promise.all([
@@ -244,6 +286,23 @@ export async function saveCustomHandStyle(
   const minutePivot = parsedPivot ? computePivotPx(parsedPivot, 16, 200) : null;
   const secondPivot = parsedPivot ? computePivotPx(parsedPivot, 8, 240) : null;
 
+  const pivotOffsets = options?.pivotOffsets;
+
+  // Effective hand positions for TIME_POINTER selection/export.
+  // If no marker-derived pivot exists, fall back to known stable defaults.
+  const baseHour = hourPivot ?? { x: 11, y: 118 };
+  const baseMinute = minutePivot ?? { x: 8, y: 172 };
+  const baseSecond = secondPivot ?? { x: 4, y: 180 };
+  const effectiveHour = pivotOffsets
+    ? { x: clamp(Math.round(baseHour.x + pivotOffsets.hour.x), 0, 22), y: clamp(Math.round(baseHour.y + pivotOffsets.hour.y), 0, 140) }
+    : baseHour;
+  const effectiveMinute = pivotOffsets
+    ? { x: clamp(Math.round(baseMinute.x + pivotOffsets.minute.x), 0, 16), y: clamp(Math.round(baseMinute.y + pivotOffsets.minute.y), 0, 200) }
+    : baseMinute;
+  const effectiveSecond = pivotOffsets
+    ? { x: clamp(Math.round(baseSecond.x + pivotOffsets.second.x), 0, 8), y: clamp(Math.round(baseSecond.y + pivotOffsets.second.y), 0, 240) }
+    : baseSecond;
+
   const record: CustomHandRecord = {
     key: `custom_hand:${slugify(name)}`,
     name,
@@ -252,9 +311,19 @@ export async function saveCustomHandStyle(
     secondDataUrl,
     coverDataUrl,
     swatchDataUrl,
-    ...(hourPivot ? { hourPosX: hourPivot.x, hourPosY: hourPivot.y } : {}),
-    ...(minutePivot ? { minutePosX: minutePivot.x, minutePosY: minutePivot.y } : {}),
-    ...(secondPivot ? { secondPosX: secondPivot.x, secondPosY: secondPivot.y } : {}),
+    hourPosX: effectiveHour.x,
+    hourPosY: effectiveHour.y,
+    minutePosX: effectiveMinute.x,
+    minutePosY: effectiveMinute.y,
+    secondPosX: effectiveSecond.x,
+    secondPosY: effectiveSecond.y,
+    ...(hasComposedSources ? {
+      sourceHourHtml: composed!.hourHtml,
+      sourceMinuteHtml: composed!.minuteHtml,
+      sourceSecondHtml: composed!.secondHtml,
+      sourceHubHtml: composed!.hubHtml,
+    } : {}),
+    ...(pivotOffsets ? { pivotOffsets } : {}),
     createdAt: Date.now(),
   };
 

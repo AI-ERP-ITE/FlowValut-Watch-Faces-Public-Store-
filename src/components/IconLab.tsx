@@ -18,6 +18,7 @@ import {
   deleteCustomIcon,
   loadCustomIcons,
   renderSvgToDataUrl,
+  renderHtmlToDataUrl,
   type CustomIconRecord,
 } from '@/lib/customIconStore';
 import {
@@ -39,6 +40,28 @@ import {
 type CodeMode = 'svg' | 'html';
 type AIModel = 'gpt-4o' | 'gemini-2.5-flash';
 type TabId = 'icons' | 'fonts';
+
+interface PointerComposerDraft {
+  hourHtml: string;
+  minuteHtml: string;
+  secondHtml: string;
+  hubHtml: string;
+}
+
+interface PointerPivotOffsets {
+  hour: { x: number; y: number };
+  minute: { x: number; y: number };
+  second: { x: number; y: number };
+}
+
+type ComposerLayerKey = 'hour' | 'minute' | 'second' | 'hub';
+type ComposerLayerValidation = {
+  state: 'idle' | 'valid' | 'error';
+  message: string;
+};
+
+const POINTER_COMPOSER_DRAFT_KEY = 'zepp-pointer-composer-draft-v1';
+const POINTER_COMPOSER_PIVOT_KEY = 'zepp-pointer-composer-pivot-v1';
 
 interface Props {
   open: boolean;
@@ -169,6 +192,71 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const [saveHandName, setSaveHandName] = useState('');
   const [savingHand, setSavingHand] = useState(false);
   const [saveHandMsg, setSaveHandMsg] = useState('');
+  // Task 2: structured state model for pointer composer, persisted locally.
+  const [composerDraft, setComposerDraft] = useState<PointerComposerDraft>(() => {
+    try {
+      const raw = localStorage.getItem(POINTER_COMPOSER_DRAFT_KEY);
+      if (!raw) {
+        return { hourHtml: '', minuteHtml: '', secondHtml: '', hubHtml: '' };
+      }
+      const parsed = JSON.parse(raw) as Partial<PointerComposerDraft>;
+      return {
+        hourHtml: typeof parsed.hourHtml === 'string' ? parsed.hourHtml : '',
+        minuteHtml: typeof parsed.minuteHtml === 'string' ? parsed.minuteHtml : '',
+        secondHtml: typeof parsed.secondHtml === 'string' ? parsed.secondHtml : '',
+        hubHtml: typeof parsed.hubHtml === 'string' ? parsed.hubHtml : '',
+      };
+    } catch {
+      return { hourHtml: '', minuteHtml: '', secondHtml: '', hubHtml: '' };
+    }
+  });
+  const [composerValidation, setComposerValidation] = useState<Record<ComposerLayerKey, ComposerLayerValidation>>({
+    hour: { state: 'idle', message: 'Not validated' },
+    minute: { state: 'idle', message: 'Not validated' },
+    second: { state: 'idle', message: 'Not validated' },
+    hub: { state: 'idle', message: 'Not validated' },
+  });
+  const [composerLayerPng, setComposerLayerPng] = useState<Record<ComposerLayerKey, string>>({
+    hour: '',
+    minute: '',
+    second: '',
+    hub: '',
+  });
+  const [validatingComposer, setValidatingComposer] = useState(false);
+  const composerCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [composerPivot, setComposerPivot] = useState<PointerPivotOffsets>(() => {
+    try {
+      const raw = localStorage.getItem(POINTER_COMPOSER_PIVOT_KEY);
+      if (!raw) {
+        return {
+          hour: { x: 0, y: 0 },
+          minute: { x: 0, y: 0 },
+          second: { x: 0, y: 0 },
+        };
+      }
+      const parsed = JSON.parse(raw) as Partial<PointerPivotOffsets>;
+      return {
+        hour: {
+          x: typeof parsed.hour?.x === 'number' ? parsed.hour.x : 0,
+          y: typeof parsed.hour?.y === 'number' ? parsed.hour.y : 0,
+        },
+        minute: {
+          x: typeof parsed.minute?.x === 'number' ? parsed.minute.x : 0,
+          y: typeof parsed.minute?.y === 'number' ? parsed.minute.y : 0,
+        },
+        second: {
+          x: typeof parsed.second?.x === 'number' ? parsed.second.x : 0,
+          y: typeof parsed.second?.y === 'number' ? parsed.second.y : 0,
+        },
+      };
+    } catch {
+      return {
+        hour: { x: 0, y: 0 },
+        minute: { x: 0, y: 0 },
+        second: { x: 0, y: 0 },
+      };
+    }
+  });
 
   // ── Iframe ref ─────────────────────────────────────────────────────────────
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -183,6 +271,14 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     loadCustomFonts().then(setSavedFonts);
     loadCustomHandStyles().then(setSavedHands);
   }, [open]);
+
+  useEffect(() => {
+    localStorage.setItem(POINTER_COMPOSER_DRAFT_KEY, JSON.stringify(composerDraft));
+  }, [composerDraft]);
+
+  useEffect(() => {
+    localStorage.setItem(POINTER_COMPOSER_PIVOT_KEY, JSON.stringify(composerPivot));
+  }, [composerPivot]);
 
   // ── Derive unique categories from saved icons ──────────────────────────────
   const categories = ['My Icons', ...Array.from(new Set(savedIcons.map(i => i.category))).filter(c => c !== 'My Icons')];
@@ -315,18 +411,48 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
 
   // ── Save as Clock Hand Style ───────────────────────────────────────────────
   const handleSaveAsHand = async () => {
-    if (!saveHandName.trim() || !code.trim()) return;
+    const hasComposedSources = !!(
+      composerDraft.hourHtml.trim()
+      && composerDraft.minuteHtml.trim()
+      && composerDraft.secondHtml.trim()
+      && composerDraft.hubHtml.trim()
+    );
+    if (!saveHandName.trim()) return;
+    if (!hasComposedSources && !code.trim()) {
+      setSaveHandMsg('✗ Provide hand code or all four composer layers');
+      return;
+    }
+
     setSavingHand(true);
     setSaveHandMsg('');
     try {
-      const record = await saveCustomHandStyle(saveHandName.trim(), code);
+      const seedCode = hasComposedSources ? composerDraft.hourHtml : code;
+      const record = await saveCustomHandStyle(
+        saveHandName.trim(),
+        seedCode,
+        hasComposedSources
+          ? {
+              composedSources: {
+                hourHtml: composerDraft.hourHtml,
+                minuteHtml: composerDraft.minuteHtml,
+                secondHtml: composerDraft.secondHtml,
+                hubHtml: composerDraft.hubHtml,
+              },
+              pivotOffsets: composerPivot,
+            }
+          : undefined,
+      );
       setSavedHands(prev => {
         const filtered = prev.filter(h => h.key !== record.key);
         return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
       });
-      setSaveHandMsg('✓ Saved — clear code editor and enter a new SVG to create another style');
+      setSaveHandMsg(hasComposedSources
+        ? '✓ Saved composed hand set (hour/minute/second/hub + pivots)'
+        : '✓ Saved — clear code editor and enter a new SVG to create another style');
       setSaveHandName('');
-      setCode('');
+      if (!hasComposedSources) {
+        setCode('');
+      }
       onHandsSaved?.();
     } catch (err) {
       setSaveHandMsg(`✗ ${(err as Error).message}`);
@@ -428,6 +554,168 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const layerStatus = (value: string): 'empty' | 'ready' => (value.trim() ? 'ready' : 'empty');
+  const updateComposerDraft = (patch: Partial<PointerComposerDraft>) => {
+    setComposerDraft(prev => ({ ...prev, ...patch }));
+  };
+  const setLayerValidation = (key: ComposerLayerKey, next: ComposerLayerValidation) => {
+    setComposerValidation(prev => ({ ...prev, [key]: next }));
+  };
+  const setLayerPng = (key: ComposerLayerKey, dataUrl: string) => {
+    setComposerLayerPng(prev => ({ ...prev, [key]: dataUrl }));
+  };
+
+  const validateLayer = async (key: ComposerLayerKey, codeText: string) => {
+    const raw = codeText.trim();
+    if (!raw) {
+      setLayerValidation(key, { state: 'error', message: 'Empty input' });
+      setLayerPng(key, '');
+      return;
+    }
+
+    try {
+      const hasSvg = /<svg[\s\S]*?<\/svg>/i.test(raw);
+      const pngDataUrl = hasSvg
+        ? await renderSvgToDataUrl(raw, 64)
+        : await renderHtmlToDataUrl(raw, 64);
+      if (!pngDataUrl || !pngDataUrl.startsWith('data:image/png')) {
+        setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
+        setLayerPng(key, '');
+        return;
+      }
+      setLayerValidation(key, { state: 'valid', message: hasSvg ? 'Valid SVG layer' : 'Valid HTML layer' });
+      setLayerPng(key, pngDataUrl);
+    } catch (err) {
+      setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
+      setLayerPng(key, '');
+    }
+  };
+
+  const validateAllComposerLayers = async () => {
+    setValidatingComposer(true);
+    await Promise.all([
+      validateLayer('hour', composerDraft.hourHtml),
+      validateLayer('minute', composerDraft.minuteHtml),
+      validateLayer('second', composerDraft.secondHtml),
+      validateLayer('hub', composerDraft.hubHtml),
+    ]);
+    setValidatingComposer(false);
+  };
+
+  const updatePivot = (
+    hand: 'hour' | 'minute' | 'second',
+    axis: 'x' | 'y',
+    value: number,
+  ) => {
+    setComposerPivot(prev => ({
+      ...prev,
+      [hand]: {
+        ...prev[hand],
+        [axis]: value,
+      },
+    }));
+  };
+
+  const resetPivot = (hand: 'hour' | 'minute' | 'second') => {
+    setComposerPivot(prev => ({
+      ...prev,
+      [hand]: { x: 0, y: 0 },
+    }));
+  };
+
+  useEffect(() => {
+    const canvas = composerCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const size = canvas.width;
+    const cx = size / 2;
+    const cy = size / 2;
+
+    const drawGuide = () => {
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = '#0f1115';
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.65)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, size * 0.44, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy);
+      ctx.lineTo(cx + 8, cy);
+      ctx.moveTo(cx, cy - 8);
+      ctx.lineTo(cx, cy + 8);
+      ctx.stroke();
+    };
+
+    drawGuide();
+
+    const drawRotatedLayer = (img: HTMLImageElement, deg: number, ox = 0, oy = 0) => {
+      const rad = (deg * Math.PI) / 180;
+      // Keep layer proportions: fit by height so pointer length remains visible.
+      const targetH = size * 0.82;
+      const scale = targetH / Math.max(1, img.height);
+      const drawW = img.width * scale;
+      const drawH = img.height * scale;
+      ctx.save();
+      ctx.translate(cx + ox, cy + oy);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.restore();
+    };
+
+    const loadImage = (src: string) => new Promise<HTMLImageElement | null>((resolve) => {
+      if (!src) return resolve(null);
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+
+    Promise.all([
+      loadImage(composerLayerPng.hour),
+      loadImage(composerLayerPng.minute),
+      loadImage(composerLayerPng.second),
+      loadImage(composerLayerPng.hub),
+    ]).then(([hourImg, minuteImg, secondImg, hubImg]) => {
+      drawGuide();
+      // Default angles requested in spec
+      // hour=2PM (60deg), minute=10PM mark (300deg), second=12AM (0deg)
+      if (hourImg) drawRotatedLayer(hourImg, 60, composerPivot.hour.x, composerPivot.hour.y);
+      if (minuteImg) drawRotatedLayer(minuteImg, 300, composerPivot.minute.x, composerPivot.minute.y);
+      if (secondImg) drawRotatedLayer(secondImg, 0, composerPivot.second.x, composerPivot.second.y);
+
+      // Hand pivot markers (for tuning offsets relative to hub center)
+      const drawPivotDot = (x: number, y: number, color: string) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx + x, cy + y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      drawPivotDot(composerPivot.hour.x, composerPivot.hour.y, 'rgba(248,113,113,0.9)');
+      drawPivotDot(composerPivot.minute.x, composerPivot.minute.y, 'rgba(251,191,36,0.9)');
+      drawPivotDot(composerPivot.second.x, composerPivot.second.y, 'rgba(34,197,94,0.9)');
+
+      if (hubImg) {
+        const hubSize = size * 0.14;
+        ctx.drawImage(hubImg, cx - hubSize / 2, cy - hubSize / 2, hubSize, hubSize);
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.02, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+  }, [composerLayerPng, composerPivot]);
+
   if (!open) return null;
 
   return (
@@ -714,6 +1002,165 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                 {/* Save as Clock Hand Style */}
                 <div className="space-y-2 border-t border-white/10 pt-3">
                   <span className="text-[10px] text-white/40 uppercase tracking-widest">Save as Clock Hand Style</span>
+
+                  {/* Task 1: Pointer HTML Composer skeleton */}
+                  <div className="rounded border border-cyan-500/20 bg-cyan-500/5 p-2.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-cyan-300/90 font-medium">Pointer HTML Composer (Skeleton)</p>
+                      <span className="text-[9px] text-white/35">T1</span>
+                    </div>
+                    <p className="text-[9px] text-white/40 leading-snug">
+                      Paste each layer separately. Full wiring comes in next tasks.
+                    </p>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={validateAllComposerLayers}
+                        disabled={validatingComposer}
+                        className="text-[9px] px-2 py-1 rounded border border-cyan-500/40 bg-cyan-600/20 text-cyan-200 hover:bg-cyan-600/30 disabled:opacity-50"
+                      >
+                        {validatingComposer ? 'Validating…' : 'Validate Layers'}
+                      </button>
+                      <span className="text-[9px] text-white/35 self-center">Independent parse/render per layer (no silent fallback)</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Hour HTML</span>
+                          <span className={`text-[9px] ${layerStatus(composerDraft.hourHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
+                            {layerStatus(composerDraft.hourHtml)}
+                          </span>
+                        </div>
+                        <textarea
+                          value={composerDraft.hourHtml}
+                          onChange={e => updateComposerDraft({ hourHtml: e.target.value })}
+                          placeholder="<svg id='hour-hand'>...</svg>"
+                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
+                          spellCheck={false}
+                        />
+                        <p className={`text-[9px] ${composerValidation.hour.state === 'error' ? 'text-red-400' : composerValidation.hour.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
+                          {composerValidation.hour.message}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Minutes HTML</span>
+                          <span className={`text-[9px] ${layerStatus(composerDraft.minuteHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
+                            {layerStatus(composerDraft.minuteHtml)}
+                          </span>
+                        </div>
+                        <textarea
+                          value={composerDraft.minuteHtml}
+                          onChange={e => updateComposerDraft({ minuteHtml: e.target.value })}
+                          placeholder="<svg id='minute-hand'>...</svg>"
+                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
+                          spellCheck={false}
+                        />
+                        <p className={`text-[9px] ${composerValidation.minute.state === 'error' ? 'text-red-400' : composerValidation.minute.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
+                          {composerValidation.minute.message}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Seconds HTML</span>
+                          <span className={`text-[9px] ${layerStatus(composerDraft.secondHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
+                            {layerStatus(composerDraft.secondHtml)}
+                          </span>
+                        </div>
+                        <textarea
+                          value={composerDraft.secondHtml}
+                          onChange={e => updateComposerDraft({ secondHtml: e.target.value })}
+                          placeholder="<svg id='second-hand'>...</svg>"
+                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
+                          spellCheck={false}
+                        />
+                        <p className={`text-[9px] ${composerValidation.second.state === 'error' ? 'text-red-400' : composerValidation.second.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
+                          {composerValidation.second.message}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Hub HTML</span>
+                          <span className={`text-[9px] ${layerStatus(composerDraft.hubHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
+                            {layerStatus(composerDraft.hubHtml)}
+                          </span>
+                        </div>
+                        <textarea
+                          value={composerDraft.hubHtml}
+                          onChange={e => updateComposerDraft({ hubHtml: e.target.value })}
+                          placeholder="<svg id='pinion-cap'>...</svg>"
+                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
+                          spellCheck={false}
+                        />
+                        <p className={`text-[9px] ${composerValidation.hub.state === 'error' ? 'text-red-400' : composerValidation.hub.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
+                          {composerValidation.hub.message}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded border border-white/10 bg-zinc-900/80 p-2">
+                      <p className="text-[9px] text-white/45 mb-1">Composition Preview</p>
+                      <canvas
+                        ref={composerCanvasRef}
+                        width={220}
+                        height={220}
+                        className="mx-auto w-[180px] h-[180px] rounded border border-cyan-400/30 bg-[#0f1115]"
+                      />
+                      <div className="mt-1 text-[9px] text-white/35 text-center">Default demo angles: H=2PM, M=10PM mark, S=12AM</div>
+                    </div>
+
+                    <div className="rounded border border-white/10 bg-zinc-900/80 p-2 space-y-2">
+                      <p className="text-[9px] text-white/45">Pivot Controls (relative to hub center)</p>
+
+                      {([
+                        { key: 'hour', label: 'Hour', color: 'text-red-300' },
+                        { key: 'minute', label: 'Minute', color: 'text-amber-300' },
+                        { key: 'second', label: 'Second', color: 'text-green-300' },
+                      ] as const).map((hand) => (
+                        <div key={hand.key} className="rounded border border-white/10 p-1.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[9px] ${hand.color}`}>{hand.label}</span>
+                            <button
+                              onClick={() => resetPivot(hand.key)}
+                              className="text-[9px] text-white/40 hover:text-white/70 border border-white/10 rounded px-1.5 py-0.5"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-[12px_1fr_28px] items-center gap-1">
+                            <span className="text-[9px] text-white/35">X</span>
+                            <input
+                              type="range"
+                              min={-80}
+                              max={80}
+                              step={1}
+                              value={composerPivot[hand.key].x}
+                              onChange={e => updatePivot(hand.key, 'x', Number(e.target.value))}
+                              className="h-1 accent-cyan-400"
+                            />
+                            <span className="text-[9px] text-white/45 text-right">{composerPivot[hand.key].x}</span>
+                          </div>
+                          <div className="grid grid-cols-[12px_1fr_28px] items-center gap-1">
+                            <span className="text-[9px] text-white/35">Y</span>
+                            <input
+                              type="range"
+                              min={-80}
+                              max={80}
+                              step={1}
+                              value={composerPivot[hand.key].y}
+                              onChange={e => updatePivot(hand.key, 'y', Number(e.target.value))}
+                              className="h-1 accent-cyan-400"
+                            />
+                            <span className="text-[9px] text-white/45 text-right">{composerPivot[hand.key].y}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Design guide */}
                   <div className="rounded border border-cyan-500/20 bg-cyan-500/5 p-2 space-y-1">
                     <p className="text-[9px] text-cyan-300/80 font-medium">SVG design guide</p>
