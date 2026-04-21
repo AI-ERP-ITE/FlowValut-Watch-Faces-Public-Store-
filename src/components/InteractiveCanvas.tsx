@@ -1201,6 +1201,34 @@ const HAND_DEFS = [
   { key: 'cover',  w: 30,  h: 30,  pivotX: 15, pivotY: 15  },
 ] as const;
 
+function extractSvgFromHtmlSource(code?: string): string | null {
+  if (!code) return null;
+  const m = code.match(/<svg[\s\S]*<\/svg>/i);
+  return m ? m[0] : null;
+}
+
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function parsePivotRatioFromSource(code?: string): { x: number; y: number } {
+  const svg = extractSvgFromHtmlSource(code);
+  if (!svg) return { x: 0.5, y: 0.5 };
+  const tag = svg.match(/<svg\b[^>]*>/i)?.[0] ?? '';
+  const vb = tag.match(/viewBox\s*=\s*["']([^"']+)["']/i)?.[1] ?? '';
+  const parts = vb.trim().split(/[\s,]+/).map(Number);
+  if (parts.length < 4 || parts.some(Number.isNaN) || parts[2] <= 0 || parts[3] <= 0) {
+    return { x: 0.5, y: 0.5 };
+  }
+  const [minX, minY, w, h] = parts;
+  const pxRaw = Number(tag.match(/\bdata-pivot-x\s*=\s*["']([^"']+)["']/i)?.[1]);
+  const pyRaw = Number(tag.match(/\bdata-pivot-y\s*=\s*["']([^"']+)["']/i)?.[1]);
+  if (Number.isNaN(pxRaw) || Number.isNaN(pyRaw)) return { x: 0.5, y: 0.5 };
+  const x = Math.max(0, Math.min(1, (pxRaw - minX) / w));
+  const y = Math.max(0, Math.min(1, (pyRaw - minY) / h));
+  return { x, y };
+}
+
 function loadHandImages(
   style: string,
   cache: Map<string, Map<string, HTMLImageElement>>,
@@ -1213,11 +1241,17 @@ function loadHandImages(
   let srcs: Record<string, string>;
   const customRecord = customHands?.find(h => h.key === style);
   if (customRecord) {
+    const hasSourceLayers = !!(
+      customRecord.sourceHourHtml
+      && customRecord.sourceMinuteHtml
+      && customRecord.sourceSecondHtml
+      && customRecord.sourceHubHtml
+    );
     srcs = {
-      hour: customRecord.hourDataUrl,
-      minute: customRecord.minuteDataUrl,
-      second: customRecord.secondDataUrl,
-      cover: customRecord.coverDataUrl,
+      hour: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceHourHtml) ?? '') : customRecord.hourDataUrl,
+      minute: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceMinuteHtml) ?? '') : customRecord.minuteDataUrl,
+      second: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceSecondHtml) ?? '') : customRecord.secondDataUrl,
+      cover: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceHubHtml) ?? '') : customRecord.coverDataUrl,
     };
   } else {
     const set = generateHandSet(style as HandStyleKey);
@@ -1255,6 +1289,18 @@ function drawTimePointer(
 
   const style = el.handStyle ?? 'silver';
   const customRecord = customHands?.find(h => h.key === style);
+  const sourceMode = !!(
+    customRecord?.sourceHourHtml
+    && customRecord?.sourceMinuteHtml
+    && customRecord?.sourceSecondHtml
+    && customRecord?.sourceHubHtml
+  );
+  const sourcePivot = sourceMode ? {
+    hour: parsePivotRatioFromSource(customRecord.sourceHourHtml),
+    minute: parsePivotRatioFromSource(customRecord.sourceMinuteHtml),
+    second: parsePivotRatioFromSource(customRecord.sourceSecondHtml),
+    cover: { x: 0.5, y: 0.5 },
+  } : null;
   const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
@@ -1285,25 +1331,38 @@ function drawTimePointer(
       const img = imgMap.get(def.key);
       if (!img) continue;
 
-      let pivotX: number = def.pivotX;
-      let pivotY: number = def.pivotY;
-      if (def.key === 'hour') {
-        pivotX = el.hourPos?.x ?? customRecord?.hourPosX ?? def.pivotX;
-        pivotY = el.hourPos?.y ?? customRecord?.hourPosY ?? def.pivotY;
-      } else if (def.key === 'minute') {
-        pivotX = el.minutePos?.x ?? customRecord?.minutePosX ?? def.pivotX;
-        pivotY = el.minutePos?.y ?? customRecord?.minutePosY ?? def.pivotY;
-      } else if (def.key === 'second') {
-        pivotX = el.secondPos?.x ?? customRecord?.secondPosX ?? def.pivotX;
-        pivotY = el.secondPos?.y ?? customRecord?.secondPosY ?? def.pivotY;
+      const srcW = Math.max(1, img.naturalWidth || img.width || def.w);
+      const srcH = Math.max(1, img.naturalHeight || img.height || def.h);
+      const baseW = sourceMode ? srcW : def.w;
+      const baseH = sourceMode ? srcH : def.h;
+
+      let pivotX: number;
+      let pivotY: number;
+      if (sourceMode) {
+        const ratio = sourcePivot?.[def.key] ?? { x: 0.5, y: 0.5 };
+        pivotX = baseW * ratio.x;
+        pivotY = baseH * ratio.y;
+      } else {
+        pivotX = def.pivotX;
+        pivotY = def.pivotY;
+        if (def.key === 'hour') {
+          pivotX = el.hourPos?.x ?? customRecord?.hourPosX ?? def.pivotX;
+          pivotY = el.hourPos?.y ?? customRecord?.hourPosY ?? def.pivotY;
+        } else if (def.key === 'minute') {
+          pivotX = el.minutePos?.x ?? customRecord?.minutePosX ?? def.pivotX;
+          pivotY = el.minutePos?.y ?? customRecord?.minutePosY ?? def.pivotY;
+        } else if (def.key === 'second') {
+          pivotX = el.secondPos?.x ?? customRecord?.secondPosX ?? def.pivotX;
+          pivotY = el.secondPos?.y ?? customRecord?.secondPosY ?? def.pivotY;
+        }
       }
 
       const sc = perScale[def.key];
-      const drawW = def.w * sc.wid;
-      const drawH = def.h * sc.len;
+      const drawW = baseW * sc.wid;
+      const drawH = baseH * sc.len;
       // Pivot position scales with length (pivot is near base)
       const drawPivotX = pivotX * sc.wid;
-      const drawPivotY = def.key === 'cover' ? pivotY : (pivotY / def.h) * drawH;
+      const drawPivotY = def.key === 'cover' ? pivotY : (pivotY / baseH) * drawH;
 
       const angle = def.key === 'cover' ? 0 : angles[def.key];
 
