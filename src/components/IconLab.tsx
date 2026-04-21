@@ -39,7 +39,7 @@ import {
 
 type CodeMode = 'svg' | 'html';
 type AIModel = 'gpt-4o' | 'gemini-2.5-flash';
-type TabId = 'icons' | 'fonts';
+type TabId = 'icons' | 'pointers' | 'fonts';
 
 interface PointerComposerDraft {
   hourHtml: string;
@@ -279,6 +279,50 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   useEffect(() => {
     localStorage.setItem(POINTER_COMPOSER_PIVOT_KEY, JSON.stringify(composerPivot));
   }, [composerPivot]);
+
+  useEffect(() => {
+    if (activeTab !== 'pointers') return;
+    const hasAny = !!(
+      composerDraft.hourHtml.trim()
+      || composerDraft.minuteHtml.trim()
+      || composerDraft.secondHtml.trim()
+      || composerDraft.hubHtml.trim()
+    );
+    if (!hasAny) return;
+    const runLayerCheck = async (key: ComposerLayerKey, codeText: string) => {
+      const raw = codeText.trim();
+      if (!raw) {
+        setLayerValidation(key, { state: 'error', message: 'Empty input' });
+        setLayerPng(key, '');
+        return;
+      }
+      try {
+        const hasSvg = /<svg[\s\S]*?<\/svg>/i.test(raw);
+        const pngDataUrl = hasSvg
+          ? await renderSvgToDataUrl(raw, 64)
+          : await renderHtmlToDataUrl(raw, 64);
+        if (!pngDataUrl || !pngDataUrl.startsWith('data:image/png')) {
+          setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
+          setLayerPng(key, '');
+          return;
+        }
+        setLayerValidation(key, { state: 'valid', message: hasSvg ? 'Valid SVG layer' : 'Valid HTML layer' });
+        setLayerPng(key, pngDataUrl);
+      } catch (err) {
+        setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
+        setLayerPng(key, '');
+      }
+    };
+    const t = setTimeout(() => {
+      void Promise.all([
+        runLayerCheck('hour', composerDraft.hourHtml),
+        runLayerCheck('minute', composerDraft.minuteHtml),
+        runLayerCheck('second', composerDraft.secondHtml),
+        runLayerCheck('hub', composerDraft.hubHtml),
+      ]);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [activeTab, composerDraft.hourHtml, composerDraft.minuteHtml, composerDraft.secondHtml, composerDraft.hubHtml]);
 
   // ── Derive unique categories from saved icons ──────────────────────────────
   const categories = ['My Icons', ...Array.from(new Set(savedIcons.map(i => i.category))).filter(c => c !== 'My Icons')];
@@ -738,7 +782,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
           </div>
           {/* Tabs */}
           <div className="flex items-center gap-1">
-            {(['icons', 'fonts'] as TabId[]).map(t => (
+            {(['icons', 'pointers', 'fonts'] as TabId[]).map(t => (
               <button
                 key={t}
                 onClick={() => setActiveTab(t)}
@@ -748,7 +792,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     : 'text-white/40 hover:text-white/70'
                 }`}
               >
-                {t === 'icons' ? '🎨 Icons' : '🔤 Fonts'}
+                {t === 'icons' ? '🎨 Icons' : t === 'pointers' ? '🕒 Pointers' : '🔤 Fonts'}
               </button>
             ))}
           </div>
@@ -1003,162 +1047,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                 <div className="space-y-2 border-t border-white/10 pt-3">
                   <span className="text-[10px] text-white/40 uppercase tracking-widest">Save as Clock Hand Style</span>
 
-                  {/* Task 1: Pointer HTML Composer skeleton */}
-                  <div className="rounded border border-cyan-500/20 bg-cyan-500/5 p-2.5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] text-cyan-300/90 font-medium">Pointer HTML Composer (Skeleton)</p>
-                      <span className="text-[9px] text-white/35">T1</span>
-                    </div>
-                    <p className="text-[9px] text-white/40 leading-snug">
-                      Paste each layer separately. Full wiring comes in next tasks.
-                    </p>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={validateAllComposerLayers}
-                        disabled={validatingComposer}
-                        className="text-[9px] px-2 py-1 rounded border border-cyan-500/40 bg-cyan-600/20 text-cyan-200 hover:bg-cyan-600/30 disabled:opacity-50"
-                      >
-                        {validatingComposer ? 'Validating…' : 'Validate Layers'}
-                      </button>
-                      <span className="text-[9px] text-white/35 self-center">Independent parse/render per layer (no silent fallback)</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Hour HTML</span>
-                          <span className={`text-[9px] ${layerStatus(composerDraft.hourHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
-                            {layerStatus(composerDraft.hourHtml)}
-                          </span>
-                        </div>
-                        <textarea
-                          value={composerDraft.hourHtml}
-                          onChange={e => updateComposerDraft({ hourHtml: e.target.value })}
-                          placeholder="<svg id='hour-hand'>...</svg>"
-                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
-                          spellCheck={false}
-                        />
-                        <p className={`text-[9px] ${composerValidation.hour.state === 'error' ? 'text-red-400' : composerValidation.hour.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
-                          {composerValidation.hour.message}
-                        </p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Minutes HTML</span>
-                          <span className={`text-[9px] ${layerStatus(composerDraft.minuteHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
-                            {layerStatus(composerDraft.minuteHtml)}
-                          </span>
-                        </div>
-                        <textarea
-                          value={composerDraft.minuteHtml}
-                          onChange={e => updateComposerDraft({ minuteHtml: e.target.value })}
-                          placeholder="<svg id='minute-hand'>...</svg>"
-                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
-                          spellCheck={false}
-                        />
-                        <p className={`text-[9px] ${composerValidation.minute.state === 'error' ? 'text-red-400' : composerValidation.minute.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
-                          {composerValidation.minute.message}
-                        </p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Seconds HTML</span>
-                          <span className={`text-[9px] ${layerStatus(composerDraft.secondHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
-                            {layerStatus(composerDraft.secondHtml)}
-                          </span>
-                        </div>
-                        <textarea
-                          value={composerDraft.secondHtml}
-                          onChange={e => updateComposerDraft({ secondHtml: e.target.value })}
-                          placeholder="<svg id='second-hand'>...</svg>"
-                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
-                          spellCheck={false}
-                        />
-                        <p className={`text-[9px] ${composerValidation.second.state === 'error' ? 'text-red-400' : composerValidation.second.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
-                          {composerValidation.second.message}
-                        </p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-white/55 uppercase tracking-wide">Hub HTML</span>
-                          <span className={`text-[9px] ${layerStatus(composerDraft.hubHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>
-                            {layerStatus(composerDraft.hubHtml)}
-                          </span>
-                        </div>
-                        <textarea
-                          value={composerDraft.hubHtml}
-                          onChange={e => updateComposerDraft({ hubHtml: e.target.value })}
-                          placeholder="<svg id='pinion-cap'>...</svg>"
-                          className="w-full h-16 font-mono text-[10px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-1.5 resize-none focus:outline-none focus:border-cyan-500/50"
-                          spellCheck={false}
-                        />
-                        <p className={`text-[9px] ${composerValidation.hub.state === 'error' ? 'text-red-400' : composerValidation.hub.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>
-                          {composerValidation.hub.message}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="rounded border border-white/10 bg-zinc-900/80 p-2">
-                      <p className="text-[9px] text-white/45 mb-1">Composition Preview</p>
-                      <canvas
-                        ref={composerCanvasRef}
-                        width={220}
-                        height={220}
-                        className="mx-auto w-[180px] h-[180px] rounded border border-cyan-400/30 bg-[#0f1115]"
-                      />
-                      <div className="mt-1 text-[9px] text-white/35 text-center">Default demo angles: H=2PM, M=10PM mark, S=12AM</div>
-                    </div>
-
-                    <div className="rounded border border-white/10 bg-zinc-900/80 p-2 space-y-2">
-                      <p className="text-[9px] text-white/45">Pivot Controls (relative to hub center)</p>
-
-                      {([
-                        { key: 'hour', label: 'Hour', color: 'text-red-300' },
-                        { key: 'minute', label: 'Minute', color: 'text-amber-300' },
-                        { key: 'second', label: 'Second', color: 'text-green-300' },
-                      ] as const).map((hand) => (
-                        <div key={hand.key} className="rounded border border-white/10 p-1.5 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[9px] ${hand.color}`}>{hand.label}</span>
-                            <button
-                              onClick={() => resetPivot(hand.key)}
-                              className="text-[9px] text-white/40 hover:text-white/70 border border-white/10 rounded px-1.5 py-0.5"
-                            >
-                              Reset
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-[12px_1fr_28px] items-center gap-1">
-                            <span className="text-[9px] text-white/35">X</span>
-                            <input
-                              type="range"
-                              min={-80}
-                              max={80}
-                              step={1}
-                              value={composerPivot[hand.key].x}
-                              onChange={e => updatePivot(hand.key, 'x', Number(e.target.value))}
-                              className="h-1 accent-cyan-400"
-                            />
-                            <span className="text-[9px] text-white/45 text-right">{composerPivot[hand.key].x}</span>
-                          </div>
-                          <div className="grid grid-cols-[12px_1fr_28px] items-center gap-1">
-                            <span className="text-[9px] text-white/35">Y</span>
-                            <input
-                              type="range"
-                              min={-80}
-                              max={80}
-                              step={1}
-                              value={composerPivot[hand.key].y}
-                              onChange={e => updatePivot(hand.key, 'y', Number(e.target.value))}
-                              className="h-1 accent-cyan-400"
-                            />
-                            <span className="text-[9px] text-white/45 text-right">{composerPivot[hand.key].y}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="rounded border border-cyan-500/20 bg-cyan-500/5 p-2">
+                    <p className="text-[10px] text-cyan-300/90">Pointer composer moved to the dedicated Pointers tab for a wide workspace.</p>
                   </div>
 
                   {/* Design guide */}
@@ -1265,6 +1155,150 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ── POINTERS TAB ───────────────────────────────────────────────── */}
+          {activeTab === 'pointers' && (
+            <div className="p-4 lg:p-5">
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr_460px] gap-4">
+                {/* Left: separated layer editors */}
+                <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-cyan-300 font-medium">Pointer HTML Composer</p>
+                    <button
+                      onClick={validateAllComposerLayers}
+                      disabled={validatingComposer}
+                      className="text-[10px] px-2.5 py-1 rounded border border-cyan-500/40 bg-cyan-600/20 text-cyan-200 hover:bg-cyan-600/30 disabled:opacity-50"
+                    >
+                      {validatingComposer ? 'Validating…' : 'Revalidate'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-white/40">Paste each layer separately. Validation and preview run per-layer with no silent fallback.</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-white/60 uppercase tracking-wide">Hour HTML</span>
+                        <span className={`text-[10px] ${layerStatus(composerDraft.hourHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>{layerStatus(composerDraft.hourHtml)}</span>
+                      </div>
+                      <textarea
+                        value={composerDraft.hourHtml}
+                        onChange={e => updateComposerDraft({ hourHtml: e.target.value })}
+                        placeholder="<svg id='hour-hand'>...</svg>"
+                        className="w-full h-40 font-mono text-[11px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-2 resize-none focus:outline-none focus:border-cyan-500/50"
+                        spellCheck={false}
+                      />
+                      <p className={`text-[10px] ${composerValidation.hour.state === 'error' ? 'text-red-400' : composerValidation.hour.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>{composerValidation.hour.message}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-white/60 uppercase tracking-wide">Minutes HTML</span>
+                        <span className={`text-[10px] ${layerStatus(composerDraft.minuteHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>{layerStatus(composerDraft.minuteHtml)}</span>
+                      </div>
+                      <textarea
+                        value={composerDraft.minuteHtml}
+                        onChange={e => updateComposerDraft({ minuteHtml: e.target.value })}
+                        placeholder="<svg id='minute-hand'>...</svg>"
+                        className="w-full h-40 font-mono text-[11px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-2 resize-none focus:outline-none focus:border-cyan-500/50"
+                        spellCheck={false}
+                      />
+                      <p className={`text-[10px] ${composerValidation.minute.state === 'error' ? 'text-red-400' : composerValidation.minute.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>{composerValidation.minute.message}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-white/60 uppercase tracking-wide">Seconds HTML</span>
+                        <span className={`text-[10px] ${layerStatus(composerDraft.secondHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>{layerStatus(composerDraft.secondHtml)}</span>
+                      </div>
+                      <textarea
+                        value={composerDraft.secondHtml}
+                        onChange={e => updateComposerDraft({ secondHtml: e.target.value })}
+                        placeholder="<svg id='second-hand'>...</svg>"
+                        className="w-full h-40 font-mono text-[11px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-2 resize-none focus:outline-none focus:border-cyan-500/50"
+                        spellCheck={false}
+                      />
+                      <p className={`text-[10px] ${composerValidation.second.state === 'error' ? 'text-red-400' : composerValidation.second.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>{composerValidation.second.message}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-white/60 uppercase tracking-wide">Hub HTML</span>
+                        <span className={`text-[10px] ${layerStatus(composerDraft.hubHtml) === 'ready' ? 'text-green-400' : 'text-amber-400'}`}>{layerStatus(composerDraft.hubHtml)}</span>
+                      </div>
+                      <textarea
+                        value={composerDraft.hubHtml}
+                        onChange={e => updateComposerDraft({ hubHtml: e.target.value })}
+                        placeholder="<svg id='pinion-cap'>...</svg>"
+                        className="w-full h-40 font-mono text-[11px] text-cyan-100/90 bg-zinc-900 border border-white/10 rounded p-2 resize-none focus:outline-none focus:border-cyan-500/50"
+                        spellCheck={false}
+                      />
+                      <p className={`text-[10px] ${composerValidation.hub.state === 'error' ? 'text-red-400' : composerValidation.hub.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>{composerValidation.hub.message}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: preview + pivot + save */}
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-white/10 bg-zinc-900/80 p-3">
+                    <p className="text-[10px] text-white/45 mb-2 uppercase tracking-wide">Composed Preview</p>
+                    <canvas
+                      ref={composerCanvasRef}
+                      width={360}
+                      height={360}
+                      className="mx-auto w-[320px] h-[320px] rounded border border-cyan-400/30 bg-[#0f1115]"
+                    />
+                    <div className="mt-2 text-[10px] text-white/35 text-center">Default demo angles: H=2PM, M=10PM mark, S=12AM</div>
+                  </div>
+
+                  <div className="rounded-lg border border-white/10 bg-zinc-900/80 p-3 space-y-2">
+                    <p className="text-[10px] text-white/45 uppercase tracking-wide">Pivot Controls (relative to hub center)</p>
+                    {([
+                      { key: 'hour', label: 'Hour', color: 'text-red-300' },
+                      { key: 'minute', label: 'Minute', color: 'text-amber-300' },
+                      { key: 'second', label: 'Second', color: 'text-green-300' },
+                    ] as const).map((hand) => (
+                      <div key={hand.key} className="rounded border border-white/10 p-2 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[10px] ${hand.color}`}>{hand.label}</span>
+                          <button onClick={() => resetPivot(hand.key)} className="text-[10px] text-white/40 hover:text-white/70 border border-white/10 rounded px-2 py-0.5">Reset</button>
+                        </div>
+                        <div className="grid grid-cols-[16px_1fr_34px] items-center gap-1.5">
+                          <span className="text-[10px] text-white/35">X</span>
+                          <input type="range" min={-80} max={80} step={1} value={composerPivot[hand.key].x} onChange={e => updatePivot(hand.key, 'x', Number(e.target.value))} className="h-1.5 accent-cyan-400" />
+                          <span className="text-[10px] text-white/45 text-right">{composerPivot[hand.key].x}</span>
+                        </div>
+                        <div className="grid grid-cols-[16px_1fr_34px] items-center gap-1.5">
+                          <span className="text-[10px] text-white/35">Y</span>
+                          <input type="range" min={-80} max={80} step={1} value={composerPivot[hand.key].y} onChange={e => updatePivot(hand.key, 'y', Number(e.target.value))} className="h-1.5 accent-cyan-400" />
+                          <span className="text-[10px] text-white/45 text-right">{composerPivot[hand.key].y}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-2">
+                    <input
+                      type="text"
+                      value={saveHandName}
+                      onChange={e => setSaveHandName(e.target.value)}
+                      placeholder="Hand style name..."
+                      className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-cyan-500/50"
+                    />
+                    {saveHandMsg && (
+                      <p className={`text-[10px] ${saveHandMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{saveHandMsg}</p>
+                    )}
+                    <button
+                      onClick={handleSaveAsHand}
+                      disabled={savingHand || !saveHandName.trim()}
+                      className="w-full py-2 bg-cyan-700 hover:bg-cyan-600 disabled:opacity-40 text-white text-xs rounded font-medium transition-colors"
+                    >
+                      {savingHand ? 'Saving…' : 'Save Pointer Style'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
