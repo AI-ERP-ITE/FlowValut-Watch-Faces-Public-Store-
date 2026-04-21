@@ -138,6 +138,15 @@ function parseLayerAnchorFromSvg(svgRaw: string): PointerLayerAnchor {
   };
 }
 
+function extractFirstSvg(raw: string): string | null {
+  const match = raw.match(/<svg[\s\S]*?<\/svg>/i);
+  return match ? match[0] : null;
+}
+
+function svgToDataUrl(svgRaw: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgRaw)}`;
+}
+
 // ── Retry helper (for 429 / 503 transient errors) ───────────────────────────
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;
@@ -325,20 +334,20 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         return;
       }
       try {
-        const hasSvg = /<svg[\s\S]*?<\/svg>/i.test(raw);
-        const pngDataUrl = hasSvg
-          ? await renderSvgToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE)
+        const svgLayer = extractFirstSvg(raw);
+        const layerSrc = svgLayer
+          ? svgToDataUrl(svgLayer)
           : await renderHtmlToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE);
-        if (!pngDataUrl || !pngDataUrl.startsWith('data:image/png')) {
+        if (!layerSrc || !layerSrc.startsWith('data:image/')) {
           setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
           setLayerPng(key, '');
           if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
           return;
         }
-        setLayerValidation(key, { state: 'valid', message: hasSvg ? 'Valid SVG layer' : 'Valid HTML layer' });
-        setLayerPng(key, pngDataUrl);
+        setLayerValidation(key, { state: 'valid', message: svgLayer ? 'Valid SVG layer' : 'Valid HTML layer' });
+        setLayerPng(key, layerSrc);
         if (key !== 'hub') {
-          setLayerAnchor(key, hasSvg ? parseLayerAnchorFromSvg(raw) : { xRatio: 0.5, yRatio: 0.5 });
+          setLayerAnchor(key, svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 });
         }
       } catch (err) {
         setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
@@ -660,20 +669,20 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     }
 
     try {
-      const hasSvg = /<svg[\s\S]*?<\/svg>/i.test(raw);
-      const pngDataUrl = hasSvg
-        ? await renderSvgToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE)
+      const svgLayer = extractFirstSvg(raw);
+      const layerSrc = svgLayer
+        ? svgToDataUrl(svgLayer)
         : await renderHtmlToDataUrl(raw, COMPOSER_PREVIEW_RASTER_SIZE);
-      if (!pngDataUrl || !pngDataUrl.startsWith('data:image/png')) {
+      if (!layerSrc || !layerSrc.startsWith('data:image/')) {
         setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
         setLayerPng(key, '');
         if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
         return;
       }
-      setLayerValidation(key, { state: 'valid', message: hasSvg ? 'Valid SVG layer' : 'Valid HTML layer' });
-      setLayerPng(key, pngDataUrl);
+      setLayerValidation(key, { state: 'valid', message: svgLayer ? 'Valid SVG layer' : 'Valid HTML layer' });
+      setLayerPng(key, layerSrc);
       if (key !== 'hub') {
-        setLayerAnchor(key, hasSvg ? parseLayerAnchorFromSvg(raw) : { xRatio: 0.5, yRatio: 0.5 });
+        setLayerAnchor(key, svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 });
       }
     } catch (err) {
       setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
@@ -812,8 +821,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       />
 
       {/* Drawer */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-[#111] border-b border-zinc-800 shadow-2xl"
-           style={{ maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}>
+       <div className="fixed inset-0 z-50 bg-[#111] border-b border-zinc-800 shadow-2xl"
+         style={{ display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800 shrink-0">

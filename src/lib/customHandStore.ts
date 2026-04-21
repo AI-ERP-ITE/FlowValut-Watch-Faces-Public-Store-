@@ -273,6 +273,16 @@ export async function saveCustomHandStyle(
     ? stripPivotMarkers(extractSvgFromCode(composed!.hubHtml))
     : (extractLayerFromCompositeSvg(cleanedSvg, 'hub') ?? cleanedSvg);
 
+  const hourPivotSource = hasComposedSources
+    ? extractPivotFromSvg(extractSvgFromCode(composed!.hourHtml))
+    : parsedPivot;
+  const minutePivotSource = hasComposedSources
+    ? extractPivotFromSvg(extractSvgFromCode(composed!.minuteHtml))
+    : parsedPivot;
+  const secondPivotSource = hasComposedSources
+    ? extractPivotFromSvg(extractSvgFromCode(composed!.secondHtml))
+    : parsedPivot;
+
   const [hourDataUrl, minuteDataUrl, secondDataUrl, coverDataUrl, swatchDataUrl] =
     await Promise.all([
       renderToHandPng(hourSvg, 22, 140),
@@ -282,9 +292,9 @@ export async function saveCustomHandStyle(
       renderToContainPng(hubSvg, 24),  // swatch: fitted inside 24×24 square
     ]);
 
-  const hourPivot = parsedPivot ? computePivotPx(parsedPivot, 22, 140) : null;
-  const minutePivot = parsedPivot ? computePivotPx(parsedPivot, 16, 200) : null;
-  const secondPivot = parsedPivot ? computePivotPx(parsedPivot, 8, 240) : null;
+  const hourPivot = hourPivotSource ? computePivotPx(hourPivotSource, 22, 140) : null;
+  const minutePivot = minutePivotSource ? computePivotPx(minutePivotSource, 16, 200) : null;
+  const secondPivot = secondPivotSource ? computePivotPx(secondPivotSource, 8, 240) : null;
 
   const pivotOffsets = options?.pivotOffsets;
 
