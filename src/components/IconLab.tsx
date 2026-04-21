@@ -729,6 +729,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     >
                       Insert template SVG
                     </button>
+                    <p className="text-[9px] text-white/35 leading-snug">Use this to start from a ready hand shape (22×140) instead of writing SVG from scratch.</p>
                     <button
                       onClick={handleAddPivotMarker}
                       className="w-full text-[9px] text-cyan-300/80 hover:text-cyan-300 border border-cyan-500/30 rounded px-2 py-1 transition-colors"
@@ -743,6 +744,13 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     placeholder="Hand style name…"
                     className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-2 py-1.5 text-white/80 focus:outline-none focus:border-cyan-500/50"
                   />
+                  <button
+                    onClick={handleAddPivotMarker}
+                    disabled={!code.trim()}
+                    className="w-full py-1.5 bg-cyan-900/60 hover:bg-cyan-800/70 disabled:opacity-40 text-cyan-200 text-xs rounded font-medium transition-colors border border-cyan-500/30"
+                  >
+                    Add Pivot Marker to Current Code
+                  </button>
                   {saveHandMsg && (
                     <p className={`text-[10px] ${saveHandMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{saveHandMsg}</p>
                   )}
