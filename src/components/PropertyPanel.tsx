@@ -742,7 +742,6 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               </div>
             </div>
           )}
-          <p className="text-[10px] text-white/30 mt-1">Re-generate watchface to apply new hand style.</p>
           {/* Seconds toggle */}
           <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
             <input
