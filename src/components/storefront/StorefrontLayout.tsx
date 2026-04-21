@@ -15,7 +15,9 @@ export function StorefrontLayout() {
             to="/"
             className="flex items-center gap-3 shrink-0 group"
           >
-            <img src="/Watch-Faces/logo.png" alt="Flowvault" className="h-8 w-auto" />
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <span className="text-white font-bold text-xs">FV</span>
+            </div>
             <span className="font-sans font-light text-lg tracking-tight text-[#D9DBE0] group-hover:text-white transition-colors">
               Flowvault
             </span>
@@ -46,7 +48,9 @@ export function StorefrontLayout() {
       <footer className="border-t border-[#181A1F] mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[#8E9196]">
           <div className="flex items-center gap-2">
-            <img src="/Watch-Faces/logo.png" alt="Flowvault" className="h-6 w-auto" />
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+              <span className="text-white font-bold text-[9px]">FV</span>
+            </div>
             <span className="font-sans font-light text-[#D9DBE0]">Flowvault</span>
           </div>
           <p className="font-mono text-xs text-[#8E9196]">

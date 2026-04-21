@@ -4,7 +4,7 @@
  * Each uses gradients, highlights, and shadows to simulate depth/3D appearance.
  */
 
-export type HandStyleKey = 'white' | 'silver' | 'black' | 'brown' | 'gold' | 'poedagar' | 'fleming' | 'montagut' | 'olevs' | 'titanium' | 'lumed' | 'pvd';
+export type HandStyleKey = 'white' | 'silver' | 'black' | 'brown' | 'gold' | 'poedagar' | 'fleming' | 'montagut' | 'olevs';
 
 export interface HandStyleDef {
   key: HandStyleKey;
@@ -23,10 +23,7 @@ export const HAND_STYLES: HandStyleDef[] = [
   { key: 'poedagar', label: 'Poedagar Gold',  description: 'Luxury gold with blue accent diamond',  swatch: '#D4A020' },
   { key: 'fleming',  label: 'Fleming Slate',  description: 'Slim architectural steel, dark dial',   swatch: '#7A8A9A' },
   { key: 'montagut', label: 'Montagut Silver', description: 'Leaf-shaped slim silver, green dial',  swatch: '#C0CCD8' },
-  { key: 'olevs',    label: 'OLEVS Chrome',    description: 'Bold chrome, Roman-numerals style',     swatch: '#D8DDE8' },
-  { key: 'titanium', label: 'Titanium',         description: 'Matte titanium grey, cool-blue tint',   swatch: '#8A9BAB' },
-  { key: 'lumed',    label: 'Lume Diver',       description: 'Dive watch ivory lume tips, warm glow',  swatch: '#E8D9A0' },
-  { key: 'pvd',      label: 'PVD Gunmetal',     description: 'PVD-coated blue-black sport finish',    swatch: '#2E3A4A' },
+  { key: 'olevs',    label: 'OLEVS Chrome',   description: 'Bold chrome, Roman-numerals style',     swatch: '#D8DDE8' },
 ];
 
 // ─── Canvas helper ──────────────────────────────────────────────────────────────
@@ -165,42 +162,6 @@ const PALETTES: Record<HandStyleKey, HandPalette> = {
     capGrad:     ['#606870', '#F0F4FF'],
     capRing:     '#303840',
   },
-  // Titanium: matte cold-grey, cool blue-tinted highlight — modern sport/tool watch
-  titanium: {
-    bodyGrad:    ['#4A5560', '#B0BEC8', '#4A5560'],
-    bodyStroke:  'rgba(180,200,220,0.25)',
-    tip:         '#CCD8E0',
-    tailGrad:    ['#38454F', '#8A9BAB'],
-    shadow:      'rgba(0,0,0,0.50)',
-    secondMain:  '#8A9BAB',
-    secondAccent:'#4FC3F7',   // icy blue accent
-    capGrad:     ['#4A5560', '#B0BEC8'],
-    capRing:     'rgba(160,180,200,0.30)',
-  },
-  // Lumed: warm ivory lume body with glowing green-white tip — classic dive watch
-  lumed: {
-    bodyGrad:    ['#9A9060', '#EDE0A0', '#9A9060'],
-    bodyStroke:  'rgba(120,100,40,0.45)',
-    tip:         '#F8F0C0',
-    tailGrad:    ['#706840', '#C8BC78'],
-    shadow:      'rgba(40,30,0,0.45)',
-    secondMain:  '#C8BC78',
-    secondAccent:'#A8D800',   // lume green tip
-    capGrad:     ['#8A8050', '#EDE0A0'],
-    capRing:     '#6A6040',
-  },
-  // PVD: deep blue-black gunmetal coating, strong specular edge — tactical sport
-  pvd: {
-    bodyGrad:    ['#0E1620', '#3A4E62', '#0E1620'],
-    bodyStroke:  'rgba(80,120,160,0.30)',
-    tip:         '#4A6880',
-    tailGrad:    ['#080E16', '#243040'],
-    shadow:      'rgba(0,0,0,0.70)',
-    secondMain:  '#243040',
-    secondAccent:'#FF5722',   // burnt orange accent (tactical sport)
-    capGrad:     ['#0E1620', '#3A4E62'],
-    capRing:     'rgba(60,100,140,0.35)',
-  },
 };
 
 // ─── Hand drawing functions ──────────────────────────────────────────────────────
@@ -221,8 +182,14 @@ function drawTaperedHand(
   const cx = w / 2;
   const pivotY = h - tailLen;
 
-  // ── Body path (tip to pivot, tapered) ───────────────────────────
+  // ── Drop shadow ──────────────────────────────────────────────────
   ctx.save();
+  ctx.shadowColor = pal.shadow;
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 2;
+
+  // ── Body path (tip to pivot, tapered) ───────────────────────────
   const bodyPath = new Path2D();
   bodyPath.moveTo(cx - tipHalfW, 2);          // top-left near tip
   bodyPath.lineTo(cx + tipHalfW, 2);          // top-right near tip
@@ -295,14 +262,32 @@ function drawSecondHand(
   const cx = w / 2;
   const pivotY = h * 0.5;
 
-  // Main shaft
+  // Drop shadow
   ctx.save();
+  ctx.shadowColor = pal.shadow;
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 1;
+
+  // Main shaft
   const shaftGrad = ctx.createLinearGradient(cx - 1, 0, cx + 1, 0);
   shaftGrad.addColorStop(0, pal.secondMain);
   shaftGrad.addColorStop(0.5, 'rgba(255,255,255,0.7)');
   shaftGrad.addColorStop(1, pal.secondMain);
   ctx.fillStyle = shaftGrad;
   ctx.fillRect(cx - 1, 2, 2, h - 4);
+  ctx.restore();
+
+  // Accent lollipop ~20% from tip
+  const lollY = Math.floor(h * 0.2);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, lollY, 4, 0, Math.PI * 2);
+  const lollGrad = ctx.createRadialGradient(cx - 1, lollY - 1, 0, cx, lollY, 4);
+  lollGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  lollGrad.addColorStop(1, pal.secondAccent);
+  ctx.fillStyle = lollGrad;
+  ctx.fill();
   ctx.restore();
 
   // Tail counter-balance (fat pill)
@@ -333,7 +318,13 @@ function drawCenterCap(
   const cy = h / 2;
   const r = 10;
 
+  // Drop shadow ring
   ctx.save();
+  ctx.shadowColor = pal.shadow;
+  ctx.shadowBlur = 5;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 2;
+
   // Outer disk
   const grad = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, r);
   grad.addColorStop(0, pal.capGrad[1]);
@@ -394,9 +385,6 @@ export function generateHandSet(style: HandStyleKey): GeneratedHandSet {
     fleming:  { hBase: 3, hTip: 0.6, hTail: 18, mBase: 2.2, mTip: 0.5, mTail: 22 },   // ultra-slim
     montagut: { hBase: 4, hTip: 0.7, hTail: 20, mBase: 2.8, mTip: 0.6, mTail: 26 },   // slim leaf
     olevs:    { hBase: 7, hTip: 1.8, hTail: 26, mBase: 5.5, mTip: 1.4, mTail: 32 },   // wide chrome
-    titanium: { hBase: 4, hTip: 0.8, hTail: 20, mBase: 2.8, mTip: 0.6, mTail: 26 },   // matte medium slim
-    lumed:    { hBase: 6, hTip: 2.0, hTail: 24, mBase: 4.2, mTip: 1.5, mTail: 30 },   // wide with fat lume tip
-    pvd:      { hBase: 5, hTip: 1.2, hTail: 22, mBase: 3.8, mTip: 1.0, mTail: 28 },   // medium tactical
   };
   const g = GEOM[style] ?? { hBase: 5, hTip: 1, hTail: 22, mBase: 3.5, mTip: 0.8, mTail: 28 };
 
