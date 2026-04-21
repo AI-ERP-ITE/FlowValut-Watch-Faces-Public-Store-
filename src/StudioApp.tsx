@@ -1427,7 +1427,7 @@ function StudioApp() {
         height: parent.bounds.height + pad * 2,
       },
       visible: true,
-      zIndex: parent.zIndex - 1,
+      zIndex: parent.zIndex + 1,
       engraveFrame: {
         frameOf: parent.id,
         mode: 'inner',
@@ -1874,8 +1874,24 @@ function StudioApp() {
         }
       }
 
+      // Build a stable export config snapshot so all bakes/generation use the same element state.
+      // This prevents preview/export drift (especially for custom-hand pivots and cover fallback).
+      const exportElements = state.watchFaceConfig.elements.map(el => ({
+        ...el,
+        bounds: { ...el.bounds },
+        ...(el.center ? { center: { ...el.center } } : {}),
+        ...(el.pointerCenter ? { pointerCenter: { ...el.pointerCenter } } : {}),
+        ...(el.hourPos ? { hourPos: { ...el.hourPos } } : {}),
+        ...(el.minutePos ? { minutePos: { ...el.minutePos } } : {}),
+        ...(el.secondPos ? { secondPos: { ...el.secondPos } } : {}),
+      }));
+      const configForBuild: WatchFaceConfig = {
+        ...state.watchFaceConfig,
+        elements: exportElements,
+      };
+
       // Inject engrave/emboss frame PNGs for FILL_RECT elements with engraveFrame
-      for (const el of state.watchFaceConfig.elements) {
+      for (const el of exportElements) {
         if (el.type === 'FILL_RECT' && el.engraveFrame) {
           const safeName = el.name.replace(/[^a-zA-Z0-9_-]/g, '_');
           const filename = `frame_${safeName}.png`;
@@ -1889,7 +1905,7 @@ function StudioApp() {
       }
 
       // ── Drop-shadow baking for IMG / FILL_RECT / STROKE_RECT / CIRCLE ──
-      for (const el of state.watchFaceConfig.elements) {
+      for (const el of exportElements) {
         if (!el.dropShadow) continue;
         const safeName = el.name.replace(/[^a-zA-Z0-9_-]/g, '_');
         let bakeResult: { dataUrl: string; pad: number } | null = null;
@@ -1929,11 +1945,23 @@ function StudioApp() {
 
       // Inject clock hand images for TIME_POINTER elements
       // Always regenerate from current handStyle so the actual selected style is baked in.
-      const timePointerEl = state.watchFaceConfig.elements.find(el => el.type === 'TIME_POINTER');
+      const timePointerEl = exportElements.find(el => el.type === 'TIME_POINTER');
       if (timePointerEl) {
         if (timePointerEl.handStyle?.startsWith('custom_hand:')) {
           const customHand = await getCustomHandByKey(timePointerEl.handStyle);
           if (customHand) {
+            if (typeof customHand.hourPosX === 'number' && typeof customHand.hourPosY === 'number') {
+              timePointerEl.hourPos = { x: customHand.hourPosX, y: customHand.hourPosY };
+            }
+            if (typeof customHand.minutePosX === 'number' && typeof customHand.minutePosY === 'number') {
+              timePointerEl.minutePos = { x: customHand.minutePosX, y: customHand.minutePosY };
+            }
+            if (typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
+              timePointerEl.secondPos = { x: customHand.secondPosX, y: customHand.secondPosY };
+            }
+            if (!timePointerEl.coverSrc) {
+              timePointerEl.coverSrc = 'hand_cover.png';
+            }
             const handFiles = [
               { name: 'hour_hand.png', dataUrl: customHand.hourDataUrl },
               { name: 'minute_hand.png', dataUrl: customHand.minuteDataUrl },
@@ -1955,6 +1983,9 @@ function StudioApp() {
         } else {
           // Built-in hand style — always regenerate so style changes are reflected
           const hs = (timePointerEl.handStyle ?? 'silver') as HandStyleKey;
+          if (!timePointerEl.coverSrc) {
+            timePointerEl.coverSrc = 'hand_cover.png';
+          }
           const handSet = generateHandSet(hs);
           const builtInHandFiles = [
             { name: 'hour_hand.png', dataUrl: handSet.hourHand },
@@ -1977,7 +2008,7 @@ function StudioApp() {
       }
 
       const zpkResult = await buildZPK({
-        config: state.watchFaceConfig,
+        config: configForBuild,
         backgroundFile: state.backgroundFile,
         elementFiles,
       });

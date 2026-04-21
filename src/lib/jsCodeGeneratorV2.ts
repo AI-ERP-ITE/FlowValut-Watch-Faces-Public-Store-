@@ -241,7 +241,17 @@ function generateAppJsV2(config: WatchFaceConfig): string {
 
 // Generate watchface/index.js - V2 format with IMG_TIME, IMG_DATE, IMG_WEEK, and AOD mode
 function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
-  const elements = config.elements.filter((el) => el.visible);
+  const visibleElements = config.elements.filter((el) => el.visible);
+  const zById = new Map(visibleElements.map(el => [el.id, el.zIndex]));
+  const elements = [...visibleElements].sort((a, b) => {
+    const az = a.engraveFrame
+      ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) + 0.5
+      : a.zIndex;
+    const bz = b.engraveFrame
+      ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) + 0.5
+      : b.zIndex;
+    return az - bz;
+  });
   
   console.log('[JSGenV2] Total elements in config:', config.elements.length);
   console.log('[JSGenV2] Visible elements after filter:', elements.length);
