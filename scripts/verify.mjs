@@ -331,6 +331,142 @@ section('4. ZPK Asset Name Patterns');
   else fail('Hand filenames', 'Bad extension');
 }
 
+// ─── 5. CUSTOM HAND KEY LOOKUP LOGIC ─────────────────────────────────────────
+section('5. Custom Hand Key Lookup');
+
+// Replicate the loadHandImages source-resolution logic (without browser Image loading)
+function resolveHandSrcs(style, customHands = []) {
+  const customRecord = customHands.find(h => h.key === style);
+  if (customRecord) {
+    return {
+      hour:   customRecord.hourDataUrl,
+      minute: customRecord.minuteDataUrl,
+      second: customRecord.secondDataUrl,
+      cover:  customRecord.coverDataUrl,
+    };
+  }
+  // Built-in: return a sentinel so we know the branch was NOT taken
+  return null;
+}
+
+{
+  const customHands = [
+    {
+      key: 'custom_hand:abc',
+      hourDataUrl:   'data:image/png;base64,HOUR',
+      minuteDataUrl: 'data:image/png;base64,MIN',
+      secondDataUrl: 'data:image/png;base64,SEC',
+      coverDataUrl:  'data:image/png;base64,COVER',
+    },
+    {
+      key: 'custom_hand:xyz',
+      hourDataUrl:   'data:image/png;base64,HOUR2',
+      minuteDataUrl: 'data:image/png;base64,MIN2',
+      secondDataUrl: 'data:image/png;base64,SEC2',
+      coverDataUrl:  'data:image/png;base64,COVER2',
+    },
+  ];
+
+  // Test 1: matching key returns custom dataUrls
+  const srcs = resolveHandSrcs('custom_hand:abc', customHands);
+  if (srcs && srcs.hour === 'data:image/png;base64,HOUR' && srcs.cover === 'data:image/png;base64,COVER') {
+    ok('Custom hand key found → uses hourDataUrl / coverDataUrl from record');
+  } else {
+    fail('Custom hand key lookup', `Expected custom URLs, got ${JSON.stringify(srcs)}`);
+  }
+
+  // Test 2: second key in array resolves independently
+  const srcs2 = resolveHandSrcs('custom_hand:xyz', customHands);
+  if (srcs2 && srcs2.minute === 'data:image/png;base64,MIN2') {
+    ok('Second custom hand key resolves independently');
+  } else {
+    fail('Second custom hand key', `Got ${JSON.stringify(srcs2)}`);
+  }
+
+  // Test 3: unknown key returns null (falls through to built-in)
+  const srcsBuiltIn = resolveHandSrcs('silver', customHands);
+  if (srcsBuiltIn === null) {
+    ok('Unknown key falls through to built-in (returns null sentinel)');
+  } else {
+    fail('Unknown key fallthrough', `Expected null, got ${JSON.stringify(srcsBuiltIn)}`);
+  }
+
+  // Test 4: empty customHands array always falls through
+  const srcsEmpty = resolveHandSrcs('custom_hand:abc', []);
+  if (srcsEmpty === null) {
+    ok('Empty customHands → always falls through to built-in');
+  } else {
+    fail('Empty customHands fallthrough', `Expected null, got ${JSON.stringify(srcsEmpty)}`);
+  }
+
+  // Test 5: all four dataUrl fields are present on a matched record
+  const allFields = srcs && ['hour','minute','second','cover'].every(k => srcs[k]?.startsWith('data:'));
+  if (allFields) {
+    ok('Matched record exposes all four dataUrl fields (hour/minute/second/cover)');
+  } else {
+    fail('Missing dataUrl fields', JSON.stringify(srcs));
+  }
+}
+
+// ─── 6. SOURCE CODE ASSERTIONS ────────────────────────────────────────────────
+section('6. Source Code Assertions');
+
+const SRC_DIR = path.join(__dirname, '../src');
+
+function readSrc(rel) {
+  return fs.readFileSync(path.join(SRC_DIR, rel), 'utf8');
+}
+
+{
+  // 6a: Weather element label updated to include "(sensor on device)"
+  const studioSrc = readSrc('StudioApp.tsx');
+  if (studioSrc.includes("Weather Icon (sensor on device)")) {
+    ok('Weather label: "Weather Icon (sensor on device)" present in StudioApp.tsx');
+  } else {
+    fail('Weather label', 'String "Weather Icon (sensor on device)" not found in StudioApp.tsx');
+  }
+
+  // 6b: iconLibraryKey is incremented after loading icons from IndexedDB on startup
+  if (studioSrc.includes('setIconLibraryKey(k => k + 1)')) {
+    ok('Icon library key refresh: setIconLibraryKey(k => k + 1) present (startup + save triggers)');
+  } else {
+    fail('Icon library key refresh', 'setIconLibraryKey(k => k + 1) not found in StudioApp.tsx');
+  }
+
+  // 6c: InteractiveCanvas receives customHandStyles prop
+  if (studioSrc.includes('customHandStyles={customHandStyles}')) {
+    ok('InteractiveCanvas wired: customHandStyles prop passed from StudioApp');
+  } else {
+    fail('customHandStyles prop', 'customHandStyles={customHandStyles} not found in StudioApp.tsx');
+  }
+
+  // 6d: InteractiveCanvas defines customHandStyles prop type
+  const canvasSrc = readSrc('components/InteractiveCanvas.tsx');
+  if (canvasSrc.includes('customHandStyles?: CustomHandRecord[]')) {
+    ok('InteractiveCanvas prop type: customHandStyles?: CustomHandRecord[] declared');
+  } else {
+    fail('customHandStyles prop type', 'Declaration not found in InteractiveCanvas.tsx');
+  }
+
+  // 6e: Icon colorize logic uses source-atop composite in InteractiveCanvas
+  if (canvasSrc.includes("source-atop") && canvasSrc.includes('iconColorize')) {
+    ok('Icon colorize: source-atop composite + iconColorize field wired in InteractiveCanvas');
+  } else {
+    fail('Icon colorize wiring', 'source-atop or iconColorize not found in InteractiveCanvas.tsx');
+  }
+
+  // 6f: Engrave fill is now inside a clipped save/restore block (not raw fillRect at top)
+  // The fix: "fillMode === 'color'" section now appears AFTER clipShape is defined
+  const engraveSection = studioSrc.slice(studioSrc.indexOf('renderEngraveFrameToPng'));
+  const clipShapeDefIdx  = engraveSection.indexOf('const clipShape');
+  const fillModeIdx      = engraveSection.indexOf("fillMode === 'color'");
+  if (clipShapeDefIdx !== -1 && fillModeIdx > clipShapeDefIdx) {
+    ok('Engrave fill: fillMode check appears after clipShape definition (fill is clipped)');
+  } else {
+    fail('Engrave fill ordering', `clipShape at ${clipShapeDefIdx}, fillMode at ${fillModeIdx} — fill may be unclipped`);
+  }
+}
+
 // ─── SUMMARY ─────────────────────────────────────────────────────────────────
 console.log(`\n═══════════════════════════════════════════════`);
 console.log(`Results: ${passed} passed, ${failed} failed`);
