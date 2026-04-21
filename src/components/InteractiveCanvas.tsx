@@ -1313,7 +1313,8 @@ function drawTimePointer(
 
       // ── Tint overlay ──────────────────────────────────────────
       if (tintColor && def.key !== 'cover') {
-        ctx.globalCompositeOperation = 'overlay';
+        // Mask tint to existing hand pixels so transparent hand bounds do not tint the whole canvas.
+        ctx.globalCompositeOperation = 'source-atop';
         ctx.globalAlpha = 0.35;
         ctx.fillStyle = tintColor;
         ctx.fillRect(-drawPivotX, -drawPivotY, drawW, drawH);

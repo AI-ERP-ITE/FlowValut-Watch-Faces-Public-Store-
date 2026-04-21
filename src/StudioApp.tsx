@@ -1082,7 +1082,8 @@ async function applyPointerEffectsForZPK(
 
   if (tintColor && !isCover) {
     ctx.save();
-    ctx.globalCompositeOperation = 'overlay';
+    // Mask tint to existing pointer pixels only.
+    ctx.globalCompositeOperation = 'source-atop';
     ctx.globalAlpha = 0.35;
     ctx.fillStyle = tintColor;
     ctx.fillRect(0, 0, width, height);
