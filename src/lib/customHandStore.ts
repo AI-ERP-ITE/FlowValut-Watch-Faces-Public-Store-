@@ -60,15 +60,16 @@ function extractPivotFromSvg(svg: string): ParsedPivot | null {
   const vb = parseViewBox(svg);
   if (!vb) return null;
 
-  // Preferred: explicit marker element with id="pivot" and cx/cy.
-  const pivotEl = svg.match(/<[^>]*\bid\s*=\s*["']pivot["'][^>]*>/i)?.[0] ?? '';
-  const cxMatch = pivotEl.match(/\bcx\s*=\s*["']([^"']+)["']/i);
-  const cyMatch = pivotEl.match(/\bcy\s*=\s*["']([^"']+)["']/i);
-
-  // Secondary option: put data-pivot-x / data-pivot-y on the svg root.
+  // Preferred marker: put data-pivot-x / data-pivot-y on the svg root.
   const svgTag = svg.match(/<svg\b[^>]*>/i)?.[0] ?? '';
   const dataX = svgTag.match(/\bdata-pivot-x\s*=\s*["']([^"']+)["']/i);
   const dataY = svgTag.match(/\bdata-pivot-y\s*=\s*["']([^"']+)["']/i);
+
+  // Legacy fallback (older auto-marker): tiny magenta circle with id="pivot".
+  // IMPORTANT: do not parse arbitrary id="pivot" elements from user artwork.
+  const legacyPivotEl = svg.match(/<circle[^>]*\bid\s*=\s*["']pivot["'][^>]*\bfill\s*=\s*["']#ff00ff["'][^>]*>/i)?.[0] ?? '';
+  const cxMatch = legacyPivotEl.match(/\bcx\s*=\s*["']([^"']+)["']/i);
+  const cyMatch = legacyPivotEl.match(/\bcy\s*=\s*["']([^"']+)["']/i);
 
   const x = Number(cxMatch?.[1] ?? dataX?.[1]);
   const y = Number(cyMatch?.[1] ?? dataY?.[1]);
@@ -85,12 +86,12 @@ function extractPivotFromSvg(svg: string): ParsedPivot | null {
 }
 
 function stripPivotMarkers(svg: string): string {
-  // Remove explicit pivot / tip markers so they never appear in the exported PNGs.
+  // Remove only known marker artifacts created by this app.
+  // Do NOT strip arbitrary id="pivot" from user artwork.
   return svg
-    .replace(/<[^>]*\bid\s*=\s*["']pivot["'][^>]*>\s*<\/[^>]+>\s*/gi, '')
-    .replace(/<[^>]*\bid\s*=\s*["']tip["'][^>]*>\s*<\/[^>]+>\s*/gi, '')
-    .replace(/<[^>]*\bid\s*=\s*["']pivot["'][^>]*\/?>\s*/gi, '')
-    .replace(/<[^>]*\bid\s*=\s*["']tip["'][^>]*\/?>\s*/gi, '');
+    // Legacy auto-added pivot marker (tiny magenta circle)
+    .replace(/<circle[^>]*\bid\s*=\s*["']pivot["'][^>]*\bfill\s*=\s*["']#ff00ff["'][^>]*>\s*<\/circle>\s*/gi, '')
+    .replace(/<circle[^>]*\bid\s*=\s*["']pivot["'][^>]*\bfill\s*=\s*["']#ff00ff["'][^>]*\/?>\s*/gi, '');
 }
 
 function computePivotPx(pivot: ParsedPivot, outW: number, outH: number): { x: number; y: number } {
