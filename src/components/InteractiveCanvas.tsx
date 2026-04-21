@@ -981,8 +981,8 @@ function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const { x, y, width: w, height: h } = el.bounds;
   const cfg = el.engraveFrame!;
   const depth = typeof cfg.depth === 'number' ? cfg.depth : 6;
-  const blur = Math.max(2, depth * 1.5);
-  const offsetMag = Math.max(1, depth * 0.5);
+  const blur = depth * 1.2;
+  const offsetMag = Math.max(1, depth * 0.6);
   const angle = ((cfg.lightAngle ?? 135) * Math.PI) / 180;
   const offX = Math.cos(angle) * offsetMag;
   const offY = Math.sin(angle) * offsetMag;
@@ -1019,32 +1019,64 @@ function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
     ctx.restore();
   }
 
-  // Inner shadow via evenodd donut technique:
-  // 1. Clip to the shape so only the interior is visible.
-  // 2. Draw a "donut": large outer rect minus the shape (evenodd subtracts the hole).
-  // 3. The opaque donut fill gets clipped away, but its SHADOW spills INTO the clip region.
-  // This is the only reliable way to render inset / inner shadows on HTML Canvas.
-  const drawInnerShadow = (shadowCol: string, ox: number, oy: number) => {
+  // Match export renderer: clip + outer edge shadows to emulate inset/emboss on device.
+  const drawShadowEdge = (shadowCol: string, ox: number, oy: number) => {
     ctx.save();
     ctx.beginPath();
     makeShapePath();
     ctx.clip();
-    ctx.beginPath();
-    ctx.rect(x - 9999, y - 9999, w + 19998, h + 19998); // large outer rect
-    makeShapePath();                                       // subtract inner shape
-    ctx.shadowColor   = shadowCol;
-    ctx.shadowBlur    = blur;
+    ctx.shadowColor = shadowCol;
+    ctx.shadowBlur = blur;
     ctx.shadowOffsetX = ox;
     ctx.shadowOffsetY = oy;
-    ctx.fillStyle     = 'rgba(0,0,0,0.9)'; // opaque so it casts shadow; hidden by clip
-    ctx.fill('evenodd');
+    ctx.fillStyle = shadowCol;
+    ctx.fillRect(x - blur - Math.abs(ox) - 2, y - blur - Math.abs(oy) - 2, w + 2 * (blur + Math.abs(ox)) + 4, blur + Math.abs(oy) + 2);
+    ctx.fillRect(x - blur - Math.abs(ox) - 2, y + h + 1, w + 2 * (blur + Math.abs(ox)) + 4, blur + Math.abs(oy) + 2);
+    ctx.fillRect(x - blur - Math.abs(ox) - 2, y - blur - Math.abs(oy) - 2, blur + Math.abs(ox) + 2, h + 2 * (blur + Math.abs(oy)) + 4);
+    ctx.fillRect(x + w + 1, y - blur - Math.abs(oy) - 2, blur + Math.abs(ox) + 2, h + 2 * (blur + Math.abs(oy)) + 4);
     ctx.restore();
   };
 
-  // Light-side edge shadow
-  drawInnerShadow(lightSideColor,  offX,  offY);
-  // Dark-side edge (opposite light)
-  drawInnerShadow(darkSideColor,  -offX, -offY);
+  drawShadowEdge(lightSideColor, offX, offY);
+  drawShadowEdge(darkSideColor, -offX, -offY);
+
+  // Match export explicit edge pass so preview density tracks device output.
+  const edgePx = Math.max(1, Math.round(depth * 0.35));
+  const strokeShapePath = (inset = 0) => {
+    ctx.beginPath();
+    if (shape === 'circle') {
+      ctx.arc(x + w / 2, y + h / 2, Math.max(0, (Math.min(w, h) / 2) - inset), 0, Math.PI * 2);
+    } else if (shape === 'rounded') {
+      const rr = Math.max(0, cr - inset * 0.5);
+      ctx.roundRect(x + inset, y + inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2), rr);
+    } else {
+      ctx.rect(x + inset, y + inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2));
+    }
+  };
+
+  for (let i = 0; i < edgePx; i++) {
+    const inset = i + 0.5;
+    const alphaFalloff = 1 - (i / (edgePx + 1));
+
+    ctx.save();
+    strokeShapePath(inset);
+    ctx.strokeStyle = hexToRgba(isEngrave ? shC : hiC, (isEngrave ? shO : hiO) * 0.5 * alphaFalloff);
+    ctx.lineWidth = 1;
+    ctx.shadowColor = 'transparent';
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    strokeShapePath(inset);
+    ctx.strokeStyle = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.45 * alphaFalloff);
+    ctx.lineWidth = 1;
+    ctx.shadowColor = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.35 * alphaFalloff);
+    ctx.shadowBlur = 1;
+    ctx.shadowOffsetX = -offX * 0.4;
+    ctx.shadowOffsetY = -offY * 0.4;
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 // ─── Digit element: IMG_TIME, IMG_DATE, IMG_WEEK, TEXT_IMG ──────────────────────
