@@ -79,7 +79,7 @@ Checkpoint after T8:
 Checkpoint after T9:
 - User confirms old styles still usable.
 
-[~] T10 - Deployment and verification
+[x] T10 - Deployment and verification
 - Build, deploy docs parity, push.
 - Record hash parity and commit references.
 
