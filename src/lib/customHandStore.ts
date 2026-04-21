@@ -55,6 +55,19 @@ export interface SaveCustomHandStyleOptions {
   };
 }
 
+export type CustomHandPackMode = 'source-based-custom' | 'legacy-normalized';
+
+export interface ResolvedCustomHandPack {
+  mode: CustomHandPackMode;
+  sources: {
+    hour: string | null;
+    minute: string | null;
+    second: string | null;
+    cover: string | null;
+  };
+  missingLayers: Array<'hour' | 'minute' | 'second' | 'cover'>;
+}
+
 interface ParsedPivot {
   xRatio: number;
   yRatio: number;
@@ -244,6 +257,54 @@ function openDB(): Promise<IDBDatabase> {
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function htmlToSvgDataUrl(code?: string): string | null {
+  if (!code) return null;
+  const svg = extractSvgFromCode(code);
+  if (!svg || !svg.trim().startsWith('<svg')) return null;
+  return svgToDataUrl(svg);
+}
+
+export function resolveCustomHandPack(record: CustomHandRecord | null | undefined): ResolvedCustomHandPack | null {
+  if (!record) return null;
+
+  const hasAnySource = !!(
+    record.sourceHourHtml
+    || record.sourceMinuteHtml
+    || record.sourceSecondHtml
+    || record.sourceHubHtml
+  );
+
+  const mode: CustomHandPackMode = hasAnySource ? 'source-based-custom' : 'legacy-normalized';
+
+  const sourceHour = htmlToSvgDataUrl(record.sourceHourHtml);
+  const sourceMinute = htmlToSvgDataUrl(record.sourceMinuteHtml);
+  const sourceSecond = htmlToSvgDataUrl(record.sourceSecondHtml);
+  const sourceCover = htmlToSvgDataUrl(record.sourceHubHtml);
+
+  const sources = {
+    hour: mode === 'source-based-custom' ? (sourceHour ?? record.hourDataUrl ?? null) : (record.hourDataUrl ?? null),
+    minute: mode === 'source-based-custom' ? (sourceMinute ?? record.minuteDataUrl ?? null) : (record.minuteDataUrl ?? null),
+    second: mode === 'source-based-custom' ? (sourceSecond ?? record.secondDataUrl ?? null) : (record.secondDataUrl ?? null),
+    cover: mode === 'source-based-custom' ? (sourceCover ?? record.coverDataUrl ?? null) : (record.coverDataUrl ?? null),
+  };
+
+  const missingLayers: Array<'hour' | 'minute' | 'second' | 'cover'> = [];
+  if (!sources.hour) missingLayers.push('hour');
+  if (!sources.minute) missingLayers.push('minute');
+  if (!sources.second) missingLayers.push('second');
+  if (!sources.cover) missingLayers.push('cover');
+
+  return {
+    mode,
+    sources,
+    missingLayers,
+  };
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

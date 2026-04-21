@@ -112,6 +112,13 @@ export interface WatchFaceElement {
   handTrail?: number;    // 0–1: speed-blur ghost opacity
   handTint?: string;     // CSS color — accent tint blended on hands (e.g. '#4488FF')
 
+  // ── Pointer image effects (031) ─────────────────────────────────────────
+  // Values are intentionally symmetric around neutral defaults for deterministic normalization.
+  pointerBrightness?: number; // -100..100, default 0
+  pointerContrast?: number;   // -100..100, default 0
+  pointerSaturation?: number; // -100..100, default 0
+  pointerOpacity?: number;    // 0..1, default 1
+
   // Font library
   fontStyle?: string;
 
@@ -210,6 +217,23 @@ export interface GitHubUploadResult {
   watchfaceId?: string;  // For folder-based organization
   qrUrl?: string;        // URL to access QR code from GitHub Pages
   error?: string;
+}
+
+// ── Pointer parity types (031) ──────────────────────────────────────────────
+export type PointerParityStage = 'composer-preview' | 'adjustment-preview' | 'baked-export';
+
+export interface PointerParityMismatch {
+  leftStage: PointerParityStage;
+  rightStage: PointerParityStage;
+  mismatchRatio: number; // 0..1
+  maxChannelDelta: number; // 0..255
+  reason?: string;
+}
+
+export interface PointerParityResult {
+  pass: boolean;
+  tolerance: number;
+  mismatches: PointerParityMismatch[];
 }
 
 export type AppStep = 'upload' | 'analyzing' | 'preview' | 'generating' | 'success';

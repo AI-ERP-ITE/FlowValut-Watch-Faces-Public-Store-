@@ -43,7 +43,32 @@ import { loadCustomIcons } from '@/lib/customIconStore';
 import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
 import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
-import { loadCustomHandStyles, getCustomHandByKey, type CustomHandRecord } from '@/lib/customHandStore';
+import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
+import {
+  POINTER_PARITY_TOLERANCE,
+  createMissingStageParityResult,
+  runPointerParityChecks,
+} from '@/lib/pointerParity';
+import { normalizePointerEffects, pointerEffectsToCanvasFilter } from '@/lib/pointerEffects';
+import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
+import type { PointerParityResult, PointerParityStage } from '@/types';
+
+function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig {
+  return {
+    ...config,
+    elements: config.elements.map((el) => {
+      if (el.type !== 'TIME_POINTER') return el;
+      const effects = normalizePointerEffects(el);
+      return {
+        ...el,
+        pointerBrightness: effects.brightness,
+        pointerContrast: effects.contrast,
+        pointerSaturation: effects.saturation,
+        pointerOpacity: effects.opacity,
+      };
+    }),
+  };
+}
 
 // Mock Kimi analysis - simulates AI analysis
 async function mockKimiAnalysis(
@@ -983,6 +1008,91 @@ async function applyIconEffectsForZPK(
 }
 
 /**
+ * Apply pointer image effects to a rendered hand image before packaging into ZPK.
+ */
+async function applyPointerEffectsForZPK(
+  dataUrl: string,
+  el: WatchFaceElement,
+  layer: 'hour' | 'minute' | 'second' | 'cover',
+): Promise<string> {
+  const effects = normalizePointerEffects(el);
+  const shadowIntensity = Math.max(0, Math.min(1, el.handShadow ?? 0));
+  const glowIntensity = Math.max(0, Math.min(1, el.handGlow ?? 0));
+  const trailIntensity = Math.max(0, Math.min(1, el.handTrail ?? 0));
+  const tintColor = el.handTint?.trim();
+  const hasBasePointerEffects = effects.brightness === 0
+    && effects.contrast === 0
+    && effects.saturation === 0
+    && effects.opacity === 1;
+  const hasHandVisualEffects = shadowIntensity > 0 || glowIntensity > 0 || trailIntensity > 0 || !!tintColor;
+  if (hasBasePointerEffects && !hasHandVisualEffects) return dataUrl;
+
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = dataUrl;
+  });
+
+  const width = Math.max(1, img.naturalWidth || img.width || 1);
+  const height = Math.max(1, img.naturalHeight || img.height || 1);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+
+  const pointerFilter = pointerEffectsToCanvasFilter(effects);
+  const isCover = layer === 'cover';
+
+  if (trailIntensity > 0 && !isCover) {
+    for (let t = 1; t <= 3; t += 1) {
+      const trailAlpha = trailIntensity * (0.18 - t * 0.04);
+      if (trailAlpha <= 0) break;
+      ctx.save();
+      ctx.filter = pointerFilter;
+      ctx.globalAlpha = effects.opacity * trailAlpha;
+      ctx.drawImage(img, 0, -t * 2, width, height);
+      ctx.restore();
+    }
+  }
+
+  ctx.save();
+  if (shadowIntensity > 0) {
+    ctx.shadowColor = `rgba(0,0,0,${0.3 + shadowIntensity * 0.6})`;
+    ctx.shadowBlur = 4 + shadowIntensity * 20;
+    ctx.shadowOffsetX = shadowIntensity * 4;
+    ctx.shadowOffsetY = shadowIntensity * 4;
+  }
+  ctx.filter = pointerFilter;
+  ctx.globalAlpha = effects.opacity;
+  ctx.drawImage(img, 0, 0, width, height);
+  ctx.restore();
+
+  if (glowIntensity > 0 && !isCover) {
+    const glowColor = tintColor || '#00EEFF';
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = glowIntensity * 0.55 * effects.opacity;
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur = 12 + glowIntensity * 20;
+    ctx.drawImage(img, 0, 0, width, height);
+    ctx.restore();
+  }
+
+  if (tintColor && !isCover) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = tintColor;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+/**
  * Regenerate digit/label PNG images from current element colors + font styles.
  * Called at ZPK build time so that UI color/font choices actually reach the device.
  */
@@ -1195,122 +1305,7 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, w, h);
-
-  const ef = el.engraveFrame!;
-
-  const isEngrave = ef.mode === 'inner';
-  const depth = typeof ef.depth === 'number' ? ef.depth : (ef.depth === 'high' ? 12 : 6);
-  const blur = depth * 1.2;
-  const baseOffset = Math.max(1, depth * 0.6);
-  const angle = ((ef.lightAngle ?? 135) * Math.PI) / 180;
-  const offX = Math.cos(angle) * baseOffset;
-  const offY = Math.sin(angle) * baseOffset;
-  const hiC = ef.highlightColor ?? '#FFFFFF';
-  const hiO = ef.highlightOpacity ?? 0.6;
-  const shC = ef.shadowColor ?? '#000000';
-  const shO = ef.shadowOpacity ?? 0.6;
-  const hexToRgba = (hex: string, alpha: number) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  };
-  const lightColor = hexToRgba(isEngrave ? shC : hiC, isEngrave ? shO : hiO);
-  const darkColor  = hexToRgba(isEngrave ? hiC : shC, isEngrave ? hiO : shO);
-
-  // Shape clip
-  const shape = ef.shape ?? 'rect';
-  const cr = ef.cornerRadius ?? 12;
-  const clipShape = () => {
-    ctx.beginPath();
-    if (shape === 'circle') {
-      ctx.arc(w / 2, h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
-    } else if (shape === 'rounded') {
-      ctx.roundRect(0, 0, w, h, cr);
-    } else {
-      ctx.rect(0, 0, w, h);
-    }
-    ctx.clip();
-  };
-
-  const shapePath = (inset = 0) => {
-    ctx.beginPath();
-    if (shape === 'circle') {
-      ctx.arc(w / 2, h / 2, Math.max(0, (Math.min(w, h) / 2) - inset), 0, Math.PI * 2);
-    } else if (shape === 'rounded') {
-      const rr = Math.max(0, cr - inset * 0.5);
-      ctx.roundRect(inset, inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2), rr);
-    } else {
-      ctx.rect(inset, inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2));
-    }
-  };
-
-  // Fill — clipped to shape so circle/rounded corners stay transparent
-  if (ef.fillMode === 'color' && ef.fillColor) {
-    ctx.save();
-    clipShape();
-    ctx.fillStyle = ef.fillColor;
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-  }
-
-  ctx.save();
-  clipShape();
-  // Shadow edge (opposite light direction) — use fillRect so shadow actually renders
-  ctx.shadowColor = lightColor;
-  ctx.shadowBlur = blur;
-  ctx.shadowOffsetX = offX;
-  ctx.shadowOffsetY = offY;
-  // Draw a line just outside the clip so only the shadow spills in
-  ctx.fillStyle = lightColor;
-  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
-  ctx.fillRect(-blur - Math.abs(offX) - 2, h + 1, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
-  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
-  ctx.fillRect(w + 1, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
-  ctx.restore();
-
-  ctx.save();
-  clipShape();
-  // Highlight edge (light direction) — same technique for opposite shadow
-  ctx.shadowColor = darkColor;
-  ctx.shadowBlur = blur;
-  ctx.shadowOffsetX = -offX;
-  ctx.shadowOffsetY = -offY;
-  ctx.fillStyle = darkColor;
-  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
-  ctx.fillRect(-blur - Math.abs(offX) - 2, h + 1, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
-  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
-  ctx.fillRect(w + 1, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
-  ctx.restore();
-
-  // Explicit inner-edge pass so engrave/emboss remains visible on device even when
-  // blur shadows get flattened by PNG compression/device rendering differences.
-  const edgePx = Math.max(1, Math.round(depth * 0.35));
-  for (let i = 0; i < edgePx; i++) {
-    const inset = i + 0.5;
-    const alphaFalloff = 1 - (i / (edgePx + 1));
-
-    // Light edge (top/left-ish)
-    ctx.save();
-    shapePath(inset);
-    ctx.strokeStyle = hexToRgba(isEngrave ? shC : hiC, (isEngrave ? shO : hiO) * 0.5 * alphaFalloff);
-    ctx.lineWidth = 1;
-    ctx.shadowColor = 'transparent';
-    ctx.stroke();
-    ctx.restore();
-
-    // Dark edge (bottom/right-ish) via opposite offset shadow on same stroke
-    ctx.save();
-    shapePath(inset);
-    ctx.strokeStyle = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.45 * alphaFalloff);
-    ctx.lineWidth = 1;
-    ctx.shadowColor = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.35 * alphaFalloff);
-    ctx.shadowBlur = 1;
-    ctx.shadowOffsetX = -offX * 0.4;
-    ctx.shadowOffsetY = -offY * 0.4;
-    ctx.stroke();
-    ctx.restore();
-  }
+  renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, el.engraveFrame!);
 
   return canvas.toDataURL('image/png');
 }
@@ -1331,6 +1326,10 @@ function StudioApp() {
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pointerParitySnapshotsRef = useRef<Partial<Record<PointerParityStage, ImageData>>>({});
+  const pointerParityMissingAssetsRef = useRef<string[]>([]);
+  const [pointerParityResult, setPointerParityResult] = useState<PointerParityResult | null>(null);
+  const [pointerParityRunning, setPointerParityRunning] = useState(false);
 
   // Load custom icons + fonts from IndexedDB on startup and register them
   useEffect(() => {
@@ -1362,6 +1361,69 @@ function StudioApp() {
   const handleLabHandsSaved = useCallback(() => {
     loadCustomHandStyles().then(setCustomHandStyles);
   }, []);
+
+  const registerPointerParitySnapshot = useCallback((stage: PointerParityStage, snapshot: ImageData | null) => {
+    if (!snapshot) return;
+    pointerParitySnapshotsRef.current[stage] = snapshot;
+  }, []);
+
+  const capturePointerParitySnapshotFromCanvas = useCallback((stage: PointerParityStage) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    registerPointerParitySnapshot(stage, ctx.getImageData(0, 0, canvas.width, canvas.height));
+  }, [registerPointerParitySnapshot]);
+
+  const runPointerParityVerification = useCallback(() => {
+    setPointerParityRunning(true);
+    try {
+      const snapshots = pointerParitySnapshotsRef.current;
+      const requiredStages: PointerParityStage[] = ['composer-preview', 'adjustment-preview', 'baked-export'];
+      const missingStages = requiredStages.filter((stage) => !snapshots[stage]);
+
+      if (missingStages.length > 0) {
+        const result = createMissingStageParityResult(missingStages, POINTER_PARITY_TOLERANCE);
+        setPointerParityResult(result);
+        toast.error(`Pointer parity pending: missing ${missingStages.join(', ')}`);
+        return;
+      }
+
+      const parity = runPointerParityChecks(snapshots as Record<PointerParityStage, ImageData>, POINTER_PARITY_TOLERANCE);
+      const missingAssets = pointerParityMissingAssetsRef.current;
+      const result: PointerParityResult = missingAssets.length > 0
+        ? {
+            ...parity.result,
+            pass: false,
+            mismatches: [
+              ...parity.result.mismatches,
+              ...missingAssets.map((asset) => ({
+                leftStage: 'adjustment-preview' as const,
+                rightStage: 'baked-export' as const,
+                mismatchRatio: 1,
+                maxChannelDelta: 255,
+                reason: `Missing pointer asset during parity stage: ${asset}`,
+              })),
+            ],
+          }
+        : parity.result;
+
+      setPointerParityResult(result);
+      if (result.pass) {
+        toast.success('Pointer parity passed');
+      } else {
+        toast.error(`Pointer parity failed (${result.mismatches.length} mismatch pair(s))`);
+      }
+    } finally {
+      setPointerParityRunning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    pointerParitySnapshotsRef.current = {};
+    pointerParityMissingAssetsRef.current = [];
+    setPointerParityResult(null);
+  }, [state.watchFaceConfig]);
 
   const handleAddElement = () => {
     if (!state.watchFaceConfig) return;
@@ -1633,7 +1695,7 @@ function StudioApp() {
         config.name = watchFaceName.trim();
       }
 
-      dispatch(actions.setWatchFaceConfig(config));
+      dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects(config)));
       dispatch(actions.setElementImages(elementImages));
       dispatch(actions.setStep('preview'));
       toast.success('Analysis complete!');
@@ -1703,7 +1765,7 @@ function StudioApp() {
       const elementImages: ElementImage[] = generatePipelineAssets(resolvedElements);
 
       // T022 — Set state and go to preview (same as AI pipeline)
-      dispatch(actions.setWatchFaceConfig(config));
+      dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects(config)));
       dispatch(actions.setElementImages(elementImages));
       dispatch(actions.setStep('preview'));
       toast.success(`Loaded ${elements.length} elements from HTML`);
@@ -1735,6 +1797,7 @@ function StudioApp() {
         previewDataUrl = canvas.toDataURL('image/png');
         setPreviewImageUrl(previewDataUrl);
         console.log('[App] Canvas screenshot captured, size:', previewDataUrl.length);
+        capturePointerParitySnapshotFromCanvas('composer-preview');
       }
     } catch (e) {
       console.warn('[App] Canvas capture failed (tainted?), falling back to backgroundImage', e);
@@ -1771,6 +1834,8 @@ function StudioApp() {
     dispatch(actions.setStep('generating'));
 
     try {
+      pointerParityMissingAssetsRef.current = [];
+
       // Build ZPK using File objects
       console.log('[App] Calling buildZPK...');
       
@@ -1946,30 +2011,45 @@ function StudioApp() {
       // Inject clock hand images for TIME_POINTER elements
       // Always regenerate from current handStyle so the actual selected style is baked in.
       const timePointerEl = exportElements.find(el => el.type === 'TIME_POINTER');
+      const missingPointerAssets: string[] = [];
       if (timePointerEl) {
         if (timePointerEl.handStyle?.startsWith('custom_hand:')) {
           const customHand = await getCustomHandByKey(timePointerEl.handStyle);
           if (customHand) {
-            if (typeof customHand.hourPosX === 'number' && typeof customHand.hourPosY === 'number') {
+            if (!timePointerEl.hourPos && typeof customHand.hourPosX === 'number' && typeof customHand.hourPosY === 'number') {
               timePointerEl.hourPos = { x: customHand.hourPosX, y: customHand.hourPosY };
             }
-            if (typeof customHand.minutePosX === 'number' && typeof customHand.minutePosY === 'number') {
+            if (!timePointerEl.minutePos && typeof customHand.minutePosX === 'number' && typeof customHand.minutePosY === 'number') {
               timePointerEl.minutePos = { x: customHand.minutePosX, y: customHand.minutePosY };
             }
-            if (typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
+            if (!timePointerEl.secondPos && typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
               timePointerEl.secondPos = { x: customHand.secondPosX, y: customHand.secondPosY };
             }
             if (!timePointerEl.coverSrc) {
               timePointerEl.coverSrc = 'hand_cover.png';
             }
+            const resolvedPack = resolveCustomHandPack(customHand);
             const handFiles = [
-              { name: 'hour_hand.png', dataUrl: customHand.hourDataUrl },
-              { name: 'minute_hand.png', dataUrl: customHand.minuteDataUrl },
-              { name: 'second_hand.png', dataUrl: customHand.secondDataUrl },
-              { name: 'hand_cover.png', dataUrl: customHand.coverDataUrl },
+              { name: 'hour_hand.png', dataUrl: resolvedPack?.sources.hour ?? customHand.hourDataUrl },
+              { name: 'minute_hand.png', dataUrl: resolvedPack?.sources.minute ?? customHand.minuteDataUrl },
+              { name: 'second_hand.png', dataUrl: resolvedPack?.sources.second ?? customHand.secondDataUrl },
+              { name: 'hand_cover.png', dataUrl: resolvedPack?.sources.cover ?? customHand.coverDataUrl },
             ];
             for (const { name, dataUrl } of handFiles) {
-              const p = dataUrl.split(',');
+              if (!dataUrl) {
+                console.warn('[App] Missing custom hand layer for export:', name, 'style:', timePointerEl.handStyle);
+                missingPointerAssets.push(`baked-export:${name} (${timePointerEl.handStyle})`);
+                continue;
+              }
+              const layer = name.startsWith('hour_')
+                ? 'hour'
+                : name.startsWith('minute_')
+                  ? 'minute'
+                  : name.startsWith('second_')
+                    ? 'second'
+                    : 'cover';
+              const effectedDataUrl = await applyPointerEffectsForZPK(dataUrl, timePointerEl, layer);
+              const p = effectedDataUrl.split(',');
               const b = atob(p[1]);
               const u8 = new Uint8Array(b.length);
               for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
@@ -1994,7 +2074,15 @@ function StudioApp() {
             { name: 'hand_cover.png', dataUrl: handSet.cover },
           ];
           for (const { name, dataUrl } of builtInHandFiles) {
-            const p = dataUrl.split(',');
+            const layer = name.startsWith('hour_')
+              ? 'hour'
+              : name.startsWith('minute_')
+                ? 'minute'
+                : name.startsWith('second_')
+                  ? 'second'
+                  : 'cover';
+            const effectedDataUrl = await applyPointerEffectsForZPK(dataUrl, timePointerEl, layer);
+            const p = effectedDataUrl.split(',');
             const b = atob(p[1]);
             const u8 = new Uint8Array(b.length);
             for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
@@ -2006,6 +2094,10 @@ function StudioApp() {
           console.log('[App] Regenerated built-in hand images for style:', hs);
         }
       }
+      pointerParityMissingAssetsRef.current = missingPointerAssets;
+
+      // Capture adjustment-stage snapshot after export-side element/asset preparation.
+      capturePointerParitySnapshotFromCanvas('adjustment-preview');
 
       const zpkResult = await buildZPK({
         config: configForBuild,
@@ -2013,6 +2105,9 @@ function StudioApp() {
         elementFiles,
       });
       console.log('[App] ZPK built successfully, size:', zpkResult.size);
+
+      // Capture baked-export stage snapshot once export build is complete.
+      capturePointerParitySnapshotFromCanvas('baked-export');
 
       dispatch(actions.setZpkBlob(zpkResult.blob));
 
@@ -2041,7 +2136,7 @@ function StudioApp() {
       console.log('[App] QR code generated');
 
       // Build source.json for safe future regeneration
-      const sourceBlob = sourceJsonToBlob(buildSourceJson(state.watchFaceConfig));
+      const sourceBlob = sourceJsonToBlob(buildSourceJson(withNormalizedPointerEffects(state.watchFaceConfig)));
 
       // Step 2: Upload both ZPK and QR code to the same folder on GitHub
       console.log('[App] Starting folder-based upload (ZPK + QR)...');
@@ -2082,7 +2177,7 @@ function StudioApp() {
     } finally {
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, state.backgroundFile, state.backgroundImage, state.githubToken, state.githubRepo, dispatch]);
+  }, [state.watchFaceConfig, state.backgroundFile, state.backgroundImage, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas]);
 
   // Handle reset
   const handleReset = useCallback(() => {
@@ -2568,6 +2663,27 @@ function StudioApp() {
             )}
 
             {/* Action buttons */}
+            {pointerParityResult && (
+              <div className={`rounded-lg border px-3 py-2 text-xs ${pointerParityResult.pass ? 'border-green-600/40 bg-green-900/20 text-green-300' : 'border-amber-600/40 bg-amber-900/20 text-amber-300'}`}>
+                {pointerParityResult.pass
+                  ? `Pointer parity: PASS (tolerance ${pointerParityResult.tolerance.toFixed(4)})`
+                  : `Pointer parity: FAIL (${pointerParityResult.mismatches.length} mismatch pair(s))`}
+                {!pointerParityResult.pass && (
+                  <div className="mt-1 space-y-1">
+                    {pointerParityResult.mismatches.slice(0, 3).map((mismatch, index) => (
+                      <div key={`${mismatch.leftStage}-${mismatch.rightStage}-${index}`} className="text-[11px] text-amber-200/90">
+                        {`${mismatch.leftStage} vs ${mismatch.rightStage}: ratio ${mismatch.mismatchRatio.toFixed(4)}, max delta ${mismatch.maxChannelDelta}${mismatch.reason ? ` — ${mismatch.reason}` : ''}`}
+                      </div>
+                    ))}
+                    {pointerParityResult.mismatches.length > 3 && (
+                      <div className="text-[11px] text-amber-200/75">
+                        +{pointerParityResult.mismatches.length - 3} more mismatch detail(s)
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap gap-3 pt-4">
               <Button
                 onClick={handleGenerate}
@@ -2575,6 +2691,14 @@ function StudioApp() {
               >
                 <Sparkles className="h-5 w-5 mr-2" />
                 Generate ZPK & Upload
+              </Button>
+              <Button
+                onClick={runPointerParityVerification}
+                disabled={pointerParityRunning}
+                variant="outline"
+                className="h-12 border-zinc-700 text-white hover:bg-zinc-800"
+              >
+                {pointerParityRunning ? 'Checking parity...' : 'Run Pointer Parity Check'}
               </Button>
               <Button
                 onClick={() => dispatch(actions.setStep('upload'))}

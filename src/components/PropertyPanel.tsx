@@ -923,6 +923,72 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* TIME_POINTER — Pointer Image Effects (031) */}
+      {element.type === 'TIME_POINTER' && (
+        <Section label="Pointer Image Effects">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Brightness</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerBrightness ?? 0)}</span>
+            </div>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={element.pointerBrightness ?? 0}
+              onChange={e => update({ pointerBrightness: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Contrast</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerContrast ?? 0)}</span>
+            </div>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={element.pointerContrast ?? 0}
+              onChange={e => update({ pointerContrast: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Saturation</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerSaturation ?? 0)}</span>
+            </div>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={element.pointerSaturation ?? 0}
+              onChange={e => update({ pointerSaturation: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Opacity</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round((element.pointerOpacity ?? 1) * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={element.pointerOpacity ?? 1}
+              onChange={e => update({ pointerOpacity: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+        </Section>
+      )}
+
       {/* Weather style picker — IMG_LEVEL + WEATHER_CURRENT */}
       {element.type === 'IMG_LEVEL' && element.dataType === 'WEATHER_CURRENT' && (
         <Section label="Weather Style">

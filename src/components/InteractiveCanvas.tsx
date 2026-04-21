@@ -7,7 +7,9 @@ import { generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
-import type { CustomHandRecord } from '@/lib/customHandStore';
+import { resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
+import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
+import { hasNonDefaultPointerEffects, normalizePointerEffects, pointerEffectsToCanvasFilter } from '@/lib/pointerEffects';
 
 const CANVAS_SIZE = 480;
 const CX = 240;
@@ -978,105 +980,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
 // ─── Engrave / Emboss frame ────────────────────────────────────────────────────
 
 function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
-  const { x, y, width: w, height: h } = el.bounds;
-  const cfg = el.engraveFrame!;
-  const depth = typeof cfg.depth === 'number' ? cfg.depth : 6;
-  const blur = depth * 1.2;
-  const offsetMag = Math.max(1, depth * 0.6);
-  const angle = ((cfg.lightAngle ?? 135) * Math.PI) / 180;
-  const offX = Math.cos(angle) * offsetMag;
-  const offY = Math.sin(angle) * offsetMag;
-
-  const hiC = cfg.highlightColor ?? '#FFFFFF';
-  const hiO = cfg.highlightOpacity ?? 0.6;
-  const shC = cfg.shadowColor ?? '#000000';
-  const shO = cfg.shadowOpacity ?? 0.6;
-
-  const isEngrave = cfg.mode === 'inner';
-  const lightSideColor = hexToRgba(isEngrave ? shC : hiC, isEngrave ? shO : hiO);
-  const darkSideColor  = hexToRgba(isEngrave ? hiC : shC, isEngrave ? hiO : shO);
-
-  const shape = cfg.shape ?? 'rect';
-  const cr = cfg.cornerRadius ?? 12;
-
-  const makeShapePath = () => {
-    if (shape === 'circle') {
-      ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
-    } else if (shape === 'rounded') {
-      ctx.roundRect(x, y, w, h, cr);
-    } else {
-      ctx.rect(x, y, w, h);
-    }
-  };
-
-  // Optional solid fill
-  if (cfg.fillMode === 'color') {
-    ctx.save();
-    ctx.beginPath();
-    makeShapePath();
-    ctx.fillStyle = cfg.fillColor;
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Match export renderer: clip + outer edge shadows to emulate inset/emboss on device.
-  const drawShadowEdge = (shadowCol: string, ox: number, oy: number) => {
-    ctx.save();
-    ctx.beginPath();
-    makeShapePath();
-    ctx.clip();
-    ctx.shadowColor = shadowCol;
-    ctx.shadowBlur = blur;
-    ctx.shadowOffsetX = ox;
-    ctx.shadowOffsetY = oy;
-    ctx.fillStyle = shadowCol;
-    ctx.fillRect(x - blur - Math.abs(ox) - 2, y - blur - Math.abs(oy) - 2, w + 2 * (blur + Math.abs(ox)) + 4, blur + Math.abs(oy) + 2);
-    ctx.fillRect(x - blur - Math.abs(ox) - 2, y + h + 1, w + 2 * (blur + Math.abs(ox)) + 4, blur + Math.abs(oy) + 2);
-    ctx.fillRect(x - blur - Math.abs(ox) - 2, y - blur - Math.abs(oy) - 2, blur + Math.abs(ox) + 2, h + 2 * (blur + Math.abs(oy)) + 4);
-    ctx.fillRect(x + w + 1, y - blur - Math.abs(oy) - 2, blur + Math.abs(ox) + 2, h + 2 * (blur + Math.abs(oy)) + 4);
-    ctx.restore();
-  };
-
-  drawShadowEdge(lightSideColor, offX, offY);
-  drawShadowEdge(darkSideColor, -offX, -offY);
-
-  // Match export explicit edge pass so preview density tracks device output.
-  const edgePx = Math.max(1, Math.round(depth * 0.35));
-  const strokeShapePath = (inset = 0) => {
-    ctx.beginPath();
-    if (shape === 'circle') {
-      ctx.arc(x + w / 2, y + h / 2, Math.max(0, (Math.min(w, h) / 2) - inset), 0, Math.PI * 2);
-    } else if (shape === 'rounded') {
-      const rr = Math.max(0, cr - inset * 0.5);
-      ctx.roundRect(x + inset, y + inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2), rr);
-    } else {
-      ctx.rect(x + inset, y + inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2));
-    }
-  };
-
-  for (let i = 0; i < edgePx; i++) {
-    const inset = i + 0.5;
-    const alphaFalloff = 1 - (i / (edgePx + 1));
-
-    ctx.save();
-    strokeShapePath(inset);
-    ctx.strokeStyle = hexToRgba(isEngrave ? shC : hiC, (isEngrave ? shO : hiO) * 0.5 * alphaFalloff);
-    ctx.lineWidth = 1;
-    ctx.shadowColor = 'transparent';
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    strokeShapePath(inset);
-    ctx.strokeStyle = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.45 * alphaFalloff);
-    ctx.lineWidth = 1;
-    ctx.shadowColor = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.35 * alphaFalloff);
-    ctx.shadowBlur = 1;
-    ctx.shadowOffsetX = -offX * 0.4;
-    ctx.shadowOffsetY = -offY * 0.4;
-    ctx.stroke();
-    ctx.restore();
-  }
+  renderEngraveFrameEffect(ctx, el.bounds, el.engraveFrame!);
 }
 
 // ─── Digit element: IMG_TIME, IMG_DATE, IMG_WEEK, TEXT_IMG ──────────────────────
@@ -1207,10 +1111,6 @@ function extractSvgFromHtmlSource(code?: string): string | null {
   return m ? m[0] : null;
 }
 
-function svgToDataUrl(svg: string): string {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
 function parsePivotRatioFromSource(code?: string): { x: number; y: number } {
   const svg = extractSvgFromHtmlSource(code);
   if (!svg) return { x: 0.5, y: 0.5 };
@@ -1238,20 +1138,15 @@ function loadHandImages(
   if (cache.has(style)) return cache.get(style)!;
 
   // Determine image sources — custom or built-in
-  let srcs: Record<string, string>;
+  let srcs: Record<string, string | null>;
   const customRecord = customHands?.find(h => h.key === style);
   if (customRecord) {
-    const hasSourceLayers = !!(
-      customRecord.sourceHourHtml
-      && customRecord.sourceMinuteHtml
-      && customRecord.sourceSecondHtml
-      && customRecord.sourceHubHtml
-    );
+    const resolved = resolveCustomHandPack(customRecord);
     srcs = {
-      hour: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceHourHtml) ?? '') : customRecord.hourDataUrl,
-      minute: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceMinuteHtml) ?? '') : customRecord.minuteDataUrl,
-      second: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceSecondHtml) ?? '') : customRecord.secondDataUrl,
-      cover: hasSourceLayers ? svgToDataUrl(extractSvgFromHtmlSource(customRecord.sourceHubHtml) ?? '') : customRecord.coverDataUrl,
+      hour: resolved?.sources.hour ?? customRecord.hourDataUrl ?? null,
+      minute: resolved?.sources.minute ?? customRecord.minuteDataUrl ?? null,
+      second: resolved?.sources.second ?? customRecord.secondDataUrl ?? null,
+      cover: resolved?.sources.cover ?? customRecord.coverDataUrl ?? null,
     };
   } else {
     const set = generateHandSet(style as HandStyleKey);
@@ -1260,8 +1155,13 @@ function loadHandImages(
 
   const imgMap = new Map<string, HTMLImageElement>();
   cache.set(style, imgMap); // register early to avoid duplicate loads
-  let pending = Object.keys(srcs).length;
-  for (const [name, src] of Object.entries(srcs)) {
+  const entries = Object.entries(srcs).filter(([, src]) => !!src) as Array<[string, string]>;
+  let pending = entries.length;
+  if (pending === 0) {
+    cache.delete(style);
+    return null;
+  }
+  for (const [name, src] of entries) {
     const img = new Image();
     img.onload = () => {
       imgMap.set(name, img);
@@ -1289,13 +1189,9 @@ function drawTimePointer(
 
   const style = el.handStyle ?? 'silver';
   const customRecord = customHands?.find(h => h.key === style);
-  const sourceMode = !!(
-    customRecord?.sourceHourHtml
-    && customRecord?.sourceMinuteHtml
-    && customRecord?.sourceSecondHtml
-    && customRecord?.sourceHubHtml
-  );
-  const sourcePivot = sourceMode ? {
+  const resolvedPack = customRecord ? resolveCustomHandPack(customRecord) : null;
+  const sourceMode = resolvedPack?.mode === 'source-based-custom';
+  const sourcePivot = sourceMode && customRecord ? {
     hour: parsePivotRatioFromSource(customRecord.sourceHourHtml),
     minute: parsePivotRatioFromSource(customRecord.sourceMinuteHtml),
     second: parsePivotRatioFromSource(customRecord.sourceSecondHtml),
@@ -1318,6 +1214,9 @@ function drawTimePointer(
   const glowIntensity   = el.handGlow   ?? 0;
   const trailIntensity  = el.handTrail  ?? 0;
   const tintColor       = el.handTint;  // e.g. '#4488FF' or undefined
+  const pointerEffects = normalizePointerEffects(el);
+  const hasPointerEffects = hasNonDefaultPointerEffects(pointerEffects);
+  const pointerFilter = pointerEffectsToCanvasFilter(pointerEffects);
 
   if (imgMap && imgMap.size === 4) {
     // Draw using real hand images
@@ -1373,7 +1272,8 @@ function drawTimePointer(
           if (trailAlpha <= 0) break;
           const trailAngle = angle - degToRad(t * 3);
           ctx.save();
-          ctx.globalAlpha = trailAlpha;
+          ctx.filter = hasPointerEffects ? pointerFilter : 'none';
+          ctx.globalAlpha = trailAlpha * (hasPointerEffects ? pointerEffects.opacity : 1);
           ctx.translate(cx, cy);
           ctx.rotate(trailAngle);
           ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);
@@ -1393,6 +1293,8 @@ function drawTimePointer(
         ctx.shadowOffsetY = shadowIntensity * 4;
       }
 
+      ctx.filter = hasPointerEffects ? pointerFilter : 'none';
+      ctx.globalAlpha = hasPointerEffects ? pointerEffects.opacity : 1;
       ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);
 
       // ── Glow overlay ──────────────────────────────────────────
@@ -1401,7 +1303,7 @@ function drawTimePointer(
         ctx.shadowBlur = 0;
         const glowColor = tintColor ?? '#00EEFF';
         ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = glowIntensity * 0.55;
+        ctx.globalAlpha = glowIntensity * 0.55 * (hasPointerEffects ? pointerEffects.opacity : 1);
         ctx.shadowColor = glowColor;
         ctx.shadowBlur = 12 + glowIntensity * 20;
         ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);
@@ -1410,7 +1312,7 @@ function drawTimePointer(
       }
 
       // ── Tint overlay ──────────────────────────────────────────
-      if (tintColor && glowIntensity <= 0 && def.key !== 'cover') {
+      if (tintColor && def.key !== 'cover') {
         ctx.globalCompositeOperation = 'overlay';
         ctx.globalAlpha = 0.35;
         ctx.fillStyle = tintColor;
