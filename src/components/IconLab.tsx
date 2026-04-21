@@ -761,11 +761,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       axisShiftRatio = 0,
     ) => {
       const rad = (deg * Math.PI) / 180;
-      // Keep layer proportions: fit by height so pointer length remains visible.
-      const targetH = size * 0.82;
-      const scale = targetH / Math.max(1, img.height);
-      const drawW = img.width * scale;
-      const drawH = img.height * scale;
+      // True no-resize preview: draw source at its native dimensions.
+      const drawW = Math.max(1, img.width);
+      const drawH = Math.max(1, img.height);
       const anchorX = drawW * anchor.xRatio;
       const anchorY = drawH * anchor.yRatio;
       const axisShift = axisShiftRatio * drawH;
@@ -799,8 +797,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       if (secondImg) drawRotatedLayer(secondImg, 0, composerLayerAnchor.second, composerAxis.second);
 
       if (hubImg) {
-        const hubSize = size * 0.14;
-        ctx.drawImage(hubImg, cx - hubSize / 2, cy - hubSize / 2, hubSize, hubSize);
+        const hubW = Math.max(1, hubImg.width);
+        const hubH = Math.max(1, hubImg.height);
+        ctx.drawImage(hubImg, cx - hubW / 2, cy - hubH / 2, hubW, hubH);
       } else {
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
         ctx.beginPath();
