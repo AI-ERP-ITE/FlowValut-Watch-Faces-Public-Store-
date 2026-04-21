@@ -115,6 +115,10 @@ export interface WatchFaceElement {
   // Font library
   fontStyle?: string;
 
+  // TEXT character and line spacing (Zepp OS char_space / line_space)
+  charSpace?: number;   // default 0
+  lineSpace?: number;   // default 0
+
   // Curved text
   curvedText?: {
     radius: number;      // Arc radius for text path

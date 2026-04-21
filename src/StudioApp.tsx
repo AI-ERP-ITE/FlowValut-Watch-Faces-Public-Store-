@@ -1051,7 +1051,10 @@ function regenerateDigitFilesFromElements(
         results.push({ filename: `date_digit_${i}.png`, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
       }
     } else if (el.type === 'IMG_WEEK') {
-      const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+      const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+      const WEEK_INITIAL = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+      const days = el.weekFormat === 'full' ? WEEK_FULL : el.weekFormat === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
       const h = Math.max(el.bounds.height || 20, 12);
       for (let i = 0; i < 7; i++) {
@@ -1222,24 +1225,31 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
 
   ctx.save();
   clipShape();
-  // Shadow edge (opposite light direction)
+  // Shadow edge (opposite light direction) — use fillRect so shadow actually renders
   ctx.shadowColor = lightColor;
   ctx.shadowBlur = blur;
   ctx.shadowOffsetX = offX;
   ctx.shadowOffsetY = offY;
-  ctx.strokeStyle = 'transparent';
-  ctx.strokeRect(-1, -1, w + 2, h + 2);
+  // Draw a line just outside the clip so only the shadow spills in
+  ctx.fillStyle = lightColor;
+  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
+  ctx.fillRect(-blur - Math.abs(offX) - 2, h + 1, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
+  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
+  ctx.fillRect(w + 1, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
   ctx.restore();
 
   ctx.save();
   clipShape();
-  // Highlight edge (light direction)
+  // Highlight edge (light direction) — same technique for opposite shadow
   ctx.shadowColor = darkColor;
   ctx.shadowBlur = blur;
   ctx.shadowOffsetX = -offX;
   ctx.shadowOffsetY = -offY;
-  ctx.strokeStyle = 'transparent';
-  ctx.strokeRect(-1, -1, w + 2, h + 2);
+  ctx.fillStyle = darkColor;
+  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
+  ctx.fillRect(-blur - Math.abs(offX) - 2, h + 1, w + 2 * (blur + Math.abs(offX)) + 4, blur + Math.abs(offY) + 2);
+  ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
+  ctx.fillRect(w + 1, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
   ctx.restore();
 
   return canvas.toDataURL('image/png');
@@ -1855,18 +1865,42 @@ function StudioApp() {
         }
       }
 
-      // Inject custom hand images if the TIME_POINTER element uses a custom hand style
+      // Inject clock hand images for TIME_POINTER elements
+      // Always regenerate from current handStyle so the actual selected style is baked in.
       const timePointerEl = state.watchFaceConfig.elements.find(el => el.type === 'TIME_POINTER');
-      if (timePointerEl?.handStyle?.startsWith('custom_hand:')) {
-        const customHand = await getCustomHandByKey(timePointerEl.handStyle);
-        if (customHand) {
-          const handFiles = [
-            { name: 'hour_hand.png', dataUrl: customHand.hourDataUrl },
-            { name: 'minute_hand.png', dataUrl: customHand.minuteDataUrl },
-            { name: 'second_hand.png', dataUrl: customHand.secondDataUrl },
-            { name: 'hand_cover.png', dataUrl: customHand.coverDataUrl },
+      if (timePointerEl) {
+        if (timePointerEl.handStyle?.startsWith('custom_hand:')) {
+          const customHand = await getCustomHandByKey(timePointerEl.handStyle);
+          if (customHand) {
+            const handFiles = [
+              { name: 'hour_hand.png', dataUrl: customHand.hourDataUrl },
+              { name: 'minute_hand.png', dataUrl: customHand.minuteDataUrl },
+              { name: 'second_hand.png', dataUrl: customHand.secondDataUrl },
+              { name: 'hand_cover.png', dataUrl: customHand.coverDataUrl },
+            ];
+            for (const { name, dataUrl } of handFiles) {
+              const p = dataUrl.split(',');
+              const b = atob(p[1]);
+              const u8 = new Uint8Array(b.length);
+              for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
+              const newFile = { src: name, file: new File([u8], name, { type: 'image/png' }) };
+              const idx = elementFiles.findIndex(f => f.src === name);
+              if (idx >= 0) elementFiles[idx] = newFile;
+              else elementFiles.push(newFile);
+            }
+            console.log('[App] Injected custom hand images for style:', timePointerEl.handStyle);
+          }
+        } else {
+          // Built-in hand style — always regenerate so style changes are reflected
+          const hs = (timePointerEl.handStyle ?? 'silver') as HandStyleKey;
+          const handSet = generateHandSet(hs);
+          const builtInHandFiles = [
+            { name: 'hour_hand.png', dataUrl: handSet.hourHand },
+            { name: 'minute_hand.png', dataUrl: handSet.minuteHand },
+            { name: 'second_hand.png', dataUrl: handSet.secondHand },
+            { name: 'hand_cover.png', dataUrl: handSet.cover },
           ];
-          for (const { name, dataUrl } of handFiles) {
+          for (const { name, dataUrl } of builtInHandFiles) {
             const p = dataUrl.split(',');
             const b = atob(p[1]);
             const u8 = new Uint8Array(b.length);
@@ -1876,7 +1910,7 @@ function StudioApp() {
             if (idx >= 0) elementFiles[idx] = newFile;
             else elementFiles.push(newFile);
           }
-          console.log('[App] Injected custom hand images for style:', timePointerEl.handStyle);
+          console.log('[App] Regenerated built-in hand images for style:', hs);
         }
       }
 

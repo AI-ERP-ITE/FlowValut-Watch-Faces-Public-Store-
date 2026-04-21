@@ -539,6 +539,30 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
             />
           </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] text-white/40 w-14">Char gap</span>
+            <input
+              type="number"
+              value={element.charSpace ?? 0}
+              min={-10}
+              max={30}
+              onChange={e => update({ charSpace: Number(e.target.value) })}
+              className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
+              title="Letter spacing (Zepp char_space)"
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] text-white/40 w-14">Line gap</span>
+            <input
+              type="number"
+              value={element.lineSpace ?? 0}
+              min={-10}
+              max={30}
+              onChange={e => update({ lineSpace: Number(e.target.value) })}
+              className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
+              title="Line spacing (Zepp line_space)"
+            />
+          </div>
         </Section>
       )}
 

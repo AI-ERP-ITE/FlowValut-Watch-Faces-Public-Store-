@@ -290,7 +290,11 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
 
       case 'IMG_WEEK': {
         if (!generatedSets.has('week_images')) {
-          const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+          const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+          const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+          const WEEK_INITIAL = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+          const fmt = (el as unknown as { weekFormat?: string }).weekFormat ?? 'short';
+          const days = fmt === 'full' ? WEEK_FULL : fmt === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
           const weekColor = getElementColor(el);
           const weekW = el.w ?? WEEK_LABEL.w;
           const weekH = el.h ?? WEEK_LABEL.h;

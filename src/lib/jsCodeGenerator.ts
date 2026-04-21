@@ -562,6 +562,8 @@ function generateTextWidgetV3(element: WatchFaceElement): string {
   const colorHex = element.color ?? '0xFFFFFFFF';
   const colorValue = colorHex.startsWith('0x') ? colorHex : `0x${colorHex.replace('#', '')}`;
   const textContent = element.text ?? '';
+  const charSpace = element.charSpace ?? 0;
+  const lineSpace = element.lineSpace ?? 0;
 
   // Check if selected font is embeddable
   const fontEntry = element.fontStyle ? FONT_STYLES.find(f => f.key === element.fontStyle) : undefined;
@@ -577,9 +579,9 @@ function generateTextWidgetV3(element: WatchFaceElement): string {
                     w: px(${element.bounds.width || 100}),
                     h: px(${element.bounds.height || 40}),
                     text_size: px(${textSize}),
-                    char_space: 0,
+                    char_space: ${charSpace},
                     color: ${colorValue},
-                    line_space: 0,
+                    line_space: ${lineSpace},
                     align_v: hmUI.align.CENTER_V,
                     text_style: hmUI.text_style.ELLIPSIS,
                     align_h: hmUI.align.CENTER_H,
