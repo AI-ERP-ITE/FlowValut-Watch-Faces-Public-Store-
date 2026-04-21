@@ -94,6 +94,63 @@ function stripPivotMarkers(svg: string): string {
     .replace(/<circle[^>]*\bid\s*=\s*["']pivot["'][^>]*\bfill\s*=\s*["']#ff00ff["'][^>]*\/?>\s*/gi, '');
 }
 
+function extractLayerFromCompositeSvg(svg: string, layer: 'hour' | 'minute' | 'second' | 'hub'): string | null {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svg, 'image/svg+xml');
+    const sourceSvg = doc.querySelector('svg');
+    if (!sourceSvg) return null;
+
+    // Supported marker conventions in one combined SVG.
+    const selectorsByLayer: Record<typeof layer, string[]> = {
+      hour: ['#hour-hand', '[data-hand="hour"]', '.hour-hand'],
+      minute: ['#minute-hand', '[data-hand="minute"]', '.minute-hand'],
+      second: ['#second-hand', '[data-hand="second"]', '.second-hand'],
+      hub: ['#pinion-cap', '#hub', '[data-hand="hub"]', '.pinion-cap', '.hub'],
+    };
+    const allLayerSelectors = [
+      '#hour-hand', '[data-hand="hour"]', '.hour-hand',
+      '#minute-hand', '[data-hand="minute"]', '.minute-hand',
+      '#second-hand', '[data-hand="second"]', '.second-hand',
+      '#pinion-cap', '#hub', '[data-hand="hub"]', '.pinion-cap', '.hub',
+    ];
+
+    const keepSelectors = selectorsByLayer[layer];
+    const hasAnyLayer = keepSelectors.some(sel => sourceSvg.querySelector(sel));
+    if (!hasAnyLayer) return null;
+
+    // Clone full tree first so parent transforms/viewBox/defs stay intact.
+    const outDoc = document.implementation.createDocument('http://www.w3.org/2000/svg', 'svg', null);
+    const outSvg = outDoc.documentElement;
+
+    for (const attr of Array.from(sourceSvg.attributes)) {
+      outSvg.setAttribute(attr.name, attr.value);
+    }
+    if (!outSvg.getAttribute('xmlns')) {
+      outSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    }
+    outSvg.appendChild(outDoc.importNode(sourceSvg, true));
+
+    const root = outSvg.querySelector('svg');
+    if (!root) return null;
+
+    const shouldKeep = (el: Element): boolean => keepSelectors.some(sel => el.matches(sel));
+
+    // Remove all known hand/hub layers that are not the target one.
+    for (const sel of allLayerSelectors) {
+      root.querySelectorAll(sel).forEach((el) => {
+        if (!shouldKeep(el)) {
+          el.remove();
+        }
+      });
+    }
+
+    return new XMLSerializer().serializeToString(root as Element);
+  } catch {
+    return null;
+  }
+}
+
 function computePivotPx(pivot: ParsedPivot, outW: number, outH: number): { x: number; y: number } {
   // Match renderToHandPng transform: cover-fit so hands stay full-size in tall canvases.
   const scale = Math.max(outW / pivot.sourceW, outH / pivot.sourceH);
@@ -166,13 +223,21 @@ export async function saveCustomHandStyle(
   const parsedPivot = extractPivotFromSvg(sourceSvg);
   const cleanedSvg = stripPivotMarkers(sourceSvg);
 
+  // One-input composite support:
+  // if the user provides a stacked SVG with tagged groups (hour/minute/second/hub),
+  // extract each layer so exported assets stay clean and don't bleed into each other.
+  const hourSvg = extractLayerFromCompositeSvg(cleanedSvg, 'hour') ?? cleanedSvg;
+  const minuteSvg = extractLayerFromCompositeSvg(cleanedSvg, 'minute') ?? cleanedSvg;
+  const secondSvg = extractLayerFromCompositeSvg(cleanedSvg, 'second') ?? cleanedSvg;
+  const hubSvg = extractLayerFromCompositeSvg(cleanedSvg, 'hub') ?? cleanedSvg;
+
   const [hourDataUrl, minuteDataUrl, secondDataUrl, coverDataUrl, swatchDataUrl] =
     await Promise.all([
-      renderToHandPng(cleanedSvg, 22, 140),
-      renderToHandPng(cleanedSvg, 16, 200),
-      renderToHandPng(cleanedSvg, 8, 240),
-      renderToContainPng(cleanedSvg, 30),  // hub: SVG fitted inside 30×30 square
-      renderToContainPng(cleanedSvg, 24),  // swatch: SVG fitted inside 24×24 square
+      renderToHandPng(hourSvg, 22, 140),
+      renderToHandPng(minuteSvg, 16, 200),
+      renderToHandPng(secondSvg, 8, 240),
+      renderToContainPng(hubSvg, 30),  // hub: fitted inside 30×30 square
+      renderToContainPng(hubSvg, 24),  // swatch: fitted inside 24×24 square
     ]);
 
   const hourPivot = parsedPivot ? computePivotPx(parsedPivot, 22, 140) : null;
