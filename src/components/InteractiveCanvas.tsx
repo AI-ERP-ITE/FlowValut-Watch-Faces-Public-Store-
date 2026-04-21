@@ -7,6 +7,7 @@ import { generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
+import type { CustomHandRecord } from '@/lib/customHandStore';
 
 const CANVAS_SIZE = 480;
 const CX = 240;
@@ -26,6 +27,7 @@ export interface InteractiveCanvasProps {
   onAddElement?: (el: WatchFaceElement) => void;
   showGrid?: boolean;
   className?: string;
+  customHandStyles?: CustomHandRecord[];
 }
 
 export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvasProps>(function InteractiveCanvas({
@@ -37,11 +39,14 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   onAddElement: _onAddElement,
   showGrid,
   className,
+  customHandStyles,
 }, forwardedRef) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
+  const customHandStylesRef = useRef(customHandStyles ?? []);
+  customHandStylesRef.current = customHandStyles ?? [];
 
   // Drag state (refs to avoid stale closures)
   const isDraggingRef = useRef(false);
@@ -57,6 +62,15 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   // handImageCache: style key → { hour, minute, second, cover } images
   const handImageCache = useRef(new Map<string, Map<string, HTMLImageElement>>());
   useState(0); // reserved for future forced re-renders
+
+  // Clear custom hand cache entries when custom styles change (user created/updated a hand in IconLab)
+  useEffect(() => {
+    if (!customHandStyles) return;
+    const builtInKeys = new Set(['white', 'silver', 'black', 'brown', 'gold', 'poedagar', 'fleming', 'montagut', 'olevs']);
+    for (const key of handImageCache.current.keys()) {
+      if (!builtInKeys.has(key)) handImageCache.current.delete(key);
+    }
+  }, [customHandStyles]);
 
   // Draw everything to canvas
   const draw = useCallback(() => {
@@ -78,7 +92,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     if (showGridRef.current) drawGrid(ctx);
 
     // Elements
-    drawElements(ctx, elements, iconImageCache.current, digitImageCache.current, draw, handImageCache.current);
+    drawElements(ctx, elements, iconImageCache.current, digitImageCache.current, draw, handImageCache.current, customHandStylesRef.current);
 
     // Selection highlight
     if (selectedElementId) {
@@ -626,7 +640,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
 
 // ─── Element Dispatcher ─────────────────────────────────────────────────────────
 
-function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[], iconCache?: Map<string, HTMLImageElement>, digitCache?: Map<string, HTMLImageElement>, onIconLoaded?: () => void, handCache?: Map<string, Map<string, HTMLImageElement>>) {
+function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[], iconCache?: Map<string, HTMLImageElement>, digitCache?: Map<string, HTMLImageElement>, onIconLoaded?: () => void, handCache?: Map<string, Map<string, HTMLImageElement>>, customHands?: CustomHandRecord[]) {
   const sorted = [...elements].filter(e => e.visible).sort((a, b) => a.zIndex - b.zIndex);
 
   for (const el of sorted) {
@@ -672,7 +686,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         ctx.restore();
         break;
       case 'TIME_POINTER':
-        drawTimePointer(ctx, el, handCache, onIconLoaded);
+        drawTimePointer(ctx, el, handCache, onIconLoaded, customHands);
         break;
       case 'IMG_TIME':
       case 'IMG_DATE':
@@ -745,7 +759,27 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         if (el.iconKey && iconCache) {
           const cached = iconCache.get(el.iconKey);
           if (cached) {
-            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+            const { x, y, width: w, height: h } = el.bounds;
+            const hue = el.iconHue ?? 0;
+            const sat = el.iconSaturation ?? 100;
+            const colorize = el.iconColorize ?? '';
+            const colorizeOpacity = el.iconColorizeOpacity ?? 0.8;
+            if (colorize) {
+              const off = Object.assign(document.createElement('canvas'), { width: w, height: h });
+              const oc = off.getContext('2d')!;
+              if (hue !== 0 || sat !== 100) oc.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
+              oc.drawImage(cached, 0, 0, w, h);
+              oc.filter = 'none';
+              oc.globalCompositeOperation = 'source-atop';
+              oc.globalAlpha = colorizeOpacity;
+              oc.fillStyle = colorize;
+              oc.fillRect(0, 0, w, h);
+              ctx.drawImage(off, x, y);
+            } else {
+              if (hue !== 0 || sat !== 100) ctx.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
+              ctx.drawImage(cached, x, y, w, h);
+              ctx.filter = 'none';
+            }
           } else {
             const entry = getIconByKey(el.iconKey);
             if (entry) {
@@ -842,7 +876,28 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         applyShadow(ctx, el);
         if (el.iconKey && iconCache) {          const cached = iconCache.get(el.iconKey);
           if (cached) {
-            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+            const { x, y, width: w, height: h } = el.bounds;
+            const hue = el.iconHue ?? 0;
+            const sat = el.iconSaturation ?? 100;
+            const colorize = el.iconColorize ?? '';
+            const colorizeOpacity = el.iconColorizeOpacity ?? 0.8;
+            if (colorize) {
+              // Offscreen canvas: apply hue/sat, then colorize using source-atop compositing
+              const off = Object.assign(document.createElement('canvas'), { width: w, height: h });
+              const oc = off.getContext('2d')!;
+              if (hue !== 0 || sat !== 100) oc.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
+              oc.drawImage(cached, 0, 0, w, h);
+              oc.filter = 'none';
+              oc.globalCompositeOperation = 'source-atop';
+              oc.globalAlpha = colorizeOpacity;
+              oc.fillStyle = colorize;
+              oc.fillRect(0, 0, w, h);
+              ctx.drawImage(off, x, y);
+            } else {
+              if (hue !== 0 || sat !== 100) ctx.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
+              ctx.drawImage(cached, x, y, w, h);
+              ctx.filter = 'none';
+            }
           } else {
             const entry = getIconByKey(el.iconKey);
             if (entry) {
@@ -1115,18 +1170,30 @@ const HAND_DEFS = [
 ] as const;
 
 function loadHandImages(
-  style: HandStyleKey,
+  style: string,
   cache: Map<string, Map<string, HTMLImageElement>>,
   onLoaded: (() => void) | undefined,
+  customHands?: CustomHandRecord[],
 ): Map<string, HTMLImageElement> | null {
   if (cache.has(style)) return cache.get(style)!;
-  // Start loading
-  const set = generateHandSet(style);
+
+  // Determine image sources — custom or built-in
+  let srcs: Record<string, string>;
+  const customRecord = customHands?.find(h => h.key === style);
+  if (customRecord) {
+    srcs = {
+      hour: customRecord.hourDataUrl,
+      minute: customRecord.minuteDataUrl,
+      second: customRecord.secondDataUrl,
+      cover: customRecord.coverDataUrl,
+    };
+  } else {
+    const set = generateHandSet(style as HandStyleKey);
+    srcs = { hour: set.hourHand, minute: set.minuteHand, second: set.secondHand, cover: set.cover };
+  }
+
   const imgMap = new Map<string, HTMLImageElement>();
   cache.set(style, imgMap); // register early to avoid duplicate loads
-  const srcs: Record<string, string> = {
-    hour: set.hourHand, minute: set.minuteHand, second: set.secondHand, cover: set.cover,
-  };
   let pending = Object.keys(srcs).length;
   for (const [name, src] of Object.entries(srcs)) {
     const img = new Image();
@@ -1145,6 +1212,7 @@ function drawTimePointer(
   el: WatchFaceElement,
   handCache?: Map<string, Map<string, HTMLImageElement>>,
   onLoaded?: () => void,
+  customHands?: CustomHandRecord[],
 ) {
   const cx = el.pointerCenter?.x ?? el.center?.x ?? CX;
   const cy = el.pointerCenter?.y ?? el.center?.y ?? CY;
@@ -1153,8 +1221,8 @@ function drawTimePointer(
   const minuteAngle = MOCK_MINUTE * 6 - 90;
   const secondAngle = MOCK_SECOND * 6 - 90;
 
-  const style = (el.handStyle ?? 'silver') as HandStyleKey;
-  const imgMap = handCache ? loadHandImages(style, handCache, onLoaded) : null;
+  const style = el.handStyle ?? 'silver';
+  const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
   // "Scale whole" uses handLengthScale for all; "Scale each" uses per-hand fields

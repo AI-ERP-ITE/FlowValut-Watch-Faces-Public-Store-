@@ -1279,6 +1279,8 @@ function StudioApp() {
         if (icons.length > 0) registerCustomIconsInLibrary(icons);
         if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
         if (hands.length > 0) setCustomHandStyles(hands);
+        // Trigger PropertyPanel icon picker to re-fetch now that custom icons are registered
+        if (icons.length > 0) setIconLibraryKey(k => k + 1);
       }
     );
   }, []);
@@ -2280,6 +2282,7 @@ function StudioApp() {
                       }}
                       showGrid={showGrid}
                       className="w-full max-w-sm"
+                      customHandStyles={customHandStyles}
                     />
                   </div>
                   <div className="flex-1 space-y-4">
@@ -2399,7 +2402,7 @@ function StudioApp() {
                               { value: 'UVI',            label: 'UV Index'               },
                               { value: 'AQI',            label: 'Air Quality'            },
                               { value: 'SUN_RISE',       label: 'Sunrise Time'           },
-                              { value: 'WEATHER_CURRENT',label: 'Weather (preview only)' },
+                              { value: 'WEATHER_CURRENT',label: 'Weather Icon (sensor on device)' },
                             ].map(dt => (
                               <option key={dt.value} value={dt.value}>{dt.label}</option>
                             ))}
