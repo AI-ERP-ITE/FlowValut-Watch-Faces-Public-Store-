@@ -456,7 +456,6 @@ function readSrc(rel) {
   }
 
   // 6f: Engrave fill is now inside a clipped save/restore block (not raw fillRect at top)
-  // The fix: "fillMode === 'color'" section now appears AFTER clipShape is defined
   const engraveSection = studioSrc.slice(studioSrc.indexOf('renderEngraveFrameToPng'));
   const clipShapeDefIdx  = engraveSection.indexOf('const clipShape');
   const fillModeIdx      = engraveSection.indexOf("fillMode === 'color'");
@@ -464,6 +463,29 @@ function readSrc(rel) {
     ok('Engrave fill: fillMode check appears after clipShape definition (fill is clipped)');
   } else {
     fail('Engrave fill ordering', `clipShape at ${clipShapeDefIdx}, fillMode at ${fillModeIdx} — fill may be unclipped`);
+  }
+
+  // 6g: Icon picker renders a "My Icons" section for source=custom icons (not filtered by fixed category)
+  const panelSrc = readSrc('components/PropertyPanel.tsx');
+  if (panelSrc.includes("source === 'custom'") && panelSrc.includes("My Icons")) {
+    ok('Icon picker: custom icons shown in "My Icons" section (source===custom filter)');
+  } else {
+    fail('Icon picker custom section', 'source===custom filter or My Icons label missing in PropertyPanel.tsx');
+  }
+
+  // 6h: Hand picker uses hourDataUrl (not swatchDataUrl) for thumbnail
+  if (panelSrc.includes('ch.hourDataUrl') && panelSrc.includes('My Hand Styles')) {
+    ok('Hand picker: uses hourDataUrl for tall thumbnail in "My Hand Styles" section');
+  } else {
+    fail('Hand picker thumbnail', 'ch.hourDataUrl or My Hand Styles section not found in PropertyPanel.tsx');
+  }
+
+  // 6i: IconLab clears saveHandName and code after successful hand save
+  const labSrc = readSrc('components/IconLab.tsx');
+  if (labSrc.includes("setSaveHandName('')") && labSrc.includes("setCode('')")) {
+    ok('IconLab: saveHandName and code cleared after successful hand save');
+  } else {
+    fail('Hand save cleanup', "setSaveHandName('') or setCode('') not found after hand save in IconLab.tsx");
   }
 }
 
