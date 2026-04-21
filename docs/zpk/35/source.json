@@ -6,7 +6,7 @@
   "watchModel": "Balance 2",
   "elements": [
     {
-      "id": "my3sjmfv6yn",
+      "id": "hxr6lr6myb",
       "type": "IMG",
       "name": "Background",
       "bounds": {
@@ -20,7 +20,7 @@
       "zIndex": 0
     },
     {
-      "id": "qxd06y3mzvq",
+      "id": "iox72siigw8",
       "type": "IMG_TIME",
       "subtype": "hours",
       "name": "Hours",
@@ -35,23 +35,23 @@
       "color": "#ffffff"
     },
     {
-      "id": "kpq7w2okqq",
+      "id": "ajslq320oc",
       "type": "IMG_TIME",
       "subtype": "minutes",
       "name": "Minutes",
       "bounds": {
-        "x": 192,
-        "y": 81,
+        "x": 204,
+        "y": 100,
         "width": 80,
         "height": 70
       },
       "visible": true,
       "zIndex": 2,
       "color": "#ffffff",
-      "frameElementId": "vy8qdvwm73"
+      "frameElementId": "f867pb5e07h"
     },
     {
-      "id": "3q2s5hciye9",
+      "id": "himbqjdsiqw",
       "type": "IMG_DATE",
       "name": "Date",
       "bounds": {
@@ -65,7 +65,7 @@
       "color": "#ffffff"
     },
     {
-      "id": "h778ilvroa5",
+      "id": "4zjful4af13",
       "type": "TEXT_IMG",
       "name": "Weather",
       "bounds": {
@@ -80,7 +80,7 @@
       "color": "#ffffff"
     },
     {
-      "id": "dcuaunhilvg",
+      "id": "xokasn3l6h",
       "type": "TEXT_IMG",
       "name": "Battery",
       "bounds": {
@@ -95,7 +95,7 @@
       "color": "#ffffff"
     },
     {
-      "id": "16q9gmwi61i",
+      "id": "lr3suo92nk",
       "type": "TEXT",
       "name": "⚑ 6430",
       "bounds": {
@@ -111,7 +111,7 @@
       "fontSize": 18
     },
     {
-      "id": "1yp49h1v1h2",
+      "id": "wetqbwc16sm",
       "type": "TEXT_IMG",
       "name": "Heart Rate",
       "bounds": {
@@ -126,7 +126,7 @@
       "color": "#ffffff"
     },
     {
-      "id": "xrnz0no5uf",
+      "id": "3w3f7v8j2cx",
       "type": "TEXT",
       "name": "❂ LOW",
       "bounds": {
@@ -142,7 +142,7 @@
       "fontSize": 18
     },
     {
-      "id": "k2f149888o9",
+      "id": "z0hlg1zcekk",
       "type": "TEXT",
       "name": "XII",
       "bounds": {
@@ -158,22 +158,22 @@
       "fontSize": 20
     },
     {
-      "id": "vy8qdvwm73",
+      "id": "f867pb5e07h",
       "type": "FILL_RECT",
       "name": "Minutes Frame",
       "bounds": {
-        "x": 192,
-        "y": 81,
-        "width": 122,
+        "x": 204,
+        "y": 100,
+        "width": 80,
         "height": 70
       },
       "visible": true,
       "zIndex": 1,
       "engraveFrame": {
-        "frameOf": "kpq7w2okqq",
+        "frameOf": "ajslq320oc",
         "mode": "inner",
-        "depth": 2,
-        "lightAngle": 90,
+        "depth": 6,
+        "lightAngle": 135,
         "highlightColor": "#FFFFFF",
         "highlightOpacity": 0.6,
         "shadowColor": "#000000",
@@ -183,7 +183,7 @@
         "fillMode": "none",
         "fillColor": "#1A1A2E",
         "padding": 0,
-        "linked": false
+        "linked": true
       }
     }
   ],
@@ -192,5 +192,5 @@
     "format": "TGA-P"
   },
   "generatorVersion": "v2",
-  "createdAt": "2026-04-21T06:08:58.807Z"
+  "createdAt": "2026-04-21T06:10:46.204Z"
 }
