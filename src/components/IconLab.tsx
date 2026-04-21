@@ -1355,6 +1355,37 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                       {savingHand ? 'Saving…' : 'Save Pointer Style'}
                     </button>
                   </div>
+
+                  {savedHands.length > 0 && (
+                    <div className="rounded-lg border border-white/10 bg-zinc-900/80 p-3 space-y-2">
+                      <span className="text-[10px] text-white/40 uppercase tracking-widest">Saved Pointer Styles ({savedHands.length})</span>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {savedHands.map(hand => (
+                          <div key={hand.key} className="relative group">
+                            <div
+                              className="w-full aspect-square rounded border border-white/10 bg-zinc-800 overflow-hidden flex items-end justify-center pb-0.5"
+                              title={hand.name}
+                            >
+                              <img
+                                src={hand.hourDataUrl}
+                                alt={hand.name}
+                                className="w-3 h-full object-contain"
+                                style={{ maxHeight: '100%' }}
+                              />
+                            </div>
+                            <p className="text-[8px] text-white/40 text-center truncate mt-0.5">{hand.name}</p>
+                            <button
+                              onClick={() => handleDeleteHand(hand.key)}
+                              className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 bg-red-600 rounded-full text-white"
+                              title="Delete pointer style"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

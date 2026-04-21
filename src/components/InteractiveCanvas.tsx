@@ -1254,6 +1254,7 @@ function drawTimePointer(
   const secondAngle = MOCK_SECOND * 6 - 90;
 
   const style = el.handStyle ?? 'silver';
+  const customRecord = customHands?.find(h => h.key === style);
   const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
@@ -1284,12 +1285,25 @@ function drawTimePointer(
       const img = imgMap.get(def.key);
       if (!img) continue;
 
+      let pivotX: number = def.pivotX;
+      let pivotY: number = def.pivotY;
+      if (def.key === 'hour') {
+        pivotX = el.hourPos?.x ?? customRecord?.hourPosX ?? def.pivotX;
+        pivotY = el.hourPos?.y ?? customRecord?.hourPosY ?? def.pivotY;
+      } else if (def.key === 'minute') {
+        pivotX = el.minutePos?.x ?? customRecord?.minutePosX ?? def.pivotX;
+        pivotY = el.minutePos?.y ?? customRecord?.minutePosY ?? def.pivotY;
+      } else if (def.key === 'second') {
+        pivotX = el.secondPos?.x ?? customRecord?.secondPosX ?? def.pivotX;
+        pivotY = el.secondPos?.y ?? customRecord?.secondPosY ?? def.pivotY;
+      }
+
       const sc = perScale[def.key];
       const drawW = def.w * sc.wid;
       const drawH = def.h * sc.len;
       // Pivot position scales with length (pivot is near base)
-      const drawPivotX = def.pivotX * sc.wid;
-      const drawPivotY = def.key === 'cover' ? def.pivotY : (def.pivotY / def.h) * drawH;
+      const drawPivotX = pivotX * sc.wid;
+      const drawPivotY = def.key === 'cover' ? pivotY : (pivotY / def.h) * drawH;
 
       const angle = def.key === 'cover' ? 0 : angles[def.key];
 
