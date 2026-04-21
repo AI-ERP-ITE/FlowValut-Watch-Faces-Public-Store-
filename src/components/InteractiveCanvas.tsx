@@ -1313,13 +1313,21 @@ function drawTimePointer(
 
       // ── Tint overlay ──────────────────────────────────────────
       if (tintColor && def.key !== 'cover') {
-        // Mask tint to existing hand pixels so transparent hand bounds do not tint the whole canvas.
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = tintColor;
-        ctx.fillRect(-drawPivotX, -drawPivotY, drawW, drawH);
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
+        // Build a masked tint layer offscreen so tint cannot interact with already-drawn canvas pixels.
+        const tintW = Math.max(1, Math.round(drawW));
+        const tintH = Math.max(1, Math.round(drawH));
+        const tintCanvas = document.createElement('canvas');
+        tintCanvas.width = tintW;
+        tintCanvas.height = tintH;
+        const tintCtx = tintCanvas.getContext('2d');
+        if (tintCtx) {
+          tintCtx.drawImage(img, 0, 0, tintW, tintH);
+          tintCtx.globalCompositeOperation = 'source-in';
+          tintCtx.globalAlpha = 0.35;
+          tintCtx.fillStyle = tintColor;
+          tintCtx.fillRect(0, 0, tintW, tintH);
+          ctx.drawImage(tintCanvas, -drawPivotX, -drawPivotY, drawW, drawH);
+        }
       }
 
       ctx.restore();

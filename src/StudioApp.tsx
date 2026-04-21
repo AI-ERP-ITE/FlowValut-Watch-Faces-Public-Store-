@@ -1081,13 +1081,18 @@ async function applyPointerEffectsForZPK(
   }
 
   if (tintColor && !isCover) {
-    ctx.save();
-    // Mask tint to existing pointer pixels only.
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle = tintColor;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
+    const tintCanvas = document.createElement('canvas');
+    tintCanvas.width = width;
+    tintCanvas.height = height;
+    const tintCtx = tintCanvas.getContext('2d');
+    if (tintCtx) {
+      tintCtx.drawImage(img, 0, 0, width, height);
+      tintCtx.globalCompositeOperation = 'source-in';
+      tintCtx.globalAlpha = 0.35;
+      tintCtx.fillStyle = tintColor;
+      tintCtx.fillRect(0, 0, width, height);
+      ctx.drawImage(tintCanvas, 0, 0, width, height);
+    }
   }
 
   return canvas.toDataURL('image/png');
