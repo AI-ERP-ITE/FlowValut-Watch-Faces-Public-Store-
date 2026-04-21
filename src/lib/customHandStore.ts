@@ -7,6 +7,7 @@
 const DB_NAME = 'zepp-studio-hands';
 const DB_VERSION = 1;
 const STORE = 'custom-hands';
+const HUB_RENDER_VERSION = 2;
 
 export interface CustomHandRecord {
   key: string;           // 'custom_hand:slug'
@@ -29,6 +30,7 @@ export interface CustomHandRecord {
   sourceMinuteHtml?: string;
   sourceSecondHtml?: string;
   sourceHubHtml?: string;
+  hubRenderVersion?: number;
   pivotOffsets?: {
     hour: { x: number; y: number };
     minute: { x: number; y: number };
@@ -246,23 +248,26 @@ function slugify(text: string): string {
 
 export async function loadCustomHandStyles(): Promise<CustomHandRecord[]> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  const rows = await new Promise<CustomHandRecord[]>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
     const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () =>
-      resolve((req.result as CustomHandRecord[]).sort((a, b) => a.createdAt - b.createdAt));
+    req.onsuccess = () => resolve(req.result as CustomHandRecord[]);
     req.onerror = () => reject(req.error);
   });
+  const migrated = await Promise.all(rows.map(maybeMigrateHubRecord));
+  return migrated.sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export async function getCustomHandByKey(key: string): Promise<CustomHandRecord | null> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  const row = await new Promise<CustomHandRecord | null>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
     const req = tx.objectStore(STORE).get(key);
     req.onsuccess = () => resolve((req.result as CustomHandRecord) ?? null);
     req.onerror = () => reject(req.error);
   });
+  if (!row) return null;
+  return maybeMigrateHubRecord(row);
 }
 
 export async function saveCustomHandStyle(
@@ -318,8 +323,8 @@ export async function saveCustomHandStyle(
       renderToHandPng(hourSvg, 22, 140),
       renderToHandPng(minuteSvg, 16, 200),
       renderToHandPng(secondSvg, 8, 240),
-      renderToContainPng(hubSvg, 30),  // hub: fitted inside 30×30 square
-      renderToContainPng(hubSvg, 24),  // swatch: fitted inside 24×24 square
+      renderHubToContainPng(hubSvg, 30),  // hub: trim transparent bounds before fitting
+      renderHubToContainPng(hubSvg, 24),  // swatch: trim transparent bounds before fitting
     ]);
 
   const hourPivot = hourPivotSource ? computePivotPx(hourPivotSource, 22, 140) : null;
@@ -362,6 +367,7 @@ export async function saveCustomHandStyle(
       sourceMinuteHtml: composed!.minuteHtml,
       sourceSecondHtml: composed!.secondHtml,
       sourceHubHtml: composed!.hubHtml,
+      hubRenderVersion: HUB_RENDER_VERSION,
     } : {}),
     ...(pivotOffsets ? { pivotOffsets } : {}),
     createdAt: Date.now(),
@@ -470,6 +476,126 @@ function renderToContainPng(code: string, size: number): Promise<string> {
     img.onerror = () => { URL.revokeObjectURL(url); resolve(generateDefaultCover()); };
     img.src = url;
   });
+}
+
+function renderHubToContainPng(code: string, size: number): Promise<string> {
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  const svgCode = svgMatch ? svgMatch[0] : code;
+  return new Promise((resolve) => {
+    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const nw = Math.max(1, img.naturalWidth || size);
+      const nh = Math.max(1, img.naturalHeight || size);
+
+      const maxSide = 1024;
+      const downscale = Math.min(1, maxSide / Math.max(nw, nh));
+      const sampleW = Math.max(1, Math.round(nw * downscale));
+      const sampleH = Math.max(1, Math.round(nh * downscale));
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = sampleW;
+      sampleCanvas.height = sampleH;
+      const sampleCtx = sampleCanvas.getContext('2d');
+      if (!sampleCtx) {
+        URL.revokeObjectURL(url);
+        renderToContainPng(code, size).then(resolve);
+        return;
+      }
+      sampleCtx.clearRect(0, 0, sampleW, sampleH);
+      sampleCtx.drawImage(img, 0, 0, sampleW, sampleH);
+      const data = sampleCtx.getImageData(0, 0, sampleW, sampleH).data;
+
+      let minX = sampleW;
+      let minY = sampleH;
+      let maxX = -1;
+      let maxY = -1;
+      for (let y = 0; y < sampleH; y++) {
+        for (let x = 0; x < sampleW; x++) {
+          const alpha = data[(y * sampleW + x) * 4 + 3];
+          if (alpha > 8) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if (maxX < minX || maxY < minY) {
+        URL.revokeObjectURL(url);
+        renderToContainPng(code, size).then(resolve);
+        return;
+      }
+
+      const pad = Math.ceil(Math.max(maxX - minX + 1, maxY - minY + 1) * 0.2);
+      minX = Math.max(0, minX - pad);
+      minY = Math.max(0, minY - pad);
+      maxX = Math.min(sampleW - 1, maxX + pad);
+      maxY = Math.min(sampleH - 1, maxY + pad);
+
+      const cropW = Math.max(1, maxX - minX + 1);
+      const cropH = Math.max(1, maxY - minY + 1);
+
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = size;
+      outCanvas.height = size;
+      const outCtx = outCanvas.getContext('2d');
+      if (!outCtx) {
+        URL.revokeObjectURL(url);
+        renderToContainPng(code, size).then(resolve);
+        return;
+      }
+      outCtx.clearRect(0, 0, size, size);
+      outCtx.imageSmoothingEnabled = true;
+      outCtx.imageSmoothingQuality = 'high';
+
+      const scale = Math.min(size / cropW, size / cropH);
+      const dw = cropW * scale;
+      const dh = cropH * scale;
+      const dx = (size - dw) / 2;
+      const dy = (size - dh) / 2;
+      outCtx.drawImage(sampleCanvas, minX, minY, cropW, cropH, dx, dy, dw, dh);
+
+      URL.revokeObjectURL(url);
+      resolve(outCanvas.toDataURL('image/png'));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      renderToContainPng(code, size).then(resolve);
+    };
+    img.src = url;
+  });
+}
+
+async function putHandRecord(record: CustomHandRecord): Promise<void> {
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).put(record);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function maybeMigrateHubRecord(record: CustomHandRecord): Promise<CustomHandRecord> {
+  if (!record.sourceHubHtml || record.hubRenderVersion === HUB_RENDER_VERSION) return record;
+  try {
+    const [coverDataUrl, swatchDataUrl] = await Promise.all([
+      renderHubToContainPng(record.sourceHubHtml, 30),
+      renderHubToContainPng(record.sourceHubHtml, 24),
+    ]);
+    const next: CustomHandRecord = {
+      ...record,
+      coverDataUrl,
+      swatchDataUrl,
+      hubRenderVersion: HUB_RENDER_VERSION,
+    };
+    await putHandRecord(next);
+    return next;
+  } catch {
+    return record;
+  }
 }
 
 function generateDefaultCover(): Promise<string> {
