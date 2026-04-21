@@ -7,6 +7,7 @@
 const DB_NAME = 'zepp-studio-hands';
 const DB_VERSION = 1;
 const STORE = 'custom-hands';
+const HAND_RENDER_VERSION = 3;
 const HUB_RENDER_VERSION = 2;
 
 export interface CustomHandRecord {
@@ -30,6 +31,7 @@ export interface CustomHandRecord {
   sourceMinuteHtml?: string;
   sourceSecondHtml?: string;
   sourceHubHtml?: string;
+  handRenderVersion?: number;
   hubRenderVersion?: number;
   pivotOffsets?: {
     hour: { x: number; y: number };
@@ -254,7 +256,7 @@ export async function loadCustomHandStyles(): Promise<CustomHandRecord[]> {
     req.onsuccess = () => resolve(req.result as CustomHandRecord[]);
     req.onerror = () => reject(req.error);
   });
-  const migrated = await Promise.all(rows.map(maybeMigrateHubRecord));
+  const migrated = await Promise.all(rows.map(maybeMigrateRecord));
   return migrated.sort((a, b) => a.createdAt - b.createdAt);
 }
 
@@ -267,7 +269,7 @@ export async function getCustomHandByKey(key: string): Promise<CustomHandRecord 
     req.onerror = () => reject(req.error);
   });
   if (!row) return null;
-  return maybeMigrateHubRecord(row);
+  return maybeMigrateRecord(row);
 }
 
 export async function saveCustomHandStyle(
@@ -318,18 +320,18 @@ export async function saveCustomHandStyle(
     ? (extractPivotFromSvg(secondSourceSvg) ?? inferCenteredPivot(secondSourceSvg))
     : parsedPivot;
 
-  const [hourDataUrl, minuteDataUrl, secondDataUrl, coverDataUrl, swatchDataUrl] =
+  const [hourLayer, minuteLayer, secondLayer, coverDataUrl, swatchDataUrl] =
     await Promise.all([
-      renderToHandPng(hourSvg, 22, 140),
-      renderToHandPng(minuteSvg, 16, 200),
-      renderToHandPng(secondSvg, 8, 240),
+      renderHandToPngWithPivot(hourSvg, 22, 140, hourPivotSource),
+      renderHandToPngWithPivot(minuteSvg, 16, 200, minutePivotSource),
+      renderHandToPngWithPivot(secondSvg, 8, 240, secondPivotSource),
       renderHubToContainPng(hubSvg, 30),  // hub: trim transparent bounds before fitting
       renderHubToContainPng(hubSvg, 24),  // swatch: trim transparent bounds before fitting
     ]);
 
-  const hourPivot = hourPivotSource ? computePivotPx(hourPivotSource, 22, 140) : null;
-  const minutePivot = minutePivotSource ? computePivotPx(minutePivotSource, 16, 200) : null;
-  const secondPivot = secondPivotSource ? computePivotPx(secondPivotSource, 8, 240) : null;
+  const hourPivot = hourLayer.pivot;
+  const minutePivot = minuteLayer.pivot;
+  const secondPivot = secondLayer.pivot;
 
   const pivotOffsets = options?.pivotOffsets;
 
@@ -351,9 +353,9 @@ export async function saveCustomHandStyle(
   const record: CustomHandRecord = {
     key: `custom_hand:${slugify(name)}`,
     name,
-    hourDataUrl,
-    minuteDataUrl,
-    secondDataUrl,
+    hourDataUrl: hourLayer.dataUrl,
+    minuteDataUrl: minuteLayer.dataUrl,
+    secondDataUrl: secondLayer.dataUrl,
     coverDataUrl,
     swatchDataUrl,
     hourPosX: effectiveHour.x,
@@ -367,6 +369,7 @@ export async function saveCustomHandStyle(
       sourceMinuteHtml: composed!.minuteHtml,
       sourceSecondHtml: composed!.secondHtml,
       sourceHubHtml: composed!.hubHtml,
+      handRenderVersion: HAND_RENDER_VERSION,
       hubRenderVersion: HUB_RENDER_VERSION,
     } : {}),
     ...(pivotOffsets ? { pivotOffsets } : {}),
@@ -478,6 +481,142 @@ function renderToContainPng(code: string, size: number): Promise<string> {
   });
 }
 
+function findOpaqueBounds(canvas: HTMLCanvasElement): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  const { width, height } = canvas;
+  const data = ctx.getImageData(0, 0, width, height).data;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = data[(y * width + x) * 4 + 3];
+      if (alpha > 8) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < minX || maxY < minY) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+function padBounds(
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  width: number,
+  height: number,
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const span = Math.max(bounds.maxX - bounds.minX + 1, bounds.maxY - bounds.minY + 1);
+  const pad = Math.ceil(span * 0.04);
+  return {
+    minX: Math.max(0, bounds.minX - pad),
+    minY: Math.max(0, bounds.minY - pad),
+    maxX: Math.min(width - 1, bounds.maxX + pad),
+    maxY: Math.min(height - 1, bounds.maxY + pad),
+  };
+}
+
+async function renderHandToPngWithPivot(
+  code: string,
+  outW: number,
+  outH: number,
+  pivotSource: ParsedPivot | null,
+): Promise<{ dataUrl: string; pivot: { x: number; y: number } | null }> {
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  const svgCode = svgMatch ? svgMatch[0] : code;
+
+  return new Promise((resolve) => {
+    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = async () => {
+      const nw = Math.max(1, img.naturalWidth || outW);
+      const nh = Math.max(1, img.naturalHeight || outH);
+
+      const maxSide = 1024;
+      const downscale = Math.min(1, maxSide / Math.max(nw, nh));
+      const sampleW = Math.max(1, Math.round(nw * downscale));
+      const sampleH = Math.max(1, Math.round(nh * downscale));
+
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = sampleW;
+      sampleCanvas.height = sampleH;
+      const sampleCtx = sampleCanvas.getContext('2d');
+      if (!sampleCtx) {
+        URL.revokeObjectURL(url);
+        const fallback = await renderToHandPng(code, outW, outH);
+        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+        return;
+      }
+      sampleCtx.clearRect(0, 0, sampleW, sampleH);
+      sampleCtx.imageSmoothingEnabled = true;
+      sampleCtx.imageSmoothingQuality = 'high';
+      sampleCtx.drawImage(img, 0, 0, sampleW, sampleH);
+
+      const rawBounds = findOpaqueBounds(sampleCanvas);
+      if (!rawBounds) {
+        URL.revokeObjectURL(url);
+        const fallback = await renderToHandPng(code, outW, outH);
+        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+        return;
+      }
+
+      const bounds = padBounds(rawBounds, sampleW, sampleH);
+      const cropW = Math.max(1, bounds.maxX - bounds.minX + 1);
+      const cropH = Math.max(1, bounds.maxY - bounds.minY + 1);
+
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = outW;
+      outCanvas.height = outH;
+      const outCtx = outCanvas.getContext('2d');
+      if (!outCtx) {
+        URL.revokeObjectURL(url);
+        const fallback = await renderToHandPng(code, outW, outH);
+        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+        return;
+      }
+
+      outCtx.clearRect(0, 0, outW, outH);
+      outCtx.imageSmoothingEnabled = true;
+      outCtx.imageSmoothingQuality = 'high';
+
+      // Preserve source proportions by fitting trimmed artwork inside target hand canvas.
+      const scale = Math.min(outW / cropW, outH / cropH);
+      const drawW = cropW * scale;
+      const drawH = cropH * scale;
+      const dx = (outW - drawW) / 2;
+      const dy = (outH - drawH) / 2;
+
+      outCtx.drawImage(sampleCanvas, bounds.minX, bounds.minY, cropW, cropH, dx, dy, drawW, drawH);
+
+      let pivot: { x: number; y: number } | null = null;
+      if (pivotSource) {
+        const pivotXInSample = pivotSource.xRatio * sampleW;
+        const pivotYInSample = pivotSource.yRatio * sampleH;
+        const px = dx + ((pivotXInSample - bounds.minX) * scale);
+        const py = dy + ((pivotYInSample - bounds.minY) * scale);
+        pivot = {
+          x: Math.round(clamp(px, 0, outW)),
+          y: Math.round(clamp(py, 0, outH)),
+        };
+      }
+
+      URL.revokeObjectURL(url);
+      resolve({ dataUrl: outCanvas.toDataURL('image/png'), pivot });
+    };
+    img.onerror = async () => {
+      URL.revokeObjectURL(url);
+      const fallback = await renderToHandPng(code, outW, outH);
+      resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+    };
+    img.src = url;
+  });
+}
+
 function renderHubToContainPng(code: string, size: number): Promise<string> {
   const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
   const svgCode = svgMatch ? svgMatch[0] : code;
@@ -578,19 +717,75 @@ async function putHandRecord(record: CustomHandRecord): Promise<void> {
   });
 }
 
-async function maybeMigrateHubRecord(record: CustomHandRecord): Promise<CustomHandRecord> {
-  if (!record.sourceHubHtml || record.hubRenderVersion === HUB_RENDER_VERSION) return record;
+async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandRecord> {
+  const shouldMigrateHands = !!(
+    record.sourceHourHtml
+    && record.sourceMinuteHtml
+    && record.sourceSecondHtml
+    && record.handRenderVersion !== HAND_RENDER_VERSION
+  );
+  const shouldMigrateHub = !!(record.sourceHubHtml && record.hubRenderVersion !== HUB_RENDER_VERSION);
+  if (!shouldMigrateHands && !shouldMigrateHub) return record;
+
   try {
-    const [coverDataUrl, swatchDataUrl] = await Promise.all([
-      renderHubToContainPng(record.sourceHubHtml, 30),
-      renderHubToContainPng(record.sourceHubHtml, 24),
-    ]);
-    const next: CustomHandRecord = {
-      ...record,
-      coverDataUrl,
-      swatchDataUrl,
-      hubRenderVersion: HUB_RENDER_VERSION,
-    };
+    let next: CustomHandRecord = { ...record };
+
+    if (shouldMigrateHands) {
+      const hourSourceSvg = extractSvgFromCode(record.sourceHourHtml!);
+      const minuteSourceSvg = extractSvgFromCode(record.sourceMinuteHtml!);
+      const secondSourceSvg = extractSvgFromCode(record.sourceSecondHtml!);
+      const hourPivotSource = extractPivotFromSvg(hourSourceSvg) ?? inferCenteredPivot(hourSourceSvg);
+      const minutePivotSource = extractPivotFromSvg(minuteSourceSvg) ?? inferCenteredPivot(minuteSourceSvg);
+      const secondPivotSource = extractPivotFromSvg(secondSourceSvg) ?? inferCenteredPivot(secondSourceSvg);
+
+      const [hourLayer, minuteLayer, secondLayer] = await Promise.all([
+        renderHandToPngWithPivot(hourSourceSvg, 22, 140, hourPivotSource),
+        renderHandToPngWithPivot(minuteSourceSvg, 16, 200, minutePivotSource),
+        renderHandToPngWithPivot(secondSourceSvg, 8, 240, secondPivotSource),
+      ]);
+
+      const off = next.pivotOffsets;
+      const baseHour = hourLayer.pivot ?? { x: 11, y: 118 };
+      const baseMinute = minuteLayer.pivot ?? { x: 8, y: 172 };
+      const baseSecond = secondLayer.pivot ?? { x: 4, y: 180 };
+      const effectiveHour = off
+        ? { x: clamp(Math.round(baseHour.x + off.hour.x), 0, 22), y: clamp(Math.round(baseHour.y + off.hour.y), 0, 140) }
+        : baseHour;
+      const effectiveMinute = off
+        ? { x: clamp(Math.round(baseMinute.x + off.minute.x), 0, 16), y: clamp(Math.round(baseMinute.y + off.minute.y), 0, 200) }
+        : baseMinute;
+      const effectiveSecond = off
+        ? { x: clamp(Math.round(baseSecond.x + off.second.x), 0, 8), y: clamp(Math.round(baseSecond.y + off.second.y), 0, 240) }
+        : baseSecond;
+
+      next = {
+        ...next,
+        hourDataUrl: hourLayer.dataUrl,
+        minuteDataUrl: minuteLayer.dataUrl,
+        secondDataUrl: secondLayer.dataUrl,
+        hourPosX: effectiveHour.x,
+        hourPosY: effectiveHour.y,
+        minutePosX: effectiveMinute.x,
+        minutePosY: effectiveMinute.y,
+        secondPosX: effectiveSecond.x,
+        secondPosY: effectiveSecond.y,
+        handRenderVersion: HAND_RENDER_VERSION,
+      };
+    }
+
+    if (shouldMigrateHub) {
+      const [coverDataUrl, swatchDataUrl] = await Promise.all([
+        renderHubToContainPng(next.sourceHubHtml!, 30),
+        renderHubToContainPng(next.sourceHubHtml!, 24),
+      ]);
+      next = {
+        ...next,
+        coverDataUrl,
+        swatchDataUrl,
+        hubRenderVersion: HUB_RENDER_VERSION,
+      };
+    }
+
     await putHandRecord(next);
     return next;
   } catch {
