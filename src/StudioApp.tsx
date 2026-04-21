@@ -2342,7 +2342,7 @@ function StudioApp() {
                 {/* Studio Lab drawer */}
                 <IconLab
                   open={labOpen}
-                  onClose={() => setLabOpen(false)}
+                  onClose={() => { setLabOpen(false); handleLabIconsSaved(); handleLabHandsSaved(); }}
                   onIconsSaved={handleLabIconsSaved}
                   onFontsSaved={handleLabFontsSaved}
                   onHandsSaved={handleLabHandsSaved}
@@ -2668,9 +2668,10 @@ function StudioApp() {
         {/* Studio Lab drawer — icon & font creator */}
         <IconLab
           open={labOpen}
-          onClose={() => setLabOpen(false)}
+          onClose={() => { setLabOpen(false); handleLabIconsSaved(); handleLabHandsSaved(); }}
           onIconsSaved={handleLabIconsSaved}
           onFontsSaved={handleLabFontsSaved}
+          onHandsSaved={handleLabHandsSaved}
         />
 
         {/* Tips */}

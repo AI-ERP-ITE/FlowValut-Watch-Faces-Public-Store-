@@ -770,11 +770,11 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
   const centerX = element.center?.x ?? 240;
   const centerY = element.center?.y ?? 240;
   const hourPosX = element.hourPos?.x ?? 11;
-  const hourPosY = element.hourPos?.y ?? 70;
+  const hourPosY = element.hourPos?.y ?? 118;  // pivot at 85% of 140px hand height
   const minutePosX = element.minutePos?.x ?? 8;
-  const minutePosY = element.minutePos?.y ?? 100;
-  const secondPosX = element.secondPos?.x ?? 3;
-  const secondPosY = element.secondPos?.y ?? 120;
+  const minutePosY = element.minutePos?.y ?? 172; // pivot at 86% of 200px hand height
+  const secondPosX = element.secondPos?.x ?? 4;
+  const secondPosY = element.secondPos?.y ?? 180; // pivot at 75% of 240px hand height
   const hourSrc = element.hourHandSrc || 'hour_hand.png';
   const minuteSrc = element.minuteHandSrc || 'minute_hand.png';
   const secondSrc = element.secondHandSrc || 'second_hand.png';
