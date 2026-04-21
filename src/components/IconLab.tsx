@@ -134,7 +134,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   // ── Icon Lab state ─────────────────────────────────────────────────────────
   const [codeMode, setCodeMode] = useState<CodeMode>('svg');
   const [code, setCode] = useState('');
-  const [previewSize, setPreviewSize] = useState(128);
+  const [previewSize] = useState(256); // fixed container — zoom changes content scale
+  const [previewZoom, setPreviewZoom] = useState(1.0);
   const [darkBg, setDarkBg] = useState(true);
   const [saveName, setSaveName] = useState('');
   const [saveCategory, setSaveCategory] = useState('My Icons');
@@ -190,12 +191,15 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const updatePreview = useCallback((src: string, mode: CodeMode) => {
     if (!iframeRef.current) return;
     const bg = darkBg ? '#111' : '#f0f0f0';
-    const body =
+    // Zoom scales the CONTENT, not the container — so the real proportions stay visible.
+    // transform-origin: top center keeps the hand tip anchored at the top of the viewport.
+    const inner =
       mode === 'svg'
         ? `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${src}</div>`
         : src;
-    iframeRef.current.srcdoc = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:${bg};width:${previewSize}px;height:${previewSize}px;overflow:hidden;">${body}</body></html>`;
-  }, [darkBg, previewSize]);
+    const body = `<div style="transform:scale(${previewZoom});transform-origin:top center;display:inline-block;">${inner}</div>`;
+    iframeRef.current.srcdoc = `<!DOCTYPE html><html><body style="margin:0;padding:0;background:${bg};width:${previewSize}px;height:${previewSize}px;overflow:hidden;display:flex;align-items:center;justify-content:center;">${body}</body></html>`;
+  }, [darkBg, previewSize, previewZoom]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -563,7 +567,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                 <div className="space-y-2">
                   <span className="text-[10px] text-white/40 uppercase tracking-widest">Preview</span>
                   <div
-                    className="mx-auto rounded-lg overflow-hidden border border-white/10 flex items-center justify-center"
+                    className="mx-auto rounded-lg overflow-hidden border border-white/10"
                     style={{
                       width: previewSize,
                       height: previewSize,
@@ -577,14 +581,19 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                       title="Icon preview"
                     />
                   </div>
-                  {/* Controls */}
+                  {/* Zoom control — scales content, not container */}
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-white/30 w-8">Size</span>
-                    <input type="range" min="32" max="256" step="8"
-                      value={previewSize}
-                      onChange={e => setPreviewSize(Number(e.target.value))}
+                    <span className="text-[9px] text-white/30 w-10">Zoom</span>
+                    <input type="range" min="0.1" max="4" step="0.05"
+                      value={previewZoom}
+                      onChange={e => setPreviewZoom(Number(e.target.value))}
                       className="flex-1 accent-violet-400 h-1" />
-                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">{previewSize}px</span>
+                    <span className="text-[9px] font-mono text-white/40 w-8 text-right">{previewZoom.toFixed(2)}×</span>
+                    <button
+                      onClick={() => setPreviewZoom(1.0)}
+                      className="text-[9px] text-white/30 hover:text-white/60 border border-white/10 rounded px-1.5 py-0.5 transition-colors"
+                      title="Reset zoom"
+                    >1×</button>
                   </div>
                   <div className="flex items-center gap-3 text-[10px]">
                     <span className="text-white/30">BG</span>
@@ -657,9 +666,21 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                 {/* Save as Clock Hand Style */}
                 <div className="space-y-2 border-t border-white/10 pt-3">
                   <span className="text-[10px] text-white/40 uppercase tracking-widest">Save as Clock Hand Style</span>
-                  <p className="text-[9px] text-white/30 leading-tight">
-                    Design your hand shape pointing <span className="text-white/50">upward</span> (tip at top). It will appear in the TIME_POINTER hand style selector.
-                  </p>
+                  {/* Design guide */}
+                  <div className="rounded border border-cyan-500/20 bg-cyan-500/5 p-2 space-y-1">
+                    <p className="text-[9px] text-cyan-300/80 font-medium">SVG design guide</p>
+                    <p className="text-[9px] text-white/40 leading-snug">• Tip at <strong className="text-white/60">top</strong>, pivot/axis at ~85% down</p>
+                    <p className="text-[9px] text-white/40 leading-snug">• Recommended viewBox: <code className="text-cyan-400/80">0 0 22 140</code></p>
+                    <p className="text-[9px] text-white/40 leading-snug">• Saved as: hour 22×140 · minute 16×200 · second 8×240</p>
+                    <p className="text-[9px] text-white/40 leading-snug">• The design scales to fill each hand's height — wider parts clip to fit the narrower canvases</p>
+                    <p className="text-[9px] text-white/40 leading-snug">• Hub cap uses your SVG fitted to 30×30</p>
+                    <button
+                      onClick={() => { setCode('<svg viewBox="0 0 22 140" xmlns="http://www.w3.org/2000/svg">\n  <!-- Tip at top (y=0), pivot at y≈118, tail ends at y=140 -->\n  <polygon points="11,0 15,118 11,140 7,118" fill="#C0C8D8" />\n  <polygon points="11,2 14,118 11,138 8,118" fill="#E8ECF8" />\n</svg>'); setCodeMode('svg'); }}
+                      className="mt-1 w-full text-[9px] text-cyan-400/70 hover:text-cyan-400 border border-cyan-500/20 rounded px-2 py-1 transition-colors"
+                    >
+                      Insert template SVG
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={saveHandName}

@@ -77,8 +77,8 @@ export async function saveCustomHandStyle(
       renderToHandPng(svgCode, 22, 140),
       renderToHandPng(svgCode, 16, 200),
       renderToHandPng(svgCode, 8, 240),
-      generateDefaultCover(),
-      renderToHandPng(svgCode, 24, 24),
+      renderToContainPng(svgCode, 30),  // hub: SVG fitted inside 30×30 square
+      renderToContainPng(svgCode, 24),  // swatch: SVG fitted inside 24×24 square
     ]);
 
   const record: CustomHandRecord = {
@@ -132,7 +132,16 @@ export function renderToHandPng(code: string, w: number, h: number): Promise<str
       canvas.height = h;
       const ctx = canvas.getContext('2d')!;
       ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
+      // Scale to fill the HEIGHT exactly, preserve aspect ratio, center horizontally.
+      // This keeps the hand shape consistent across hour (22×140), minute (16×200),
+      // and second (8×240) canvases — same design, different thickness/length.
+      // The pivot fraction (~85% down the height) remains valid for all three.
+      const nw = img.naturalWidth || 100;
+      const nh = img.naturalHeight || 100;
+      const scale = h / nh;
+      const dw = nw * scale;
+      const dx = (w - dw) / 2; // center (clips edges if SVG is wider than canvas)
+      ctx.drawImage(img, dx, 0, dw, h);
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL('image/png'));
     };
@@ -153,6 +162,37 @@ export function renderToHandPng(code: string, w: number, h: number): Promise<str
       ctx.fill();
       resolve(canvas.toDataURL('image/png'));
     };
+    img.src = url;
+  });
+}
+
+/**
+ * Render SVG fitted inside a square (object-fit: contain).
+ * Used for the hub cover and swatch where a non-distorted square preview is needed.
+ */
+function renderToContainPng(code: string, size: number): Promise<string> {
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  const svgCode = svgMatch ? svgMatch[0] : code;
+  return new Promise((resolve) => {
+    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
+      ctx.clearRect(0, 0, size, size);
+      const nw = img.naturalWidth || size;
+      const nh = img.naturalHeight || size;
+      const scale = Math.min(size / nw, size / nh);
+      const dw = nw * scale;
+      const dh = nh * scale;
+      ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(generateDefaultCover()); };
     img.src = url;
   });
 }
