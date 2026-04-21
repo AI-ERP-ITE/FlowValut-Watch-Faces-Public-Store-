@@ -71,8 +71,8 @@ function extractPivotFromSvg(svg: string): ParsedPivot | null {
   const cxMatch = legacyPivotEl.match(/\bcx\s*=\s*["']([^"']+)["']/i);
   const cyMatch = legacyPivotEl.match(/\bcy\s*=\s*["']([^"']+)["']/i);
 
-  const x = Number(cxMatch?.[1] ?? dataX?.[1]);
-  const y = Number(cyMatch?.[1] ?? dataY?.[1]);
+  const x = Number(dataX?.[1] ?? cxMatch?.[1]);
+  const y = Number(dataY?.[1] ?? cyMatch?.[1]);
   if (Number.isNaN(x) || Number.isNaN(y)) return null;
 
   const xRatio = (x - vb.minX) / vb.width;
@@ -95,7 +95,8 @@ function stripPivotMarkers(svg: string): string {
 }
 
 function computePivotPx(pivot: ParsedPivot, outW: number, outH: number): { x: number; y: number } {
-  const scale = Math.min(outW / pivot.sourceW, outH / pivot.sourceH);
+  // Match renderToHandPng transform: cover-fit so hands stay full-size in tall canvases.
+  const scale = Math.max(outW / pivot.sourceW, outH / pivot.sourceH);
   const drawW = pivot.sourceW * scale;
   const drawH = pivot.sourceH * scale;
   const dx = (outW - drawW) / 2;
@@ -232,11 +233,11 @@ export function renderToHandPng(code: string, w: number, h: number): Promise<str
       canvas.height = h;
       const ctx = canvas.getContext('2d')!;
       ctx.clearRect(0, 0, w, h);
-      // Use contain-fit so the exported hand shape matches the design preview geometry
-      // (no horizontal clipping differences between editor preview and saved hand images).
+      // Use cover-fit so square source SVGs don't become tiny inside tall hand canvases.
+      // This keeps pointer length visible and mirrors watch runtime better.
       const nw = img.naturalWidth || 100;
       const nh = img.naturalHeight || 100;
-      const scale = Math.min(w / nw, h / nh);
+      const scale = Math.max(w / nw, h / nh);
       const dw = nw * scale;
       const dh = nh * scale;
       const dx = (w - dw) / 2;
