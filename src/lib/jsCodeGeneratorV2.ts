@@ -778,7 +778,7 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
   const hourSrc = element.hourHandSrc || 'hour_hand.png';
   const minuteSrc = element.minuteHandSrc || 'minute_hand.png';
   const secondSrc = element.secondHandSrc || 'second_hand.png';
-  const coverSrc = element.coverSrc;
+  const coverSrc = element.coverSrc || 'hand_cover.png';
   const hasSeconds = !element.hideSeconds;
 
   let coverParams = '';

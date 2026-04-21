@@ -1233,6 +1233,18 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
     ctx.clip();
   };
 
+  const shapePath = (inset = 0) => {
+    ctx.beginPath();
+    if (shape === 'circle') {
+      ctx.arc(w / 2, h / 2, Math.max(0, (Math.min(w, h) / 2) - inset), 0, Math.PI * 2);
+    } else if (shape === 'rounded') {
+      const rr = Math.max(0, cr - inset * 0.5);
+      ctx.roundRect(inset, inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2), rr);
+    } else {
+      ctx.rect(inset, inset, Math.max(0, w - inset * 2), Math.max(0, h - inset * 2));
+    }
+  };
+
   // Fill — clipped to shape so circle/rounded corners stay transparent
   if (ef.fillMode === 'color' && ef.fillColor) {
     ctx.save();
@@ -1270,6 +1282,35 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   ctx.fillRect(-blur - Math.abs(offX) - 2, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
   ctx.fillRect(w + 1, -blur - Math.abs(offY) - 2, blur + Math.abs(offX) + 2, h + 2 * (blur + Math.abs(offY)) + 4);
   ctx.restore();
+
+  // Explicit inner-edge pass so engrave/emboss remains visible on device even when
+  // blur shadows get flattened by PNG compression/device rendering differences.
+  const edgePx = Math.max(1, Math.round(depth * 0.35));
+  for (let i = 0; i < edgePx; i++) {
+    const inset = i + 0.5;
+    const alphaFalloff = 1 - (i / (edgePx + 1));
+
+    // Light edge (top/left-ish)
+    ctx.save();
+    shapePath(inset);
+    ctx.strokeStyle = hexToRgba(isEngrave ? shC : hiC, (isEngrave ? shO : hiO) * 0.5 * alphaFalloff);
+    ctx.lineWidth = 1;
+    ctx.shadowColor = 'transparent';
+    ctx.stroke();
+    ctx.restore();
+
+    // Dark edge (bottom/right-ish) via opposite offset shadow on same stroke
+    ctx.save();
+    shapePath(inset);
+    ctx.strokeStyle = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.45 * alphaFalloff);
+    ctx.lineWidth = 1;
+    ctx.shadowColor = hexToRgba(isEngrave ? hiC : shC, (isEngrave ? hiO : shO) * 0.35 * alphaFalloff);
+    ctx.shadowBlur = 1;
+    ctx.shadowOffsetX = -offX * 0.4;
+    ctx.shadowOffsetY = -offY * 0.4;
+    ctx.stroke();
+    ctx.restore();
+  }
 
   return canvas.toDataURL('image/png');
 }

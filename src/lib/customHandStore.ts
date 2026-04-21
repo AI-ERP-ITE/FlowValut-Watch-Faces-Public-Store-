@@ -30,7 +30,8 @@ export interface CustomHandRecord {
 interface ParsedPivot {
   xRatio: number;
   yRatio: number;
-  aspect: number;
+  sourceW: number;
+  sourceH: number;
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -78,7 +79,8 @@ function extractPivotFromSvg(svg: string): ParsedPivot | null {
   return {
     xRatio: clamp(xRatio, 0, 1),
     yRatio: clamp(yRatio, 0, 1),
-    aspect: vb.width / vb.height,
+    sourceW: vb.width,
+    sourceH: vb.height,
   };
 }
 
@@ -92,10 +94,13 @@ function stripPivotMarkers(svg: string): string {
 }
 
 function computePivotPx(pivot: ParsedPivot, outW: number, outH: number): { x: number; y: number } {
-  const drawW = outH * pivot.aspect;
+  const scale = Math.min(outW / pivot.sourceW, outH / pivot.sourceH);
+  const drawW = pivot.sourceW * scale;
+  const drawH = pivot.sourceH * scale;
   const dx = (outW - drawW) / 2;
+  const dy = (outH - drawH) / 2;
   const x = dx + (pivot.xRatio * drawW);
-  const y = pivot.yRatio * outH;
+  const y = dy + (pivot.yRatio * drawH);
   return {
     x: Math.round(clamp(x, 0, outW)),
     y: Math.round(clamp(y, 0, outH)),
@@ -226,16 +231,16 @@ export function renderToHandPng(code: string, w: number, h: number): Promise<str
       canvas.height = h;
       const ctx = canvas.getContext('2d')!;
       ctx.clearRect(0, 0, w, h);
-      // Scale to fill the HEIGHT exactly, preserve aspect ratio, center horizontally.
-      // This keeps the hand shape consistent across hour (22×140), minute (16×200),
-      // and second (8×240) canvases — same design, different thickness/length.
-      // The pivot fraction (~85% down the height) remains valid for all three.
+      // Use contain-fit so the exported hand shape matches the design preview geometry
+      // (no horizontal clipping differences between editor preview and saved hand images).
       const nw = img.naturalWidth || 100;
       const nh = img.naturalHeight || 100;
-      const scale = h / nh;
+      const scale = Math.min(w / nw, h / nh);
       const dw = nw * scale;
-      const dx = (w - dw) / 2; // center (clips edges if SVG is wider than canvas)
-      ctx.drawImage(img, dx, 0, dw, h);
+      const dh = nh * scale;
+      const dx = (w - dw) / 2;
+      const dy = (h - dh) / 2;
+      ctx.drawImage(img, dx, dy, dw, dh);
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL('image/png'));
     };
