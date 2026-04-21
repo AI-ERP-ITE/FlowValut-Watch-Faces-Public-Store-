@@ -7,7 +7,7 @@
 const DB_NAME = 'zepp-studio-hands';
 const DB_VERSION = 1;
 const STORE = 'custom-hands';
-const HAND_RENDER_VERSION = 3;
+const HAND_RENDER_VERSION = 4;
 const HUB_RENDER_VERSION = 2;
 
 export interface CustomHandRecord {
@@ -584,8 +584,9 @@ async function renderHandToPngWithPivot(
       outCtx.imageSmoothingEnabled = true;
       outCtx.imageSmoothingQuality = 'high';
 
-      // Preserve source proportions by fitting trimmed artwork inside target hand canvas.
-      const scale = Math.min(outW / cropW, outH / cropH);
+      // Legacy-style larger fit: fill hand height/width using cover policy.
+      // This matches older stack sizing behavior better than contain-fit.
+      const scale = Math.max(outW / cropW, outH / cropH);
       const drawW = cropW * scale;
       const drawH = cropH * scale;
       const dx = (outW - drawW) / 2;
