@@ -320,7 +320,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         const filtered = prev.filter(h => h.key !== record.key);
         return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
       });
-      setSaveHandMsg('✓ Saved to clock hand styles');
+      setSaveHandMsg('✓ Saved — clear code editor and enter a new SVG to create another style');
+      setSaveHandName('');
+      setCode('');
       onHandsSaved?.();
     } catch (err) {
       setSaveHandMsg(`✗ ${(err as Error).message}`);

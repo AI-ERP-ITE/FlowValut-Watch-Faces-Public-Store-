@@ -708,32 +708,40 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 </button>
               );
             })}
-            {/* Custom hand styles from IconLab */}
-            {customHandStyles.map(ch => {
-              const active = element.handStyle === ch.key;
-              return (
-                <button
-                  key={ch.key}
-                  title={`Custom: ${ch.name}`}
-                  onClick={() => update({ handStyle: ch.key })}
-                  className={cn(
-                    'flex flex-col items-center gap-1 py-1.5 rounded border text-[9px] transition-colors',
-                    active
-                      ? 'border-cyan-500 bg-cyan-500/15 text-white'
-                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
-                  )}
-                >
-                  <img
-                    src={ch.swatchDataUrl}
-                    alt={ch.name}
-                    className="w-4 h-4 rounded object-contain"
-                    style={{ border: active ? '1px solid #22d3ee' : '1px solid rgba(255,255,255,0.15)' }}
-                  />
-                  <span className="leading-tight text-center px-0.5 truncate w-full">{ch.name.split(' ')[0]}</span>
-                </button>
-              );
-            })}
           </div>
+          {/* Custom hand styles from IconLab — separate section with real hand preview */}
+          {customHandStyles.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-[9px] text-cyan-400/60 uppercase tracking-wider">My Hand Styles</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {customHandStyles.map(ch => {
+                  const active = element.handStyle === ch.key;
+                  return (
+                    <button
+                      key={ch.key}
+                      title={`Custom: ${ch.name}`}
+                      onClick={() => update({ handStyle: ch.key })}
+                      className={cn(
+                        'flex flex-col items-center gap-1 py-2 px-1 rounded border text-[9px] transition-colors',
+                        active
+                          ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                          : 'border-cyan-500/20 bg-cyan-500/5 text-white/60 hover:border-cyan-500/50 hover:text-white/90'
+                      )}
+                    >
+                      {/* Show hour hand image at actual aspect ratio (22:140 ≈ 1:6.4) */}
+                      <img
+                        src={ch.hourDataUrl}
+                        alt={ch.name}
+                        className="w-5 h-14 object-contain"
+                        style={{ borderRadius: 2, border: active ? '1px solid #22d3ee' : '1px solid rgba(100,200,255,0.15)' }}
+                      />
+                      <span className="leading-tight text-center truncate w-full px-0.5 mt-0.5">{ch.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <p className="text-[10px] text-white/30 mt-1">Re-generate watchface to apply new hand style.</p>
           {/* Seconds toggle */}
           <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
@@ -948,9 +956,39 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               None
             </button>
             <div className="max-h-56 overflow-y-auto pr-1 space-y-2">
+              {/* Custom (user-saved) icons — shown first */}
+              {(() => {
+                const q = iconSearch.trim().toLowerCase();
+                const customIcons = allIcons.filter(i =>
+                  i.source === 'custom' &&
+                  (q === '' || i.label.toLowerCase().includes(q) || i.key.toLowerCase().includes(q))
+                );
+                if (customIcons.length === 0) return null;
+                return (
+                  <div key="custom">
+                    <p className="text-[9px] text-cyan-400/60 uppercase tracking-wider mb-1">My Icons</p>
+                    <div className="grid grid-cols-6 gap-1">
+                      {customIcons.map(icon => (
+                        <button
+                          key={icon.key}
+                          onClick={() => update({ iconKey: icon.key })}
+                          className={cn(
+                            'relative p-1 rounded border',
+                            element.iconKey === icon.key ? 'border-cyan-500 bg-cyan-500/20' : 'border-cyan-500/20 bg-cyan-500/5 hover:border-cyan-500/50'
+                          )}
+                          title={icon.label}
+                        >
+                          <img src={icon.dataUrl} alt={icon.label} className="w-6 h-6 object-contain" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {(['health', 'fitness', 'weather', 'system', 'time'] as const).map(cat => {
                 const q = iconSearch.trim().toLowerCase();
                 const icons = allIcons.filter(i =>
+                  i.source !== 'custom' &&
                   i.category === cat &&
                   (q === '' || i.label.toLowerCase().includes(q) || i.key.toLowerCase().includes(q))
                 );
