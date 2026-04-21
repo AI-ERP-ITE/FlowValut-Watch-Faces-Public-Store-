@@ -1266,7 +1266,7 @@ function drawTimePointer(
       const angle = def.key === 'cover' ? 0 : angles[def.key];
 
       // ── Trail (speed-blur ghost) ─────────────────────────────
-      if (trailIntensity > 0 && def.key !== 'cover') {
+      if (trailIntensity > 0) {
         for (let t = 1; t <= 3; t++) {
           const trailAlpha = trailIntensity * (0.18 - t * 0.04);
           if (trailAlpha <= 0) break;
@@ -1298,7 +1298,7 @@ function drawTimePointer(
       ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);
 
       // ── Glow overlay ──────────────────────────────────────────
-      if (glowIntensity > 0 && def.key !== 'cover') {
+      if (glowIntensity > 0) {
         ctx.shadowColor = 'rgba(0,0,0,0)';
         ctx.shadowBlur = 0;
         const glowColor = tintColor ?? '#00EEFF';
@@ -1312,7 +1312,7 @@ function drawTimePointer(
       }
 
       // ── Tint overlay ──────────────────────────────────────────
-      if (tintColor && def.key !== 'cover') {
+      if (tintColor) {
         // Build a masked tint layer offscreen so tint cannot interact with already-drawn canvas pixels.
         const tintW = Math.max(1, Math.round(drawW));
         const tintH = Math.max(1, Math.round(drawH));

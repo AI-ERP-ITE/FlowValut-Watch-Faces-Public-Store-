@@ -458,7 +458,10 @@ function readSrc(rel) {
   // 6f: Engrave rendering must use shared renderer in both preview + export paths
   const usesSharedInExport =
     studioSrc.includes("import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';")
-    && studioSrc.includes('renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, el.engraveFrame!)');
+    && (
+      studioSrc.includes('renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, el.engraveFrame!)')
+      || studioSrc.includes('renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, compensatedCfg)')
+    );
   const usesSharedInPreview =
     canvasSrc.includes("import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';")
     && canvasSrc.includes('renderEngraveFrameEffect(ctx, el.bounds, el.engraveFrame!)');

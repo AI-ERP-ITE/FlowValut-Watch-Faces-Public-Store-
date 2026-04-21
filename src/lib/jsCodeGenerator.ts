@@ -423,8 +423,8 @@ function generateWidgetCode(element: WatchFaceElement): string {
 
 // TIME_POINTER - Analog clock hands (hour/minute/second in ONE widget)
 function generateTimePointerWidgetV3(element: WatchFaceElement): string {
-  const centerX = element.center?.x ?? 240;
-  const centerY = element.center?.y ?? 240;
+  const centerX = element.pointerCenter?.x ?? element.center?.x ?? (element.bounds.x + (element.bounds.width || 480) / 2);
+  const centerY = element.pointerCenter?.y ?? element.center?.y ?? (element.bounds.y + (element.bounds.height || 480) / 2);
   const hourPosX = element.hourPos?.x ?? 11;
   const hourPosY = element.hourPos?.y ?? 118;  // pivot at 85% of 140px hand height
   const minutePosX = element.minutePos?.x ?? 8;

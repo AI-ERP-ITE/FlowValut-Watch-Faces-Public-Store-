@@ -1013,7 +1013,7 @@ async function applyIconEffectsForZPK(
 async function applyPointerEffectsForZPK(
   dataUrl: string,
   el: WatchFaceElement,
-  layer: 'hour' | 'minute' | 'second' | 'cover',
+  _layer: 'hour' | 'minute' | 'second' | 'cover',
 ): Promise<string> {
   const effects = normalizePointerEffects(el);
   const shadowIntensity = Math.max(0, Math.min(1, el.handShadow ?? 0));
@@ -1043,9 +1043,8 @@ async function applyPointerEffectsForZPK(
   if (!ctx) return dataUrl;
 
   const pointerFilter = pointerEffectsToCanvasFilter(effects);
-  const isCover = layer === 'cover';
 
-  if (trailIntensity > 0 && !isCover) {
+  if (trailIntensity > 0) {
     for (let t = 1; t <= 3; t += 1) {
       const trailAlpha = trailIntensity * (0.18 - t * 0.04);
       if (trailAlpha <= 0) break;
@@ -1069,7 +1068,7 @@ async function applyPointerEffectsForZPK(
   ctx.drawImage(img, 0, 0, width, height);
   ctx.restore();
 
-  if (glowIntensity > 0 && !isCover) {
+  if (glowIntensity > 0) {
     const glowColor = tintColor || '#00EEFF';
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
@@ -1080,7 +1079,7 @@ async function applyPointerEffectsForZPK(
     ctx.restore();
   }
 
-  if (tintColor && !isCover) {
+  if (tintColor) {
     const tintCanvas = document.createElement('canvas');
     tintCanvas.width = width;
     tintCanvas.height = height;
@@ -1311,7 +1310,15 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, w, h);
-  renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, el.engraveFrame!);
+  const cfg = el.engraveFrame!;
+  // Device renderer tends to produce heavier bevels than browser preview; pre-compensate export slightly.
+  const compensatedCfg = {
+    ...cfg,
+    depth: Math.max(1, (cfg.depth ?? 6) * 0.82),
+    highlightOpacity: Math.max(0, Math.min(1, (cfg.highlightOpacity ?? 0.6) * 0.82)),
+    shadowOpacity: Math.max(0, Math.min(1, (cfg.shadowOpacity ?? 0.6) * 0.82)),
+  };
+  renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, compensatedCfg);
 
   return canvas.toDataURL('image/png');
 }
