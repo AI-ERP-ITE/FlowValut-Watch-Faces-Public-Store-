@@ -529,7 +529,7 @@ function generateTextImgWidgetV3(element: WatchFaceElement): string {
                     w: px(${element.bounds.width || 100}),
                     h: px(${element.bounds.height || 40}),
                     font_array: ${fontArrayStr},${typeParam}
-                    h_space: px(${hSpace}),
+                    h_space: ${hSpace},
                     align_h: hmUI.align.${alignH},
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;

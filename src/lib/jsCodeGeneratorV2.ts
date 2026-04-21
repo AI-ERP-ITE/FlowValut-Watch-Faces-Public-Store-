@@ -580,8 +580,11 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
     return '';
   }
   
-  // Skip dynamic widget types - they're handled separately
-  if (element.name.toLowerCase().includes('time') || element.name.toLowerCase().includes('date') || element.name.toLowerCase().includes('week')) {
+  // Skip dynamic widget types - they're handled separately (as dedicated top-level widgets).
+  // IMPORTANT: use TYPE check, not name check — name-based matching wrongly kills
+  // TIME_POINTER (name='TIME_POINTER' contains 'time') and engrave FILL_RECT frames
+  // named e.g. "Time Display Frame" (parent name has 'time').
+  if (element.type === 'IMG_TIME' || element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') {
     return '';
   }
   
@@ -753,7 +756,7 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
                     w: px(${element.bounds.width || 100}),
                     h: px(${element.bounds.height || 40}),
                     font_array: ${fontArrayStr},${typeParam}
-                    h_space: px(${hSpace}),
+                    h_space: ${hSpace},
                     align_h: hmUI.align.${alignH},
                     show_level: hmUI.show_level.${showLevel}
                 });`;

@@ -1003,15 +1003,30 @@ function regenerateDigitFilesFromElements(
   };
 
   function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
+    // Pre-measure the widest digit (0-9) in this font so all digit images share the
+    // same width (monospace-like), with minimal whitespace on the sides.
+    // This prevents proportional glyphs like "1" from having huge empty margins
+    // that appear as large visual gaps (e.g. "0  1" on device).
+    const fontSize = Math.floor(h * 0.75);
+    const measureCtx = document.createElement('canvas').getContext('2d')!;
+    measureCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    let maxGlyphW = 0;
+    for (let d = 0; d <= 9; d++) {
+      const m = measureCtx.measureText(String(d));
+      maxGlyphW = Math.max(maxGlyphW, Math.ceil(m.width));
+    }
+    // Canvas width = widest glyph + 2px margin on each side, capped by caller's max
+    const canvasW = Math.min(w, Math.max(maxGlyphW + 4, 10));
+
     const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
+    canvas.width = canvasW; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, canvasW, h);
     ctx.fillStyle = color;
-    ctx.font = `${fontWeight} ${Math.floor(h * 0.75)}px ${fontFamily}`;
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(digit, w / 2, h / 2);
+    ctx.fillText(digit, canvasW / 2, h / 2);
     return canvas.toDataURL('image/png');
   }
 
