@@ -18,6 +18,14 @@ Follow all phases in order — do not skip steps.
 | Live site | https://ai-erp-ite.github.io/Watch-Faces/ |
 | Studio | https://ai-erp-ite.github.io/Watch-Faces/studio/ |
 
+### Critical Deployment Invariant (Must Always Hold)
+
+- [ ] This repo deploys from `app/docs/` only (there is no `workspace-root/docs/` deploy target)
+- [ ] Website route uses `app/docs/index.html`
+- [ ] Studio route uses `app/docs/studio/index.html`
+- [ ] Both HTML files must point to the latest built asset hash from `app/dist/assets/`
+- [ ] If one route is updated and the other is not, deployment is considered failed
+
 ---
 
 ## Phase 1 — Understand & Locate
@@ -92,6 +100,13 @@ git -C $app push origin main
   ```powershell
   Select-String "index-" docs/index.html
   Select-String "index-" docs/studio/index.html
+  ```
+- [ ] Verify BOTH live routes after push (not only homepage):
+  ```powershell
+  # should load homepage
+  start "https://ai-erp-ite.github.io/Watch-Faces/?v=$(Get-Date -Format yyyyMMddHHmmss)"
+  # should load studio page with latest JS
+  start "https://ai-erp-ite.github.io/Watch-Faces/studio/?v=$(Get-Date -Format yyyyMMddHHmmss)"
   ```
 
 ---
