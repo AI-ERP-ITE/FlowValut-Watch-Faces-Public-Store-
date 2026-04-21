@@ -455,14 +455,18 @@ function readSrc(rel) {
     fail('Icon colorize wiring', 'source-atop or iconColorize not found in InteractiveCanvas.tsx');
   }
 
-  // 6f: Engrave fill is now inside a clipped save/restore block (not raw fillRect at top)
-  const engraveSection = studioSrc.slice(studioSrc.indexOf('renderEngraveFrameToPng'));
-  const clipShapeDefIdx  = engraveSection.indexOf('const clipShape');
-  const fillModeIdx      = engraveSection.indexOf("fillMode === 'color'");
-  if (clipShapeDefIdx !== -1 && fillModeIdx > clipShapeDefIdx) {
-    ok('Engrave fill: fillMode check appears after clipShape definition (fill is clipped)');
+  // 6f: Engrave rendering must use shared renderer in both preview + export paths
+  const usesSharedInExport =
+    studioSrc.includes("import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';")
+    && studioSrc.includes('renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, el.engraveFrame!)');
+  const usesSharedInPreview =
+    canvasSrc.includes("import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';")
+    && canvasSrc.includes('renderEngraveFrameEffect(ctx, el.bounds, el.engraveFrame!)');
+
+  if (usesSharedInExport && usesSharedInPreview) {
+    ok('Engrave renderer: shared renderEngraveFrameEffect is used by both preview and export');
   } else {
-    fail('Engrave fill ordering', `clipShape at ${clipShapeDefIdx}, fillMode at ${fillModeIdx} — fill may be unclipped`);
+    fail('Engrave renderer wiring', `shared export=${usesSharedInExport}, shared preview=${usesSharedInPreview}`);
   }
 
   // 6g: Icon picker renders a "My Icons" section for source=custom icons (not filtered by fixed category)
