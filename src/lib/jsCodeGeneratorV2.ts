@@ -737,7 +737,7 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
       SLEEP: 'sleep_digit', STAND: 'stand_digit', FAT_BURN: 'fatburn_digit',
       UVI: 'uvi_digit', AQI: 'aqi_digit', HUMIDITY: 'humid_digit',
       WIND: 'wind_digit', ALTIMETER: 'alt_digit', VO2MAX: 'vo2_digit',
-      TRAINING_LOAD: 'training_digit', WEATHER: 'weather_digit',
+      TRAINING_LOAD: 'training_digit', WEATHER: 'weather', WEATHER_CURRENT: 'weather',
       SUN_RISE: 'sunrise_digit', SUN_SET: 'sunset_digit',
     };
     const prefix = (element.dataType && DATA_TYPE_PREFIXES[element.dataType])
