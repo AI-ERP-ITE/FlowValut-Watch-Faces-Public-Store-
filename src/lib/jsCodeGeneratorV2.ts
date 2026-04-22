@@ -785,16 +785,17 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
   const minutePosY = element.minutePos?.y ?? 172; // pivot at 86% of 200px hand height
   const secondPosX = element.secondPos?.x ?? 4;
   const secondPosY = element.secondPos?.y ?? 180; // pivot at 75% of 240px hand height
-    const toAssetPath = (src?: string): string | undefined => {
+    const toHandPath = (src?: string): string | undefined => {
       if (!src) return undefined;
       const clean = src.replace(/^assets\//, '').trim();
       if (!clean) return undefined;
-      return `assets/${clean}`;
+      // Balance-class V2 runtime resolves hand assets by filename in watchface config.
+      return clean;
     };
-    const hourSrc = toAssetPath(element.hourHandSrc || 'hour_hand.png')!;
-    const minuteSrc = toAssetPath(element.minuteHandSrc || 'minute_hand.png')!;
-    const secondSrc = toAssetPath(element.secondHandSrc || 'second_hand.png')!;
-    const coverSrc = toAssetPath(element.coverSrc);
+    const hourSrc = toHandPath(element.hourHandSrc || 'hour_hand.png')!;
+    const minuteSrc = toHandPath(element.minuteHandSrc || 'minute_hand.png')!;
+    const secondSrc = toHandPath(element.secondHandSrc || 'second_hand.png')!;
+    const coverSrc = toHandPath(element.coverSrc);
   const hasSeconds = !element.hideSeconds;
 
   let coverParams = '';
