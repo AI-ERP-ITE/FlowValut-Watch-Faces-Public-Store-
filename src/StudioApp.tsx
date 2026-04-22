@@ -1626,16 +1626,57 @@ function StudioApp() {
 
   const openCropTool = (file: File) => { setCropFile(file); };
 
+  const decodeDataUrlToBytes = (dataUrl: string, label: string): { mimeType: string; bytes: ArrayBuffer } => {
+    if (!dataUrl || !dataUrl.startsWith('data:')) {
+      throw new Error(`${label}: invalid data URL`);
+    }
+
+    const commaIndex = dataUrl.indexOf(',');
+    if (commaIndex < 0) {
+      throw new Error(`${label}: malformed data URL`);
+    }
+
+    const header = dataUrl.slice(0, commaIndex);
+    const payload = dataUrl.slice(commaIndex + 1);
+    const mimeType = header.match(/^data:([^;,]+)/)?.[1] || 'image/png';
+    const isBase64 = /;base64/i.test(header);
+
+    if (isBase64) {
+      const normalized = payload
+        .trim()
+        .replace(/\s+/g, '')
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+      const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+      let binary: string;
+      try {
+        binary = atob(padded);
+      } catch {
+        throw new Error(`${label}: invalid base64 payload`);
+      }
+      const raw = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) raw[i] = binary.charCodeAt(i);
+      const bytes = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);
+      return { mimeType, bytes };
+    }
+
+    try {
+      const decoded = decodeURIComponent(payload);
+      const encoded = new TextEncoder().encode(decoded);
+      const bytes = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength);
+      return { mimeType, bytes };
+    } catch {
+      throw new Error(`${label}: invalid URI-encoded payload`);
+    }
+  };
+
   const handleCropConfirm = (dataUrl: string) => {
     dispatch(actions.setBackgroundImage(dataUrl));
-    // Convert cropped data URL to File so buildZPK gets the cropped version
-    const parts = dataUrl.split(',');
-    const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
-    const bstr = atob(parts[1]);
-    const u8 = new Uint8Array(bstr.length);
-    for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
-    console.log('[Crop] Converted data URL → Uint8Array, size:', u8.length, 'mime:', mime, 'PNG magic:', u8[0] === 137 && u8[1] === 80);
-    const croppedFile = new File([u8], 'background.png', { type: mime });
+    // Convert cropped data URL to File so buildZPK gets the cropped version.
+    const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, 'Background crop');
+    const pngProbe = new Uint8Array(bytes);
+    console.log('[Crop] Converted data URL → Uint8Array, size:', pngProbe.length, 'mime:', mimeType, 'PNG magic:', pngProbe[0] === 137 && pngProbe[1] === 80);
+    const croppedFile = new File([bytes], 'background.png', { type: mimeType });
     console.log('[Crop] Created File:', croppedFile.name, 'size:', croppedFile.size);
     dispatch(actions.setBackgroundFile(croppedFile));
     setCropFile(null);
@@ -1650,12 +1691,8 @@ function StudioApp() {
   // T042: on Save → dispatch edited image to state (also rebuild backgroundFile)
   const handlePhotoEditorSave = (dataUrl: string) => {
     dispatch(actions.setBackgroundImage(dataUrl));
-    const parts = dataUrl.split(',');
-    const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
-    const bstr = atob(parts[1]);
-    const u8 = new Uint8Array(bstr.length);
-    for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
-    dispatch(actions.setBackgroundFile(new File([u8], 'background.png', { type: mime })));
+    const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, 'Photo editor save');
+    dispatch(actions.setBackgroundFile(new File([bytes], 'background.png', { type: mimeType })));
     setShowPhotoEditor(false);
   };
 
@@ -1907,16 +1944,8 @@ function StudioApp() {
       const elementFiles = state.elementImages.map((img) => {
         console.log('[App] Converting element image to file:', img.name);
         
-        // Parse data URL properly
-        const parts = img.dataUrl.split(',');
-        const mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
-        const bstr = atob(parts[1]);
-        const n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        for (let i = 0; i < n; i++) {
-          u8arr[i] = bstr.charCodeAt(i);
-        }
-        const blob = new Blob([u8arr], { type: mimeType });
+        const { mimeType, bytes } = decodeDataUrlToBytes(img.dataUrl, `Element image ${img.name}`);
+        const blob = new Blob([bytes], { type: mimeType });
         
         console.log('[App] Converted', img.name, 'size:', blob.size);
         return {
@@ -1950,12 +1979,9 @@ function StudioApp() {
       // This replaces any stale images from initial generation so UI choices reach the device.
       const freshDigits = regenerateDigitFilesFromElements(state.watchFaceConfig.elements);
       for (const { filename, dataUrl } of freshDigits) {
-        const p0 = dataUrl.split(',');
-        const b0 = atob(p0[1]);
-        const u0 = new Uint8Array(b0.length);
-        for (let i = 0; i < b0.length; i++) u0[i] = b0.charCodeAt(i);
+        const { bytes } = decodeDataUrlToBytes(dataUrl, `Digit image ${filename}`);
         const existing = elementFiles.findIndex(f => f.src === filename);
-        const newFile = { src: filename, file: new File([u0], filename, { type: 'image/png' }) };
+        const newFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
         if (existing >= 0) elementFiles[existing] = newFile;
         else elementFiles.push(newFile);
       }
@@ -1980,11 +2006,8 @@ function StudioApp() {
             const finalDataUrl = hasEffects
               ? await applyIconEffectsForZPK(iconEntry.dataUrl, el, el.bounds.width || 48, el.bounds.height || 48)
               : iconEntry.dataUrl;
-            const p = finalDataUrl.split(',');
-            const b = atob(p[1]);
-            const u8 = new Uint8Array(b.length);
-            for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
-            elementFiles.push({ src: filename, file: new File([u8], filename, { type: 'image/png' }) });
+            const { bytes } = decodeDataUrlToBytes(finalDataUrl, `Icon image ${filename}`);
+            elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
           }
         }
       }
@@ -2010,11 +2033,8 @@ function StudioApp() {
             el.fontSize ?? 16,
             rawColor
           );
-          const p2 = dataUrl.split(',');
-          const b2 = atob(p2[1]);
-          const u2 = new Uint8Array(b2.length);
-          for (let i = 0; i < b2.length; i++) u2[i] = b2.charCodeAt(i);
-          elementFiles.push({ src: filename, file: new File([u2], filename, { type: 'image/png' }) });
+          const { bytes } = decodeDataUrlToBytes(dataUrl, `Curved text image ${filename}`);
+          elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
         }
       }
 
@@ -2040,11 +2060,8 @@ function StudioApp() {
           const safeName = el.name.replace(/[^a-zA-Z0-9_-]/g, '_');
           const filename = `frame_${safeName}.png`;
           const dataUrl = renderEngraveFrameToPng(el);
-          const pf = dataUrl.split(',');
-          const bf = atob(pf[1]);
-          const uf = new Uint8Array(bf.length);
-          for (let i = 0; i < bf.length; i++) uf[i] = bf.charCodeAt(i);
-          elementFiles.push({ src: filename, file: new File([uf], filename, { type: 'image/png' }) });
+          const { bytes } = decodeDataUrlToBytes(dataUrl, `Engrave frame image ${filename}`);
+          elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
         }
       }
 
@@ -2079,11 +2096,8 @@ function StudioApp() {
 
         if (bakeResult) {
           const filename = `shadow_${safeName}.png`;
-          const pf = bakeResult.dataUrl.split(',');
-          const bf = atob(pf[1]);
-          const uf = new Uint8Array(bf.length);
-          for (let i = 0; i < bf.length; i++) uf[i] = bf.charCodeAt(i);
-          elementFiles.push({ src: filename, file: new File([uf], filename, { type: 'image/png' }) });
+          const { bytes } = decodeDataUrlToBytes(bakeResult.dataUrl, `Drop shadow image ${filename}`);
+          elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
         }
       }
 
@@ -2132,11 +2146,8 @@ function StudioApp() {
                     ? 'second'
                     : 'cover';
               const effectedDataUrl = await applyPointerEffectsForZPK(dataUrl, timePointerEl, layer);
-              const p = effectedDataUrl.split(',');
-              const b = atob(p[1]);
-              const u8 = new Uint8Array(b.length);
-              for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
-              const newFile = { src: name, file: new File([u8], name, { type: 'image/png' }) };
+              const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Pointer image ${name}`);
+              const newFile = { src: name, file: new File([bytes], name, { type: 'image/png' }) };
               const idx = elementFiles.findIndex(f => f.src === name);
               if (idx >= 0) elementFiles[idx] = newFile;
               else elementFiles.push(newFile);
@@ -2166,11 +2177,8 @@ function StudioApp() {
                   ? 'second'
                   : 'cover';
             const effectedDataUrl = await applyPointerEffectsForZPK(dataUrl, timePointerEl, layer);
-            const p = effectedDataUrl.split(',');
-            const b = atob(p[1]);
-            const u8 = new Uint8Array(b.length);
-            for (let i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i);
-            const newFile = { src: name, file: new File([u8], name, { type: 'image/png' }) };
+            const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Pointer image ${name}`);
+            const newFile = { src: name, file: new File([bytes], name, { type: 'image/png' }) };
             const idx = elementFiles.findIndex(f => f.src === name);
             if (idx >= 0) elementFiles[idx] = newFile;
             else elementFiles.push(newFile);
