@@ -448,11 +448,11 @@ function readSrc(rel) {
     fail('customHandStyles prop type', 'Declaration not found in InteractiveCanvas.tsx');
   }
 
-  // 6e: Icon colorize logic uses source-atop composite in InteractiveCanvas
-  if (canvasSrc.includes("source-atop") && canvasSrc.includes('iconColorize')) {
-    ok('Icon colorize: source-atop composite + iconColorize field wired in InteractiveCanvas');
+  // 6e: Icon colorize logic uses deterministic shared bake engine in InteractiveCanvas
+  if (canvasSrc.includes('bakeDeterministicIconEffects') && canvasSrc.includes('drawImageWithDeterministicIconEffects')) {
+    ok('Icon colorize: deterministic bake engine wired in InteractiveCanvas');
   } else {
-    fail('Icon colorize wiring', 'source-atop or iconColorize not found in InteractiveCanvas.tsx');
+    fail('Icon colorize wiring', 'deterministic icon effects wiring not found in InteractiveCanvas.tsx');
   }
 
   // 6f: Engrave rendering must use shared renderer in both preview + export paths
@@ -493,6 +493,32 @@ function readSrc(rel) {
     ok('IconLab: saveHandName and code cleared after successful hand save');
   } else {
     fail('Hand save cleanup', "setSaveHandName('') or setCode('') not found after hand save in IconLab.tsx");
+  }
+
+  // 6j: TIME_POINTER paths in generator must be normalized to assets/ prefix
+  const generatorSrc = readSrc('lib/jsCodeGenerator.ts');
+  if (generatorSrc.includes("return `assets/${clean}`") && generatorSrc.includes("const coverSrc = toAssetPath(element.coverSrc);")) {
+    ok('TIME_POINTER generator: paths normalized to assets/ and cover remains optional');
+  } else {
+    fail('TIME_POINTER generator path normalization', 'assets/ normalization or optional cover handling missing in jsCodeGenerator.ts');
+  }
+
+  // 6k: Export pipeline must block build when referenced TIME_POINTER assets are missing
+  if (studioSrc.includes('TIME_POINTER assets missing before build')) {
+    ok('Export pointer guard: build-blocking validation exists for missing TIME_POINTER assets');
+  } else {
+    fail('Export pointer guard', 'Missing build-blocking TIME_POINTER asset reference validation in StudioApp.tsx');
+  }
+
+  // 6l: Drop-shadow normalization must be shared between preview and export
+  const usesShadowNormalizationInExport = studioSrc.includes("normalizeDropShadowForBake")
+    && studioSrc.includes('function applyShadowToCtx');
+  const usesShadowNormalizationInPreview = canvasSrc.includes("normalizeDropShadowForBake")
+    && canvasSrc.includes('function applyShadow(');
+  if (usesShadowNormalizationInExport && usesShadowNormalizationInPreview) {
+    ok('Drop shadow: shared normalization wired in preview and export paths');
+  } else {
+    fail('Drop shadow normalization wiring', `export=${usesShadowNormalizationInExport}, preview=${usesShadowNormalizationInPreview}`);
   }
 }
 

@@ -9,7 +9,9 @@ import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
 import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
-import { hasNonDefaultPointerEffects, normalizePointerEffects, pointerEffectsToCanvasFilter } from '@/lib/pointerEffects';
+import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/pointerEffects';
+import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
+import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
 
 const CANVAS_SIZE = 480;
 const CX = 240;
@@ -589,7 +591,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 }
 
 function applyShadow(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
-  const s = el.dropShadow;
+  const s = el.dropShadow ? normalizeDropShadowForBake(el.dropShadow) : undefined;
   if (!s) return;
   const { r, g, b } = hexToRgb(s.color);
   ctx.shadowColor = `rgba(${r},${g},${b},${s.opacity})`;
@@ -603,6 +605,21 @@ function clearShadow(ctx: CanvasRenderingContext2D) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
+}
+
+function drawImageWithDeterministicIconEffects(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  el: WatchFaceElement,
+) {
+  const { x, y, width: w, height: h } = el.bounds;
+  const baked = bakeDeterministicIconEffects(img, w, h, {
+    hueDeg: el.iconHue ?? 0,
+    saturationPercent: el.iconSaturation ?? 100,
+    colorize: el.iconColorize,
+    colorizeOpacity: el.iconColorizeOpacity ?? 0.8,
+  });
+  ctx.drawImage(baked, x, y, w, h);
 }
 
 // ─── Background ─────────────────────────────────────────────────────────────────
@@ -761,27 +778,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         if (el.iconKey && iconCache) {
           const cached = iconCache.get(el.iconKey);
           if (cached) {
-            const { x, y, width: w, height: h } = el.bounds;
-            const hue = el.iconHue ?? 0;
-            const sat = el.iconSaturation ?? 100;
-            const colorize = el.iconColorize ?? '';
-            const colorizeOpacity = el.iconColorizeOpacity ?? 0.8;
-            if (colorize) {
-              const off = Object.assign(document.createElement('canvas'), { width: w, height: h });
-              const oc = off.getContext('2d')!;
-              if (hue !== 0 || sat !== 100) oc.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
-              oc.drawImage(cached, 0, 0, w, h);
-              oc.filter = 'none';
-              oc.globalCompositeOperation = 'source-atop';
-              oc.globalAlpha = colorizeOpacity;
-              oc.fillStyle = colorize;
-              oc.fillRect(0, 0, w, h);
-              ctx.drawImage(off, x, y);
-            } else {
-              if (hue !== 0 || sat !== 100) ctx.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
-              ctx.drawImage(cached, x, y, w, h);
-              ctx.filter = 'none';
-            }
+            drawImageWithDeterministicIconEffects(ctx, cached, el);
           } else {
             const entry = getIconByKey(el.iconKey);
             if (entry) {
@@ -878,28 +875,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         applyShadow(ctx, el);
         if (el.iconKey && iconCache) {          const cached = iconCache.get(el.iconKey);
           if (cached) {
-            const { x, y, width: w, height: h } = el.bounds;
-            const hue = el.iconHue ?? 0;
-            const sat = el.iconSaturation ?? 100;
-            const colorize = el.iconColorize ?? '';
-            const colorizeOpacity = el.iconColorizeOpacity ?? 0.8;
-            if (colorize) {
-              // Offscreen canvas: apply hue/sat, then colorize using source-atop compositing
-              const off = Object.assign(document.createElement('canvas'), { width: w, height: h });
-              const oc = off.getContext('2d')!;
-              if (hue !== 0 || sat !== 100) oc.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
-              oc.drawImage(cached, 0, 0, w, h);
-              oc.filter = 'none';
-              oc.globalCompositeOperation = 'source-atop';
-              oc.globalAlpha = colorizeOpacity;
-              oc.fillStyle = colorize;
-              oc.fillRect(0, 0, w, h);
-              ctx.drawImage(off, x, y);
-            } else {
-              if (hue !== 0 || sat !== 100) ctx.filter = `hue-rotate(${hue}deg) saturate(${sat}%)`;
-              ctx.drawImage(cached, x, y, w, h);
-              ctx.filter = 'none';
-            }
+            drawImageWithDeterministicIconEffects(ctx, cached, el);
           } else {
             const entry = getIconByKey(el.iconKey);
             if (entry) {
@@ -1216,7 +1192,6 @@ function drawTimePointer(
   const tintColor       = el.handTint;  // e.g. '#4488FF' or undefined
   const pointerEffects = normalizePointerEffects(el);
   const hasPointerEffects = hasNonDefaultPointerEffects(pointerEffects);
-  const pointerFilter = pointerEffectsToCanvasFilter(pointerEffects);
 
   if (imgMap && imgMap.size === 4) {
     // Draw using real hand images
@@ -1264,6 +1239,15 @@ function drawTimePointer(
       const drawPivotY = def.key === 'cover' ? pivotY : (pivotY / baseH) * drawH;
 
       const angle = def.key === 'cover' ? 0 : angles[def.key];
+      const bakedBase = hasPointerEffects
+        ? bakeDeterministicColorAdjustments(img, drawW, drawH, {
+          brightness: pointerEffects.brightness,
+          contrast: pointerEffects.contrast,
+          saturation: pointerEffects.saturation,
+          saturationMode: 'delta',
+          opacity: pointerEffects.opacity,
+        })
+        : img;
 
       // ── Trail (speed-blur ghost) ─────────────────────────────
       if (trailIntensity > 0) {
@@ -1272,11 +1256,10 @@ function drawTimePointer(
           if (trailAlpha <= 0) break;
           const trailAngle = angle - degToRad(t * 3);
           ctx.save();
-          ctx.filter = hasPointerEffects ? pointerFilter : 'none';
-          ctx.globalAlpha = trailAlpha * (hasPointerEffects ? pointerEffects.opacity : 1);
+          ctx.globalAlpha = trailAlpha;
           ctx.translate(cx, cy);
           ctx.rotate(trailAngle);
-          ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);
+          ctx.drawImage(bakedBase, -drawPivotX, -drawPivotY, drawW, drawH);
           ctx.restore();
         }
       }
@@ -1293,9 +1276,8 @@ function drawTimePointer(
         ctx.shadowOffsetY = shadowIntensity * 4;
       }
 
-      ctx.filter = hasPointerEffects ? pointerFilter : 'none';
-      ctx.globalAlpha = hasPointerEffects ? pointerEffects.opacity : 1;
-      ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(bakedBase, -drawPivotX, -drawPivotY, drawW, drawH);
 
       // ── Glow overlay ──────────────────────────────────────────
       if (glowIntensity > 0) {
@@ -1303,10 +1285,10 @@ function drawTimePointer(
         ctx.shadowBlur = 0;
         const glowColor = tintColor ?? '#00EEFF';
         ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = glowIntensity * 0.55 * (hasPointerEffects ? pointerEffects.opacity : 1);
+        ctx.globalAlpha = glowIntensity * 0.55;
         ctx.shadowColor = glowColor;
         ctx.shadowBlur = 12 + glowIntensity * 20;
-        ctx.drawImage(img, -drawPivotX, -drawPivotY, drawW, drawH);
+        ctx.drawImage(bakedBase, -drawPivotX, -drawPivotY, drawW, drawH);
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
       }
@@ -1321,7 +1303,7 @@ function drawTimePointer(
         tintCanvas.height = tintH;
         const tintCtx = tintCanvas.getContext('2d');
         if (tintCtx) {
-          tintCtx.drawImage(img, 0, 0, tintW, tintH);
+          tintCtx.drawImage(bakedBase, 0, 0, tintW, tintH);
           tintCtx.globalCompositeOperation = 'source-in';
           tintCtx.globalAlpha = 0.35;
           tintCtx.fillStyle = tintColor;

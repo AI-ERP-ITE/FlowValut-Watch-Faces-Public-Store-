@@ -50,8 +50,10 @@ import {
   runPointerParityChecks,
 } from '@/lib/pointerParity';
 import { createParityCaptureSession, isInvestigationModeEnabled } from '@/lib/parityCapture';
-import { normalizePointerEffects, pointerEffectsToCanvasFilter } from '@/lib/pointerEffects';
+import { normalizePointerEffects } from '@/lib/pointerEffects';
 import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
+import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
+import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
 function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig {
@@ -973,38 +975,12 @@ async function applyIconEffectsForZPK(
     i.src = dataUrl;
   });
 
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
-
-  // Hue-rotate + saturation via canvas filter
-  const hue = el.iconHue ?? 0;
-  const sat = el.iconSaturation ?? 100;
-  const filterParts: string[] = [];
-  if (hue !== 0)   filterParts.push(`hue-rotate(${hue}deg)`);
-  if (sat !== 100) filterParts.push(`saturate(${sat}%)`);
-  ctx.save();
-  if (filterParts.length > 0) ctx.filter = filterParts.join(' ');
-  ctx.drawImage(img, 0, 0, w, h);
-  ctx.restore();
-
-  // Colorize: paint solid color through icon's alpha mask (source-in)
-  if (el.iconColorize) {
-    const offscreen = document.createElement('canvas');
-    offscreen.width = w;
-    offscreen.height = h;
-    const octx = offscreen.getContext('2d')!;
-    octx.drawImage(img, 0, 0, w, h);
-    octx.globalCompositeOperation = 'source-in';
-    octx.fillStyle = el.iconColorize;
-    octx.fillRect(0, 0, w, h);
-    ctx.save();
-    ctx.globalAlpha = el.iconColorizeOpacity ?? 1.0;
-    ctx.drawImage(offscreen, 0, 0);
-    ctx.restore();
-  }
-
+  const canvas = bakeDeterministicIconEffects(img, w, h, {
+    hueDeg: el.iconHue ?? 0,
+    saturationPercent: el.iconSaturation ?? 100,
+    colorize: el.iconColorize,
+    colorizeOpacity: el.iconColorizeOpacity ?? 1,
+  });
   return canvas.toDataURL('image/png');
 }
 
@@ -1043,16 +1019,21 @@ async function applyPointerEffectsForZPK(
   const ctx = canvas.getContext('2d');
   if (!ctx) return dataUrl;
 
-  const pointerFilter = pointerEffectsToCanvasFilter(effects);
+  const adjustedBase = bakeDeterministicColorAdjustments(img, width, height, {
+    brightness: effects.brightness,
+    contrast: effects.contrast,
+    saturation: effects.saturation,
+    saturationMode: 'delta',
+    opacity: effects.opacity,
+  });
 
   if (trailIntensity > 0) {
     for (let t = 1; t <= 3; t += 1) {
       const trailAlpha = trailIntensity * (0.18 - t * 0.04);
       if (trailAlpha <= 0) break;
       ctx.save();
-      ctx.filter = pointerFilter;
-      ctx.globalAlpha = effects.opacity * trailAlpha;
-      ctx.drawImage(img, 0, -t * 2, width, height);
+      ctx.globalAlpha = trailAlpha;
+      ctx.drawImage(adjustedBase, 0, -t * 2, width, height);
       ctx.restore();
     }
   }
@@ -1064,19 +1045,18 @@ async function applyPointerEffectsForZPK(
     ctx.shadowOffsetX = shadowIntensity * 4;
     ctx.shadowOffsetY = shadowIntensity * 4;
   }
-  ctx.filter = pointerFilter;
-  ctx.globalAlpha = effects.opacity;
-  ctx.drawImage(img, 0, 0, width, height);
+  ctx.globalAlpha = 1;
+  ctx.drawImage(adjustedBase, 0, 0, width, height);
   ctx.restore();
 
   if (glowIntensity > 0) {
     const glowColor = tintColor || '#00EEFF';
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = glowIntensity * 0.55 * effects.opacity;
+    ctx.globalAlpha = glowIntensity * 0.55;
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = 12 + glowIntensity * 20;
-    ctx.drawImage(img, 0, 0, width, height);
+    ctx.drawImage(adjustedBase, 0, 0, width, height);
     ctx.restore();
   }
 
@@ -1086,7 +1066,7 @@ async function applyPointerEffectsForZPK(
     tintCanvas.height = height;
     const tintCtx = tintCanvas.getContext('2d');
     if (tintCtx) {
-      tintCtx.drawImage(img, 0, 0, width, height);
+      tintCtx.drawImage(adjustedBase, 0, 0, width, height);
       tintCtx.globalCompositeOperation = 'source-in';
       tintCtx.globalAlpha = 0.35;
       tintCtx.fillStyle = tintColor;
@@ -1219,15 +1199,17 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 
 /** Compute extra canvas padding required to contain a drop shadow. */
 function shadowPadding(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
-  return ds.blur + Math.max(Math.abs(ds.offsetX), Math.abs(ds.offsetY)) + 4;
+  const n = normalizeDropShadowForBake(ds);
+  return n.blur + Math.max(Math.abs(n.offsetX), Math.abs(n.offsetY)) + 4;
 }
 
 function applyShadowToCtx(ctx: CanvasRenderingContext2D, ds: NonNullable<WatchFaceElement['dropShadow']>) {
-  const { r, g, b } = hexToRgb(ds.color);
-  ctx.shadowColor = `rgba(${r},${g},${b},${ds.opacity})`;
-  ctx.shadowBlur = ds.blur;
-  ctx.shadowOffsetX = ds.offsetX;
-  ctx.shadowOffsetY = ds.offsetY;
+  const n = normalizeDropShadowForBake(ds);
+  const { r, g, b } = hexToRgb(n.color);
+  ctx.shadowColor = `rgba(${r},${g},${b},${n.opacity})`;
+  ctx.shadowBlur = n.blur;
+  ctx.shadowOffsetX = n.offsetX;
+  ctx.shadowOffsetY = n.offsetY;
 }
 
 /**
@@ -2125,6 +2107,9 @@ function StudioApp() {
             const resolvedPack = resolveCustomHandPack(customHand);
             const coverDataUrl = resolvedPack?.sources.cover ?? customHand.coverDataUrl;
             timePointerEl.coverSrc = coverDataUrl ? 'hand_cover.png' : undefined;
+            timePointerEl.hourHandSrc = 'hour_hand.png';
+            timePointerEl.minuteHandSrc = 'minute_hand.png';
+            timePointerEl.secondHandSrc = 'second_hand.png';
             const handFiles = [
               { name: 'hour_hand.png', dataUrl: resolvedPack?.sources.hour ?? customHand.hourDataUrl },
               { name: 'minute_hand.png', dataUrl: resolvedPack?.sources.minute ?? customHand.minuteDataUrl },
@@ -2161,9 +2146,10 @@ function StudioApp() {
         } else {
           // Built-in hand style — always regenerate so style changes are reflected
           const hs = (timePointerEl.handStyle ?? 'silver') as HandStyleKey;
-          if (!timePointerEl.coverSrc) {
-            timePointerEl.coverSrc = 'hand_cover.png';
-          }
+          timePointerEl.hourHandSrc = 'hour_hand.png';
+          timePointerEl.minuteHandSrc = 'minute_hand.png';
+          timePointerEl.secondHandSrc = 'second_hand.png';
+          timePointerEl.coverSrc = 'hand_cover.png';
           const handSet = generateHandSet(hs);
           const builtInHandFiles = [
             { name: 'hour_hand.png', dataUrl: handSet.hourHand },
@@ -2190,6 +2176,19 @@ function StudioApp() {
             else elementFiles.push(newFile);
           }
           console.log('[App] Regenerated built-in hand images for style:', hs);
+        }
+
+        const pointerAssetRefs = [
+          timePointerEl.hourHandSrc,
+          timePointerEl.minuteHandSrc,
+          timePointerEl.hideSeconds ? undefined : timePointerEl.secondHandSrc,
+          timePointerEl.coverSrc,
+        ].filter((src): src is string => !!src);
+        const exportedAssetNames = new Set(elementFiles.map((f) => f.src));
+        const missingReferencedAssets = pointerAssetRefs.filter((src) => !exportedAssetNames.has(src));
+        if (missingReferencedAssets.length > 0) {
+          missingPointerAssets.push(...missingReferencedAssets.map((src) => `reference-missing:${src}`));
+          throw new Error(`TIME_POINTER assets missing before build: ${missingReferencedAssets.join(', ')}`);
         }
       }
       pointerParityMissingAssetsRef.current = missingPointerAssets;

@@ -423,6 +423,13 @@ function generateWidgetCode(element: WatchFaceElement): string {
 
 // TIME_POINTER - Analog clock hands (hour/minute/second in ONE widget)
 function generateTimePointerWidgetV3(element: WatchFaceElement): string {
+  const toAssetPath = (src?: string): string | undefined => {
+    if (!src) return undefined;
+    const clean = src.replace(/^assets\//, '').trim();
+    if (!clean) return undefined;
+    return `assets/${clean}`;
+  };
+
   const centerX = element.pointerCenter?.x ?? element.center?.x ?? (element.bounds.x + (element.bounds.width || 480) / 2);
   const centerY = element.pointerCenter?.y ?? element.center?.y ?? (element.bounds.y + (element.bounds.height || 480) / 2);
   const hourPosX = element.hourPos?.x ?? 11;
@@ -431,10 +438,10 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
   const minutePosY = element.minutePos?.y ?? 172; // pivot at 86% of 200px hand height
   const secondPosX = element.secondPos?.x ?? 4;
   const secondPosY = element.secondPos?.y ?? 180; // pivot at 75% of 240px hand height
-  const hourSrc = element.hourHandSrc || 'hour_hand.png';
-  const minuteSrc = element.minuteHandSrc || 'minute_hand.png';
-  const secondSrc = element.secondHandSrc || 'second_hand.png';
-  const coverSrc = element.coverSrc;
+  const hourSrc = toAssetPath(element.hourHandSrc || 'hour_hand.png')!;
+  const minuteSrc = toAssetPath(element.minuteHandSrc || 'minute_hand.png')!;
+  const secondSrc = toAssetPath(element.secondHandSrc || 'second_hand.png')!;
+  const coverSrc = toAssetPath(element.coverSrc);
   const hasSeconds = !element.hideSeconds;
 
   let coverParams = '';
