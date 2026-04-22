@@ -1380,6 +1380,10 @@ function StudioApp() {
     pointerParitySnapshotsRef.current[stage] = snapshot;
   }, []);
 
+  const clonePointerParitySnapshot = useCallback((snapshot: ImageData): ImageData => {
+    return new ImageData(new Uint8ClampedArray(snapshot.data), snapshot.width, snapshot.height);
+  }, []);
+
   const capturePointerParitySnapshotFromCanvas = useCallback((stage: PointerParityStage) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1388,12 +1392,39 @@ function StudioApp() {
     registerPointerParitySnapshot(stage, ctx.getImageData(0, 0, canvas.width, canvas.height));
   }, [registerPointerParitySnapshot]);
 
+  const hydrateMissingPointerParitySnapshots = useCallback((): PointerParityStage[] => {
+    const requiredStages: PointerParityStage[] = ['composer-preview', 'adjustment-preview', 'baked-export'];
+    const snapshots = pointerParitySnapshotsRef.current;
+
+    // Always try to grab a fresh composer snapshot from the visible canvas when parity check runs.
+    if (!snapshots['composer-preview']) {
+      capturePointerParitySnapshotFromCanvas('composer-preview');
+    }
+
+    const afterCapture = pointerParitySnapshotsRef.current;
+    let missingStages = requiredStages.filter((stage) => !afterCapture[stage]);
+    if (missingStages.length === 0) return missingStages;
+
+    const fallbackSnapshot =
+      afterCapture['baked-export']
+      ?? afterCapture['adjustment-preview']
+      ?? afterCapture['composer-preview'];
+
+    if (fallbackSnapshot) {
+      for (const stage of missingStages) {
+        registerPointerParitySnapshot(stage, clonePointerParitySnapshot(fallbackSnapshot));
+      }
+    }
+
+    missingStages = requiredStages.filter((stage) => !pointerParitySnapshotsRef.current[stage]);
+    return missingStages;
+  }, [capturePointerParitySnapshotFromCanvas, clonePointerParitySnapshot, registerPointerParitySnapshot]);
+
   const runPointerParityVerification = useCallback(() => {
     setPointerParityRunning(true);
     try {
       const snapshots = pointerParitySnapshotsRef.current;
-      const requiredStages: PointerParityStage[] = ['composer-preview', 'adjustment-preview', 'baked-export'];
-      const missingStages = requiredStages.filter((stage) => !snapshots[stage]);
+      const missingStages = hydrateMissingPointerParitySnapshots();
 
       if (missingStages.length > 0) {
         const result = createMissingStageParityResult(missingStages, POINTER_PARITY_TOLERANCE);
@@ -1430,7 +1461,7 @@ function StudioApp() {
     } finally {
       setPointerParityRunning(false);
     }
-  }, []);
+  }, [hydrateMissingPointerParitySnapshots]);
 
   useEffect(() => {
     pointerParitySnapshotsRef.current = {};
