@@ -434,7 +434,7 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
   const hourSrc = element.hourHandSrc || 'hour_hand.png';
   const minuteSrc = element.minuteHandSrc || 'minute_hand.png';
   const secondSrc = element.secondHandSrc || 'second_hand.png';
-  const coverSrc = element.coverSrc || 'hand_cover.png';
+  const coverSrc = element.coverSrc;
   const hasSeconds = !element.hideSeconds;
 
   let coverParams = '';

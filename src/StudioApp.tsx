@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,7 @@ import {
   createMissingStageParityResult,
   runPointerParityChecks,
 } from '@/lib/pointerParity';
+import { createParityCaptureSession, isInvestigationModeEnabled } from '@/lib/parityCapture';
 import { normalizePointerEffects, pointerEffectsToCanvasFilter } from '@/lib/pointerEffects';
 import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import type { PointerParityResult, PointerParityStage } from '@/types';
@@ -1311,12 +1312,13 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, w, h);
   const cfg = el.engraveFrame!;
-  // Device renderer tends to produce heavier bevels than browser preview; pre-compensate export slightly.
+  // Preview canvas is typically CSS-downscaled, which visually softens edges.
+  // Apply stronger export compensation so device output better matches preview perception.
   const compensatedCfg = {
     ...cfg,
-    depth: Math.max(1, (cfg.depth ?? 6) * 0.82),
-    highlightOpacity: Math.max(0, Math.min(1, (cfg.highlightOpacity ?? 0.6) * 0.82)),
-    shadowOpacity: Math.max(0, Math.min(1, (cfg.shadowOpacity ?? 0.6) * 0.82)),
+    depth: Math.max(1, (cfg.depth ?? 6) * 0.68),
+    highlightOpacity: Math.max(0, Math.min(1, (cfg.highlightOpacity ?? 0.6) * 0.72)),
+    shadowOpacity: Math.max(0, Math.min(1, (cfg.shadowOpacity ?? 0.6) * 0.72)),
   };
   renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, compensatedCfg);
 
@@ -1343,6 +1345,17 @@ function StudioApp() {
   const pointerParityMissingAssetsRef = useRef<string[]>([]);
   const [pointerParityResult, setPointerParityResult] = useState<PointerParityResult | null>(null);
   const [pointerParityRunning, setPointerParityRunning] = useState(false);
+  const investigationRunIdRef = useRef<string | null>(null);
+  const investigationBuildHash = import.meta.env['VITE_GIT_COMMIT_SHA'] ?? 'local-dev';
+  const parityCaptureSession = useMemo(() => {
+    const operator =
+      (typeof window !== 'undefined' && window.localStorage.getItem('wf.investigationOperator'))
+      || 'unknown-operator';
+    return createParityCaptureSession({
+      enabled: isInvestigationModeEnabled(),
+      operator,
+    });
+  }, []);
 
   // Load custom icons + fonts from IndexedDB on startup and register them
   useEffect(() => {
@@ -1879,6 +1892,31 @@ function StudioApp() {
 
     try {
       pointerParityMissingAssetsRef.current = [];
+      const hasEngrave = state.watchFaceConfig.elements.some((el) => el.type === 'FILL_RECT' && !!el.engraveFrame);
+      const hasPointer = state.watchFaceConfig.elements.some((el) => el.type === 'TIME_POINTER');
+      const issueFocus = hasEngrave && hasPointer ? 'both' : hasEngrave ? 'engrave' : 'pointer';
+      const runRecord = parityCaptureSession.startRun({
+        fixtureId: state.watchFaceConfig.name,
+        issueFocus,
+        buildHash: investigationBuildHash,
+      });
+      investigationRunIdRef.current = runRecord?.run.runId ?? null;
+
+      if (investigationRunIdRef.current) {
+        parityCaptureSession.captureStage({
+          runId: investigationRunIdRef.current,
+          fixtureId: state.watchFaceConfig.name,
+          buildHash: investigationBuildHash,
+          stage: 'fixture_setup',
+          eventType: 'fixture.snapshot',
+          capturePoint: 'fixture_snapshot',
+          data: {
+            elementCount: state.watchFaceConfig.elements.length,
+            backgroundFileName: state.backgroundFile.name,
+            previewCaptured: !!previewDataUrl,
+          },
+        });
+      }
 
       // Build ZPK using File objects
       console.log('[App] Calling buildZPK...');
@@ -1909,6 +1947,21 @@ function StudioApp() {
       
       if (elementFiles.length === 0) {
         console.warn('[App] WARNING: No element files were prepared!');
+      }
+
+      if (investigationRunIdRef.current) {
+        parityCaptureSession.captureStage({
+          runId: investigationRunIdRef.current,
+          fixtureId: state.watchFaceConfig.name,
+          buildHash: investigationBuildHash,
+          stage: 'preview',
+          eventType: 'preview.snapshot',
+          capturePoint: 'preview_metrics',
+          data: {
+            pointerParitySnapshotCount: Object.keys(pointerParitySnapshotsRef.current).length,
+            previewDataUrlCaptured: !!previewDataUrl,
+          },
+        });
       }
 
       // Regenerate digit images with current element colors + font styles.
@@ -2069,16 +2122,17 @@ function StudioApp() {
             if (!timePointerEl.secondPos && typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
               timePointerEl.secondPos = { x: customHand.secondPosX, y: customHand.secondPosY };
             }
-            if (!timePointerEl.coverSrc) {
-              timePointerEl.coverSrc = 'hand_cover.png';
-            }
             const resolvedPack = resolveCustomHandPack(customHand);
+            const coverDataUrl = resolvedPack?.sources.cover ?? customHand.coverDataUrl;
+            timePointerEl.coverSrc = coverDataUrl ? 'hand_cover.png' : undefined;
             const handFiles = [
               { name: 'hour_hand.png', dataUrl: resolvedPack?.sources.hour ?? customHand.hourDataUrl },
               { name: 'minute_hand.png', dataUrl: resolvedPack?.sources.minute ?? customHand.minuteDataUrl },
               { name: 'second_hand.png', dataUrl: resolvedPack?.sources.second ?? customHand.secondDataUrl },
-              { name: 'hand_cover.png', dataUrl: resolvedPack?.sources.cover ?? customHand.coverDataUrl },
             ];
+            if (coverDataUrl) {
+              handFiles.push({ name: 'hand_cover.png', dataUrl: coverDataUrl });
+            }
             for (const { name, dataUrl } of handFiles) {
               if (!dataUrl) {
                 console.warn('[App] Missing custom hand layer for export:', name, 'style:', timePointerEl.handStyle);
@@ -2143,6 +2197,22 @@ function StudioApp() {
       // Capture adjustment-stage snapshot after export-side element/asset preparation.
       capturePointerParitySnapshotFromCanvas('adjustment-preview');
 
+      if (investigationRunIdRef.current) {
+        parityCaptureSession.captureStage({
+          runId: investigationRunIdRef.current,
+          fixtureId: state.watchFaceConfig.name,
+          buildHash: investigationBuildHash,
+          stage: 'export',
+          eventType: 'export.asset_manifest',
+          capturePoint: 'export_manifest',
+          data: {
+            totalElementFiles: elementFiles.length,
+            missingPointerAssets,
+            exportElementCount: exportElements.length,
+          },
+        });
+      }
+
       const zpkResult = await buildZPK({
         config: configForBuild,
         backgroundFile: state.backgroundFile,
@@ -2152,6 +2222,21 @@ function StudioApp() {
 
       // Capture baked-export stage snapshot once export build is complete.
       capturePointerParitySnapshotFromCanvas('baked-export');
+
+      if (investigationRunIdRef.current) {
+        parityCaptureSession.captureStage({
+          runId: investigationRunIdRef.current,
+          fixtureId: state.watchFaceConfig.name,
+          buildHash: investigationBuildHash,
+          stage: 'synthesis',
+          eventType: 'export.completed',
+          capturePoint: 'verdict_synthesis',
+          data: {
+            zpkSizeBytes: zpkResult.size,
+            pointerParityMissingAssets: missingPointerAssets.length,
+          },
+        });
+      }
 
       dispatch(actions.setZpkBlob(zpkResult.blob));
 
@@ -2210,18 +2295,28 @@ function StudioApp() {
       dispatch(actions.setGithubUrl(uploadResult.downloadUrl || ''));
       dispatch(actions.setQrCode(qrDataUrl));
       dispatch(actions.setStep('success'));
+      if (investigationRunIdRef.current) {
+        parityCaptureSession.completeRun({ runId: investigationRunIdRef.current });
+      }
       toast.success('Watch face created successfully!');
     } catch (error) {
       console.error('[App] Generation failed with error:', error);
       if (error instanceof Error) {
         console.error('[App] Error stack:', error.stack);
       }
+      if (investigationRunIdRef.current) {
+        parityCaptureSession.completeRun({
+          runId: investigationRunIdRef.current,
+          invalidationReason: error instanceof Error ? error.message : 'unknown-error',
+        });
+      }
       toast.error('Generation failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
       dispatch(actions.setStep('preview'));
     } finally {
+      investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, state.backgroundFile, state.backgroundImage, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas]);
+  }, [state.watchFaceConfig, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
 
   // Handle reset
   const handleReset = useCallback(() => {
