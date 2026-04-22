@@ -1002,7 +1002,10 @@ async function applyPointerEffectsForZPK(
     && effects.saturation === 0
     && effects.opacity === 1;
   const hasHandVisualEffects = shadowIntensity > 0 || glowIntensity > 0 || trailIntensity > 0 || !!tintColor;
-  if (hasBasePointerEffects && !hasHandVisualEffects) return dataUrl;
+  const isSvgDataUrl = /^data:image\/svg\+xml/i.test(dataUrl);
+  // HTML/custom pointers may provide SVG data URLs. Zepp TIME_POINTER expects raster assets.
+  // Always rasterize SVG to PNG even when no effects are enabled.
+  if (hasBasePointerEffects && !hasHandVisualEffects && !isSvgDataUrl) return dataUrl;
 
   const img = await new Promise<HTMLImageElement>((res, rej) => {
     const i = new Image();
