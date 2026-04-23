@@ -1205,7 +1205,8 @@ async function preparePointerGeometryForExport(
   const shadowPad = Math.ceil((Math.max(0, el.handShadow ?? 0) * 20) + (Math.max(0, el.handShadow ?? 0) * 4) + 6);
   const glowPad = Math.ceil((Math.max(0, el.handGlow ?? 0) * 20) + 12);
   const trailPad = Math.ceil(Math.max(0, el.handTrail ?? 0) * 6);
-  const effectPad = Math.max(0, shadowPad, glowPad, trailPad);
+  // Keep hub (cover) placement contract stable at centerX-15/centerY-15 in generators.
+  const effectPad = layer === 'cover' ? 0 : Math.max(0, shadowPad, glowPad, trailPad);
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
