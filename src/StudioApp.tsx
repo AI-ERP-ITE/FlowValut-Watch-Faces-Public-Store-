@@ -1201,6 +1201,13 @@ async function preparePointerGeometryForExport(
   const drawPivotX = pivotX * wid;
   const drawPivotY = layer === 'cover' ? pivotY : (pivotY / baseH) * targetH;
 
+  // Hub must keep a stable runtime contract for overlay placement.
+  // Always export cover as 30x30 with pivot 15,15.
+  const finalTargetW = layer === 'cover' ? POINTER_BASE_METRICS.cover.width : targetW;
+  const finalTargetH = layer === 'cover' ? POINTER_BASE_METRICS.cover.height : targetH;
+  const finalPivotX = layer === 'cover' ? POINTER_BASE_METRICS.cover.pivotX : drawPivotX;
+  const finalPivotY = layer === 'cover' ? POINTER_BASE_METRICS.cover.pivotY : drawPivotY;
+
   // Reserve safe margins so baked pointer shadows/glow are not clipped at export time.
   const shadowPad = Math.ceil((Math.max(0, el.handShadow ?? 0) * 20) + (Math.max(0, el.handShadow ?? 0) * 4) + 6);
   const glowPad = Math.ceil((Math.max(0, el.handGlow ?? 0) * 20) + 12);
@@ -1231,16 +1238,16 @@ async function preparePointerGeometryForExport(
   }
 
   const out = document.createElement('canvas');
-  out.width = targetW + effectPad * 2;
-  out.height = targetH + effectPad * 2;
+  out.width = finalTargetW + effectPad * 2;
+  out.height = finalTargetH + effectPad * 2;
   const outCtx = out.getContext('2d');
   if (!outCtx) return { dataUrl };
   outCtx.clearRect(0, 0, out.width, out.height);
-  outCtx.drawImage(canvas, sx, sy, sw, sh, effectPad, effectPad, targetW, targetH);
+  outCtx.drawImage(canvas, sx, sy, sw, sh, effectPad, effectPad, finalTargetW, finalTargetH);
 
   const pivot = {
-    x: Math.round(clampPointerValue(drawPivotX + effectPad, 0, out.width)),
-    y: Math.round(clampPointerValue(drawPivotY + effectPad, 0, out.height)),
+    x: Math.round(clampPointerValue(finalPivotX + effectPad, 0, out.width)),
+    y: Math.round(clampPointerValue(finalPivotY + effectPad, 0, out.height)),
   };
 
   return { dataUrl: out.toDataURL('image/png'), pivot };

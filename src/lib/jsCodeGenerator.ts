@@ -464,6 +464,8 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
                 hmUI.createWidget(hmUI.widget.IMG, {
                     x: px(${centerX - 15}),
                     y: px(${centerY - 15}),
+            w: px(30),
+            h: px(30),
                     src: '${coverSrc}',
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });` : '';

@@ -818,6 +818,8 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
                 let widget_${widgetIndex}_cover = hmUI.createWidget(hmUI.widget.IMG, {
                     x: px(${centerX - 15}),
                     y: px(${centerY - 15}),
+            w: px(30),
+            h: px(30),
                     src: '${coverSrc}',
                     show_level: hmUI.show_level.${showLevel}
                 });` : '';
