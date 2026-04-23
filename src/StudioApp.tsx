@@ -1081,6 +1081,101 @@ async function applyPointerEffectsForZPK(
   return canvas.toDataURL('image/png');
 }
 
+type PointerLayer = 'hour' | 'minute' | 'second' | 'cover';
+
+const POINTER_BASE_SIZE: Record<PointerLayer, { width: number; height: number }> = {
+  hour: { width: 22, height: 140 },
+  minute: { width: 16, height: 200 },
+  second: { width: 8, height: 240 },
+  cover: { width: 30, height: 30 },
+};
+
+function clampPointerValue(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+async function cropPointerAssetForExport(
+  dataUrl: string,
+  layer: PointerLayer,
+  sourcePivot?: { x: number; y: number },
+): Promise<{ dataUrl: string; pivot?: { x: number; y: number } }> {
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = dataUrl;
+  });
+
+  const width = Math.max(1, img.naturalWidth || img.width || 1);
+  const height = Math.max(1, img.naturalHeight || img.height || 1);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return { dataUrl, pivot: sourcePivot };
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const imageData = ctx.getImageData(0, 0, width, height).data;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const alpha = imageData[(y * width + x) * 4 + 3];
+      if (alpha > 0) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < 0 || maxY < 0) {
+    return { dataUrl, pivot: sourcePivot };
+  }
+
+  const cropW = Math.max(1, maxX - minX + 1);
+  const cropH = Math.max(1, maxY - minY + 1);
+  if (cropW === width && cropH === height) {
+    return { dataUrl, pivot: sourcePivot };
+  }
+
+  const croppedCanvas = document.createElement('canvas');
+  croppedCanvas.width = cropW;
+  croppedCanvas.height = cropH;
+  const croppedCtx = croppedCanvas.getContext('2d');
+  if (!croppedCtx) return { dataUrl, pivot: sourcePivot };
+  croppedCtx.clearRect(0, 0, cropW, cropH);
+  croppedCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+
+  if (!sourcePivot) {
+    return { dataUrl: croppedCanvas.toDataURL('image/png') };
+  }
+
+  // First try direct translation from original canvas space.
+  let translatedX = sourcePivot.x - minX;
+  let translatedY = sourcePivot.y - minY;
+  const translatedValid = translatedX >= 0 && translatedX <= cropW && translatedY >= 0 && translatedY <= cropH;
+
+  // If source pivot is from canonical hand coordinates (common case), remap by canonical ratios.
+  if (!translatedValid) {
+    const base = POINTER_BASE_SIZE[layer];
+    translatedX = (sourcePivot.x / base.width) * cropW;
+    translatedY = (sourcePivot.y / base.height) * cropH;
+  }
+
+  const pivot = {
+    x: Math.round(clampPointerValue(translatedX, 0, cropW)),
+    y: Math.round(clampPointerValue(translatedY, 0, cropH)),
+  };
+
+  return { dataUrl: croppedCanvas.toDataURL('image/png'), pivot };
+}
+
 /**
  * Regenerate digit/label PNG images from current element colors + font styles.
  * Called at ZPK build time so that UI color/font choices actually reach the device.
@@ -2141,7 +2236,7 @@ function StudioApp() {
                 missingPointerAssets.push(`baked-export:${name} (${timePointerEl.handStyle})`);
                 continue;
               }
-              const layer = name.startsWith('hour_')
+              const layer: PointerLayer = name.startsWith('hour_')
                 ? 'hour'
                 : name.startsWith('minute_')
                   ? 'minute'
@@ -2149,7 +2244,18 @@ function StudioApp() {
                     ? 'second'
                     : 'cover';
               const effectedDataUrl = await applyPointerEffectsForZPK(dataUrl, timePointerEl, layer);
-              const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Pointer image ${name}`);
+              const sourcePivot = layer === 'hour'
+                ? timePointerEl.hourPos
+                : layer === 'minute'
+                  ? timePointerEl.minutePos
+                  : layer === 'second'
+                    ? timePointerEl.secondPos
+                    : undefined;
+              const cropped = await cropPointerAssetForExport(effectedDataUrl, layer, sourcePivot);
+              if (layer === 'hour' && cropped.pivot) timePointerEl.hourPos = cropped.pivot;
+              if (layer === 'minute' && cropped.pivot) timePointerEl.minutePos = cropped.pivot;
+              if (layer === 'second' && cropped.pivot) timePointerEl.secondPos = cropped.pivot;
+              const { bytes } = decodeDataUrlToBytes(cropped.dataUrl, `Pointer image ${name}`);
               const newFile = { src: name, file: new File([bytes], name, { type: 'image/png' }) };
               const idx = elementFiles.findIndex(f => f.src === name);
               if (idx >= 0) elementFiles[idx] = newFile;
@@ -2172,15 +2278,26 @@ function StudioApp() {
             { name: 'hand_cover.png', dataUrl: handSet.cover },
           ];
           for (const { name, dataUrl } of builtInHandFiles) {
-            const layer = name.startsWith('hour_')
+            const layer: PointerLayer = name.startsWith('hour_')
               ? 'hour'
               : name.startsWith('minute_')
                 ? 'minute'
                 : name.startsWith('second_')
                   ? 'second'
                   : 'cover';
-            const effectedDataUrl = await applyPointerEffectsForZPK(dataUrl, timePointerEl, layer);
-            const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Pointer image ${name}`);
+              const effectedDataUrl = await applyPointerEffectsForZPK(dataUrl, timePointerEl, layer);
+            const sourcePivot = layer === 'hour'
+              ? timePointerEl.hourPos
+              : layer === 'minute'
+                ? timePointerEl.minutePos
+                : layer === 'second'
+                  ? timePointerEl.secondPos
+                  : undefined;
+            const cropped = await cropPointerAssetForExport(effectedDataUrl, layer, sourcePivot);
+            if (layer === 'hour' && cropped.pivot) timePointerEl.hourPos = cropped.pivot;
+            if (layer === 'minute' && cropped.pivot) timePointerEl.minutePos = cropped.pivot;
+            if (layer === 'second' && cropped.pivot) timePointerEl.secondPos = cropped.pivot;
+            const { bytes } = decodeDataUrlToBytes(cropped.dataUrl, `Pointer image ${name}`);
             const newFile = { src: name, file: new File([bytes], name, { type: 'image/png' }) };
             const idx = elementFiles.findIndex(f => f.src === name);
             if (idx >= 0) elementFiles[idx] = newFile;
