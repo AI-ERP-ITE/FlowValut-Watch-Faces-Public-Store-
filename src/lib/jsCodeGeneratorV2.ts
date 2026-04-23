@@ -813,6 +813,15 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
                     second_posY: px(${secondPosY}),
                     second_path: '${secondSrc}',` : '';
 
+  const coverOverlay = coverSrc ? `
+                // ${element.name} - Hub overlay (kept above hands)
+                let widget_${widgetIndex}_cover = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${centerX - 15}),
+                    y: px(${centerY - 15}),
+                    src: '${coverSrc}',
+                    show_level: hmUI.show_level.${showLevel}
+                });` : '';
+
   return `
                 // ${element.name} - TIME_POINTER Widget (Analog Clock)
                 let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TIME_POINTER, {
@@ -827,7 +836,7 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
                     minute_posY: px(${minutePosY}),
                     minute_path: '${minuteSrc}',${secondParams}
                     show_level: hmUI.show_level.${showLevel}
-                });`;
+                });${coverOverlay}`;
 }
 
 // ============================================================

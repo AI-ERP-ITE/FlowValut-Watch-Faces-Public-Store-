@@ -1201,6 +1201,12 @@ async function preparePointerGeometryForExport(
   const drawPivotX = pivotX * wid;
   const drawPivotY = layer === 'cover' ? pivotY : (pivotY / baseH) * targetH;
 
+  // Reserve safe margins so baked pointer shadows/glow are not clipped at export time.
+  const shadowPad = Math.ceil((Math.max(0, el.handShadow ?? 0) * 20) + (Math.max(0, el.handShadow ?? 0) * 4) + 6);
+  const glowPad = Math.ceil((Math.max(0, el.handGlow ?? 0) * 20) + 12);
+  const trailPad = Math.ceil(Math.max(0, el.handTrail ?? 0) * 6);
+  const effectPad = Math.max(0, shadowPad, glowPad, trailPad);
+
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -1224,16 +1230,16 @@ async function preparePointerGeometryForExport(
   }
 
   const out = document.createElement('canvas');
-  out.width = targetW;
-  out.height = targetH;
+  out.width = targetW + effectPad * 2;
+  out.height = targetH + effectPad * 2;
   const outCtx = out.getContext('2d');
   if (!outCtx) return { dataUrl };
-  outCtx.clearRect(0, 0, targetW, targetH);
-  outCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
+  outCtx.clearRect(0, 0, out.width, out.height);
+  outCtx.drawImage(canvas, sx, sy, sw, sh, effectPad, effectPad, targetW, targetH);
 
   const pivot = {
-    x: Math.round(clampPointerValue(drawPivotX, 0, targetW)),
-    y: Math.round(clampPointerValue(drawPivotY, 0, targetH)),
+    x: Math.round(clampPointerValue(drawPivotX + effectPad, 0, out.width)),
+    y: Math.round(clampPointerValue(drawPivotY + effectPad, 0, out.height)),
   };
 
   return { dataUrl: out.toDataURL('image/png'), pivot };

@@ -459,6 +459,15 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
                     second_posY: px(${secondPosY}),
                     second_path: '${secondSrc}',` : '';
 
+  const coverOverlay = coverSrc ? `
+                // ${element.name} - Hub overlay (kept above hands)
+                hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${centerX - 15}),
+                    y: px(${centerY - 15}),
+                    src: '${coverSrc}',
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });` : '';
+
   return `
                 // ${element.name} - TIME_POINTER Widget (Analog Clock)
                 hmUI.createWidget(hmUI.widget.TIME_POINTER, {
@@ -473,7 +482,7 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
                     minute_posY: px(${minutePosY}),
                     minute_path: '${minuteSrc}',${secondParams}
                     show_level: hmUI.show_level.ONLY_NORMAL
-                });`;
+                });${coverOverlay}`;
 }
 
 // ARC_PROGRESS - Arc progress indicator (battery, steps, etc.)
