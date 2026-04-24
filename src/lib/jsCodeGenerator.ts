@@ -444,14 +444,6 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
   const coverSrc = toAssetPath(element.coverSrc);
   const hasSeconds = !element.hideSeconds;
 
-  let coverParams = '';
-  if (coverSrc) {
-    coverParams = `
-                    hour_cover_path: '${coverSrc}',
-                    hour_cover_x: px(${centerX - 15}),
-                    hour_cover_y: px(${centerY - 15}),`;
-  }
-
   const secondParams = hasSeconds ? `
                     second_centerX: px(${centerX}),
                     second_centerY: px(${centerY}),
@@ -477,7 +469,7 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
                     hour_centerY: px(${centerY}),
                     hour_posX: px(${hourPosX}),
                     hour_posY: px(${hourPosY}),
-                    hour_path: '${hourSrc}',${coverParams}
+                  hour_path: '${hourSrc}',
                     minute_centerX: px(${centerX}),
                     minute_centerY: px(${centerY}),
                     minute_posX: px(${minutePosX}),
@@ -789,7 +781,6 @@ function generateDatePointerWidgetV3(element: WatchFaceElement): string {
   const centerY = element.center?.y ?? 240;
   const posX = element.hourPos?.x ?? 10;
   const posY = element.hourPos?.y ?? 60;
-  const src = element.src || 'date_hand.png';
   return `
                 // ${element.name} - DATE_POINTER Widget (${dateType})
                 hmUI.createWidget(hmUI.widget.DATE_POINTER, {
@@ -798,7 +789,6 @@ function generateDatePointerWidgetV3(element: WatchFaceElement): string {
                     center_y: px(${centerY}),
                     posX: px(${posX}),
                     posY: px(${posY}),
-                    path: '${src}',
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
 }

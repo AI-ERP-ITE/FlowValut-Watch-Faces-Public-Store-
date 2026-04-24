@@ -1227,7 +1227,7 @@ async function preparePointerGeometryForExport(
   let sy = 0;
   let sw = width;
   let sh = height;
-  if (!sourceMode) {
+  if (!sourceMode || layer === 'cover') {
     const bounds = getAlphaBoundsFromImageData(ctx.getImageData(0, 0, width, height).data, width, height);
     if (bounds) {
       sx = bounds.x;
