@@ -36,6 +36,28 @@ export const DEFAULT_EDIT_PARAMS: EditParams = {
   vignette:    0,
 };
 
+const DEFAULT_SHADOW_CLAMP = 47;
+
+function applyShadowClampToImageData(imageData: ImageData, threshold: number): void {
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+    const a = data[i + 3];
+
+    if (a === 0) continue;
+
+    if (r > 0 && r < threshold) r = 0;
+    if (g > 0 && g < threshold) g = 0;
+    if (b > 0 && b < threshold) b = 0;
+
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+  }
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -105,6 +127,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props) {
   const [editParams, setEditParams] = useState<EditParams>(DEFAULT_EDIT_PARAMS);
+  const [shadowClamp, setShadowClamp] = useState<number>(DEFAULT_SHADOW_CLAMP);
   const [flickerInfo, setFlickerInfo] = useState<FlickerPreviewInfo>({
     ratio: 0,
     severity: 'none',
@@ -144,32 +167,6 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
 
     const SIZE = 480;
 
-    // T013: Fast-path — all params at default → draw source image directly
-    const isDefault =
-      editParams.exposure === 0 && editParams.brightness === 0 && editParams.contrast === 0 &&
-      editParams.highlights === 0 && editParams.shadows === 0 && editParams.saturation === 0 &&
-      editParams.hue === 0 && editParams.temperature === 0 && editParams.tint === 0 &&
-      editParams.sharpness === 0 && editParams.vignette === 0;
-
-    if (isDefault) {
-      const ctx = canvas.getContext('2d')!;
-      ctx.clearRect(0, 0, SIZE, SIZE);
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(240, 240, 240, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(img, 0, 0, SIZE, SIZE);
-      ctx.restore();
-
-      const analysis = analyzeFlicker(ctx.getImageData(0, 0, SIZE, SIZE));
-      setFlickerInfo({
-        ratio: analysis.ratio,
-        severity: analysis.severity,
-        forbiddenCount: analysis.forbiddenCount,
-        totalCount: analysis.totalCount,
-      });
-      return;
-    }
     const { exposure, brightness, contrast, highlights, shadows,
             saturation, hue, temperature, tint, sharpness, vignette } = editParams;
 
@@ -341,14 +338,18 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
       ctx.restore();
     }
 
-    const analysis = analyzeFlicker(ctx.getImageData(0, 0, SIZE, SIZE));
+    const imageData = ctx.getImageData(0, 0, SIZE, SIZE);
+    applyShadowClampToImageData(imageData, shadowClamp);
+    ctx.putImageData(imageData, 0, 0);
+
+    const analysis = analyzeFlicker(imageData);
     setFlickerInfo({
       ratio: analysis.ratio,
       severity: analysis.severity,
       forbiddenCount: analysis.forbiddenCount,
       totalCount: analysis.totalCount,
     });
-  }, [editParams]);
+  }, [editParams, shadowClamp]);
 
   // T012: Schedule draw via RAF; cancel pending frame if params change again before it fires.
   // T028: Cancel on unmount too.
@@ -608,6 +609,8 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
             <SectionHeading>Detail</SectionHeading>
             <EditorSlider label="Sharpness" min={0} max={100} defaultValue={0} value={editParams.sharpness}
               onChange={(v) => setEditParams((p) => ({ ...p, sharpness: v }))} />
+            <EditorSlider label="Shadow Clamp" min={30} max={60} step={1} defaultValue={DEFAULT_SHADOW_CLAMP} value={shadowClamp}
+              onChange={(v) => setShadowClamp(v)} />
 
             {/* T024: Effects section */}
             <SectionHeading>Effects</SectionHeading>
@@ -622,7 +625,10 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
           <Button
             variant="outline"
             className="border-zinc-600 text-zinc-300 hover:bg-zinc-700"
-            onClick={() => setEditParams(DEFAULT_EDIT_PARAMS)}
+            onClick={() => {
+              setEditParams(DEFAULT_EDIT_PARAMS);
+              setShadowClamp(DEFAULT_SHADOW_CLAMP);
+            }}
           >
             Reset All
           </Button>
