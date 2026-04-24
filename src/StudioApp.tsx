@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical } from 'lucide-react';
+import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { QRDisplay } from '@/components/QRDisplay';
 import { StepIndicator } from '@/components/StepIndicator';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { ElementList } from '@/components/ElementList';
-import { InteractiveCanvas } from '@/components/InteractiveCanvas';
+import { InteractiveCanvas, type ElementWarningsMap } from '@/components/InteractiveCanvas';
 import { PropertyPanel } from '@/components/PropertyPanel';
 
 import { useApp, actions } from '@/context/AppContext';
@@ -1488,6 +1488,9 @@ function StudioApp() {
   const [watchFaceName, setWatchFaceName] = useState('');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
+  const [devicePreviewEnabled, setDevicePreviewEnabled] = useState(false);
+  const [showFlickerZones, setShowFlickerZones] = useState(false);
+  const [elementWarnings, setElementWarnings] = useState<ElementWarningsMap>({});
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showAddElement, setShowAddElement] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
@@ -2802,6 +2805,32 @@ function StudioApp() {
                         </button>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2 w-full max-w-sm mb-3">
+                      <button
+                        onClick={() => setDevicePreviewEnabled((v) => !v)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+                          devicePreviewEnabled
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                            : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                        }`}
+                        title="Simulate Zepp device rendering constraints in preview"
+                      >
+                        Device Preview Mode
+                      </button>
+                      <button
+                        onClick={() => setShowFlickerZones((v) => !v)}
+                        disabled={!devicePreviewEnabled}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                          showFlickerZones && devicePreviewEnabled
+                            ? 'bg-red-500/20 border-red-500 text-red-300'
+                            : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                        }`}
+                        title="Overlay forbidden RGB (1-46) flicker-prone pixels"
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Show Flicker Zones
+                      </button>
+                    </div>
                     <InteractiveCanvas
                       ref={canvasRef}
                       backgroundImage={state.backgroundImage}
@@ -2814,6 +2843,9 @@ function StudioApp() {
                         setSelectedElementId(el.id);
                       }}
                       showGrid={showGrid}
+                      devicePreviewEnabled={devicePreviewEnabled}
+                      showFlickerZones={showFlickerZones}
+                      onElementWarningsChange={setElementWarnings}
                       className="w-full max-w-sm"
                       customHandStyles={customHandStyles}
                     />
@@ -2842,6 +2874,7 @@ function StudioApp() {
                     </div>
                     <ElementList
                       elements={state.watchFaceConfig.elements}
+                      elementWarnings={devicePreviewEnabled ? elementWarnings : {}}
                       onToggleVisibility={handleToggleElement}
                       selectedElementId={selectedElementId}
                       onSelectElement={setSelectedElementId}

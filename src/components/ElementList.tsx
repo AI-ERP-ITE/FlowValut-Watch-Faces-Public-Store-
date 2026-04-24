@@ -1,9 +1,16 @@
 import { cn } from '@/lib/utils';
 import type { WatchFaceElement } from '@/types';
-import { Eye, EyeOff, GripVertical, Trash2 } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, GripVertical, Trash2 } from 'lucide-react';
+
+interface ElementWarningInfo {
+  hasFlickerRisk: boolean;
+  ratio: number;
+  severity: 'none' | 'medium' | 'high';
+}
 
 interface ElementListProps {
   elements: WatchFaceElement[];
+  elementWarnings?: Record<string, ElementWarningInfo>;
   onToggleVisibility?: (id: string) => void;
   onReorder?: (elements: WatchFaceElement[]) => void;
   onDeleteElement?: (id: string) => void;
@@ -14,6 +21,7 @@ interface ElementListProps {
 
 export function ElementList({
   elements,
+  elementWarnings,
   onToggleVisibility,
   onReorder,
   onDeleteElement,
@@ -48,22 +56,30 @@ export function ElementList({
       </h4>
       
       <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-        {elements.map((element) => (
-          <div
-            key={element.id}
-            onClick={() => onSelectElement?.(element.id)}
-            className={cn(
-              'group flex items-center gap-3 p-2.5 rounded-lg border transition-all',
-              element.engraveFrame
-                ? selectedElementId === element.id
-                  ? 'bg-amber-500/10 border-amber-500 border-l-[3px] cursor-default'
-                  : 'bg-[#1A1A1A] border-zinc-800 border-l-[3px] border-l-amber-500/60 hover:border-zinc-700'
-                : selectedElementId === element.id
-                  ? 'bg-cyan-500/10 border-cyan-500 cursor-default'
-                  : 'bg-[#1A1A1A] border-zinc-800 hover:border-zinc-700',
-              onSelectElement && 'cursor-pointer'
-            )}
-          >
+        {elements.map((element) => {
+          const warning = elementWarnings?.[element.id];
+          const hasWarning = !!warning?.hasFlickerRisk;
+          const warningColorClass = warning?.severity === 'high' ? 'text-red-400' : 'text-amber-400';
+          const warningTitle = warning
+            ? `Flicker Risk: contains low RGB values (1-46)\nMay appear unstable or disappear on device\nAffected ratio: ${(warning.ratio * 100).toFixed(1)}%`
+            : '';
+
+          return (
+            <div
+              key={element.id}
+              onClick={() => onSelectElement?.(element.id)}
+              className={cn(
+                'group flex items-center gap-3 p-2.5 rounded-lg border transition-all',
+                element.engraveFrame
+                  ? selectedElementId === element.id
+                    ? 'bg-amber-500/10 border-amber-500 border-l-[3px] cursor-default'
+                    : 'bg-[#1A1A1A] border-zinc-800 border-l-[3px] border-l-amber-500/60 hover:border-zinc-700'
+                  : selectedElementId === element.id
+                    ? 'bg-cyan-500/10 border-cyan-500 cursor-default'
+                    : 'bg-[#1A1A1A] border-zinc-800 hover:border-zinc-700',
+                onSelectElement && 'cursor-pointer'
+              )}
+            >
             {/* Drag handle */}
             {onReorder && (
               <button className="text-zinc-600 hover:text-zinc-400 cursor-grab active:cursor-grabbing">
@@ -79,6 +95,11 @@ export function ElementList({
               <p className="text-sm font-medium text-white truncate">
                 {element.engraveFrame && <span className="text-amber-400 mr-1">🔗</span>}
                 {element.name}
+                {hasWarning && (
+                  <span title={warningTitle} className={cn('inline-flex align-middle ml-2', warningColorClass)}>
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                  </span>
+                )}
               </p>
               <p className="text-xs text-zinc-500">
                 {element.type}
@@ -120,8 +141,9 @@ export function ElementList({
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {elements.length === 0 && (
