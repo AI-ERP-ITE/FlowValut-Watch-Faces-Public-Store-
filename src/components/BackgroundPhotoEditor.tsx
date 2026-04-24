@@ -37,6 +37,7 @@ export const DEFAULT_EDIT_PARAMS: EditParams = {
 };
 
 const DEFAULT_SHADOW_CLAMP = 47;
+const DEFAULT_SHADOW_CLAMP_ENABLED = false;
 
 function applyShadowClampToImageData(imageData: ImageData, threshold: number): void {
   const data = imageData.data;
@@ -128,6 +129,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props) {
   const [editParams, setEditParams] = useState<EditParams>(DEFAULT_EDIT_PARAMS);
   const [shadowClamp, setShadowClamp] = useState<number>(DEFAULT_SHADOW_CLAMP);
+  const [shadowClampEnabled, setShadowClampEnabled] = useState<boolean>(DEFAULT_SHADOW_CLAMP_ENABLED);
   const [flickerInfo, setFlickerInfo] = useState<FlickerPreviewInfo>({
     ratio: 0,
     severity: 'none',
@@ -339,8 +341,10 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
     }
 
     const imageData = ctx.getImageData(0, 0, SIZE, SIZE);
-    applyShadowClampToImageData(imageData, shadowClamp);
-    ctx.putImageData(imageData, 0, 0);
+    if (shadowClampEnabled) {
+      applyShadowClampToImageData(imageData, shadowClamp);
+      ctx.putImageData(imageData, 0, 0);
+    }
 
     const analysis = analyzeFlicker(imageData);
     setFlickerInfo({
@@ -349,7 +353,7 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
       forbiddenCount: analysis.forbiddenCount,
       totalCount: analysis.totalCount,
     });
-  }, [editParams, shadowClamp]);
+  }, [editParams, shadowClamp, shadowClampEnabled]);
 
   // T012: Schedule draw via RAF; cancel pending frame if params change again before it fires.
   // T028: Cancel on unmount too.
@@ -521,9 +525,15 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
       offCtx.fillRect(0, 0, SIZE, SIZE);
     }
 
+    if (shadowClampEnabled) {
+      const imageData = offCtx.getImageData(0, 0, SIZE, SIZE);
+      applyShadowClampToImageData(imageData, shadowClamp);
+      offCtx.putImageData(imageData, 0, 0);
+    }
+
     // Step 8: Export full 480×480 square PNG → dispatch via onSave
     onSave(off.toDataURL('image/png'));
-  }, [editParams, onSave]);
+  }, [editParams, onSave, shadowClamp, shadowClampEnabled]);
 
   return (
     // T003: Full-screen overlay with dark backdrop
@@ -609,6 +619,20 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
             <SectionHeading>Detail</SectionHeading>
             <EditorSlider label="Sharpness" min={0} max={100} defaultValue={0} value={editParams.sharpness}
               onChange={(v) => setEditParams((p) => ({ ...p, sharpness: v }))} />
+
+            <div className="flex items-center gap-3 py-1">
+              <span className="text-zinc-400 text-xs w-24 flex-shrink-0">Erase Flickery Shadows</span>
+              <label className="inline-flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={shadowClampEnabled}
+                  onChange={(e) => setShadowClampEnabled(e.target.checked)}
+                  className="accent-cyan-500"
+                />
+                <span>{shadowClampEnabled ? 'On' : 'Off'}</span>
+              </label>
+            </div>
+
             <EditorSlider label="Shadow Clamp" min={30} max={60} step={1} defaultValue={DEFAULT_SHADOW_CLAMP} value={shadowClamp}
               onChange={(v) => setShadowClamp(v)} />
 
@@ -628,6 +652,7 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
             onClick={() => {
               setEditParams(DEFAULT_EDIT_PARAMS);
               setShadowClamp(DEFAULT_SHADOW_CLAMP);
+              setShadowClampEnabled(DEFAULT_SHADOW_CLAMP_ENABLED);
             }}
           >
             Reset All
