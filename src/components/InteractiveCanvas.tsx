@@ -12,6 +12,7 @@ import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/pointerEffects';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
+import { analyzeFlicker, isFlickerForbiddenRgb } from '@/utils/flickerEngine';
 
 const CANVAS_SIZE = 480;
 const CX = 240;
@@ -752,10 +753,6 @@ function toRgb565Green(value: number): number {
   return Math.round((value / 255) * 63) * (255 / 63);
 }
 
-function isForbiddenRange(r: number, g: number, b: number): boolean {
-  return (r > 0 && r < 47) || (g > 0 && g < 47) || (b > 0 && b < 47);
-}
-
 function addFlickerOverlay(data: Uint8ClampedArray, invalidMask: Uint8Array): void {
   for (let i = 0; i < invalidMask.length; i += 1) {
     if (!invalidMask[i]) continue;
@@ -845,28 +842,15 @@ function analyzeElementFlickerRiskIsolated(
   );
 
   const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-
-  let invalidPixelCount = 0;
-  let visiblePixelCount = 0;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const alpha = data[i + 3];
-    if (alpha === 0) continue;
-    visiblePixelCount += 1;
-    if (isForbiddenRange(data[i], data[i + 1], data[i + 2])) {
-      invalidPixelCount += 1;
-    }
-  }
-
-  const ratio = visiblePixelCount > 0 ? invalidPixelCount / visiblePixelCount : 0;
-  const severity: ElementWarningInfo['severity'] = ratio > 0.1 ? 'high' : ratio > options.threshold ? 'medium' : 'none';
+  const analysis = analyzeFlicker(imageData, {
+    mediumThreshold: options.threshold,
+  });
   return {
-    hasFlickerRisk: ratio > options.threshold,
-    ratio,
-    severity,
-    invalidPixelCount,
-    visiblePixelCount,
+    hasFlickerRisk: analysis.ratio >= options.threshold,
+    ratio: analysis.ratio,
+    severity: analysis.severity,
+    invalidPixelCount: analysis.forbiddenCount,
+    visiblePixelCount: analysis.totalCount,
   };
 }
 
@@ -945,15 +929,8 @@ function applyDeviceSimulation(
 
   // Scene-level invalid mask for optional global red overlay.
   const originalData = new Uint8ClampedArray(imageData.data);
-
-  const invalidMask = new Uint8Array(width * height);
-  for (let i = 0, p = 0; i < originalData.length; i += 4, p += 1) {
-    const alpha = originalData[i + 3];
-    if (alpha === 0) continue;
-    if (isForbiddenRange(originalData[i], originalData[i + 1], originalData[i + 2])) {
-      invalidMask[p] = 1;
-    }
-  }
+  const sourceImageData = new ImageData(new Uint8ClampedArray(originalData), width, height);
+  const flickerAnalysis = analyzeFlicker(sourceImageData);
 
   // Pipeline order (strict): gamma -> forbidden clamp -> contrast -> quantization -> dither -> clamp -> sharpen
   for (let i = 0; i < data.length; i += 4) {
@@ -964,7 +941,7 @@ function applyDeviceSimulation(
     data[i + 1] = clampByte(Math.pow(data[i + 1] / 255, 0.85) * 255);
     data[i + 2] = clampByte(Math.pow(data[i + 2] / 255, 0.85) * 255);
 
-    if (isForbiddenRange(data[i], data[i + 1], data[i + 2])) {
+    if (isFlickerForbiddenRgb(data[i], data[i + 1], data[i + 2])) {
       if (data[i] > 0 && data[i] < 47) data[i] = 0;
       if (data[i + 1] > 0 && data[i + 1] < 47) data[i + 1] = 0;
       if (data[i + 2] > 0 && data[i + 2] < 47) data[i + 2] = 0;
@@ -1014,7 +991,7 @@ function applyDeviceSimulation(
   }
 
   if (options.showFlickerZones) {
-    addFlickerOverlay(data, invalidMask);
+    addFlickerOverlay(data, flickerAnalysis.mask);
   }
 
   ctx.putImageData(imageData, 0, 0);

@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { analyzeFlicker, type FlickerSeverity } from '@/utils/flickerEngine';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,13 @@ interface Props {
   onCancel: () => void;
 }
 
+interface FlickerPreviewInfo {
+  ratio: number;
+  severity: FlickerSeverity;
+  forbiddenCount: number;
+  totalCount: number;
+}
+
 // ── T020: Reusable slider row ─────────────────────────────────────────────────
 
 interface SliderProps {
@@ -53,13 +61,10 @@ interface SliderProps {
   value: number;
   defaultValue?: number;
   unit?: string;
-  safeMin?: number;  // values outside [safeMin, safeMax] show a flicker warning
-  safeMax?: number;
   onChange: (v: number) => void;
 }
 
-function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit = '', safeMin, safeMax, onChange }: SliderProps) {
-  const isUnsafe = (safeMin !== undefined && value < safeMin) || (safeMax !== undefined && value > safeMax);
+function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit = '', onChange }: SliderProps) {
   return (
     <>
       <div className="flex items-center gap-3 py-1">
@@ -75,21 +80,13 @@ function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit
         />
         {/* T032: double-click value badge to reset single param */}
         <span
-          className={`text-xs w-10 text-right flex-shrink-0 select-none cursor-pointer transition-colors hover:text-cyan-400 ${isUnsafe ? 'text-amber-400 font-semibold' : 'text-zinc-300'}`}
-          title={isUnsafe ? `⚠ May cause display flicker on watch. Safe range: ${safeMin ?? min} to ${safeMax ?? max}` : 'Double-click to reset'}
+          className="text-xs w-10 text-right flex-shrink-0 select-none cursor-pointer transition-colors hover:text-cyan-400 text-zinc-300"
+          title="Double-click to reset"
           onDoubleClick={() => onChange(defaultValue)}
         >
           {value > 0 && min < 0 ? `+${value}` : `${value}`}{unit}
         </span>
       </div>
-      {isUnsafe && (
-        <div className="flex items-center gap-1.5 mt-0.5 mb-1 px-1 py-1 rounded bg-amber-500/10 border border-amber-500/30">
-          <span className="text-amber-400 text-xs">⚠</span>
-          <span className="text-amber-300 text-[10px]">
-            May flicker on device — safe range: {safeMin ?? min} to {safeMax ?? max}
-          </span>
-        </div>
-      )}
     </>
   );
 }
@@ -108,6 +105,12 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props) {
   const [editParams, setEditParams] = useState<EditParams>(DEFAULT_EDIT_PARAMS);
+  const [flickerInfo, setFlickerInfo] = useState<FlickerPreviewInfo>({
+    ratio: 0,
+    severity: 'none',
+    forbiddenCount: 0,
+    totalCount: 0,
+  });
 
   // T007: Store loaded HTMLImageElement so draw functions can access it
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -157,6 +160,14 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
       ctx.clip();
       ctx.drawImage(img, 0, 0, SIZE, SIZE);
       ctx.restore();
+
+      const analysis = analyzeFlicker(ctx.getImageData(0, 0, SIZE, SIZE));
+      setFlickerInfo({
+        ratio: analysis.ratio,
+        severity: analysis.severity,
+        forbiddenCount: analysis.forbiddenCount,
+        totalCount: analysis.totalCount,
+      });
       return;
     }
     const { exposure, brightness, contrast, highlights, shadows,
@@ -329,6 +340,14 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
       ctx.fillRect(0, 0, SIZE, SIZE);
       ctx.restore();
     }
+
+    const analysis = analyzeFlicker(ctx.getImageData(0, 0, SIZE, SIZE));
+    setFlickerInfo({
+      ratio: analysis.ratio,
+      severity: analysis.severity,
+      forbiddenCount: analysis.forbiddenCount,
+      totalCount: analysis.totalCount,
+    });
   }, [editParams]);
 
   // T012: Schedule draw via RAF; cancel pending frame if params change again before it fires.
@@ -554,18 +573,24 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
 
           {/* Right column: sliders panel — scrollable */}
           <div className="flex-1 overflow-y-auto p-6 min-w-0">
+            <div className={`mb-3 rounded border px-3 py-2 text-xs ${flickerInfo.severity === 'high' ? 'border-red-500/40 bg-red-500/10 text-red-300' : flickerInfo.severity === 'medium' ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}>
+              <div className="font-semibold">Flicker risk: {flickerInfo.severity.toUpperCase()}</div>
+              <div className="mt-1 opacity-90">
+                Forbidden pixels: {flickerInfo.forbiddenCount}/{flickerInfo.totalCount} ({(flickerInfo.ratio * 100).toFixed(2)}%)
+              </div>
+            </div>
 
             {/* T021: Light section */}
             <SectionHeading>Light</SectionHeading>
-            <EditorSlider label="Exposure"   min={-100} max={100} safeMin={-40} safeMax={40} value={editParams.exposure}
+            <EditorSlider label="Exposure"   min={-100} max={100} value={editParams.exposure}
               onChange={(v) => setEditParams((p) => ({ ...p, exposure: v }))} />
             <EditorSlider label="Brightness" min={-100} max={100} value={editParams.brightness}
               onChange={(v) => setEditParams((p) => ({ ...p, brightness: v }))} />
             <EditorSlider label="Contrast"   min={-100} max={100} value={editParams.contrast}
               onChange={(v) => setEditParams((p) => ({ ...p, contrast: v }))} />
-            <EditorSlider label="Highlights" min={-100} max={100} safeMin={-65} safeMax={65} value={editParams.highlights}
+            <EditorSlider label="Highlights" min={-100} max={100} value={editParams.highlights}
               onChange={(v) => setEditParams((p) => ({ ...p, highlights: v }))} />
-            <EditorSlider label="Shadows"    min={-100} max={100} safeMin={-65} safeMax={65} value={editParams.shadows}
+            <EditorSlider label="Shadows"    min={-100} max={100} value={editParams.shadows}
               onChange={(v) => setEditParams((p) => ({ ...p, shadows: v }))} />
 
             {/* T022: Colour section */}
