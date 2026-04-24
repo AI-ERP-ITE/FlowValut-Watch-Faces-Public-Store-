@@ -1491,6 +1491,7 @@ function StudioApp() {
   const [devicePreviewEnabled, setDevicePreviewEnabled] = useState(false);
   const [showFlickerZones, setShowFlickerZones] = useState(false);
   const [elementWarnings, setElementWarnings] = useState<ElementWarningsMap>({});
+  const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showAddElement, setShowAddElement] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
@@ -2830,6 +2831,15 @@ function StudioApp() {
                         <AlertTriangle className="h-3.5 w-3.5" />
                         Show Flicker Zones
                       </button>
+                      <button
+                        onClick={() => setPreviewRefreshToken((v) => v + 1)}
+                        disabled={!devicePreviewEnabled}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-white/5 border-white/10 text-white/50 hover:text-white/70"
+                        title="Force refresh of per-element warning analysis"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Refresh Warnings
+                      </button>
                     </div>
                     <InteractiveCanvas
                       ref={canvasRef}
@@ -2845,6 +2855,7 @@ function StudioApp() {
                       showGrid={showGrid}
                       devicePreviewEnabled={devicePreviewEnabled}
                       showFlickerZones={showFlickerZones}
+                      refreshToken={previewRefreshToken}
                       onElementWarningsChange={setElementWarnings}
                       className="w-full max-w-sm"
                       customHandStyles={customHandStyles}

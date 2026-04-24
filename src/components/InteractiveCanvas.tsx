@@ -32,6 +32,7 @@ export interface InteractiveCanvasProps {
   showGrid?: boolean;
   devicePreviewEnabled?: boolean;
   showFlickerZones?: boolean;
+  refreshToken?: number;
   onElementWarningsChange?: (warnings: ElementWarningsMap) => void;
   className?: string;
   customHandStyles?: CustomHandRecord[];
@@ -57,6 +58,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   showGrid,
   devicePreviewEnabled,
   showFlickerZones,
+  refreshToken,
   onElementWarningsChange,
   className,
   customHandStyles,
@@ -86,6 +88,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   const lastComputedVersionRef = useRef<Record<string, number>>({});
   const lastDevicePreviewEnabledRef = useRef<boolean>(!!devicePreviewEnabled);
   const lastShowFlickerZonesRef = useRef<boolean>(!!showFlickerZones);
+  const lastRefreshTokenRef = useRef<number>(refreshToken ?? 0);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const analysisCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   useState(0); // reserved for future forced re-renders
@@ -124,7 +127,8 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     if (devicePreviewEnabled) {
       const forceRecompute =
         !lastDevicePreviewEnabledRef.current
-        || lastShowFlickerZonesRef.current !== !!showFlickerZones;
+        || lastShowFlickerZonesRef.current !== !!showFlickerZones
+        || lastRefreshTokenRef.current !== (refreshToken ?? 0);
 
       const warningPayload = computeElementWarningsIsolated(elements, {
         previousWarnings: lastWarningPayloadRef.current,
@@ -153,6 +157,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
       lastDevicePreviewEnabledRef.current = true;
       lastShowFlickerZonesRef.current = !!showFlickerZones;
+      lastRefreshTokenRef.current = refreshToken ?? 0;
     } else {
       if (lastWarningsKeyRef.current !== '{}') {
         lastWarningsKeyRef.current = '{}';
@@ -162,6 +167,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       }
       lastDevicePreviewEnabledRef.current = false;
       lastShowFlickerZonesRef.current = !!showFlickerZones;
+      lastRefreshTokenRef.current = refreshToken ?? 0;
     }
 
     // Selection highlight (drawn after simulation so editor controls remain readable)
@@ -169,7 +175,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const sel = elements.find((el) => el.id === selectedElementId);
       if (sel) drawSelection(ctx, sel);
     }
-  }, [devicePreviewEnabled, elements, onElementWarningsChange, selectedElementId, showFlickerZones]);
+  }, [devicePreviewEnabled, elements, onElementWarningsChange, refreshToken, selectedElementId, showFlickerZones]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Suppress click after a drag
