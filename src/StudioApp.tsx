@@ -54,6 +54,11 @@ import { normalizePointerEffects } from '@/lib/pointerEffects';
 import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
+import {
+  getAllowedDataTypesForElement,
+  getDataTypeLabel,
+  normalizeDataTypeForElement,
+} from '@/lib/elementDataRules';
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
 function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig {
@@ -1501,6 +1506,10 @@ function StudioApp() {
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
+  const addAllowedDataTypes = useMemo(
+    () => getAllowedDataTypesForElement(addElType, addElSubtype),
+    [addElType, addElSubtype]
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pointerParitySnapshotsRef = useRef<Partial<Record<PointerParityStage, ImageData>>>({});
   const pointerParityMissingAssetsRef = useRef<string[]>([]);
@@ -1666,9 +1675,12 @@ function StudioApp() {
     const { w = 120, h = 60 } = defaults[addElType] ?? {};
     const x = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : cx - Math.floor(w / 2);
     const y = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : Math.floor(canvas * 0.4) - Math.floor(h / 2);
-    const needsDataType = addElType === 'ARC_PROGRESS' || addElType === 'TEXT_IMG' || addElType === 'IMG_LEVEL';
+    const needsDataType = addAllowedDataTypes.length > 0;
     const isStatus = addElType === 'IMG_STATUS';
     const isArc = addElType === 'ARC_PROGRESS';
+    const normalizedAddDataType = normalizeDataTypeForElement(addElType, addElSubtype, addElDataType, {
+      fillDefaultWhenEmpty: true,
+    });
     const newEl: WatchFaceElement = {
       id: generateId(),
       type: addElType,
@@ -1679,7 +1691,7 @@ function StudioApp() {
       bounds: { x, y, width: w, height: h },
       visible: true,
       zIndex: maxZ + 1,
-      ...(needsDataType ? { dataType: addElDataType } : {}),
+      ...(needsDataType && normalizedAddDataType ? { dataType: normalizedAddDataType } : {}),
       ...(isStatus ? { statusType: addElDataType } : {}),
       ...(isArc ? { startAngle: -90, endAngle: 270, radius: 190, lineWidth: 10, color: '#00CC88' } : {}),
       ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cx } } : {}),
@@ -1691,6 +1703,16 @@ function StudioApp() {
     setShowAddElement(false);
     toast.success(`Added ${newEl.name}`);
   };
+
+  useEffect(() => {
+    const normalized = normalizeDataTypeForElement(addElType, addElSubtype, addElDataType, {
+      fillDefaultWhenEmpty: true,
+    });
+
+    if (normalized && normalized !== addElDataType) {
+      setAddElDataType(normalized);
+    }
+  }, [addElDataType, addElSubtype, addElType]);
 
   const handleAddFrame = (parent: WatchFaceElement) => {
     if (!state.watchFaceConfig) return;
@@ -2955,7 +2977,7 @@ function StudioApp() {
                       </div>
 
                       {/* Data type selector — shown for relevant widget types */}
-                      {(addElType === 'ARC_PROGRESS' || addElType === 'TEXT_IMG' || addElType === 'IMG_LEVEL') && (
+                      {addAllowedDataTypes.length > 0 && (
                         <div>
                           <p className="text-xs text-zinc-400 mb-2">Data type</p>
                           <select
@@ -2963,25 +2985,8 @@ function StudioApp() {
                             onChange={(e) => setAddElDataType(e.target.value)}
                             className="w-full bg-zinc-900 border border-zinc-700 text-white text-sm rounded px-2 py-1.5"
                           >
-                            {[
-                              { value: 'BATTERY',        label: 'Battery %'              },
-                              { value: 'STEP',           label: 'Step Count'             },
-                              { value: 'HEART',          label: 'Heart Rate'             },
-                              { value: 'SPO2',           label: 'Blood Oxygen'           },
-                              { value: 'CAL',            label: 'Calories'               },
-                              { value: 'DISTANCE',       label: 'Distance'               },
-                              { value: 'STRESS',         label: 'Stress Level'           },
-                              { value: 'PAI_WEEKLY',     label: 'PAI (Weekly)'           },
-                              { value: 'SLEEP',          label: 'Sleep Duration'         },
-                              { value: 'TRAINING_LOAD',  label: 'Training Load'          },
-                              { value: 'VO2MAX',         label: 'VO2 Max'                },
-                              { value: 'ALTIMETER',      label: 'Altitude'               },
-                              { value: 'UVI',            label: 'UV Index'               },
-                              { value: 'AQI',            label: 'Air Quality'            },
-                              { value: 'SUN_RISE',       label: 'Sunrise Time'           },
-                              { value: 'WEATHER_CURRENT',label: 'Weather Icon (sensor on device)' },
-                            ].map(dt => (
-                              <option key={dt.value} value={dt.value}>{dt.label}</option>
+                            {addAllowedDataTypes.map((dataType) => (
+                              <option key={dataType} value={dataType}>{getDataTypeLabel(dataType)}</option>
                             ))}
                           </select>
                         </div>
