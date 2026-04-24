@@ -13,6 +13,12 @@ import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
 import type { CustomHandRecord } from '@/lib/customHandStore';
 import { useState, useEffect, useRef } from 'react';
+import {
+  getAllowedDataTypesForElement,
+  getDataTypeLabel,
+  getImageSwitcherExpectedImageCount,
+  normalizeDataTypeForElement,
+} from '@/lib/elementDataRules';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -29,25 +35,6 @@ const WIDGET_TYPES: WatchFaceElement['type'][] = [
   'ARC_PROGRESS', 'TIME_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
   'TEXT_IMG', 'IMG', 'TEXT',
   'IMG_LEVEL', 'IMG_STATUS', 'CIRCLE', 'BUTTON',
-];
-
-const DATA_TYPES: { value: string; label: string }[] = [
-  { value: 'BATTERY',       label: 'Battery %'        },
-  { value: 'STEP',          label: 'Step Count'        },
-  { value: 'HEART',         label: 'Heart Rate'        },
-  { value: 'SPO2',          label: 'Blood Oxygen'      },
-  { value: 'CAL',           label: 'Calories'          },
-  { value: 'DISTANCE',      label: 'Distance'          },
-  { value: 'STRESS',        label: 'Stress Level'      },
-  { value: 'PAI_WEEKLY',    label: 'PAI (Weekly)'      },
-  { value: 'SLEEP',         label: 'Sleep Duration'    },
-  { value: 'TRAINING_LOAD', label: 'Training Load'     },
-  { value: 'VO2MAX',        label: 'VO2 Max'           },
-  { value: 'ALTIMETER',     label: 'Altitude'          },
-  { value: 'UVI',           label: 'UV Index'          },
-  { value: 'AQI',           label: 'Air Quality'       },
-  { value: 'SUN_RISE',      label: 'Sunrise Time'      },
-  { value: 'WEATHER_CURRENT', label: 'Weather (preview only)' },
 ];
 
 const APP_SHORTCUTS = [
@@ -112,6 +99,34 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     getFullIconLibrary().then(setAllIcons);
   }, [iconLibraryKey]);
 
+  const allowedDataTypes = element
+    ? getAllowedDataTypesForElement(element.type, element.subtype)
+    : [];
+  const expectedImageCount = element?.type === 'IMG_LEVEL'
+    ? getImageSwitcherExpectedImageCount(element.dataType)
+    : null;
+
+  const update = (changes: Partial<WatchFaceElement>) => {
+    if (!element) return;
+    onUpdateElement?.(element.id, changes);
+  };
+
+  useEffect(() => {
+    if (!element) return;
+    if (allowedDataTypes.length === 0) return;
+
+    const normalized = normalizeDataTypeForElement(element.type, element.subtype, element.dataType);
+    if (normalized !== element.dataType) {
+      update({ dataType: normalized });
+    }
+  }, [
+    allowedDataTypes.length,
+    element?.dataType,
+    element?.id,
+    element?.subtype,
+    element?.type,
+  ]);
+
   if (!element) {
     return (
       <div className={`rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/40 ${className ?? ''}`}>
@@ -119,8 +134,6 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       </div>
     );
   }
-
-  const update = (changes: Partial<WatchFaceElement>) => onUpdateElement?.(element.id, changes);
 
   // ── Frame element: show dedicated controls ──────────────────────────────
   if (element.engraveFrame) {
@@ -614,8 +627,8 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         );
       })()}
 
-      {/* DataType — shown for all data-bindable elements */}
-      {['ARC_PROGRESS', 'TEXT_IMG', 'IMG', 'IMG_LEVEL', 'TEXT', 'CIRCLE'].includes(element.type) && (
+      {/* DataType — shown only when current element accepts data bindings */}
+      {allowedDataTypes.length > 0 && (
         <Section label="Data Type">
           <Select value={element.dataType ?? '__none__'} onValueChange={v => update({ dataType: v === '__none__' ? undefined : v })}>
             <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
@@ -623,11 +636,17 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">— none —</SelectItem>
-              {DATA_TYPES.map(dt => (
-                <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+              {allowedDataTypes.map((dataType) => (
+                <SelectItem key={dataType} value={dataType}>{getDataTypeLabel(dataType)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {element.type === 'IMG_LEVEL' && expectedImageCount !== null && (
+            <p className="text-[10px] text-white/40 mt-1">
+              Expected images for {getDataTypeLabel(element.dataType ?? '')}: {expectedImageCount}
+              {Array.isArray(element.images) ? `, current: ${element.images.length}` : ''}
+            </p>
+          )}
         </Section>
       )}
 
