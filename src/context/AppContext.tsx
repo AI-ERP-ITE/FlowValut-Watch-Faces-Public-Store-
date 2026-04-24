@@ -52,6 +52,14 @@ type Action =
   | { type: 'REDO' }
   | { type: 'RESET' };
 
+function ensureElementsVersioned(elements: WatchFaceElement[]): WatchFaceElement[] {
+  return elements.map((el) => ({ ...el, version: el.version ?? 1 }));
+}
+
+function bumpElementVersion(element: WatchFaceElement): WatchFaceElement {
+  return { ...element, version: (element.version ?? 1) + 1 };
+}
+
 // Reducer
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -66,7 +74,12 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'SET_FULL_DESIGN_FILE':
       return { ...state, fullDesignFile: action.payload };
     case 'SET_WATCH_FACE_CONFIG':
-      return { ...state, watchFaceConfig: action.payload };
+      return {
+        ...state,
+        watchFaceConfig: action.payload
+          ? { ...action.payload, elements: ensureElementsVersioned(action.payload.elements) }
+          : null,
+      };
     case 'SET_ELEMENT_IMAGES':
       return { ...state, elementImages: action.payload };
     case 'SET_GENERATED_CODE':
@@ -92,9 +105,10 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'ADD_ELEMENT': {
       if (!state.watchFaceConfig) return state;
       const newUndoForAdd = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
+      const withVersion = { ...action.payload, version: action.payload.version ?? 1 };
       return {
         ...state,
-        watchFaceConfig: { ...state.watchFaceConfig, elements: [...state.watchFaceConfig.elements, action.payload] },
+        watchFaceConfig: { ...state.watchFaceConfig, elements: [...state.watchFaceConfig.elements, withVersion] },
         undoStack: newUndoForAdd,
         redoStack: [],
       };
@@ -123,7 +137,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const newUndoStack = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
       // First pass: apply the requested change
       let updatedElements = state.watchFaceConfig.elements.map(el =>
-        el.id === action.payload.id ? { ...el, ...action.payload.changes } : el
+        el.id === action.payload.id ? bumpElementVersion({ ...el, ...action.payload.changes }) : el
       );
       // Second pass: if bounds changed on a parent that has a linked frame, sync the frame bounds
       if (action.payload.changes.bounds) {
@@ -154,7 +168,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const changeMap = new Map(action.payload.map(p => [p.id, p.changes]));
       const batchUpdated = state.watchFaceConfig.elements.map(el => {
         const changes = changeMap.get(el.id);
-        return changes ? { ...el, ...changes } : el;
+        return changes ? bumpElementVersion({ ...el, ...changes }) : el;
       });
       return {
         ...state,
@@ -169,7 +183,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const currentForRedo = structuredClone(state.watchFaceConfig.elements);
       return {
         ...state,
-        watchFaceConfig: { ...state.watchFaceConfig, elements: previousElements },
+        watchFaceConfig: { ...state.watchFaceConfig, elements: ensureElementsVersioned(previousElements) },
         undoStack: state.undoStack.slice(0, -1),
         redoStack: [...state.redoStack, currentForRedo].slice(-30),
       };
@@ -180,7 +194,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const currentForUndo = structuredClone(state.watchFaceConfig.elements);
       return {
         ...state,
-        watchFaceConfig: { ...state.watchFaceConfig, elements: nextElements },
+        watchFaceConfig: { ...state.watchFaceConfig, elements: ensureElementsVersioned(nextElements) },
         undoStack: [...state.undoStack, currentForUndo].slice(-30),
         redoStack: state.redoStack.slice(0, -1),
       };

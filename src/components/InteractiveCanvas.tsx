@@ -81,9 +81,13 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   const digitImageCache = useRef(new Map<string, HTMLImageElement>());
   // handImageCache: style key → { hour, minute, second, cover } images
   const handImageCache = useRef(new Map<string, Map<string, HTMLImageElement>>());
-  const lastAnalysisKeyRef = useRef<string>('');
   const lastWarningsKeyRef = useRef<string>('');
   const lastWarningPayloadRef = useRef<ElementWarningsMap>({});
+  const lastComputedVersionRef = useRef<Record<string, number>>({});
+  const lastDevicePreviewEnabledRef = useRef<boolean>(!!devicePreviewEnabled);
+  const lastShowFlickerZonesRef = useRef<boolean>(!!showFlickerZones);
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const analysisCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   useState(0); // reserved for future forced re-renders
 
   // Clear custom hand cache entries when custom styles change (user created/updated a hand in IconLab)
@@ -118,14 +122,24 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     drawElements(ctx, elements, iconImageCache.current, digitImageCache.current, draw, handImageCache.current, customHandStylesRef.current);
 
     if (devicePreviewEnabled) {
-      const simulation = applyDeviceSimulation(ctx, elements, {
-        showFlickerZones: !!showFlickerZones,
-        threshold: 0.02,
-        previousAnalysisKey: lastAnalysisKeyRef.current,
+      const forceRecompute =
+        !lastDevicePreviewEnabledRef.current
+        || lastShowFlickerZonesRef.current !== !!showFlickerZones;
+
+      const warningPayload = computeElementWarningsIsolated(elements, {
         previousWarnings: lastWarningPayloadRef.current,
+        lastComputedVersion: lastComputedVersionRef.current,
+        iconCache: iconImageCache.current,
+        digitCache: digitImageCache.current,
+        handCache: handImageCache.current,
+        customHands: customHandStylesRef.current,
+        onAssetLoaded: draw,
+        forceRecompute,
+        threshold: 0.02,
+        analysisCanvasRef,
+        analysisCtxRef,
       });
 
-      const warningPayload = simulation.elementWarnings;
       const warningKey = JSON.stringify(warningPayload);
       if (warningKey !== lastWarningsKeyRef.current) {
         lastWarningsKeyRef.current = warningKey;
@@ -133,14 +147,21 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         onElementWarningsChange?.(warningPayload);
       }
 
-      lastAnalysisKeyRef.current = simulation.analysisKey;
+      applyDeviceSimulation(ctx, {
+        showFlickerZones: !!showFlickerZones,
+      });
+
+      lastDevicePreviewEnabledRef.current = true;
+      lastShowFlickerZonesRef.current = !!showFlickerZones;
     } else {
       if (lastWarningsKeyRef.current !== '{}') {
         lastWarningsKeyRef.current = '{}';
         lastWarningPayloadRef.current = {};
+        lastComputedVersionRef.current = {};
         onElementWarningsChange?.({});
       }
-      lastAnalysisKeyRef.current = '';
+      lastDevicePreviewEnabledRef.current = false;
+      lastShowFlickerZonesRef.current = !!showFlickerZones;
     }
 
     // Selection highlight (drawn after simulation so editor controls remain readable)
@@ -725,32 +746,8 @@ function toRgb565Green(value: number): number {
   return Math.round((value / 255) * 63) * (255 / 63);
 }
 
-function computeSourceFingerprint(data: Uint8ClampedArray): number {
-  let hash = 2166136261;
-  const step = 32;
-  for (let i = 0; i < data.length; i += step) {
-    hash ^= data[i] ?? 0;
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
 function isForbiddenRange(r: number, g: number, b: number): boolean {
   return (r > 0 && r < 47) || (g > 0 && g < 47) || (b > 0 && b < 47);
-}
-
-function createDefaultWarnings(elements: WatchFaceElement[]): ElementWarningsMap {
-  const map: ElementWarningsMap = {};
-  for (const el of elements) {
-    map[el.id] = {
-      hasFlickerRisk: false,
-      ratio: 0,
-      severity: 'none',
-      invalidPixelCount: 0,
-      visiblePixelCount: 0,
-    };
-  }
-  return map;
 }
 
 function addFlickerOverlay(data: Uint8ClampedArray, invalidMask: Uint8Array): void {
@@ -766,28 +763,182 @@ function addFlickerOverlay(data: Uint8ClampedArray, invalidMask: Uint8Array): vo
   }
 }
 
-function applyDeviceSimulation(
-  ctx: CanvasRenderingContext2D,
+function cloneElementForLocalAnalysis(element: WatchFaceElement): WatchFaceElement {
+  const offsetX = element.bounds.x;
+  const offsetY = element.bounds.y;
+  return {
+    ...element,
+    bounds: {
+      x: 0,
+      y: 0,
+      width: Math.max(1, Math.round(element.bounds.width)),
+      height: Math.max(1, Math.round(element.bounds.height)),
+    },
+    center: element.center
+      ? {
+        x: element.center.x - offsetX,
+        y: element.center.y - offsetY,
+      }
+      : undefined,
+    pointerCenter: element.pointerCenter
+      ? {
+        x: element.pointerCenter.x - offsetX,
+        y: element.pointerCenter.y - offsetY,
+      }
+      : undefined,
+  };
+}
+
+function analyzeElementFlickerRiskIsolated(
+  element: WatchFaceElement,
+  options: {
+    threshold: number;
+    iconCache: Map<string, HTMLImageElement>;
+    digitCache: Map<string, HTMLImageElement>;
+    handCache: Map<string, Map<string, HTMLImageElement>>;
+    customHands: CustomHandRecord[];
+    onAssetLoaded?: () => void;
+    analysisCanvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
+    analysisCtxRef: React.MutableRefObject<CanvasRenderingContext2D | null>;
+  },
+): ElementWarningInfo {
+  const width = Math.max(1, Math.round(element.bounds.width));
+  const height = Math.max(1, Math.round(element.bounds.height));
+
+  if (!options.analysisCanvasRef.current || !options.analysisCtxRef.current) {
+    const canvas = document.createElement('canvas');
+    options.analysisCanvasRef.current = canvas;
+    options.analysisCtxRef.current = canvas.getContext('2d');
+  }
+
+  const canvas = options.analysisCanvasRef.current;
+  const ctx = options.analysisCtxRef.current;
+  if (!canvas || !ctx) {
+    return {
+      hasFlickerRisk: false,
+      ratio: 0,
+      severity: 'none',
+      invalidPixelCount: 0,
+      visiblePixelCount: 0,
+    };
+  }
+
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+
+  ctx.clearRect(0, 0, width, height);
+  const localElement = cloneElementForLocalAnalysis(element);
+  drawElements(
+    ctx,
+    [localElement],
+    options.iconCache,
+    options.digitCache,
+    options.onAssetLoaded,
+    options.handCache,
+    options.customHands,
+  );
+
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  let invalidPixelCount = 0;
+  let visiblePixelCount = 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3];
+    if (alpha === 0) continue;
+    visiblePixelCount += 1;
+    if (isForbiddenRange(data[i], data[i + 1], data[i + 2])) {
+      invalidPixelCount += 1;
+    }
+  }
+
+  const ratio = visiblePixelCount > 0 ? invalidPixelCount / visiblePixelCount : 0;
+  const severity: ElementWarningInfo['severity'] = ratio > 0.1 ? 'high' : ratio > options.threshold ? 'medium' : 'none';
+  return {
+    hasFlickerRisk: ratio > options.threshold,
+    ratio,
+    severity,
+    invalidPixelCount,
+    visiblePixelCount,
+  };
+}
+
+function computeElementWarningsIsolated(
   elements: WatchFaceElement[],
   options: {
-    showFlickerZones: boolean;
-    threshold: number;
-    previousAnalysisKey: string;
     previousWarnings: ElementWarningsMap;
+    lastComputedVersion: Record<string, number>;
+    threshold: number;
+    iconCache: Map<string, HTMLImageElement>;
+    digitCache: Map<string, HTMLImageElement>;
+    handCache: Map<string, Map<string, HTMLImageElement>>;
+    customHands: CustomHandRecord[];
+    onAssetLoaded?: () => void;
+    forceRecompute?: boolean;
+    analysisCanvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
+    analysisCtxRef: React.MutableRefObject<CanvasRenderingContext2D | null>;
   },
-): { analysisKey: string; elementWarnings: ElementWarningsMap } {
+): ElementWarningsMap {
+  const warnings: ElementWarningsMap = {};
+  const nextVersions: Record<string, number> = {};
+
+  for (const element of elements) {
+    const version = element.version ?? 1;
+    const previousVersion = options.lastComputedVersion[element.id];
+    const canReuse = !options.forceRecompute && previousVersion === version && !!options.previousWarnings[element.id];
+
+    if (!element.visible) {
+      warnings[element.id] = {
+        hasFlickerRisk: false,
+        ratio: 0,
+        severity: 'none',
+        invalidPixelCount: 0,
+        visiblePixelCount: 0,
+      };
+      nextVersions[element.id] = version;
+      continue;
+    }
+
+    if (canReuse) {
+      warnings[element.id] = options.previousWarnings[element.id];
+      nextVersions[element.id] = version;
+      continue;
+    }
+
+    warnings[element.id] = analyzeElementFlickerRiskIsolated(element, {
+      threshold: options.threshold,
+      iconCache: options.iconCache,
+      digitCache: options.digitCache,
+      handCache: options.handCache,
+      customHands: options.customHands,
+      onAssetLoaded: options.onAssetLoaded,
+      analysisCanvasRef: options.analysisCanvasRef,
+      analysisCtxRef: options.analysisCtxRef,
+    });
+    nextVersions[element.id] = version;
+  }
+
+  for (const key of Object.keys(options.lastComputedVersion)) {
+    delete options.lastComputedVersion[key];
+  }
+  Object.assign(options.lastComputedVersion, nextVersions);
+  return warnings;
+}
+
+function applyDeviceSimulation(
+  ctx: CanvasRenderingContext2D,
+  options: {
+    showFlickerZones: boolean;
+  },
+): void {
   const width = ctx.canvas.width;
   const height = ctx.canvas.height;
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
-  // Critical: analysis must run against immutable original pixels before any pipeline mutation.
+  // Scene-level invalid mask for optional global red overlay.
   const originalData = new Uint8ClampedArray(imageData.data);
-  const sourceFingerprint = computeSourceFingerprint(originalData);
-  const elementSignature = elements
-    .map((el) => `${el.id}:${el.visible ? 1 : 0}:${Math.round(el.bounds.x)}:${Math.round(el.bounds.y)}:${Math.round(el.bounds.width)}:${Math.round(el.bounds.height)}`)
-    .join('|');
-  const analysisKey = `${width}x${height}|${sourceFingerprint}|${elementSignature}`;
 
   const invalidMask = new Uint8Array(width * height);
   for (let i = 0, p = 0; i < originalData.length; i += 4, p += 1) {
@@ -796,44 +947,6 @@ function applyDeviceSimulation(
     if (isForbiddenRange(originalData[i], originalData[i + 1], originalData[i + 2])) {
       invalidMask[p] = 1;
     }
-  }
-
-  let elementWarnings = createDefaultWarnings(elements);
-
-  if (analysisKey !== options.previousAnalysisKey) {
-    for (const el of elements) {
-      if (!el.visible) continue;
-      const x0 = Math.max(0, Math.floor(el.bounds.x));
-      const y0 = Math.max(0, Math.floor(el.bounds.y));
-      const x1 = Math.min(width, Math.ceil(el.bounds.x + el.bounds.width));
-      const y1 = Math.min(height, Math.ceil(el.bounds.y + el.bounds.height));
-
-      let invalidPixelCount = 0;
-      let visiblePixelCount = 0;
-
-      for (let y = y0; y < y1; y += 1) {
-        for (let x = x0; x < x1; x += 1) {
-          const pixelIndex = y * width + x;
-          const base = pixelIndex * 4;
-          const alpha = originalData[base + 3];
-          if (alpha === 0) continue;
-          visiblePixelCount += 1;
-          if (invalidMask[pixelIndex]) invalidPixelCount += 1;
-        }
-      }
-
-      const ratio = visiblePixelCount > 0 ? invalidPixelCount / visiblePixelCount : 0;
-      const severity: ElementWarningInfo['severity'] = ratio > 0.1 ? 'high' : ratio > options.threshold ? 'medium' : 'none';
-      elementWarnings[el.id] = {
-        hasFlickerRisk: ratio > options.threshold,
-        ratio,
-        severity,
-        invalidPixelCount,
-        visiblePixelCount,
-      };
-    }
-  } else {
-    elementWarnings = options.previousWarnings;
   }
 
   // Pipeline order (strict): gamma -> forbidden clamp -> contrast -> quantization -> dither -> clamp -> sharpen
@@ -899,8 +1012,6 @@ function applyDeviceSimulation(
   }
 
   ctx.putImageData(imageData, 0, 0);
-
-  return { analysisKey, elementWarnings };
 }
 
 // ─── Element Dispatcher ─────────────────────────────────────────────────────────

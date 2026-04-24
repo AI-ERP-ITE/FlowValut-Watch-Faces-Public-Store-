@@ -2,6 +2,7 @@
 
 export interface WatchFaceElement {
   id: string;
+  version?: number;
   type: 'TIME_POINTER' | 'IMG_LEVEL' | 'TEXT' | 'IMG' | 'ARC_PROGRESS' | 'CIRCLE' | 'TEXT_IMG' | 'BUTTON' | 'IMG_STATUS' | 'IMG_TIME' | 'IMG_DATE' | 'IMG_WEEK' | 'FILL_RECT' | 'STROKE_RECT' | 'IMG_ANIM' | 'IMG_PROGRESS' | 'DATE_POINTER' | 'IMG_CLICK';
   subtype?: string;
   name: string;
