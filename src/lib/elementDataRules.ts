@@ -5,6 +5,7 @@ export type RuleElementKey =
   | 'DIGITAL_HOURS'
   | 'DIGITAL_MINUTES'
   | 'DIGITAL_SECONDS'
+  | 'GAUGE_POINTER'
   | 'ARC_PROGRESS'
   | 'NUMERIC_DISPLAY'
   | 'DATE_DIGIT'
@@ -58,6 +59,9 @@ export const ELEMENT_TO_DATA: Record<RuleElementKey, readonly string[]> = {
   DIGITAL_MINUTES: [],
   DIGITAL_SECONDS: [],
   ANALOG_CLOCK: [],
+  // IMG_POINTER capability completion: bounded/progress sensor and weather metrics only.
+  // Rotation is handled by Zepp runtime via start_angle/end_angle normalization.
+  GAUGE_POINTER: ['BATTERY', 'STEP', 'CAL', 'DISTANCE', 'STAND', 'PAI', 'FAT_BURN', 'STRESS', 'SPO2', 'HUMIDITY', 'UVI', 'AQI', 'HEART'],
   DATE_DIGIT: [],
   WEEKDAY_NAME: [],
 
@@ -124,6 +128,7 @@ export function toRuleElementKey(type: WatchFaceElement['type'], subtype?: strin
   if (type === 'IMG') return 'STATIC_IMAGE';
   if (type === 'CIRCLE') return 'SHAPE';
   if (type === 'TIME_POINTER') return 'ANALOG_CLOCK';
+  if (type === 'GAUGE_POINTER') return 'GAUGE_POINTER';
   return null;
 }
 

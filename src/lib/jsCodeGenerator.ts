@@ -347,6 +347,8 @@ function generateWidgetCode(element: WatchFaceElement): string {
   switch (element.type) {
     case 'TIME_POINTER':
       return generateTimePointerWidgetV3(element);
+    case 'GAUGE_POINTER':
+      return generateGaugePointerWidgetV3(element);
     case 'ARC_PROGRESS':
       return generateArcProgressWidgetV3(element);
     case 'TEXT_IMG':
@@ -477,6 +479,35 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
                     minute_path: '${minuteSrc}',${secondParams}
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });${coverOverlay}`;
+}
+
+// GAUGE_POINTER - Data-driven rotating needle (IMG_POINTER)
+function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
+  const width = element.bounds.width || 40;
+  const height = element.bounds.height || 120;
+  const centerX = element.center?.x ?? (element.bounds.x + Math.floor(width / 2));
+  const centerY = element.center?.y ?? (element.bounds.y + Math.floor(height / 2));
+  const pivotX = element.hourPos?.x ?? Math.floor(width / 2);
+  const pivotY = element.hourPos?.y ?? height;
+  const startAngle = element.startAngle ?? -90;
+  const endAngle = element.endAngle ?? 90;
+  const src = element.src || 'gauge_pointer.png';
+  const dataType = element.dataType || 'BATTERY';
+
+  return `
+                // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
+                hmUI.createWidget(hmUI.widget.IMG_POINTER, {
+                    src: '${src}',
+                    center_x: px(${centerX}),
+                    center_y: px(${centerY}),
+                    x: px(${pivotX}),
+                    y: px(${pivotY}),
+                    start_angle: ${startAngle},
+                    end_angle: ${endAngle},
+                    type: hmUI.data_type.${dataType},
+                    invalid_visible: true,
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
 }
 
 // ARC_PROGRESS - Arc progress indicator (battery, steps, etc.)

@@ -608,6 +608,8 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
       return generateTextImgWidget(element, widgetIndex, showLevel);
     case 'TIME_POINTER':
       return generateTimePointerWidget(element, widgetIndex, showLevel);
+    case 'GAUGE_POINTER':
+      return generateGaugePointerWidget(element, widgetIndex, showLevel);
     case 'TEXT':
       return generateTextWidget(element, widgetIndex, showLevel);
     case 'BUTTON':
@@ -658,6 +660,35 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
   }
   
   // Handle IMG elements (static images)
+  // GAUGE_POINTER - Data-driven rotating needle (IMG_POINTER)
+  function generateGaugePointerWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+    const width = element.bounds.width || 40;
+    const height = element.bounds.height || 120;
+    const centerX = element.center?.x ?? (element.bounds.x + Math.floor(width / 2));
+    const centerY = element.center?.y ?? (element.bounds.y + Math.floor(height / 2));
+    const pivotX = element.hourPos?.x ?? Math.floor(width / 2);
+    const pivotY = element.hourPos?.y ?? height;
+    const startAngle = element.startAngle ?? -90;
+    const endAngle = element.endAngle ?? 90;
+    const src = element.src || 'gauge_pointer.png';
+    const dataType = element.dataType || 'BATTERY';
+
+    return `
+                  // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
+                  let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_POINTER, {
+                      src: '${src}',
+                      center_x: px(${centerX}),
+                      center_y: px(${centerY}),
+                      x: px(${pivotX}),
+                      y: px(${pivotY}),
+                      start_angle: ${startAngle},
+                      end_angle: ${endAngle},
+                      type: hmUI.data_type.${dataType},
+                      invalid_visible: true,
+                      show_level: hmUI.show_level.${showLevel}
+                  });`;
+  }
+
   if (element.type === 'IMG') {
     // Drop-shadow baked → padded shadow PNG
     if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'IMG');

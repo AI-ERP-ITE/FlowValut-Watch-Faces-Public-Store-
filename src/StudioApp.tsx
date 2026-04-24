@@ -1661,6 +1661,7 @@ function StudioApp() {
     const defaults: Partial<Record<WatchFaceElement['type'], { w: number; h: number }>> = {
       TEXT: { w: 160, h: 50 },
       ARC_PROGRESS: { w: 400, h: 400 },
+      GAUGE_POINTER: { w: 40, h: 120 },
       TEXT_IMG: { w: 160, h: 50 },
       IMG: { w: 100, h: 100 },
       IMG_TIME: { w: 200, h: 80 },
@@ -1695,6 +1696,15 @@ function StudioApp() {
       ...(isStatus ? { statusType: addElDataType } : {}),
       ...(isArc ? { startAngle: -90, endAngle: 270, radius: 190, lineWidth: 10, color: '#00CC88' } : {}),
       ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cx } } : {}),
+      ...(addElType === 'GAUGE_POINTER'
+        ? {
+            src: 'gauge_pointer.png',
+            center: { x: cx, y: Math.floor(canvas * 0.72) },
+            hourPos: { x: Math.floor(w / 2), y: h - 8 },
+            startAngle: -90,
+            endAngle: 90,
+          }
+        : {}),
       ...(addElType === 'TEXT' ? { text: 'Text', fontSize: 36, color: '#FFFFFF' } : {}),
       ...(addElType === 'CIRCLE' ? { shapeType: addElShapeType, color: '0xFFFFFF', ...(addElShapeType === 'rounded_rect' ? { shapeCornerRadius: 12 } : {}) } : {}),
     };
@@ -2954,6 +2964,7 @@ function StudioApp() {
                               { type: 'IMG' as const, label: 'Static Image', icon: '🖼️', desc: 'A static image or icon from your library' },
                               { type: 'CIRCLE' as const, label: 'Shape', icon: '⚪', desc: 'Circle, filled rect, stroke rect or rounded rect shape' },
                               { type: 'TIME_POINTER' as const, label: 'Analog Clock', icon: '🕐', desc: 'Analog clock with rotating hour, minute and second hands' },
+                              { type: 'GAUGE_POINTER' as const, label: 'Gauge Pointer', icon: '📍', desc: 'Data-driven rotating needle (Zepp IMG_POINTER) for bounded metrics like battery, steps, heart, stress and weather indices' },
                             ] as { type: WatchFaceElement['type']; label: string; icon: string; sub?: string; desc: string }[]
                           ).map((opt) => {
                             const isSelected = addElType === opt.type && (addElSubtype || '') === (opt.sub || '');

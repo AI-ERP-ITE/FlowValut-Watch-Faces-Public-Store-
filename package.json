@@ -10,7 +10,15 @@
     "preview": "vite preview",
     "sync-downloads": "tsx scripts/syncDownloads.ts",
     "regenerate": "tsx scripts/regenerate.ts",
-    "rollback": "tsx scripts/rollback.ts"
+    "rollback": "tsx scripts/rollback.ts",
+    "investigation:capture": "node scripts/captureInvestigationRun.mjs",
+    "investigation:create:pointer-zpk": "tsx scripts/createPointerSampleZpk.mjs",
+    "investigation:validate:zpk": "node scripts/validateZpkParity.mjs",
+    "investigation:validate:manifest": "node scripts/verifyAssetManifest.mjs",
+    "investigation:validate:minimums": "node scripts/validateRunMinimums.mjs",
+    "investigation:validate:sc001": "node scripts/validateSc001MatrixIntegrity.mjs",
+    "investigation:validate:coverage": "node scripts/validateTwoDeviceClassCoverage.mjs",
+    "investigation:validate:nonintrusive": "node scripts/checkInstrumentationNonIntrusive.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
