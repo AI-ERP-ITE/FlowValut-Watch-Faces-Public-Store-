@@ -55,6 +55,12 @@ import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
 import {
+  DEFAULT_GAUGE_POINTER_FILENAME,
+  createDefaultGaugePointerDataUrl,
+  gaugePointerAssetName,
+  normalizeGaugePivot,
+} from '@/lib/gaugePointerDefaults';
+import {
   getAllowedDataTypesForElement,
   getDataTypeLabel,
   normalizeDataTypeForElement,
@@ -65,14 +71,21 @@ function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig 
   return {
     ...config,
     elements: config.elements.map((el) => {
-      if (el.type !== 'TIME_POINTER') return el;
+      if (el.type !== 'TIME_POINTER' && el.type !== 'GAUGE_POINTER') return el;
       const effects = normalizePointerEffects(el);
+      const gaugePivot = el.type === 'GAUGE_POINTER' ? normalizeGaugePivot(el) : null;
       return {
         ...el,
         pointerBrightness: effects.brightness,
         pointerContrast: effects.contrast,
         pointerSaturation: effects.saturation,
         pointerOpacity: effects.opacity,
+        ...(gaugePivot
+          ? {
+              pivotX: gaugePivot.pivotX,
+              pivotY: gaugePivot.pivotY,
+            }
+          : {}),
       };
     }),
   };
@@ -995,7 +1008,7 @@ async function applyIconEffectsForZPK(
 async function applyPointerEffectsForZPK(
   dataUrl: string,
   el: WatchFaceElement,
-  _layer: 'hour' | 'minute' | 'second' | 'cover',
+  _layer: 'hour' | 'minute' | 'second' | 'cover' | 'gauge',
 ): Promise<string> {
   const effects = normalizePointerEffects(el);
   const shadowIntensity = Math.max(0, Math.min(1, el.handShadow ?? 0));
@@ -1698,9 +1711,11 @@ function StudioApp() {
       ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cx } } : {}),
       ...(addElType === 'GAUGE_POINTER'
         ? {
-            src: 'gauge_pointer.png',
+            src: DEFAULT_GAUGE_POINTER_FILENAME,
             center: { x: cx, y: Math.floor(canvas * 0.72) },
             hourPos: { x: Math.floor(w / 2), y: h - 8 },
+            pivotX: 0.5,
+            pivotY: 0.9,
             startAngle: -90,
             endAngle: 90,
           }
@@ -2223,6 +2238,29 @@ function StudioApp() {
         }
       }
 
+      // Inject GAUGE_POINTER assets with deterministic fallback + pointer effects.
+      for (const el of state.watchFaceConfig.elements) {
+        if (el.type !== 'GAUGE_POINTER') continue;
+        const filename = gaugePointerAssetName(el);
+        let sourceDataUrl: string | null = null;
+        if (el.src?.startsWith('data:')) {
+          sourceDataUrl = el.src;
+        } else {
+          const existing = state.elementImages.find((img) => img.name === filename);
+          sourceDataUrl = existing?.dataUrl ?? null;
+        }
+        if (!sourceDataUrl && filename === DEFAULT_GAUGE_POINTER_FILENAME) {
+          sourceDataUrl = createDefaultGaugePointerDataUrl(el.bounds.width || 40, el.bounds.height || 120);
+        }
+        if (!sourceDataUrl) continue;
+        const effectedDataUrl = await applyPointerEffectsForZPK(sourceDataUrl, el, 'gauge');
+        const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Gauge pointer image ${filename}`);
+        const existingIdx = elementFiles.findIndex((f) => f.src === filename);
+        const nextFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
+        if (existingIdx >= 0) elementFiles[existingIdx] = nextFile;
+        else elementFiles.push(nextFile);
+      }
+
       // Inject curved text PNGs for TEXT elements with curvedText
       for (const el of state.watchFaceConfig.elements) {
         if (el.type === 'TEXT' && el.curvedText) {
@@ -2254,6 +2292,13 @@ function StudioApp() {
       const exportElements = state.watchFaceConfig.elements.map(el => ({
         ...el,
         bounds: { ...el.bounds },
+        ...(el.type === 'GAUGE_POINTER'
+          ? {
+              src: gaugePointerAssetName(el),
+              assetFilename: gaugePointerAssetName(el),
+              ...normalizeGaugePivot(el),
+            }
+          : {}),
         ...(el.center ? { center: { ...el.center } } : {}),
         ...(el.pointerCenter ? { pointerCenter: { ...el.pointerCenter } } : {}),
         ...(el.hourPos ? { hourPos: { ...el.hourPos } } : {}),
@@ -2297,6 +2342,20 @@ function StudioApp() {
             });
             bakeResult = renderImgWithShadowToPng(el, imgEl);
           }
+        } else if (el.type === 'GAUGE_POINTER') {
+          const filename = gaugePointerAssetName(el);
+          const existingFile = elementFiles.find(f => f.src === filename);
+          if (existingFile) {
+            const imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
+              const img = new Image();
+              img.onload = () => resolve(img);
+              img.onerror = reject;
+              const reader = new FileReader();
+              reader.onload = () => { img.src = reader.result as string; };
+              reader.readAsDataURL(existingFile.file);
+            });
+            bakeResult = renderImgWithShadowToPng(el, imgEl);
+          }
         } else if (el.type === 'FILL_RECT' && !el.engraveFrame) {
           bakeResult = renderFillRectWithShadowToPng(el);
         } else if (el.type === 'STROKE_RECT') {
@@ -2309,6 +2368,27 @@ function StudioApp() {
           const filename = `shadow_${safeName}.png`;
           const { bytes } = decodeDataUrlToBytes(bakeResult.dataUrl, `Drop shadow image ${filename}`);
           elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
+          if (el.type === 'GAUGE_POINTER') {
+            const pivot = normalizeGaugePivot(el);
+            const oldW = Math.max(1, el.bounds.width || 1);
+            const oldH = Math.max(1, el.bounds.height || 1);
+            const newW = oldW + bakeResult.pad * 2;
+            const newH = oldH + bakeResult.pad * 2;
+            const oldPivotX = oldW * pivot.pivotX;
+            const oldPivotY = oldH * pivot.pivotY;
+            const shiftedPivotX = oldPivotX + bakeResult.pad;
+            const shiftedPivotY = oldPivotY + bakeResult.pad;
+            el.bounds = {
+              x: el.bounds.x - bakeResult.pad,
+              y: el.bounds.y - bakeResult.pad,
+              width: newW,
+              height: newH,
+            };
+            el.pivotX = shiftedPivotX / newW;
+            el.pivotY = shiftedPivotY / newH;
+            el.src = filename;
+            el.assetFilename = filename;
+          }
         }
       }
 

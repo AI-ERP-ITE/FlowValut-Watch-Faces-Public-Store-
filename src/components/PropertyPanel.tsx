@@ -19,6 +19,7 @@ import {
   getImageSwitcherExpectedImageCount,
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
+import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -32,7 +33,7 @@ export interface PropertyPanelProps {
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
-  'ARC_PROGRESS', 'TIME_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
+  'ARC_PROGRESS', 'TIME_POINTER', 'GAUGE_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
   'TEXT_IMG', 'IMG', 'TEXT',
   'IMG_LEVEL', 'IMG_STATUS', 'CIRCLE', 'BUTTON',
 ];
@@ -56,6 +57,7 @@ const APP_SHORTCUTS = [
 const TYPE_LABELS: Record<string, string> = {
   ARC_PROGRESS: 'Arc Progress',
   TIME_POINTER: 'Clock Hands',
+  GAUGE_POINTER: 'Gauge Pointer',
   TEXT_IMG: 'Text Image',
   IMG: 'Image',
   IMG_TIME: 'Time Image',
@@ -350,6 +352,13 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         changes.hourPos = { x: 11, y: 118 };
         changes.minutePos = { x: 8, y: 172 };
         changes.secondPos = { x: 4, y: 180 };
+        break;
+      case 'GAUGE_POINTER':
+        changes.src = element.src ?? DEFAULT_GAUGE_POINTER_FILENAME;
+        changes.startAngle = element.startAngle ?? -90;
+        changes.endAngle = element.endAngle ?? 90;
+        changes.pivotX = normalizeGaugePivot(element).pivotX;
+        changes.pivotY = normalizeGaugePivot(element).pivotY;
         break;
       case 'TEXT':
         changes.fontSize = element.fontSize ?? 20;
@@ -698,6 +707,40 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </>
       )}
 
+      {element.type === 'GAUGE_POINTER' && (
+        <Section label="Gauge Pointer">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-white/40 w-14 shrink-0">Source</span>
+              <Input
+                value={element.src ?? DEFAULT_GAUGE_POINTER_FILENAME}
+                onChange={e => update({ src: e.target.value || DEFAULT_GAUGE_POINTER_FILENAME })}
+                className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <FieldRow>
+              <NumField label="Start°" value={element.startAngle ?? -90} onChange={v => update({ startAngle: v })} />
+              <NumField label="End°" value={element.endAngle ?? 90} onChange={v => update({ endAngle: v })} />
+            </FieldRow>
+            <FieldRow>
+              <NumField
+                label="Pivot X"
+                value={Number((element.pivotX ?? normalizeGaugePivot(element).pivotX).toFixed(2))}
+                onChange={v => update({ pivotX: clamp(v, 0, 1) })}
+                step="0.01"
+              />
+              <NumField
+                label="Pivot Y"
+                value={Number((element.pivotY ?? normalizeGaugePivot(element).pivotY).toFixed(2))}
+                onChange={v => update({ pivotY: clamp(v, 0, 1) })}
+                step="0.01"
+              />
+            </FieldRow>
+            <p className="text-[9px] text-white/35">Pivot uses normalized values in local pointer box (0..1).</p>
+          </div>
+        </Section>
+      )}
+
       {/* TIME_POINTER-specific fields */}
       {element.type === 'TIME_POINTER' && (
         <Section label="Hand Style">
@@ -942,8 +985,8 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
-      {/* TIME_POINTER — Pointer Image Effects (031) */}
-      {element.type === 'TIME_POINTER' && (
+      {/* POINTER effects — TIME_POINTER + GAUGE_POINTER */}
+      {(element.type === 'TIME_POINTER' || element.type === 'GAUGE_POINTER') && (
         <Section label="Pointer Image Effects">
           <div className="space-y-1">
             <div className="flex items-center justify-between">
@@ -1472,13 +1515,14 @@ function FieldRow({ children }: { children: React.ReactNode }) {
   return <div className="flex gap-2">{children}</div>;
 }
 
-function NumField({ label, value, onChange, disabled }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean }) {
+function NumField({ label, value, onChange, disabled, step }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean; step?: string }) {
   return (
     <div className="flex items-center gap-1 flex-1">
       <span className="text-[10px] text-white/40 w-4 shrink-0">{label}</span>
       <Input
         type="number"
-        value={Math.round(value)}
+        value={step ? value : Math.round(value)}
+        step={step}
         onChange={e => onChange(Number(e.target.value))}
         disabled={disabled}
         className={cn(

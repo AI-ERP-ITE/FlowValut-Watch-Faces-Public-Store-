@@ -13,6 +13,11 @@ import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/poin
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
 import { analyzeFlicker, isFlickerForbiddenRgb } from '@/utils/flickerEngine';
+import {
+  DEFAULT_GAUGE_POINTER_FILENAME,
+  createDefaultGaugePointerDataUrl,
+  normalizeGaugePivot,
+} from '@/lib/gaugePointerDefaults';
 
 const CANVAS_SIZE = 480;
 const CX = 240;
@@ -1047,6 +1052,9 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'TIME_POINTER':
         drawTimePointer(ctx, el, handCache, onIconLoaded, customHands);
         break;
+      case 'GAUGE_POINTER':
+        drawGaugePointer(ctx, el, iconCache, onIconLoaded);
+        break;
       case 'IMG_TIME':
       case 'IMG_DATE':
       case 'IMG_WEEK':
@@ -1667,6 +1675,94 @@ function drawTimePointer(
     ctx.fill();
     ctx.restore();
   }
+}
+
+function gaugeProgress(el: WatchFaceElement): number {
+  switch (el.dataType) {
+    case 'BATTERY': return 0.72;
+    case 'STEP': return 0.58;
+    case 'HEART': return 0.44;
+    case 'SPO2': return 0.91;
+    case 'STRESS': return 0.38;
+    default: return 0.65;
+  }
+}
+
+function drawFallbackGaugeNeedle(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const tipY = -Math.max(8, height * 0.82);
+  ctx.fillStyle = '#f4f4f4';
+  ctx.beginPath();
+  ctx.moveTo(0, tipY);
+  ctx.lineTo(-Math.max(2, width * 0.08), 0);
+  ctx.lineTo(Math.max(2, width * 0.08), 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#f87171';
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(3, width * 0.12), 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawGaugePointer(
+  ctx: CanvasRenderingContext2D,
+  el: WatchFaceElement,
+  iconCache?: Map<string, HTMLImageElement>,
+  onLoaded?: () => void,
+) {
+  const width = Math.max(8, el.bounds.width || 40);
+  const height = Math.max(24, el.bounds.height || 120);
+  const startAngle = el.startAngle ?? -90;
+  const endAngle = el.endAngle ?? 90;
+  const angleDeg = startAngle + (endAngle - startAngle) * gaugeProgress(el);
+  const pivot = normalizeGaugePivot(el);
+  const pivotX = width * pivot.pivotX;
+  const pivotY = height * pivot.pivotY;
+  const src = el.src || DEFAULT_GAUGE_POINTER_FILENAME;
+  const resolvedSrc = src === DEFAULT_GAUGE_POINTER_FILENAME
+    ? createDefaultGaugePointerDataUrl(width, height)
+    : src;
+
+  let image: HTMLImageElement | null = null;
+  if (iconCache && resolvedSrc) {
+    const cacheKey = `__gauge_${resolvedSrc}`;
+    const cached = iconCache.get(cacheKey);
+    if (cached) {
+      image = cached;
+    } else {
+      const img = new Image();
+      img.onload = () => {
+        iconCache.set(cacheKey, img);
+        onLoaded?.();
+      };
+      img.src = resolvedSrc;
+    }
+  }
+
+  const pointerEffects = normalizePointerEffects(el);
+  const hasPointerEffects = hasNonDefaultPointerEffects(pointerEffects);
+
+  ctx.save();
+  applyShadow(ctx, el);
+  ctx.translate(el.bounds.x + pivotX, el.bounds.y + pivotY);
+  ctx.rotate(degToRad(angleDeg));
+
+  if (image) {
+    const base = hasPointerEffects
+      ? bakeDeterministicColorAdjustments(image, width, height, {
+        brightness: pointerEffects.brightness,
+        contrast: pointerEffects.contrast,
+        saturation: pointerEffects.saturation,
+        saturationMode: 'delta',
+        opacity: pointerEffects.opacity,
+      })
+      : image;
+    ctx.drawImage(base, -pivotX, -pivotY, width, height);
+  } else {
+    drawFallbackGaugeNeedle(ctx, width, height);
+  }
+
+  clearShadow(ctx);
+  ctx.restore();
 }
 
 function drawHand(

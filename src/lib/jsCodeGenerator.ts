@@ -5,6 +5,7 @@
 import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import { generateWatchFaceCodeV2 } from './jsCodeGeneratorV2';
 import { FONT_STYLES } from '@/lib/fontLibrary';
+import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 
 /** Compute shadow-bake padding (mirrors V2 helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
@@ -485,13 +486,14 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
 function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
   const width = element.bounds.width || 40;
   const height = element.bounds.height || 120;
-  const centerX = element.center?.x ?? (element.bounds.x + Math.floor(width / 2));
-  const centerY = element.center?.y ?? (element.bounds.y + Math.floor(height / 2));
-  const pivotX = element.hourPos?.x ?? Math.floor(width / 2);
-  const pivotY = element.hourPos?.y ?? height;
+  const pivot = normalizeGaugePivot(element);
+  const pivotX = Math.round(width * pivot.pivotX);
+  const pivotY = Math.round(height * pivot.pivotY);
+  const centerX = Math.round(element.bounds.x + pivotX);
+  const centerY = Math.round(element.bounds.y + pivotY);
   const startAngle = element.startAngle ?? -90;
   const endAngle = element.endAngle ?? 90;
-  const src = element.src || 'gauge_pointer.png';
+  const src = gaugePointerAssetName(element);
   const dataType = element.dataType || 'BATTERY';
 
   return `

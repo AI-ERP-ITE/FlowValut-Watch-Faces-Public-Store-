@@ -43,6 +43,9 @@ export interface WatchFaceElement {
   hourPos?: { x: number; y: number };
   minutePos?: { x: number; y: number };
   secondPos?: { x: number; y: number };
+  // GAUGE_POINTER normalized pivot (0..1 in local element bounds)
+  pivotX?: number;
+  pivotY?: number;
 
   // BUTTON specific
   clickAction?: string;

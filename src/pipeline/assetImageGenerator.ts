@@ -10,6 +10,7 @@ import { generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
+import { createDefaultGaugePointerDataUrl } from '@/lib/gaugePointerDefaults';
 
 // ─── Canvas Utility ─────────────────────────────────────────────────────────────
 
@@ -226,6 +227,7 @@ const DATA_TYPE_PREFIXES: Record<string, string> = {
   UVI:      'uvi_digit',
   AQI:      'aqi_digit',
   HUMIDITY: 'humid_digit',
+  WEATHER_CURRENT: 'weather',
   SUN_RISE: 'sunrise_digit',
   SUN_SET:  'sunset_digit',
   WIND:     'wind_digit',
@@ -246,6 +248,22 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
         if (!generatedSets.has('clock_hands')) {
           images.push(...generateClockHands('silver'));
           generatedSets.add('clock_hands');
+        }
+        break;
+      }
+
+      case 'GAUGE_POINTER': {
+        const src = el.assets?.src ?? 'gauge_pointer.png';
+        if (!generatedSets.has(src)) {
+          const width = Math.max(8, el.w ?? 40);
+          const height = Math.max(24, el.h ?? 120);
+          images.push({
+            name: src,
+            dataUrl: createDefaultGaugePointerDataUrl(width, height),
+            bounds: { x: 0, y: 0, width, height },
+            type: 'GAUGE_POINTER',
+          });
+          generatedSets.add(src);
         }
         break;
       }

@@ -126,6 +126,7 @@ export interface AIExtractionResult {
 
 export type ZeppWidget =
   | 'TIME_POINTER'
+  | 'GAUGE_POINTER'
   | 'IMG_TIME'
   | 'IMG_DATE'
   | 'IMG_WEEK'

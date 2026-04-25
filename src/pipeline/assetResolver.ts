@@ -37,6 +37,11 @@ function resolveForWidget(
         coverSrc:      'hand_cover.png',
       };
 
+    case 'GAUGE_POINTER':
+      return {
+        src: 'gauge_pointer.png',
+      };
+
     case 'IMG_TIME':
       return {
         fontArray: digitArray('time_digit'),
