@@ -1102,15 +1102,18 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         applyShadow(ctx, el);
         if (el.dataType === 'WEATHER_CURRENT' && iconCache) {
           const wStyle = (el.weatherStyle ?? 'flat') as WeatherStyle;
-          const cacheKey = `__weather_${wStyle}_2`;
+          // Deterministic preview fallback until live weather code simulation is wired.
+          const simulatedWeatherCode = 0;
+          const cacheKey = `__weather_${wStyle}_${simulatedWeatherCode}`;
           const cached = iconCache.get(cacheKey);
           if (cached) {
             ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
           } else {
             const dataUrls = generateWeatherSet(wStyle);
+            const clampedIndex = Math.max(0, Math.min(dataUrls.length - 1, simulatedWeatherCode));
             const img = new Image();
             img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
-            img.src = dataUrls[2];
+            img.src = dataUrls[clampedIndex] || dataUrls[0];
             drawPlaceholder(ctx, el);
           }
         } else {

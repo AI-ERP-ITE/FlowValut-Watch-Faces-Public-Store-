@@ -26,6 +26,8 @@ import { extractElementsFromImage, type PipelineAIProvider } from '@/pipeline/pi
 import { generatePipelineAssets, generateCurvedTextImage } from '@/pipeline/assetImageGenerator';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
+import { generateWeatherSet } from '@/lib/weatherIconSets';
+import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { buildSourceJson, sourceJsonToBlob } from '@/lib/sourceJsonGenerator';
 import { PublishForm } from '@/components/PublishForm';
 import { AdminPanel } from '@/components/AdminPanel';
@@ -89,6 +91,10 @@ function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig 
       };
     }),
   };
+}
+
+function weatherImageFilenames(): string[] {
+  return Array.from({ length: 29 }, (_, i) => `weather_${i}.png`);
 }
 
 // Mock Kimi analysis - simulates AI analysis
@@ -1706,6 +1712,9 @@ function StudioApp() {
       visible: true,
       zIndex: maxZ + 1,
       ...(needsDataType && normalizedAddDataType ? { dataType: normalizedAddDataType } : {}),
+      ...(addElType === 'IMG_LEVEL' && normalizedAddDataType === 'WEATHER_CURRENT'
+        ? { images: weatherImageFilenames(), weatherStyle: 'flat' }
+        : {}),
       ...(isStatus ? { statusType: addElDataType } : {}),
       ...(isArc ? { startAngle: -90, endAngle: 270, radius: 190, lineWidth: 10, color: '#00CC88' } : {}),
       ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cx } } : {}),
@@ -2213,6 +2222,32 @@ function StudioApp() {
       }
       console.log('[App] Digit images regenerated with current colors/fonts:', freshDigits.length, 'files updated');
 
+      // Ensure weather IMG_LEVEL elements always ship a full 29-image set and image_array filenames.
+      const weatherFilesByStyle = new Set<string>();
+      for (const el of state.watchFaceConfig.elements) {
+        if (el.type !== 'IMG_LEVEL' || el.dataType !== 'WEATHER_CURRENT') continue;
+        const weatherStyle = ((el.weatherStyle ?? 'flat') as WeatherStyle);
+        const weatherFiles = weatherImageFilenames();
+
+        const styleKey = `weather_${weatherStyle}`;
+        if (weatherFilesByStyle.has(styleKey)) continue;
+
+        const dataUrls = generateWeatherSet(weatherStyle);
+        for (let i = 0; i < weatherFiles.length; i++) {
+          const filename = weatherFiles[i];
+          const dataUrl = dataUrls[i] ?? dataUrls[0];
+          const { bytes } = decodeDataUrlToBytes(dataUrl, `Weather image ${filename}`);
+          const newFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
+          const existingIndex = elementFiles.findIndex(f => f.src === filename);
+          if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
+          else elementFiles.push(newFile);
+        }
+        weatherFilesByStyle.add(styleKey);
+      }
+      if (weatherFilesByStyle.size > 0) {
+        console.log('[App] Weather IMG_LEVEL assets regenerated:', weatherFilesByStyle.size, 'style set(s)');
+      }
+
       // Pre-warm Tabler icon cache so getIconByKey works synchronously for tabler:* keys
       if (state.watchFaceConfig.elements.some(el => el.iconKey?.startsWith('tabler:'))) {
         dispatch(actions.setLoadingMessage('Warming icon cache...'));
@@ -2305,6 +2340,11 @@ function StudioApp() {
         ...(el.minutePos ? { minutePos: { ...el.minutePos } } : {}),
         ...(el.secondPos ? { secondPos: { ...el.secondPos } } : {}),
       }));
+      for (const el of exportElements) {
+        if (el.type === 'IMG_LEVEL' && el.dataType === 'WEATHER_CURRENT') {
+          el.images = weatherImageFilenames();
+        }
+      }
       const configForBuild: WatchFaceConfig = {
         ...state.watchFaceConfig,
         elements: exportElements,
