@@ -97,6 +97,10 @@ function weatherImageFilenames(): string[] {
   return Array.from({ length: 29 }, (_, i) => `weather_${i}.png`);
 }
 
+function isWeatherImgLevelDataType(dataType: string | undefined): boolean {
+  return dataType === 'WEATHER_CURRENT' || dataType === 'WEATHER_STATUS';
+}
+
 // Mock Kimi analysis - simulates AI analysis
 async function mockKimiAnalysis(
   _backgroundImage: string,
@@ -388,7 +392,7 @@ async function mockKimiAnalysis(
       name: 'Weather Icon',
       bounds: { x: 60, y: resolution.height - 60, width: 40, height: 40 },
       images: Array.from({length: 29}, (_, i) => `weather_${i}.png`),
-      dataType: 'WEATHER_CURRENT',
+      dataType: 'WEATHER_STATUS',
       visible: true,
       zIndex: 6,
     },
@@ -1712,7 +1716,7 @@ function StudioApp() {
       visible: true,
       zIndex: maxZ + 1,
       ...(needsDataType && normalizedAddDataType ? { dataType: normalizedAddDataType } : {}),
-      ...(addElType === 'IMG_LEVEL' && normalizedAddDataType === 'WEATHER_CURRENT'
+      ...(addElType === 'IMG_LEVEL' && isWeatherImgLevelDataType(normalizedAddDataType)
         ? { images: weatherImageFilenames(), weatherStyle: 'flat' }
         : {}),
       ...(isStatus ? { statusType: addElDataType } : {}),
@@ -2225,7 +2229,7 @@ function StudioApp() {
       // Ensure weather IMG_LEVEL elements always ship a full 29-image set and image_array filenames.
       const weatherFilesByStyle = new Set<string>();
       for (const el of state.watchFaceConfig.elements) {
-        if (el.type !== 'IMG_LEVEL' || el.dataType !== 'WEATHER_CURRENT') continue;
+        if (el.type !== 'IMG_LEVEL' || !isWeatherImgLevelDataType(el.dataType)) continue;
         const weatherStyle = ((el.weatherStyle ?? 'flat') as WeatherStyle);
         const weatherFiles = weatherImageFilenames();
 
@@ -2341,7 +2345,7 @@ function StudioApp() {
         ...(el.secondPos ? { secondPos: { ...el.secondPos } } : {}),
       }));
       for (const el of exportElements) {
-        if (el.type === 'IMG_LEVEL' && el.dataType === 'WEATHER_CURRENT') {
+        if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
           el.images = weatherImageFilenames();
         }
       }

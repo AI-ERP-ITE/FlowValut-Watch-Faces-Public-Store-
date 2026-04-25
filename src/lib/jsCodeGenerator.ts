@@ -717,8 +717,12 @@ function generateCircleWidgetV3(element: WatchFaceElement): string {
 function generateImgLevelWidgetV3(element: WatchFaceElement): string {
   const images = element.images || (element.src ? [element.src] : []);
   const imageArrayStr = `[${images.map(img => `"${img}"`).join(', ')}]`;
-  const typeParam = element.dataType
-    ? `\n                    type: hmUI.data_type.${element.dataType},`
+  const resolvedImgLevelType =
+    element.dataType === 'WEATHER_CURRENT' || element.dataType === 'WEATHER_STATUS'
+      ? 'WEATHER'
+      : element.dataType;
+  const typeParam = resolvedImgLevelType
+    ? `\n                    type: hmUI.data_type.${resolvedImgLevelType},`
     : '';
 
   return `

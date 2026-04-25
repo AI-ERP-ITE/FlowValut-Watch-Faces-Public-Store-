@@ -1100,7 +1100,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'IMG_LEVEL':
         ctx.save();
         applyShadow(ctx, el);
-        if (el.dataType === 'WEATHER_CURRENT' && iconCache) {
+        if ((el.dataType === 'WEATHER_CURRENT' || el.dataType === 'WEATHER_STATUS') && iconCache) {
           const wStyle = (el.weatherStyle ?? 'flat') as WeatherStyle;
           // Deterministic preview fallback until live weather code simulation is wired.
           const simulatedWeatherCode = 0;
