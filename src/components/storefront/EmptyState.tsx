@@ -13,9 +13,9 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[40vh] w-full py-20">
-      <div className="flex flex-col items-center gap-4 px-8 py-10 rounded-2xl border border-[#181A1F] bg-[#181A1F]/50 max-w-sm w-full text-center">
+      <div className="flex flex-col items-center gap-4 px-8 py-10 rounded-2xl border border-[#2d3440] bg-[#131821]/70 max-w-sm w-full text-center vault-glass">
         {/* Minimal monochrome icon */}
-        <div className="w-10 h-10 rounded-full border border-[#8E9196]/30 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full border border-[#8E9196]/45 flex items-center justify-center">
           <svg
             width="18"
             height="18"
@@ -32,7 +32,7 @@ export function EmptyState({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <h3 className="font-sans font-light text-2xl tracking-tight text-[#D9DBE0]">
+          <h3 className="font-sans font-light text-2xl tracking-tight text-[#E1E4EA]">
             {title}
           </h3>
           <p className="font-mono text-sm text-[#8E9196] leading-relaxed">
@@ -43,7 +43,7 @@ export function EmptyState({
         {showClearFilters && onClearFilters && (
           <button
             onClick={onClearFilters}
-            className="mt-2 px-4 py-1.5 rounded-full text-xs font-mono text-[#C0A678] border border-[#C0A678]/40 hover:border-[#C0A678] hover:bg-[#C0A678]/5 transition-colors"
+            className="mt-2 px-4 py-1.5 rounded-full text-xs font-mono text-[#E8D2A8] border border-[#C7A86F]/45 hover:border-[#C7A86F] hover:bg-[#C7A86F]/10 transition-colors"
           >
             Clear all filters
           </button>

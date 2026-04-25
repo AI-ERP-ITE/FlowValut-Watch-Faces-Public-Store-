@@ -21,7 +21,7 @@ export function ProductPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
+      <div className="min-h-screen flex items-center justify-center text-[#8E9196] text-sm">
         Loading…
       </div>
     );
@@ -29,7 +29,7 @@ export function ProductPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-red-400 text-sm">
+      <div className="min-h-screen flex items-center justify-center text-red-400 text-sm">
         {error}
       </div>
     );
@@ -37,7 +37,7 @@ export function ProductPage() {
 
   if (!entry) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4 text-zinc-400">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-[#8E9196]">
         <span className="text-5xl">⌚</span>
         <p className="text-sm">Watchface not found.</p>
         <Link to="/" className="text-xs underline underline-offset-4 hover:text-zinc-200">
@@ -64,25 +64,25 @@ export function ProductPage() {
   });
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen vault-shell">
       <div className="max-w-5xl mx-auto px-4 py-8">
 
         {/* Breadcrumb */}
-        <nav className="text-xs text-zinc-500 mb-6 flex items-center gap-1.5">
-          <Link to="/" className="hover:text-zinc-300 transition-colors">Browse</Link>
+        <nav className="text-xs text-[#8E9196] mb-6 flex items-center gap-1.5 font-mono">
+          <Link to="/" className="hover:text-[#E1E4EA] transition-colors">Browse</Link>
           <span>/</span>
           {entry.categories[0] && (
             <>
               <Link
                 to={`/category/${entry.categories[0]}`}
-                className="hover:text-zinc-300 transition-colors capitalize"
+                className="hover:text-[#E1E4EA] transition-colors capitalize"
               >
                 {entry.categories[0]}
               </Link>
               <span>/</span>
             </>
           )}
-          <span className="text-zinc-300">{entry.name}</span>
+          <span className="text-[#E1E4EA]">{entry.name}</span>
         </nav>
 
         {/* Main layout */}
@@ -91,7 +91,7 @@ export function ProductPage() {
           {/* ── Left: Preview ───────────────────────────────────────── */}
           <div className="space-y-4">
             {/* Main preview */}
-            <div className="aspect-square rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+            <div className="aspect-square rounded-2xl overflow-hidden bg-[#121418] border border-[#2f3743] flex items-center justify-center">
               {entry.previewPath ? (
                 <img
                   src={`${baseUrl}${entry.previewPath}`}
@@ -99,14 +99,14 @@ export function ProductPage() {
                   className="w-full h-full object-contain"
                 />
               ) : (
-                <span className="text-6xl text-zinc-700">⌚</span>
+                <span className="text-6xl text-[#6e7786]">⌚</span>
               )}
             </div>
 
             {/* QR code */}
             {entry.qrPath && (
-              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-                <p className="text-xs text-zinc-500">Scan on your phone to install</p>
+              <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#121418] border border-[#2f3743]">
+                <p className="text-xs text-[#8E9196]">Scan on your phone to install</p>
                 <img
                   src={`${baseUrl}${entry.qrPath}`}
                   alt="Install QR code"
@@ -120,18 +120,18 @@ export function ProductPage() {
           <div className="space-y-6">
             {/* Name + price */}
             <div>
-              <h1 className="text-3xl font-bold text-white leading-tight">{entry.name}</h1>
+              <h1 className="text-3xl font-light text-[#E1E4EA] leading-tight">{entry.name}</h1>
               <div className="flex items-center gap-3 mt-2">
                 {isFree ? (
                   <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                     FREE
                   </span>
                 ) : (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#C7A86F]/15 text-[#E8D2A8] border border-[#C7A86F]/45">
                     ${entry.price.toFixed(2)}
                   </span>
                 )}
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-[#8E9196]">
                   {entry.downloads.toLocaleString()} download{entry.downloads !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -144,7 +144,7 @@ export function ProductPage() {
                 w-full py-3 rounded-xl font-semibold text-sm transition-all
                 ${isFree
                   ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20'
-                  : 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-500/25'
+                  : 'bg-[#bc9456] hover:bg-[#d2af78] text-[#17120a] shadow-lg shadow-[#c7a86f]/30'
                 }
               `}
             >
@@ -153,7 +153,7 @@ export function ProductPage() {
 
             {/* Compatible models */}
             <div>
-              <p className="text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">
+              <p className="text-xs font-medium uppercase tracking-widest text-[#8E9196] mb-2">
                 Compatible Watches
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -161,7 +161,7 @@ export function ProductPage() {
                   <Link
                     key={slug}
                     to={`/model/${slug}`}
-                    className="px-2.5 py-1 rounded-full text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                    className="px-2.5 py-1 rounded-full text-xs bg-[#121418] border border-[#2f3743] text-[#8E9196] hover:text-[#E8D2A8] hover:border-[#C7A86F]/45 transition-colors"
                   >
                     {model.name}
                   </Link>
@@ -172,7 +172,7 @@ export function ProductPage() {
             {/* Spec info */}
             {specGroup && (
               <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">
+                <p className="text-xs font-medium uppercase tracking-widest text-[#8E9196] mb-2">
                   Specs
                 </p>
                 <div className="flex gap-2 flex-wrap">
@@ -186,7 +186,7 @@ export function ProductPage() {
             {/* Hashtags */}
             {entry.hashtags.length > 0 && (
               <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">
+                <p className="text-xs font-medium uppercase tracking-widest text-[#8E9196] mb-2">
                   Tags
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -194,7 +194,7 @@ export function ProductPage() {
                     <Link
                       key={tag}
                       to={`/search?q=${encodeURIComponent(tag)}`}
-                      className="px-2.5 py-1 rounded-full text-xs bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 transition-colors"
+                      className="px-2.5 py-1 rounded-full text-xs bg-[#121418] border border-[#2f3743] text-[#8E9196] hover:text-[#E8D2A8] hover:border-[#C7A86F]/45 transition-colors"
                     >
                       #{tag}
                     </Link>
@@ -206,7 +206,7 @@ export function ProductPage() {
             {/* Categories */}
             {entry.categories.length > 0 && (
               <div>
-                <p className="text-xs font-medium uppercase tracking-widest text-zinc-500 mb-2">
+                <p className="text-xs font-medium uppercase tracking-widest text-[#8E9196] mb-2">
                   Categories
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -214,7 +214,7 @@ export function ProductPage() {
                     <Link
                       key={cat}
                       to={`/category/${cat}`}
-                      className="px-2.5 py-1 rounded-full text-xs bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors capitalize"
+                      className="px-2.5 py-1 rounded-full text-xs bg-[#121418] border border-[#2f3743] text-[#8E9196] hover:text-[#E8D2A8] hover:border-[#C7A86F]/45 transition-colors capitalize"
                     >
                       {cat}
                     </Link>
@@ -224,7 +224,7 @@ export function ProductPage() {
             )}
 
             {/* Meta */}
-            <p className="text-xs text-zinc-600">Added {formattedDate}</p>
+            <p className="text-xs text-[#7f8794]">Added {formattedDate}</p>
           </div>
         </div>
       </div>
@@ -234,7 +234,7 @@ export function ProductPage() {
 
 function SpecBadge({ label }: { label: string }) {
   return (
-    <span className="px-2.5 py-1 rounded-md text-xs bg-zinc-800 border border-zinc-700 text-zinc-400 capitalize">
+    <span className="px-2.5 py-1 rounded-md text-xs bg-[#121418] border border-[#2f3743] text-[#a2a9b5] capitalize">
       {label}
     </span>
   );

@@ -56,19 +56,19 @@ export function HomePage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#101115] text-[#D9DBE0]">
+    <div className="min-h-screen vault-shell">
       {/* Hero — always visible */}
       <section
-        className="py-20 px-6 text-center border-b border-[#181A1F]"
-        style={{ background: 'radial-gradient(ellipse at center, #181A1F 0%, #101115 70%)' }}
+        className="vault-page-hero py-24 px-6 text-center border-b border-[#20252f]"
       >
-        <h1 className="font-sans font-light text-4xl tracking-tight text-[#D9DBE0] mb-3">
+        <p className="vault-micro mb-4">Premium Collection</p>
+        <h1 className="font-sans font-light text-5xl md:text-6xl tracking-tight text-[#E1E4EA] mb-4">
           Flowvault
         </h1>
-        <p className="font-sans text-lg text-[#8E9196] mb-2">
+        <p className="font-sans text-lg text-[#A0A6B2] mb-2">
           Premium Watchfaces for Amazfit
         </p>
-        <p className="font-mono text-sm text-[#8E9196] max-w-sm mx-auto">
+        <p className="font-mono text-sm text-[#8B93A0] max-w-sm mx-auto">
           Designed for clarity, performance, and style.
         </p>
       </section>
@@ -97,7 +97,7 @@ export function HomePage() {
       {!loading && !error && hasFaces && (
         <>
           {/* Model chips */}
-          <section className="border-b border-[#181A1F] px-4 py-3 overflow-x-auto">
+          <section className="border-b border-[#20252f] px-4 py-4 overflow-x-auto">
             <div className="flex gap-2 w-max mx-auto">
               <ModelChip
                 label="All Models"
@@ -121,16 +121,16 @@ export function HomePage() {
           </section>
 
           {/* Category cards */}
-          <section className="px-6 py-6 border-b border-[#181A1F]">
+          <section className="px-6 py-7 border-b border-[#20252f]">
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 max-w-4xl mx-auto">
               {CATEGORIES.map((cat) => (
                 <Link
                   key={cat.slug}
                   to={`/category/${cat.slug}`}
-                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-[#181A1F] hover:border-[#C0A678]/40 transition-colors group"
+                  className="vault-panel flex flex-col items-center gap-1.5 py-3 hover:border-[#C7A86F]/45 transition-colors group"
                 >
-                  <span className="text-lg text-[#8E9196] group-hover:text-[#C0A678] transition-colors">{cat.emoji}</span>
-                  <span className="text-xs font-sans text-[#8E9196] group-hover:text-[#C0A678] transition-colors">{cat.label}</span>
+                  <span className="text-lg text-[#8E9196] group-hover:text-[#C7A86F] transition-colors">{cat.emoji}</span>
+                  <span className="text-xs font-sans text-[#8E9196] group-hover:text-[#E8D2A8] transition-colors">{cat.label}</span>
                 </Link>
               ))}
             </div>
@@ -189,10 +189,10 @@ function ModelChip({
     <button
       onClick={onClick}
       className={`
-        px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors
+        px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border
         ${active
-          ? 'bg-zinc-100 text-zinc-900'
-          : 'bg-zinc-900 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+          ? 'bg-[#F0DFC0] text-[#231b0e] border-[#F0DFC0]'
+          : 'bg-[#121418] border-[#313843] text-[#9AA1AD] hover:bg-[#171a22] hover:text-[#E1E4EA] hover:border-[#4a5463]'
         }
       `}
     >
@@ -220,7 +220,7 @@ function MobileFilterRow({
       <select
         value={filters.brand ?? ''}
         onChange={(e) => onChange({ brand: e.target.value || null, modelSlug: null })}
-        className="text-xs rounded-lg px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 text-zinc-300 focus:outline-none"
+        className="text-xs rounded-lg px-2.5 py-1.5 vault-input focus:outline-none"
       >
         <option value="">All Brands</option>
         {brands.map((b) => (
@@ -236,7 +236,7 @@ function MobileFilterRow({
         onChange={(e) =>
           onChange({ priceFilter: e.target.value as FilterState['priceFilter'] })
         }
-        className="text-xs rounded-lg px-2.5 py-1.5 bg-zinc-900 border border-zinc-700 text-zinc-300 focus:outline-none"
+        className="text-xs rounded-lg px-2.5 py-1.5 vault-input focus:outline-none"
       >
         <option value="all">All Prices</option>
         <option value="free">Free</option>

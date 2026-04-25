@@ -44,7 +44,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
         {hasActiveFilters && (
           <button
             onClick={clearAll}
-            className="flex items-center gap-1 text-xs font-mono text-[#C0A678] hover:text-[#D4BC96] transition-colors"
+            className="flex items-center gap-1 text-xs font-mono text-[#C7A86F] hover:text-[#E8D2A8] transition-colors"
           >
             <X size={11} />
             Clear
@@ -83,7 +83,7 @@ export function FilterSidebar({ filters, onChange }: FilterSidebarProps) {
               className={`
                 text-left px-2.5 py-1.5 rounded-lg text-xs font-sans transition-colors
                 ${filters.modelSlug === slug
-                  ? 'text-[#C0A678] border-l-2 border-[#C0A678] pl-2'
+                  ? 'text-[#E8D2A8] border-l-2 border-[#C7A86F] pl-2'
                   : 'text-[#8E9196] hover:text-[#D9DBE0]'
                 }
               `}
@@ -121,7 +121,7 @@ function FilterSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2 bg-[#181A1F] rounded-xl p-4">
+    <div className="space-y-2 bg-[#131821] rounded-xl p-4 border border-[#2d3440]">
       <p className="font-mono text-xs uppercase tracking-widest text-[#8E9196]">
         {label}
       </p>
@@ -145,8 +145,8 @@ function FilterChip({
       className={`
         px-2.5 py-1 rounded-lg text-xs font-mono transition-colors
         ${active
-          ? 'text-[#C0A678] border border-[#C0A678]/60 bg-[#C0A678]/5'
-          : 'text-[#8E9196] border border-[#181A1F] hover:border-[#C0A678]/30 hover:text-[#C0A678]'
+          ? 'text-[#E8D2A8] border border-[#C7A86F]/60 bg-[#C7A86F]/10'
+          : 'text-[#8E9196] border border-[#2f3743] hover:border-[#C7A86F]/30 hover:text-[#C7A86F]'
         }
       `}
     >

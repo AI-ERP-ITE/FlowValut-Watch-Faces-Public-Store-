@@ -32,7 +32,7 @@ export function WatchfaceGrid({
         <div className="flex justify-center pt-2">
           <button
             onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-            className="px-6 py-2.5 text-xs font-mono rounded-xl bg-[#181A1F] border border-[#181A1F] text-[#8E9196] hover:border-[#C0A678]/40 hover:text-[#C0A678] transition-colors"
+            className="px-6 py-2.5 text-xs font-mono rounded-xl bg-[#141820] border border-[#2f3743] text-[#8E9196] hover:border-[#C7A86F]/45 hover:text-[#E7D0A6] transition-colors"
           >
             Load more ({entries.length - visibleCount} remaining)
           </button>
@@ -40,7 +40,7 @@ export function WatchfaceGrid({
       )}
 
       {/* Total count */}
-      <p className="text-center text-xs font-mono text-[#8E9196]/50">
+      <p className="text-center text-xs font-mono text-[#8E9196]/70">
         Showing {Math.min(visibleCount, entries.length)} of {entries.length} watchfaces
       </p>
     </div>

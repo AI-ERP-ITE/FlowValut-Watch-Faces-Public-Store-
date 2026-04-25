@@ -36,7 +36,7 @@ export function SuccessPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
+      <div className="min-h-screen flex items-center justify-center text-[#8E9196] text-sm">
         Loading…
       </div>
     );
@@ -44,7 +44,7 @@ export function SuccessPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-red-400 text-sm">
+      <div className="min-h-screen flex items-center justify-center text-red-400 text-sm">
         {error}
       </div>
     );
@@ -52,7 +52,7 @@ export function SuccessPage() {
 
   if (!entry) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4 text-zinc-400">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-[#8E9196]">
         <span className="text-5xl">⌚</span>
         <p className="text-sm">Watchface not found.</p>
         <Link to="/" className="text-xs underline underline-offset-4 hover:text-zinc-200">
@@ -65,28 +65,28 @@ export function SuccessPage() {
   const isFree = entry.price === 0;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen vault-shell flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-8">
 
         {/* Header */}
         <div className="text-center space-y-1">
-          <p className="text-xs text-zinc-600 uppercase tracking-widest font-mono">
+          <p className="text-xs text-[#8E9196] uppercase tracking-widest font-mono">
             Flowvault
           </p>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
+          <h1 className="text-2xl font-light text-[#E1E4EA] tracking-tight">
             {isFree ? 'Your watchface is ready!' : 'Thank you for your purchase!'}
           </h1>
           {isFree && (
-            <p className="text-zinc-500 text-sm">
+            <p className="text-[#8E9196] text-sm">
               Download starting automatically…
             </p>
           )}
         </div>
 
         {/* Preview */}
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="rounded-2xl border border-[#2f3743] bg-[#121418] overflow-hidden">
           {entry.previewPath && (
-            <div className="aspect-square w-full overflow-hidden bg-zinc-800">
+            <div className="aspect-square w-full overflow-hidden bg-[#1a1f29]">
               <img
                 src={`${baseUrl}${entry.previewPath}`}
                 alt={entry.name}
@@ -96,8 +96,8 @@ export function SuccessPage() {
             </div>
           )}
           <div className="px-4 py-3">
-            <p className="text-white font-medium text-sm">{entry.name}</p>
-            <p className="text-zinc-500 text-xs mt-0.5 capitalize">
+            <p className="text-[#E1E4EA] font-medium text-sm">{entry.name}</p>
+            <p className="text-[#8E9196] text-xs mt-0.5 capitalize">
               {entry.categories.join(' · ')}
             </p>
           </div>
@@ -106,10 +106,10 @@ export function SuccessPage() {
         {/* QR code */}
         {entry.qrPath && (
           <div className="flex flex-col items-center gap-3">
-            <p className="text-zinc-500 text-xs text-center">
+            <p className="text-[#8E9196] text-xs text-center">
               Or scan with the Zepp app to install directly on your watch
             </p>
-            <div className="rounded-xl border border-zinc-800 bg-white p-3 w-36 h-36">
+            <div className="rounded-xl border border-[#2f3743] bg-white p-3 w-36 h-36">
               <img
                 src={`${baseUrl}${entry.qrPath}`}
                 alt="Install QR code"
@@ -123,7 +123,7 @@ export function SuccessPage() {
         {zpkUrl && (
           <button
             onClick={triggerDownload}
-            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-white text-zinc-900 font-semibold text-sm hover:bg-zinc-100 transition-colors"
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#bc9456] text-[#17120a] font-semibold text-sm hover:bg-[#d2af78] transition-colors"
           >
             <Download className="h-4 w-4" />
             Download .zpk
@@ -131,10 +131,10 @@ export function SuccessPage() {
         )}
 
         {/* Browse more */}
-        <p className="text-center text-zinc-600 text-xs">
+        <p className="text-center text-[#8E9196] text-xs">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-zinc-400 transition-colors"
+            className="inline-flex items-center gap-1 underline underline-offset-4 hover:text-[#E1E4EA] transition-colors"
           >
             <ArrowLeft className="h-3 w-3" />
             Browse more watchfaces

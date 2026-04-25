@@ -26,7 +26,7 @@ export function ModelPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#101115] flex items-center justify-center font-mono text-[#8E9196] text-sm">
+      <div className="min-h-screen flex items-center justify-center font-mono text-[#8E9196] text-sm">
         Loading…
       </div>
     );
@@ -34,7 +34,7 @@ export function ModelPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#101115] flex items-center justify-center text-red-400 font-mono text-sm">
+      <div className="min-h-screen flex items-center justify-center text-red-400 font-mono text-sm">
         {error}
       </div>
     );
@@ -42,7 +42,7 @@ export function ModelPage() {
 
   if (!model) {
     return (
-      <div className="min-h-screen bg-[#101115] flex flex-col items-center justify-center gap-4 text-[#8E9196]">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-[#8E9196]">
         <p className="font-mono text-sm">Model not found.</p>
         <Link to="/" className="text-xs font-mono underline underline-offset-4 hover:text-[#D9DBE0]">
           Back to Browse
@@ -52,25 +52,25 @@ export function ModelPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101115] text-[#D9DBE0]">
+    <div className="min-h-screen vault-shell">
       {/* Header band */}
-      <section className="border-b border-[#181A1F] py-8 px-6">
+      <section className="vault-page-hero border-b border-[#20252f] py-10 px-6">
         <div className="max-w-5xl mx-auto">
           {/* Breadcrumb */}
           <nav className="text-xs font-mono text-[#8E9196] mb-4 flex items-center gap-1.5">
-            <Link to="/" className="hover:text-[#D9DBE0] transition-colors">Browse</Link>
+            <Link to="/" className="hover:text-[#E1E4EA] transition-colors">Browse</Link>
             <span>/</span>
-            <span className="text-[#D9DBE0]">{model.name}</span>
+            <span className="text-[#E1E4EA]">{model.name}</span>
           </nav>
 
           <div className="flex flex-col sm:flex-row sm:items-end gap-4">
             <div>
-              <p className="font-mono text-xs uppercase tracking-widest text-[#8E9196] mb-1">
+                <p className="font-mono text-xs uppercase tracking-[0.17em] text-[#8E9196] mb-1">
                 {model.brand.charAt(0).toUpperCase() + model.brand.slice(1)}
               </p>
-              <h1 className="font-sans font-light text-2xl tracking-tight text-[#D9DBE0]">{model.name}</h1>
+                <h1 className="font-sans font-light text-3xl tracking-tight text-[#E1E4EA]">{model.name}</h1>
               {specGroup && (
-                <p className="font-mono text-xs text-[#8E9196] mt-1">
+                  <p className="font-mono text-xs text-[#8E9196] mt-2">
                   {specGroup.resolution} · {specGroup.shape} · API {specGroup.apiVersion.toUpperCase()}
                 </p>
               )}
@@ -91,7 +91,7 @@ export function ModelPage() {
                 <Link
                   key={s}
                   to={`/model/${s}`}
-                  className="px-2.5 py-1 rounded-full text-xs font-mono border border-[#181A1F] text-[#8E9196] hover:text-[#C0A678] hover:border-[#C0A678]/40 transition-colors"
+                  className="px-2.5 py-1 rounded-full text-xs font-mono border border-[#2f3743] text-[#8E9196] hover:text-[#E8D2A8] hover:border-[#C7A86F]/45 transition-colors"
                 >
                   {m.name}
                 </Link>

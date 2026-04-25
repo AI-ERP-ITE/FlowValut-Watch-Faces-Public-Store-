@@ -28,7 +28,7 @@ export function CategoryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#101115] flex items-center justify-center font-mono text-[#8E9196] text-sm">
+      <div className="min-h-screen flex items-center justify-center font-mono text-[#8E9196] text-sm">
         Loading…
       </div>
     );
@@ -36,7 +36,7 @@ export function CategoryPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#101115] flex items-center justify-center text-red-400 font-mono text-sm">
+      <div className="min-h-screen flex items-center justify-center text-red-400 font-mono text-sm">
         {error}
       </div>
     );
@@ -44,7 +44,7 @@ export function CategoryPage() {
 
   if (!meta) {
     return (
-      <div className="min-h-screen bg-[#101115] flex flex-col items-center justify-center gap-4 text-[#8E9196]">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-[#8E9196]">
         <p className="font-mono text-sm">Category not found.</p>
         <Link to="/" className="text-xs font-mono underline underline-offset-4 hover:text-[#D9DBE0]">
           Back to Browse
@@ -54,22 +54,22 @@ export function CategoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101115] text-[#D9DBE0]">
+    <div className="min-h-screen vault-shell">
       {/* Header band */}
-      <section className="border-b border-[#181A1F] py-8 px-6">
+      <section className="vault-page-hero border-b border-[#20252f] py-10 px-6">
         <div className="max-w-5xl mx-auto">
           {/* Breadcrumb */}
           <nav className="text-xs font-mono text-[#8E9196] mb-4 flex items-center gap-1.5">
-            <Link to="/" className="hover:text-[#D9DBE0] transition-colors">Browse</Link>
+            <Link to="/" className="hover:text-[#E1E4EA] transition-colors">Browse</Link>
             <span>/</span>
-            <span className="text-[#D9DBE0]">{meta.label}</span>
+            <span className="text-[#E1E4EA]">{meta.label}</span>
           </nav>
 
           <div className="flex items-end gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <span className="text-2xl text-[#8E9196]">{meta.emoji}</span>
-                <h1 className="font-sans font-light text-2xl tracking-tight text-[#D9DBE0]">{meta.label}</h1>
+                <h1 className="font-sans font-light text-3xl tracking-tight text-[#E1E4EA]">{meta.label}</h1>
               </div>
               {meta.description && (
                 <p className="font-mono text-sm text-[#8E9196] max-w-md">{meta.description}</p>
@@ -90,7 +90,7 @@ export function CategoryPage() {
                 <Link
                   key={s}
                   to={`/category/${s}`}
-                  className="px-2.5 py-1 rounded-full text-xs font-mono border border-[#181A1F] text-[#8E9196] hover:text-[#C0A678] hover:border-[#C0A678]/40 transition-colors"
+                  className="px-2.5 py-1 rounded-full text-xs font-mono border border-[#2f3743] text-[#8E9196] hover:text-[#E8D2A8] hover:border-[#C7A86F]/45 transition-colors"
                 >
                   {m.emoji} {m.label}
                 </Link>

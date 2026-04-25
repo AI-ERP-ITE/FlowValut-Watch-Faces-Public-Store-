@@ -20,12 +20,12 @@ export function SortControls({ value, onChange, count }: SortControlsProps) {
   return (
     <div className="flex items-center gap-3">
       {count !== undefined && (
-        <span className="text-xs text-zinc-500 shrink-0">
+        <span className="text-xs text-[#8E9196] shrink-0 font-mono">
           {count} {count === 1 ? 'result' : 'results'}
         </span>
       )}
       <div className="flex items-center gap-2 ml-auto">
-        <label htmlFor="sort-select" className="text-xs text-zinc-500 shrink-0">
+        <label htmlFor="sort-select" className="text-xs text-[#8E9196] shrink-0 font-mono uppercase tracking-wider">
           Sort by
         </label>
         <select
@@ -34,9 +34,8 @@ export function SortControls({ value, onChange, count }: SortControlsProps) {
           onChange={(e) => onChange(e.target.value as SortOption)}
           className="
             text-xs rounded-lg px-2.5 py-1.5
-            bg-zinc-900 border border-zinc-700 text-zinc-300
-            focus:outline-none focus:border-zinc-500
-            cursor-pointer transition-colors hover:bg-zinc-800
+            vault-input focus:outline-none
+            cursor-pointer transition-colors hover:bg-[#1a1f29]
           "
         >
           {SORT_OPTIONS.map((opt) => (

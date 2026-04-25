@@ -72,38 +72,38 @@ export function SearchPage() {
   }, [catalog]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+    <div className="min-h-screen vault-shell">
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
 
         {/* Header */}
         <div>
-          <nav className="text-xs text-zinc-500 mb-3 flex items-center gap-1.5">
-            <Link to="/" className="hover:text-zinc-300 transition-colors">Browse</Link>
+          <nav className="text-xs text-[#8E9196] mb-3 flex items-center gap-1.5 font-mono">
+            <Link to="/" className="hover:text-[#E1E4EA] transition-colors">Browse</Link>
             <span>/</span>
-            <span className="text-zinc-300">Search</span>
+            <span className="text-[#E1E4EA]">Search</span>
           </nav>
 
           {query ? (
             <div className="flex items-end gap-3 flex-wrap">
-              <h1 className="text-xl font-bold text-white">
+              <h1 className="text-2xl font-light text-[#E1E4EA]">
                 Results for{' '}
-                <span className="text-violet-400">&ldquo;{query}&rdquo;</span>
+                <span className="vault-gold-text">&ldquo;{query}&rdquo;</span>
               </h1>
               <Link
                 to="/"
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-0.5"
+                className="text-xs text-[#8E9196] hover:text-[#E1E4EA] transition-colors mb-0.5"
               >
                 Clear search
               </Link>
             </div>
           ) : (
-            <h1 className="text-xl font-bold text-white">Search</h1>
+            <h1 className="text-2xl font-light text-[#E1E4EA]">Search</h1>
           )}
         </div>
 
         {/* Loading / error */}
         {loading && (
-          <p className="text-sm text-zinc-500">Loading…</p>
+          <p className="text-sm text-[#8E9196]">Loading…</p>
         )}
         {error && (
           <p className="text-sm text-red-400">{error}</p>
@@ -112,12 +112,12 @@ export function SearchPage() {
         {/* No query state */}
         {!loading && !error && !query && (
           <div className="space-y-4">
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-[#8E9196]">
               Type in the search bar above to find watchfaces by name, hashtag, or style.
             </p>
             {suggestedTags.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-zinc-600 mb-2">
+                <p className="text-xs uppercase tracking-widest text-[#8E9196] mb-2 font-mono">
                   Popular tags
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -125,7 +125,7 @@ export function SearchPage() {
                     <button
                       key={tag}
                       onClick={() => setSearchParams({ q: tag })}
-                      className="px-2.5 py-1 rounded-full text-xs bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
+                      className="px-2.5 py-1 rounded-full text-xs bg-[#131821] border border-[#2f3743] text-[#8E9196] hover:text-[#E8D2A8] hover:border-[#C7A86F]/45 transition-colors"
                     >
                       #{tag}
                     </button>

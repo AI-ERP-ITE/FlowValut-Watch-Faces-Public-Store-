@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -29,6 +31,13 @@
     --input: 0 0% 16%;
     --ring: 190 100% 50%;
     --radius: 0.75rem;
+    --vault-bg: #090a0c;
+    --vault-card: #121418;
+    --vault-card-soft: #151922;
+    --vault-line: #252a33;
+    --vault-text: #e1e4ea;
+    --vault-muted: #949aa6;
+    --vault-gold: #c7a86f;
   }
 }
 
@@ -42,7 +51,11 @@
   }
   
   body {
-    @apply bg-obsidian text-text-primary antialiased;
+    @apply text-text-primary antialiased;
+    background:
+      radial-gradient(1000px 700px at 82% -10%, rgba(199, 168, 111, 0.12), transparent 55%),
+      radial-gradient(900px 650px at -10% 24%, rgba(130, 145, 181, 0.08), transparent 60%),
+      var(--vault-bg);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 
@@ -54,6 +67,76 @@
 }
 
 @layer utilities {
+  .vault-shell {
+    color: var(--vault-text);
+    background: transparent;
+  }
+
+  .vault-glass {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+  }
+
+  .vault-panel {
+    background: linear-gradient(170deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+    border: 1px solid var(--vault-line);
+    border-radius: 1.1rem;
+  }
+
+  .vault-gold-text {
+    color: var(--vault-gold);
+  }
+
+  .vault-muted {
+    color: var(--vault-muted);
+  }
+
+  .vault-micro {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--vault-muted);
+  }
+
+  .vault-pill {
+    border-radius: 9999px;
+    padding: 0.3rem 0.75rem;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--vault-line);
+    color: var(--vault-muted);
+    transition: all 180ms ease;
+  }
+
+  .vault-pill:hover {
+    color: var(--vault-gold);
+    border-color: rgba(199, 168, 111, 0.45);
+  }
+
+  .vault-page-hero {
+    background:
+      radial-gradient(120% 120% at 50% -25%, rgba(199, 168, 111, 0.2), transparent 42%),
+      radial-gradient(140% 100% at 100% 0%, rgba(255, 255, 255, 0.06), transparent 58%);
+  }
+
+  .vault-input {
+    background: rgba(18, 20, 24, 0.9);
+    border: 1px solid #313843;
+    color: var(--vault-text);
+  }
+
+  .vault-input::placeholder {
+    color: #7f8794;
+  }
+
+  .vault-input:focus {
+    border-color: rgba(199, 168, 111, 0.7);
+    box-shadow: 0 0 0 2px rgba(199, 168, 111, 0.2);
+  }
+
   /* Custom scrollbar */
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
