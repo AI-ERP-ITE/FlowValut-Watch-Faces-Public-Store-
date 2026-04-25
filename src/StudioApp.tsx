@@ -1299,6 +1299,7 @@ function regenerateDigitFilesFromElements(
     WIND: 'wind_digit',      ALARM: 'alarm_digit',     NOTIFICATION: 'notif_digit',
     MOON: 'moon_digit',      SUN_RISE: 'sunrise_digit',SUN_SET: 'sunset_digit',
     VO2MAX: 'vo2_digit',     ALTIMETER: 'alt_digit',   TRAINING_LOAD: 'training_digit',
+    WEATHER_CURRENT: 'temp_digit',
   };
 
   function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {

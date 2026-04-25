@@ -227,7 +227,7 @@ const DATA_TYPE_PREFIXES: Record<string, string> = {
   UVI:      'uvi_digit',
   AQI:      'aqi_digit',
   HUMIDITY: 'humid_digit',
-  WEATHER_CURRENT: 'weather',
+  WEATHER_CURRENT: 'temp_digit',
   SUN_RISE: 'sunrise_digit',
   SUN_SET:  'sunset_digit',
   WIND:     'wind_digit',
