@@ -65,6 +65,7 @@ import {
 import {
   getAllowedDataTypesForElement,
   getDataTypeLabel,
+  getTextImgPrefixForDataType,
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import type { PointerParityResult, PointerParityStage } from '@/types';
@@ -95,6 +96,10 @@ function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig 
 
 function weatherImageFilenames(): string[] {
   return Array.from({ length: 29 }, (_, i) => `weather_${i}.png`);
+}
+
+function weatherTempDigitFilenames(): string[] {
+  return Array.from({ length: 10 }, (_, i) => `temp_digit_${i}.png`);
 }
 
 function isWeatherImgLevelDataType(dataType: string | undefined): boolean {
@@ -1290,18 +1295,6 @@ function regenerateDigitFilesFromElements(
 ): { filename: string; dataUrl: string }[] {
   const results: { filename: string; dataUrl: string }[] = [];
 
-  const DATA_TYPE_PREFIXES: Record<string, string> = {
-    BATTERY: 'batt_digit',   STEP: 'step_digit',      HEART: 'heart_digit',
-    SPO2: 'spo2_digit',      CAL: 'cal_digit',         DISTANCE: 'dist_digit',
-    STRESS: 'stress_digit',  PAI: 'pai_digit',         PAI_WEEKLY: 'pai_digit',
-    SLEEP: 'sleep_digit',    STAND: 'stand_digit',     FAT_BURN: 'fatburn_digit',
-    UVI: 'uvi_digit',        AQI: 'aqi_digit',         HUMIDITY: 'humid_digit',
-    WIND: 'wind_digit',      ALARM: 'alarm_digit',     NOTIFICATION: 'notif_digit',
-    MOON: 'moon_digit',      SUN_RISE: 'sunrise_digit',SUN_SET: 'sunset_digit',
-    VO2MAX: 'vo2_digit',     ALTIMETER: 'alt_digit',   TRAINING_LOAD: 'training_digit',
-    WEATHER_CURRENT: 'temp_digit',
-  };
-
   function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
     // Pre-measure the widest digit (0-9) in this font so all digit images share the
     // same width (monospace-like), with minimal whitespace on the sides.
@@ -1376,7 +1369,7 @@ function regenerateDigitFilesFromElements(
         results.push({ filename: `week_${i}.png`, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
       }
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
-      const prefix = DATA_TYPE_PREFIXES[el.dataType];
+      const prefix = getTextImgPrefixForDataType(el.dataType);
       if (prefix) {
         const w = Math.max(Math.floor((el.bounds.width || 64) / 4), 8);
         const h = Math.max(el.bounds.height || 25, 12);
@@ -2348,6 +2341,9 @@ function StudioApp() {
       for (const el of exportElements) {
         if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
           el.images = weatherImageFilenames();
+        }
+        if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT') {
+          el.fontArray = weatherTempDigitFilenames();
         }
       }
       const configForBuild: WatchFaceConfig = {

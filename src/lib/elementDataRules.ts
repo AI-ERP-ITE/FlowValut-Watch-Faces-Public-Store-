@@ -30,8 +30,15 @@ export const DATA_TYPE_LABELS: Record<string, string> = {
   STRESS: 'Stress Level',
   SPO2: 'Blood Oxygen',
   HUMIDITY: 'Humidity',
+  WIND: 'Wind',
   UVI: 'UV Index',
   AQI: 'Air Quality',
+  SLEEP: 'Sleep Duration',
+  SUN_RISE: 'Sunrise Time',
+  SUN_SET: 'Sunset Time',
+  ALTIMETER: 'Altitude',
+  VO2MAX: 'VO2 Max',
+  TRAINING_LOAD: 'Training Load',
   WEATHER_CURRENT: 'Weather Current',
   WEATHER_STATUS: 'Weather Status',
   MOON: 'Moon Phase',
@@ -49,9 +56,61 @@ const PRIMARY_DATA_TYPES = [
   'STRESS',
   'SPO2',
   'HUMIDITY',
+  'WIND',
   'UVI',
   'AQI',
+  'SLEEP',
+  'SUN_RISE',
+  'SUN_SET',
+  'ALTIMETER',
+  'VO2MAX',
+  'TRAINING_LOAD',
 ] as const;
+
+const PROGRESS_DATA_TYPES = [
+  'BATTERY',
+  'STEP',
+  'CAL',
+  'DISTANCE',
+  'STAND',
+  'PAI',
+  'PAI_WEEKLY',
+  'FAT_BURN',
+  'HEART',
+  'STRESS',
+  'SPO2',
+  'HUMIDITY',
+  'UVI',
+  'AQI',
+  'ALTIMETER',
+  'VO2MAX',
+  'TRAINING_LOAD',
+] as const;
+
+export const TEXT_IMG_DATA_TYPE_PREFIXES: Record<string, string> = {
+  BATTERY: 'batt_digit',
+  STEP: 'step_digit',
+  HEART: 'heart_digit',
+  SPO2: 'spo2_digit',
+  CAL: 'cal_digit',
+  DISTANCE: 'dist_digit',
+  STRESS: 'stress_digit',
+  PAI: 'pai_digit',
+  PAI_WEEKLY: 'pai_digit',
+  SLEEP: 'sleep_digit',
+  STAND: 'stand_digit',
+  FAT_BURN: 'fatburn_digit',
+  UVI: 'uvi_digit',
+  AQI: 'aqi_digit',
+  HUMIDITY: 'humid_digit',
+  WIND: 'wind_digit',
+  ALTIMETER: 'alt_digit',
+  VO2MAX: 'vo2_digit',
+  TRAINING_LOAD: 'training_digit',
+  SUN_RISE: 'sunrise_digit',
+  SUN_SET: 'sunset_digit',
+  WEATHER_CURRENT: 'temp_digit',
+};
 
 // Final authority: ELEMENT -> allowed DATA TYPE values.
 export const ELEMENT_TO_DATA: Record<RuleElementKey, readonly string[]> = {
@@ -67,7 +126,7 @@ export const ELEMENT_TO_DATA: Record<RuleElementKey, readonly string[]> = {
 
   TEXT: [...PRIMARY_DATA_TYPES, 'WEATHER_CURRENT', 'PAI_WEEKLY'],
   NUMERIC_DISPLAY: [...PRIMARY_DATA_TYPES, 'WEATHER_CURRENT', 'PAI_WEEKLY'],
-  ARC_PROGRESS: [...PRIMARY_DATA_TYPES, 'PAI_WEEKLY'],
+  ARC_PROGRESS: [...PROGRESS_DATA_TYPES],
 
   IMAGE_SWITCHER: [
     'BATTERY',
@@ -165,6 +224,12 @@ export function normalizeDataTypeForElement(
 
 export function getDataTypeLabel(dataType: string): string {
   return DATA_TYPE_LABELS[dataType] ?? dataType;
+}
+
+export function getTextImgPrefixForDataType(dataType: string | undefined): string | undefined {
+  const normalized = normalizeDataAlias(dataType);
+  if (!normalized) return undefined;
+  return TEXT_IMG_DATA_TYPE_PREFIXES[normalized];
 }
 
 export function getImageSwitcherExpectedImageCount(dataType: string | undefined): number | null {

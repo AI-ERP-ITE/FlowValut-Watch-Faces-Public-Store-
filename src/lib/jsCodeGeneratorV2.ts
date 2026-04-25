@@ -5,6 +5,7 @@
 import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
+import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 
 /** Compute extra canvas padding required to contain a drop shadow (mirrors StudioApp helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
@@ -757,24 +758,17 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
 function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   // Build font_array from element.fontArray or element.images
   const fontImages = element.fontArray || element.images || [];
+  const hasLegacyWeatherIconFontArray =
+    element.dataType === 'WEATHER_CURRENT' &&
+    fontImages.some((entry) => /^weather_\d+\.png$/i.test(entry));
   let fontArrayStr: string;
 
-  if (fontImages.length > 0) {
+  if (fontImages.length > 0 && !hasLegacyWeatherIconFontArray) {
     fontArrayStr = `[${fontImages.map(f => `'${f}'`).join(', ')}]`;
   } else {
-    // Use same prefix convention as assetImageGenerator DATA_TYPE_PREFIXES
-    const DATA_TYPE_PREFIXES: Record<string, string> = {
-      BATTERY: 'batt_digit', STEP: 'step_digit', HEART: 'heart_digit',
-      SPO2: 'spo2_digit', CAL: 'cal_digit', DISTANCE: 'dist_digit',
-      STRESS: 'stress_digit', PAI: 'pai_digit', PAI_WEEKLY: 'pai_digit',
-      SLEEP: 'sleep_digit', STAND: 'stand_digit', FAT_BURN: 'fatburn_digit',
-      UVI: 'uvi_digit', AQI: 'aqi_digit', HUMIDITY: 'humid_digit',
-      WIND: 'wind_digit', ALTIMETER: 'alt_digit', VO2MAX: 'vo2_digit',
-      TRAINING_LOAD: 'training_digit', WEATHER: 'weather', WEATHER_CURRENT: 'temp_digit',
-      SUN_RISE: 'sunrise_digit', SUN_SET: 'sunset_digit',
-    };
-    const prefix = (element.dataType && DATA_TYPE_PREFIXES[element.dataType])
-      ? DATA_TYPE_PREFIXES[element.dataType]
+    const resolvedPrefix = getTextImgPrefixForDataType(element.dataType);
+    const prefix = resolvedPrefix
+      ? resolvedPrefix
       : element.name.toLowerCase().replace(/\s+/g, '_');
     const arr = [];
     for (let i = 0; i < 10; i++) {

@@ -11,6 +11,7 @@ import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { createDefaultGaugePointerDataUrl } from '@/lib/gaugePointerDefaults';
+import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 
 // ─── Canvas Utility ─────────────────────────────────────────────────────────────
 
@@ -208,34 +209,6 @@ function getElementColor(el: ResolvedElement): string {
   return '#FFFFFF';
 }
 
-const DATA_TYPE_PREFIXES: Record<string, string> = {
-  BATTERY:  'batt_digit',
-  STEP:     'step_digit',
-  HEART:    'heart_digit',
-  SPO2:     'spo2_digit',
-  CAL:      'cal_digit',
-  DISTANCE: 'dist_digit',
-  STRESS:   'stress_digit',
-  PAI:      'pai_digit',
-  PAI_WEEKLY: 'pai_digit',
-  ALTIMETER:  'alt_digit',
-  VO2MAX:     'vo2_digit',
-  TRAINING_LOAD: 'training_digit',
-  SLEEP:    'sleep_digit',
-  STAND:    'stand_digit',
-  FAT_BURN: 'fatburn_digit',
-  UVI:      'uvi_digit',
-  AQI:      'aqi_digit',
-  HUMIDITY: 'humid_digit',
-  WEATHER_CURRENT: 'temp_digit',
-  SUN_RISE: 'sunrise_digit',
-  SUN_SET:  'sunset_digit',
-  WIND:     'wind_digit',
-  ALARM:    'alarm_digit',
-  NOTIFICATION: 'notif_digit',
-  MOON:     'moon_digit',
-};
-
 // ─── Main: Generate All Assets for Pipeline Elements ────────────────────────────
 
 export function generatePipelineAssets(elements: ResolvedElement[]): ElementImage[] {
@@ -328,7 +301,7 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
       }
 
       case 'TEXT_IMG': {
-        const prefix = el.dataType ? DATA_TYPE_PREFIXES[el.dataType] || 'digit' : 'digit';
+        const prefix = getTextImgPrefixForDataType(el.dataType) ?? 'digit';
         if (!generatedSets.has(`textimg_${prefix}`)) {
           const color = getElementColor(el);
           // Derive digit size from element bounds (estimate ~4 chars)
