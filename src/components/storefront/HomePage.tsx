@@ -59,18 +59,50 @@ export function HomePage() {
     <div className="min-h-screen vault-shell">
       {/* Hero — always visible */}
       <section
-        className="vault-page-hero py-24 px-6 text-center border-b border-[#20252f]"
+        className="vault-page-hero py-20 md:py-24 px-6 border-b border-[#20252f]"
       >
-        <p className="vault-micro mb-4">Premium Collection</p>
-        <h1 className="font-sans font-light text-5xl md:text-6xl tracking-tight text-[#E1E4EA] mb-4">
-          Flowvault
-        </h1>
-        <p className="font-sans text-lg text-[#A0A6B2] mb-2">
-          Premium Watchfaces for Amazfit
-        </p>
-        <p className="font-mono text-sm text-[#8B93A0] max-w-sm mx-auto">
-          Designed for clarity, performance, and style.
-        </p>
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10 items-center">
+          <div className="text-center lg:text-left">
+            <p className="vault-micro mb-4">Premium Collection</p>
+            <h1 className="font-sans font-light text-5xl md:text-6xl tracking-tight text-[#E1E4EA] mb-4">
+              Flowvault
+            </h1>
+            <p className="font-sans text-lg text-[#A0A6B2] mb-2">
+              Premium Watchfaces for Amazfit
+            </p>
+            <p className="font-mono text-sm text-[#8B93A0] max-w-sm mx-auto lg:mx-0">
+              Designed for clarity, performance, and style.
+            </p>
+            <div className="mt-7 grid grid-cols-3 gap-2 max-w-sm mx-auto lg:mx-0">
+              <div className="vault-glass rounded-xl px-3 py-2 text-left">
+                <p className="vault-micro">Faces</p>
+                <p className="text-[#E8D2A8] text-lg font-medium">{results.length}</p>
+              </div>
+              <div className="vault-glass rounded-xl px-3 py-2 text-left">
+                <p className="vault-micro">Models</p>
+                <p className="text-[#E8D2A8] text-lg font-medium">{modelList.length}</p>
+              </div>
+              <div className="vault-glass rounded-xl px-3 py-2 text-left">
+                <p className="vault-micro">Style</p>
+                <p className="text-[#E8D2A8] text-lg font-medium">Pro</p>
+              </div>
+            </div>
+          </div>
+          <div className="hidden lg:flex items-center justify-center">
+            <div className="store-hero-watch">
+              <div className="store-hero-watch-inner">
+                <div className="text-center">
+                  <div className="text-5xl font-extralight tracking-[0.08em] text-[#f7f8fa]">12:48</div>
+                  <div className="vault-micro mt-2">Tuesday</div>
+                </div>
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E8D2A8]" />
+                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-12 h-1 rounded-full bg-[#2a313e] overflow-hidden">
+                  <div className="w-3/4 h-full bg-[#D4B57D]" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Loading */}

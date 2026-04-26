@@ -122,6 +122,28 @@
       radial-gradient(140% 100% at 100% 0%, rgba(255, 255, 255, 0.06), transparent 58%);
   }
 
+  .store-hero-watch {
+    width: 310px;
+    height: 310px;
+    border-radius: 9999px;
+    padding: 11px;
+    border: 8px solid #1f2632;
+    box-shadow: 0 0 80px rgba(199, 168, 111, 0.22);
+    background: radial-gradient(circle at center, #1f2531 0%, #090a0c 70%);
+  }
+
+  .store-hero-watch-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
   .vault-input {
     background: rgba(18, 20, 24, 0.9);
     border: 1px solid #313843;

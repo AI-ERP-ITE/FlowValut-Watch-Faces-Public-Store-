@@ -33,6 +33,10 @@ export function StorefrontLayout() {
 
           {/* Right: search only (Studio removed from public nav) */}
           <div className="flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#3a4452] bg-[#141820]/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d5b987]" />
+              <span className="font-mono text-[11px] uppercase tracking-wide text-[#aeb5c1]">Premium Store</span>
+            </div>
             <SearchBar compact />
           </div>
 
@@ -58,6 +62,7 @@ export function StorefrontLayout() {
           </p>
           <div className="flex items-center gap-4 text-xs font-sans">
             <Link to="/" className="hover:text-[#E1E4EA] transition-colors">Browse</Link>
+            <Link to="/category/premium" className="hover:text-[#E1E4EA] transition-colors">Premium</Link>
           </div>
         </div>
       </footer>
