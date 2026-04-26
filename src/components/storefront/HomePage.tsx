@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCatalog, type FilterState, type SortOption } from '@/context/CatalogContext';
 import { FilterSidebar } from './FilterSidebar';
 import { SortControls } from './SortControls';
 import { WatchfaceGrid } from './WatchfaceGrid';
 import { EmptyState } from './EmptyState';
+import { readHeroConfig, resolveFeaturedFace } from './heroConfig';
 
 // ── Category metadata ──────────────────────────────────────────────────────
 
@@ -54,75 +55,10 @@ export function HomePage() {
     filters.priceFilter !== 'all' ||
     filters.searchQuery !== '';
 
-  const [heroModelSlug, setHeroModelSlug] = useState<string>('all');
-  const [heroCategory, setHeroCategory] = useState<string>('all');
-  const [heroIndex, setHeroIndex] = useState(0);
-  const [heroNow, setHeroNow] = useState(() => new Date());
-
-  const heroCategories = useMemo(() => {
-    const set = new Set<string>();
-    results.forEach((entry) => {
-      entry.categories.forEach((cat) => set.add(cat.toLowerCase()));
-    });
-    return ['all', ...Array.from(set).sort()];
+  const featuredFace = useMemo(() => {
+    if (typeof window === 'undefined') return results[0] ?? null;
+    return resolveFeaturedFace(results, readHeroConfig());
   }, [results]);
-
-  const heroCandidates = useMemo(() => {
-    let source = results;
-
-    if (heroModelSlug !== 'all') {
-      const model = models[heroModelSlug];
-      if (!model) return [];
-      source = source.filter((entry) => entry.specGroup === model.specGroup);
-    }
-
-    if (heroCategory !== 'all') {
-      source = source.filter((entry) =>
-        entry.categories.some((cat) => cat.toLowerCase() === heroCategory)
-      );
-    }
-
-    return source;
-  }, [results, heroModelSlug, heroCategory, models]);
-
-  const featuredFace = heroCandidates[heroIndex] ?? null;
-
-  useEffect(() => {
-    setHeroIndex((prev) => {
-      if (heroCandidates.length === 0) return 0;
-      return prev >= heroCandidates.length ? 0 : prev;
-    });
-  }, [heroCandidates.length]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setHeroNow(new Date());
-    }, 30_000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const heroTime = useMemo(
-    () =>
-      heroNow.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }),
-    [heroNow]
-  );
-
-  const heroDay = useMemo(
-    () => heroNow.toLocaleDateString([], { weekday: 'long' }),
-    [heroNow]
-  );
-
-  const heroStyleLabel = heroCategory === 'all' ? 'All' : capitalize(heroCategory);
-
-  function cycleHeroFace() {
-    if (heroCandidates.length === 0) return;
-    setHeroIndex((prev) => (prev + 1) % heroCandidates.length);
-  }
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -144,50 +80,19 @@ export function HomePage() {
               Designed for clarity, performance, and style.
             </p>
             <div className="mt-7 grid grid-cols-3 gap-2 max-w-sm mx-auto lg:mx-0">
-              <button
-                type="button"
-                onClick={cycleHeroFace}
-                className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
-                title="Click to cycle featured watchface"
-              >
+              <div className="vault-glass rounded-xl px-3 py-2 text-left">
                 <p className="vault-micro">Faces</p>
-                <p className="text-[#E8D2A8] text-lg font-medium">{heroCandidates.length}</p>
-                <p className="text-[10px] text-[#8E9196] mt-0.5">click next</p>
-              </button>
+                <p className="text-[#E8D2A8] text-lg font-medium">{results.length}</p>
+              </div>
               <div className="vault-glass rounded-xl px-3 py-2 text-left">
                 <p className="vault-micro">Models</p>
-                <select
-                  value={heroModelSlug}
-                  onChange={(e) => {
-                    setHeroModelSlug(e.target.value);
-                    setHeroIndex(0);
-                  }}
-                  className="mt-1 w-full bg-transparent text-[#E8D2A8] text-sm font-medium focus:outline-none"
-                >
-                  <option value="all" className="bg-[#121418] text-[#E8D2A8]">All ({modelList.length})</option>
-                  {modelList.map(([slug, model]) => (
-                    <option key={slug} value={slug} className="bg-[#121418] text-[#E8D2A8]">
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
+                <p className="text-[#E8D2A8] text-lg font-medium">{modelList.length}</p>
               </div>
               <div className="vault-glass rounded-xl px-3 py-2 text-left">
                 <p className="vault-micro">Style</p>
-                <select
-                  value={heroCategory}
-                  onChange={(e) => {
-                    setHeroCategory(e.target.value);
-                    setHeroIndex(0);
-                  }}
-                  className="mt-1 w-full bg-transparent text-[#E8D2A8] text-sm font-medium focus:outline-none"
-                >
-                  {heroCategories.map((cat) => (
-                    <option key={cat} value={cat} className="bg-[#121418] text-[#E8D2A8]">
-                      {cat === 'all' ? 'All' : capitalize(cat)}
-                    </option>
-                  ))}
-                </select>
+                <p className="text-[#E8D2A8] text-lg font-medium capitalize">
+                  {featuredFace?.categories[0] ?? 'N/A'}
+                </p>
               </div>
             </div>
           </div>
@@ -202,12 +107,13 @@ export function HomePage() {
                   />
                 )}
                 <div className="text-center">
-                  <div className="text-5xl font-extralight tracking-[0.08em] text-[#f7f8fa]">{heroTime}</div>
-                  <div className="vault-micro mt-2">{heroDay}</div>
+                  <div className="text-2xl font-light tracking-[0.04em] text-[#f7f8fa]">Featured</div>
                   <p className="mt-3 text-xs text-[#E8D2A8] max-w-[220px] truncate">
                     {featuredFace?.name ?? 'No watchface for current selection'}
                   </p>
-                  <p className="text-[10px] text-[#9ca3af] mt-1">Style: {heroStyleLabel}</p>
+                  <p className="text-[10px] text-[#9ca3af] mt-1">
+                    Manage from /admin/hero
+                  </p>
                 </div>
                 <div className="absolute top-8 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E8D2A8]" />
                 <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-12 h-1 rounded-full bg-[#2a313e] overflow-hidden">
@@ -318,10 +224,6 @@ export function HomePage() {
       )}
     </div>
   );
-}
-
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
