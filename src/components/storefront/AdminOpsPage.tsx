@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Wrench, Database } from 'lucide-react';
+import { Wrench, Database, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPanel } from '@/components/AdminPanel';
 import type { GitHubConfig } from '@/lib/githubApi';
-import { patchCatalogSpecGroups } from '@/lib/catalogApi';
+import {
+  patchCatalogSpecGroups,
+  fetchCatalogFromGitHub,
+  fetchStorefrontConfigFromGitHub,
+  writeStorefrontConfigToGitHub,
+} from '@/lib/catalogApi';
 import { Button } from '@/components/ui/button';
 
 const DEFAULT_OWNER = 'AI-ERP-ITE';
@@ -16,6 +21,10 @@ export function AdminOpsPage() {
   const [repo, setRepo] = useState(DEFAULT_REPO);
   const [branch, setBranch] = useState('main');
   const [patching, setPatching] = useState(false);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [catalogOptions, setCatalogOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [featuredFaceId, setFeaturedFaceId] = useState<string>('');
+  const [savingFeatured, setSavingFeatured] = useState(false);
 
   const config = useMemo<GitHubConfig>(
     () => ({ token: token.trim(), owner: owner.trim(), repo: repo.trim(), branch: branch.trim() || 'main' }),
@@ -28,6 +37,45 @@ export function AdminOpsPage() {
   }, [owner, repo]);
 
   const canRun = Boolean(config.token && config.owner && config.repo);
+
+  async function loadCatalogData() {
+    if (!canRun) return;
+
+    setLoadingCatalog(true);
+    try {
+      const [catalog, storefrontConfig] = await Promise.all([
+        fetchCatalogFromGitHub(config),
+        fetchStorefrontConfigFromGitHub(config),
+      ]);
+
+      setCatalogOptions(catalog.map((entry) => ({ id: entry.id, name: entry.name })));
+      setFeaturedFaceId(storefrontConfig.featuredFaceId ?? '');
+      toast.success('Catalog loaded.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load catalog data');
+    } finally {
+      setLoadingCatalog(false);
+    }
+  }
+
+  async function handleSaveFeaturedFace() {
+    if (!canRun) {
+      toast.error('Set token, owner, and repo first.');
+      return;
+    }
+
+    setSavingFeatured(true);
+    try {
+      await writeStorefrontConfigToGitHub(config, {
+        featuredFaceId: featuredFaceId || null,
+      });
+      toast.success('Featured watchface updated.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save featured watchface');
+    } finally {
+      setSavingFeatured(false);
+    }
+  }
 
   async function handleRunSpecGroupPatch() {
     if (!canRun) {
@@ -101,6 +149,49 @@ export function AdminOpsPage() {
               className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
             />
           </div>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">
+          <div className="flex items-center gap-2 text-[#dce3ee] text-sm font-medium">
+            <Star className="h-4 w-4 text-[#d2b37a]" />
+            Featured Watchface (Hero)
+          </div>
+          <p className="text-xs text-[#8f9aac]">
+            Client users cannot change this. Hero featured face uses this admin selection only.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={loadCatalogData}
+              disabled={!canRun || loadingCatalog}
+              variant="outline"
+              className="h-10 border-[#3b4d68] text-[#ecf2ff] hover:bg-[#263448]"
+            >
+              {loadingCatalog ? 'Loading Catalog...' : 'Load Catalog'}
+            </Button>
+          </div>
+
+          <select
+            value={featuredFaceId}
+            onChange={(e) => setFeaturedFaceId(e.target.value)}
+            disabled={!catalogOptions.length || savingFeatured}
+            className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
+          >
+            <option value="">No featured override (auto latest)</option>
+            {catalogOptions.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name} ({entry.id})
+              </option>
+            ))}
+          </select>
+
+          <Button
+            onClick={handleSaveFeaturedFace}
+            disabled={!canRun || savingFeatured}
+            className="h-10 bg-[#1d2736] hover:bg-[#263448] text-[#ecf2ff] border border-[#3b4d68]"
+          >
+            {savingFeatured ? 'Saving Featured Face...' : 'Save Featured Face'}
+          </Button>
         </div>
 
         <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">

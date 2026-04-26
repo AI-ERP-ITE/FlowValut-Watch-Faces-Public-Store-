@@ -1,15 +1,33 @@
 {
-  "balance-2":        { "name": "Amazfit Balance 2",        "brand": "amazfit", "specGroup": "480-round-v2" },
-  "balance":          { "name": "Amazfit Balance",          "brand": "amazfit", "specGroup": "480-round-v2" },
-  "active-max":       { "name": "Amazfit Active Max",       "brand": "amazfit", "specGroup": "480-round-v2" },
-  "active-3-premium": { "name": "Amazfit Active 3 Premium", "brand": "amazfit", "specGroup": "480-round-v2-b" },
-  "gtr-4":            { "name": "Amazfit GTR 4",            "brand": "amazfit", "specGroup": "round-v3-a" },
-  "gts-4":            { "name": "Amazfit GTS 4",            "brand": "amazfit", "specGroup": "square-v3-a" },
-  "active-2-round":   { "name": "Amazfit Active 2 Round",   "brand": "amazfit", "specGroup": "round-v3-a" },
-  "active-2-square":  { "name": "Amazfit Active 2 Square",  "brand": "amazfit", "specGroup": "square-v3-a" },
-  "active":           { "name": "Amazfit Active",           "brand": "amazfit", "specGroup": "round-v3-a" },
-  "pop-3s":           { "name": "Amazfit Pop 3S",           "brand": "amazfit", "specGroup": "round-v3-a" },
-  "cheetah-pro":      { "name": "Amazfit Cheetah Pro",      "brand": "amazfit", "specGroup": "round-v3-a" },
-  "t-rex-2":          { "name": "Amazfit T-Rex 2",          "brand": "amazfit", "specGroup": "round-v3-a" },
-  "falcon":           { "name": "Amazfit Falcon",           "brand": "amazfit", "specGroup": "round-v3-a" }
+  "balance": { "name": "Amazfit Balance", "brand": "amazfit", "specGroup": "480-round-v2" },
+  "balance-2": { "name": "Amazfit Balance 2", "brand": "amazfit", "specGroup": "480-round-v2" },
+  "t-rex-2": { "name": "Amazfit T-Rex 2", "brand": "amazfit", "specGroup": "454-round-v2" },
+  "gtr-mini": { "name": "Amazfit GTR Mini", "brand": "amazfit", "specGroup": "416-round-v2" },
+  "bip-5": { "name": "Amazfit Bip 5", "brand": "amazfit", "specGroup": "320x380-square-v2" },
+
+  "t-rex-ultra-2": { "name": "Amazfit T-Rex Ultra 2", "brand": "amazfit", "specGroup": "480-round-v3" },
+  "active-max": { "name": "Amazfit Active Max", "brand": "amazfit", "specGroup": "480-round-v3" },
+  "t-rex-3-pro-48mm": { "name": "Amazfit T-Rex 3 Pro (48mm)", "brand": "amazfit", "specGroup": "480-round-v3" },
+  "t-rex-3": { "name": "Amazfit T-Rex 3", "brand": "amazfit", "specGroup": "480-round-v3" },
+  "cheetah-pro": { "name": "Amazfit Cheetah Pro", "brand": "amazfit", "specGroup": "480-round-v3" },
+
+  "active-3-premium": { "name": "Active 3 Premium", "brand": "amazfit", "specGroup": "466-round-v3" },
+  "t-rex-3-pro-44mm": { "name": "Amazfit T-Rex 3 Pro (44mm)", "brand": "amazfit", "specGroup": "466-round-v3" },
+  "active-2-round": { "name": "Active 2 (Round)", "brand": "amazfit", "specGroup": "466-round-v3" },
+  "gtr-4": { "name": "Amazfit GTR 4", "brand": "amazfit", "specGroup": "466-round-v3" },
+
+  "cheetah-round": { "name": "Amazfit Cheetah (Round)", "brand": "amazfit", "specGroup": "454-round-v3" },
+  "t-rex-ultra": { "name": "Amazfit T-Rex Ultra", "brand": "amazfit", "specGroup": "454-round-v3" },
+
+  "falcon": { "name": "Amazfit Falcon", "brand": "amazfit", "specGroup": "416-round-v3" },
+
+  "active-2-square": { "name": "Amazfit Active 2 (Square)", "brand": "amazfit", "specGroup": "390x450-square-v3" },
+  "bip-6": { "name": "Amazfit Bip 6", "brand": "amazfit", "specGroup": "390x450-square-v3" },
+  "active": { "name": "Amazfit Active", "brand": "amazfit", "specGroup": "390x450-square-v3" },
+  "cheetah-square": { "name": "Amazfit Cheetah (Square)", "brand": "amazfit", "specGroup": "390x450-square-v3" },
+  "gts-4": { "name": "Amazfit GTS 4", "brand": "amazfit", "specGroup": "390x450-square-v3" },
+
+  "active-edge": { "name": "Amazfit Active Edge", "brand": "amazfit", "specGroup": "360-round-v3" },
+
+  "bip-5-unity": { "name": "Amazfit Bip 5 Unity", "brand": "amazfit", "specGroup": "320x380-square-v3" }
 }

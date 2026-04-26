@@ -20,7 +20,7 @@ const CATEGORIES = [
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function HomePage() {
-  const { models, loading, error, getFiltered, baseUrl } = useCatalog();
+  const { catalog, models, loading, error, getFiltered, baseUrl } = useCatalog();
   const [searchParams] = useSearchParams();
 
   // Seed from URL if coming from SearchBar
@@ -41,7 +41,7 @@ export function HomePage() {
   const coreResults = useMemo(() => getFiltered(filters), [getFiltered, filters]);
 
   const [heroStyle, setHeroStyle] = useState<string>('all');
-  const [heroFaceIndex, setHeroFaceIndex] = useState(0);
+  const [featuredFaceId, setFeaturedFaceId] = useState<string | null>(null);
 
   const styleOptions = useMemo(() => {
     const set = new Set<string>();
@@ -63,7 +63,6 @@ export function HomePage() {
   function clearFilters() {
     updateFilter({ brand: null, modelSlug: null, priceFilter: 'all', searchQuery: '' });
     setHeroStyle('all');
-    setHeroFaceIndex(0);
   }
 
   // ── Model chip list ──────────────────────────────────────────────────────
@@ -75,14 +74,14 @@ export function HomePage() {
     filters.priceFilter !== 'all' ||
     filters.searchQuery !== '';
 
-  const featuredFace = results[heroFaceIndex] ?? null;
-
-  useEffect(() => {
-    setHeroFaceIndex((prev) => {
-      if (results.length === 0) return 0;
-      return prev >= results.length ? 0 : prev;
-    });
-  }, [results.length]);
+  const featuredFace = useMemo(() => {
+    if (!catalog.length) return null;
+    if (featuredFaceId) {
+      const picked = catalog.find((entry) => entry.id === featuredFaceId);
+      if (picked) return picked;
+    }
+    return catalog[0] ?? null;
+  }, [catalog, featuredFaceId]);
 
   useEffect(() => {
     if (heroStyle !== 'all' && !styleOptions.includes(heroStyle)) {
@@ -90,10 +89,27 @@ export function HomePage() {
     }
   }, [heroStyle, styleOptions]);
 
-  function cycleFeaturedFace() {
-    if (!results.length) return;
-    setHeroFaceIndex((prev) => (prev + 1) % results.length);
-  }
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStoreConfig() {
+      try {
+        const response = await fetch(`${baseUrl}storeConfig.json`);
+        if (!response.ok) return;
+        const data = (await response.json()) as { featuredFaceId?: string | null };
+        if (!cancelled) {
+          setFeaturedFaceId(data.featuredFaceId ?? null);
+        }
+      } catch {
+        // Keep default fallback when config file is missing.
+      }
+    }
+
+    loadStoreConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl]);
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -115,16 +131,13 @@ export function HomePage() {
               Designed for clarity, performance, and style.
             </p>
             <div className="mt-7 grid grid-cols-3 gap-2 max-w-sm mx-auto lg:mx-0">
-              <button
-                type="button"
-                onClick={cycleFeaturedFace}
-                className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
-                title="Next featured face"
+              <div
+                className="vault-glass rounded-xl px-3 py-2 text-left"
               >
                 <p className="vault-micro">Faces</p>
                 <p className="text-[#E8D2A8] text-lg font-medium">{results.length}</p>
-                <p className="text-[10px] text-[#8E9196] mt-0.5">click to cycle</p>
-              </button>
+                <p className="text-[10px] text-[#8E9196] mt-0.5">matching filters</p>
+              </div>
               <div className="vault-glass rounded-xl px-3 py-2 text-left">
                 <p className="vault-micro">Models</p>
                 <select
@@ -132,7 +145,6 @@ export function HomePage() {
                   onChange={(e) => {
                     const next = e.target.value;
                     updateFilter({ modelSlug: next === 'all' ? null : next, brand: null });
-                    setHeroFaceIndex(0);
                   }}
                   className="mt-1 w-full bg-transparent text-[#E8D2A8] text-sm font-medium focus:outline-none"
                 >
@@ -150,7 +162,6 @@ export function HomePage() {
                   value={heroStyle}
                   onChange={(e) => {
                     setHeroStyle(e.target.value);
-                    setHeroFaceIndex(0);
                   }}
                   className="mt-1 w-full bg-transparent text-[#E8D2A8] text-sm font-medium focus:outline-none"
                 >

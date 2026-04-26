@@ -2,6 +2,7 @@ import { uploadToGitHub, type GitHubConfig } from './githubApi';
 import type { CatalogEntry, ModelEntry, SpecGroup } from '@/context/CatalogContext';
 
 const CATALOG_PATH = 'docs/catalog.json';
+const STOREFRONT_CONFIG_PATH = 'docs/storeConfig.json';
 
 interface SourceMetadata {
   specGroup?: string | null;
@@ -16,6 +17,10 @@ export interface SpecGroupPatchResult {
   patched: number;
   unknownAfter: number;
   updated: boolean;
+}
+
+export interface StorefrontConfig {
+  featuredFaceId: string | null;
 }
 
 function decodeGitHubFileContent(content: string): string {
@@ -119,6 +124,16 @@ export async function fetchCatalogFromGitHub(
   return JSON.parse(decoded) as CatalogEntry[];
 }
 
+/**
+ * Fetch docs/storeConfig.json from GitHub. Returns default config if missing.
+ */
+export async function fetchStorefrontConfigFromGitHub(
+  config: GitHubConfig
+): Promise<StorefrontConfig> {
+  const parsed = await fetchJsonFromGitHub<StorefrontConfig>(config, STOREFRONT_CONFIG_PATH);
+  return parsed ?? { featuredFaceId: null };
+}
+
 // ── Write ─────────────────────────────────────────────────────────────────
 
 /**
@@ -212,6 +227,60 @@ export async function writeCatalogToGitHub(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(`Failed to write catalog.json: ${err.message}`);
+  }
+}
+
+/**
+ * Write docs/storeConfig.json directly in repository root docs/.
+ */
+export async function writeStorefrontConfigToGitHub(
+  config: GitHubConfig,
+  storefrontConfig: StorefrontConfig
+): Promise<void> {
+  const { token, owner, repo, branch = 'main' } = config;
+
+  const content = btoa(
+    unescape(encodeURIComponent(JSON.stringify(storefrontConfig, null, 2)))
+  );
+
+  let sha: string | undefined;
+  const checkRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${STOREFRONT_CONFIG_PATH}?ref=${branch}`,
+    {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    }
+  );
+  if (checkRes.ok) {
+    const existing = await checkRes.json();
+    sha = existing.sha;
+  }
+
+  const body: Record<string, string> = {
+    message: 'Update storeConfig.json',
+    content,
+    branch,
+  };
+  if (sha) body.sha = sha;
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${STOREFRONT_CONFIG_PATH}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(`Failed to write storeConfig.json: ${err.message}`);
   }
 }
 
