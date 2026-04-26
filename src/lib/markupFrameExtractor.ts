@@ -1,5 +1,6 @@
 export interface MarkupFrameExtractionResult {
   frames: string[];
+  frameIndexes: number[];
   strategy: string;
   warnings: string[];
 }
@@ -80,9 +81,11 @@ function splitSingleSvgByFrameMarkers(svgMarkup: string): MarkupFrameExtractionR
       const inner = `${defs}${node.outerHTML}`;
       return `<svg ${baseAttrs}>${inner}</svg>`;
     });
+  const frameIndexes = Array.from(grouped.keys()).sort((a, b) => a - b);
 
   return {
     frames,
+    frameIndexes,
     strategy: 'single-svg-frame-markers',
     warnings: [],
   };
@@ -91,13 +94,14 @@ function splitSingleSvgByFrameMarkers(svgMarkup: string): MarkupFrameExtractionR
 export function extractFramesFromMarkup(markup: string): MarkupFrameExtractionResult {
   const trimmed = markup.trim();
   if (!trimmed) {
-    return { frames: [], strategy: 'empty', warnings: ['Input is empty.'] };
+    return { frames: [], frameIndexes: [], strategy: 'empty', warnings: ['Input is empty.'] };
   }
 
   const directSvgs = extractAllSvgs(trimmed);
   if (directSvgs.length > 1) {
     return {
       frames: directSvgs,
+      frameIndexes: directSvgs.map((_, i) => i),
       strategy: 'multi-svg-tags',
       warnings: [],
     };
@@ -110,6 +114,7 @@ export function extractFramesFromMarkup(markup: string): MarkupFrameExtractionRe
 
     return {
       frames: [singleSvg],
+      frameIndexes: [0],
       strategy: 'single-svg-no-markers',
       warnings: ['Only one SVG frame detected; add frame markers to split automatically.'],
     };
@@ -121,6 +126,7 @@ export function extractFramesFromMarkup(markup: string): MarkupFrameExtractionRe
   if (htmlSvgs.length > 0) {
     return {
       frames: htmlSvgs,
+      frameIndexes: htmlSvgs.map((_, i) => i),
       strategy: 'html-svg-extraction',
       warnings: htmlSvgs.length === 1 ? ['Only one SVG extracted from HTML input.'] : [],
     };
@@ -128,6 +134,7 @@ export function extractFramesFromMarkup(markup: string): MarkupFrameExtractionRe
 
   return {
     frames: [trimmed],
+    frameIndexes: [0],
     strategy: 'raw-html-fallback',
     warnings: ['No SVG tags found; using full HTML input as a single frame.'],
   };

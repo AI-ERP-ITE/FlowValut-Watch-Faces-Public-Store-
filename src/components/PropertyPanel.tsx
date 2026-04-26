@@ -12,7 +12,7 @@ import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
 import type { CustomHandRecord } from '@/lib/customHandStore';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getAllowedDataTypesForElement,
   getDataTypeLabel,
@@ -175,6 +175,10 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
   const expectedImageCount = element?.type === 'IMG_LEVEL'
     ? getImageSwitcherExpectedImageCount(element.dataType, imageSwitcherExplicitCount)
     : null;
+  const switcherDetection = useMemo(
+    () => extractFramesFromMarkup(switcherMarkup),
+    [switcherMarkup],
+  );
 
   const update = (changes: Partial<WatchFaceElement>) => {
     if (!element) return;
@@ -206,7 +210,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
   const buildImageSwitcherFramesFromMarkup = async () => {
     if (!element || element.type !== 'IMG_LEVEL') return;
 
-    const extracted = extractFramesFromMarkup(switcherMarkup);
+    const extracted = switcherDetection;
     if (extracted.frames.length === 0) {
       setCreatorStatus('No frames detected in switcher markup input.');
       return;
@@ -966,6 +970,23 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               className="w-full h-28 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
               spellCheck={false}
             />
+            {switcherMarkup.trim().length > 0 && (
+              <div className="rounded border border-cyan-500/25 bg-cyan-500/10 p-2 space-y-1">
+                <p className="text-[10px] text-cyan-200">
+                  Detected frames: {switcherDetection.frames.length} via {switcherDetection.strategy}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {switcherDetection.frameIndexes.map((index) => (
+                    <span key={index} className="px-1.5 py-0.5 rounded border border-cyan-400/30 text-[9px] text-cyan-200/90">
+                      #{index}
+                    </span>
+                  ))}
+                </div>
+                {switcherDetection.warnings.length > 0 && (
+                  <p className="text-[9px] text-amber-300/90">{switcherDetection.warnings[0]}</p>
+                )}
+              </div>
+            )}
             <button
               onClick={() => { void buildImageSwitcherFramesFromMarkup(); }}
               className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
