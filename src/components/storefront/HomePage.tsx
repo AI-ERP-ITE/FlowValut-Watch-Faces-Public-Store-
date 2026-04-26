@@ -103,22 +103,17 @@ export function HomePage() {
                   <img
                     src={`${baseUrl}${featuredFace.previewPath}`}
                     alt={`${featuredFace.name} preview`}
-                    className="absolute inset-0 w-full h-full object-cover opacity-35"
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
                 )}
-                <div className="text-center">
-                  <div className="text-2xl font-light tracking-[0.04em] text-[#f7f8fa]">Featured</div>
-                  <p className="mt-3 text-xs text-[#E8D2A8] max-w-[220px] truncate">
-                    {featuredFace?.name ?? 'No watchface for current selection'}
-                  </p>
-                  <p className="text-[10px] text-[#9ca3af] mt-1">
-                    Manage from /admin/hero
-                  </p>
-                </div>
-                <div className="absolute top-8 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E8D2A8]" />
-                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-12 h-1 rounded-full bg-[#2a313e] overflow-hidden">
-                  <div className="w-3/4 h-full bg-[#D4B57D]" />
-                </div>
+                {!featuredFace?.previewPath && (
+                  <div className="w-24 h-24 rounded-full border-2 border-[#465064] flex items-center justify-center">
+                    <span className="text-[#7f8794] text-4xl">⌚</span>
+                  </div>
+                )}
+                {featuredFace?.previewPath && (
+                  <div className="absolute inset-0 ring-1 ring-white/10 pointer-events-none" />
+                )}
               </div>
             </div>
           </div>
