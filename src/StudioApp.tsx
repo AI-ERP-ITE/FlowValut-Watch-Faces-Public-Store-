@@ -2329,9 +2329,27 @@ function StudioApp() {
         }
 
         const sanitizedBase = (el.name || el.id).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() || 'img_level';
-        const normalizedFrames = configuredFrames.slice(0, targetCount);
-        for (let i = normalizedFrames.length; i < targetCount; i += 1) {
-          normalizedFrames.push(`imglvl_${sanitizedBase}_${i}.png`);
+        const normalizedFrames: string[] = [];
+        for (let i = 0; i < targetCount; i += 1) {
+          const configuredFrame = configuredFrames[i];
+          const generatedName = `imglvl_${sanitizedBase}_${i}.png`;
+
+          if (configuredFrame && configuredFrame.startsWith('data:')) {
+            const { bytes } = decodeDataUrlToBytes(configuredFrame, `IMG_LEVEL inline frame ${el.name}#${i}`);
+            const existingInline = elementFiles.find((f) => f.src === generatedName);
+            if (!existingInline) {
+              elementFiles.push({ src: generatedName, file: new File([bytes], generatedName, { type: 'image/png' }) });
+            }
+            normalizedFrames.push(generatedName);
+            continue;
+          }
+
+          if (configuredFrame) {
+            normalizedFrames.push(configuredFrame);
+            continue;
+          }
+
+          normalizedFrames.push(generatedName);
         }
 
         for (let i = 0; i < normalizedFrames.length; i += 1) {

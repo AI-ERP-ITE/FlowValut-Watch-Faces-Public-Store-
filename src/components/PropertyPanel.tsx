@@ -21,6 +21,8 @@ import {
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
+import { renderHtmlToDataUrl, renderSvgToDataUrl } from '@/lib/customIconStore';
+import { extractFramesFromMarkup } from '@/lib/markupFrameExtractor';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -143,6 +145,9 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
   const [activeTab, setActiveTab] = useState<PanelTab>('position');
+  const [gaugeMarkup, setGaugeMarkup] = useState('');
+  const [switcherMarkup, setSwitcherMarkup] = useState('');
+  const [creatorStatus, setCreatorStatus] = useState('');
   const tablerLoadedRef = useRef(false);
 
   // Load Tabler icons lazily when an IMG element is selected
@@ -176,6 +181,60 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     onUpdateElement?.(element.id, changes);
   };
 
+  const buildGaugeFromMarkup = async () => {
+    if (!element || element.type !== 'GAUGE_POINTER') return;
+    const extracted = extractFramesFromMarkup(gaugeMarkup);
+    if (extracted.frames.length === 0) {
+      setCreatorStatus('No frame detected in gauge markup input.');
+      return;
+    }
+
+    const frame = extracted.frames[0];
+    const dataUrl = frame.trim().startsWith('<svg')
+      ? await renderSvgToDataUrl(frame, 256)
+      : await renderHtmlToDataUrl(frame, 256);
+
+    if (!dataUrl) {
+      setCreatorStatus('Gauge markup render failed. Ensure SVG or HTML includes a valid SVG node.');
+      return;
+    }
+
+    update({ src: dataUrl, assetFilename: `gauge_pointer_${element.id}.png` });
+    setCreatorStatus(`Gauge pointer built from markup (${extracted.strategy}).`);
+  };
+
+  const buildImageSwitcherFramesFromMarkup = async () => {
+    if (!element || element.type !== 'IMG_LEVEL') return;
+
+    const extracted = extractFramesFromMarkup(switcherMarkup);
+    if (extracted.frames.length === 0) {
+      setCreatorStatus('No frames detected in switcher markup input.');
+      return;
+    }
+
+    const renderedFrames: string[] = [];
+    for (const frame of extracted.frames) {
+      const dataUrl = frame.trim().startsWith('<svg')
+        ? await renderSvgToDataUrl(frame, 128)
+        : await renderHtmlToDataUrl(frame, 128);
+      if (dataUrl) renderedFrames.push(dataUrl);
+    }
+
+    if (renderedFrames.length === 0) {
+      setCreatorStatus('Frame rendering failed. Verify each frame includes valid SVG content.');
+      return;
+    }
+
+    const minCount = imageSwitcherPolicy?.minCount ?? 2;
+    update({
+      images: renderedFrames,
+      imageSwitcherFrameCount: Math.max(minCount, renderedFrames.length),
+    });
+
+    const warningSuffix = extracted.warnings.length > 0 ? ` ${extracted.warnings[0]}` : '';
+    setCreatorStatus(`Parsed ${renderedFrames.length} frame(s) via ${extracted.strategy}.${warningSuffix}`);
+  };
+
   useEffect(() => {
     if (!element) return;
     if (allowedDataTypes.length === 0) return;
@@ -203,6 +262,12 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       return;
     }
     setActiveTab('position');
+  }, [element?.id, element?.type]);
+
+  useEffect(() => {
+    setCreatorStatus('');
+    setGaugeMarkup('');
+    setSwitcherMarkup('');
   }, [element?.id, element?.type]);
 
   if (!element) {
@@ -867,8 +932,55 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               />
             </FieldRow>
             <p className="text-[9px] text-white/35">Pivot uses normalized values in local pointer box (0..1).</p>
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <p className="text-[10px] text-cyan-300/80 uppercase tracking-wider">SVG/HTML Gauge Creator</p>
+              <textarea
+                value={gaugeMarkup}
+                onChange={(e) => setGaugeMarkup(e.target.value)}
+                placeholder="Paste SVG or HTML for the gauge pointer."
+                className="w-full h-24 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
+                spellCheck={false}
+              />
+              <button
+                onClick={() => { void buildGaugeFromMarkup(); }}
+                className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+              >
+                Build Gauge Pointer From Markup
+              </button>
+            </div>
           </div>
         </Section>
+      )}
+
+      {element.type === 'IMG_LEVEL' && (
+        <Section label="Image Switcher Batch Creator">
+          <div className="space-y-2">
+            <p className="text-[10px] text-white/45 leading-relaxed">
+              Paste one HTML/SVG source. Parser auto-splits frames from multiple <code>&lt;svg&gt;</code> tags or frame markers
+              (<code>data-frame-index</code>, <code>data-index</code>, <code>id=frame-*</code>, <code>id=imglvl-*</code>).
+            </p>
+            <textarea
+              value={switcherMarkup}
+              onChange={(e) => setSwitcherMarkup(e.target.value)}
+              placeholder="Paste one SVG/HTML containing one or many frame definitions."
+              className="w-full h-28 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
+              spellCheck={false}
+            />
+            <button
+              onClick={() => { void buildImageSwitcherFramesFromMarkup(); }}
+              className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+            >
+              Parse And Build IMG_LEVEL Frames
+            </button>
+            <p className="text-[9px] text-white/35">
+              Built frames are stored inline as data URLs and exported as deterministic PNG files.
+            </p>
+          </div>
+        </Section>
+      )}
+
+      {creatorStatus && (
+        <p className="text-[10px] text-cyan-300/80">{creatorStatus}</p>
       )}
 
       {/* TIME_POINTER-specific fields */}
