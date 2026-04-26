@@ -38,31 +38,13 @@ async function fetchJsonFromGitHub<T>(
   config: GitHubConfig,
   repoPath: string
 ): Promise<T | null> {
-  if (isBackendBridgeConfigured()) {
-    const bridged = await bridgeReadContent(repoPath, config.branch || 'main');
-    if (!bridged.exists || !bridged.content) return null;
-    const decoded = decodeGitHubFileContent(bridged.content);
-    return JSON.parse(decoded) as T;
+  if (!isBackendBridgeConfigured()) {
+    throw new Error('Backend bridge is required for catalog operations');
   }
 
-  const { token, owner, repo, branch = 'main' } = config;
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}?ref=${branch}`,
-    {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    }
-  );
-
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${repoPath}: HTTP ${response.status}`);
-  }
-
-  const data = await response.json();
-  const decoded = decodeGitHubFileContent(data.content);
+  const bridged = await bridgeReadContent(repoPath, config.branch || 'main');
+  if (!bridged.exists || !bridged.content) return null;
+  const decoded = decodeGitHubFileContent(bridged.content);
   return JSON.parse(decoded) as T;
 }
 
@@ -113,33 +95,13 @@ function inferSpecGroupFromSource(
 export async function fetchCatalogFromGitHub(
   config: GitHubConfig
 ): Promise<CatalogEntry[]> {
-  if (isBackendBridgeConfigured()) {
-    const bridged = await bridgeReadContent(CATALOG_PATH, config.branch || 'main');
-    if (!bridged.exists || !bridged.content) return [];
-    const decoded = decodeGitHubFileContent(bridged.content);
-    return JSON.parse(decoded) as CatalogEntry[];
+  if (!isBackendBridgeConfigured()) {
+    throw new Error('Backend bridge is required for catalog operations');
   }
 
-  const { token, owner, repo, branch = 'main' } = config;
-
-  const response = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${CATALOG_PATH}?ref=${branch}`,
-    {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    }
-  );
-
-  if (!response.ok) {
-    if (response.status === 404) return []; // catalog doesn't exist yet
-    throw new Error(`Failed to fetch catalog.json: HTTP ${response.status}`);
-  }
-
-  const data = await response.json();
-  // GitHub returns file content as base64
-  const decoded = decodeGitHubFileContent(data.content);
+  const bridged = await bridgeReadContent(CATALOG_PATH, config.branch || 'main');
+  if (!bridged.exists || !bridged.content) return [];
+  const decoded = decodeGitHubFileContent(bridged.content);
   return JSON.parse(decoded) as CatalogEntry[];
 }
 
@@ -201,65 +163,19 @@ export async function writeCatalogToGitHub(
   config: GitHubConfig,
   entries: CatalogEntry[]
 ): Promise<void> {
-  if (isBackendBridgeConfigured()) {
-    const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(entries, null, 2))));
-    const current = await bridgeReadContent(CATALOG_PATH, config.branch || 'main');
-    await bridgeWriteContent({
-      path: CATALOG_PATH,
-      contentBase64,
-      message: 'Update catalog.json',
-      branch: config.branch || 'main',
-      sha: current.exists ? current.sha : undefined,
-    });
-    return;
+  if (!isBackendBridgeConfigured()) {
+    throw new Error('Backend bridge is required for catalog operations');
   }
 
-  const { token, owner, repo, branch = 'main' } = config;
-
-  const content = btoa(
-    unescape(encodeURIComponent(JSON.stringify(entries, null, 2)))
-  );
-
-  // Check existing SHA
-  let sha: string | undefined;
-  const checkRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${CATALOG_PATH}?ref=${branch}`,
-    {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    }
-  );
-  if (checkRes.ok) {
-    const existing = await checkRes.json();
-    sha = existing.sha;
-  }
-
-  const body: Record<string, string> = {
+  const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(entries, null, 2))));
+  const current = await bridgeReadContent(CATALOG_PATH, config.branch || 'main');
+  await bridgeWriteContent({
+    path: CATALOG_PATH,
+    contentBase64,
     message: 'Update catalog.json',
-    content,
-    branch,
-  };
-  if (sha) body.sha = sha;
-
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${CATALOG_PATH}`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(`Failed to write catalog.json: ${err.message}`);
-  }
+    branch: config.branch || 'main',
+    sha: current.exists ? current.sha : undefined,
+  });
 }
 
 /**
@@ -269,64 +185,19 @@ export async function writeStorefrontConfigToGitHub(
   config: GitHubConfig,
   storefrontConfig: StorefrontConfig
 ): Promise<void> {
-  if (isBackendBridgeConfigured()) {
-    const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(storefrontConfig, null, 2))));
-    const current = await bridgeReadContent(STOREFRONT_CONFIG_PATH, config.branch || 'main');
-    await bridgeWriteContent({
-      path: STOREFRONT_CONFIG_PATH,
-      contentBase64,
-      message: 'Update storeConfig.json',
-      branch: config.branch || 'main',
-      sha: current.exists ? current.sha : undefined,
-    });
-    return;
+  if (!isBackendBridgeConfigured()) {
+    throw new Error('Backend bridge is required for catalog operations');
   }
 
-  const { token, owner, repo, branch = 'main' } = config;
-
-  const content = btoa(
-    unescape(encodeURIComponent(JSON.stringify(storefrontConfig, null, 2)))
-  );
-
-  let sha: string | undefined;
-  const checkRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${STOREFRONT_CONFIG_PATH}?ref=${branch}`,
-    {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-    }
-  );
-  if (checkRes.ok) {
-    const existing = await checkRes.json();
-    sha = existing.sha;
-  }
-
-  const body: Record<string, string> = {
+  const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(storefrontConfig, null, 2))));
+  const current = await bridgeReadContent(STOREFRONT_CONFIG_PATH, config.branch || 'main');
+  await bridgeWriteContent({
+    path: STOREFRONT_CONFIG_PATH,
+    contentBase64,
     message: 'Update storeConfig.json',
-    content,
-    branch,
-  };
-  if (sha) body.sha = sha;
-
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/${STOREFRONT_CONFIG_PATH}`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(`Failed to write storeConfig.json: ${err.message}`);
-  }
+    branch: config.branch || 'main',
+    sha: current.exists ? current.sha : undefined,
+  });
 }
 
 /**

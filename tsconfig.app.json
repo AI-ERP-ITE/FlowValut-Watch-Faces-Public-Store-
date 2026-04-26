@@ -12,6 +12,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@app-routes": [
+        "./src/AppPrivate.tsx"
       ]
     },
     /* Bundler mode */

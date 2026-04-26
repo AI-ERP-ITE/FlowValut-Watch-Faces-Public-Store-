@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:public": "cross-env VITE_BUILD_TARGET=public tsc -b && vite build --mode public",
+    "build:private": "cross-env VITE_BUILD_TARGET=private tsc -b && vite build --mode private",
     "lint": "eslint .",
     "preview": "vite preview",
     "sync-downloads": "tsx scripts/syncDownloads.ts",
@@ -81,6 +83,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.23",
     "canvas": "^3.2.3",
+    "cross-env": "^7.0.3",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

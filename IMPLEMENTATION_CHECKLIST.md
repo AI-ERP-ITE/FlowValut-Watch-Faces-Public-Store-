@@ -1,4 +1,5 @@
 # Implementation Checklist
+[ ] Caveman say: Before make new logic, always look at similar component pipeline. If other element already do thing, use same way or improve. No reinvent wheel unless must. (Best practice!)
 
 Complete workflow for every bug fix or feature added to this codebase.  
 Follow all phases in order — do not skip steps.
@@ -10,6 +11,7 @@ Follow all phases in order — do not skip steps.
 | Item | Value |
 |---|---|
 | Git repo root | `app/` (NOT workspace root) |
+| Current resolved root (this workspace) | `D:\Zepp Watchface maker website\Kimi_Agent_Untitled Chat\app` |
 | Source code | `app/src/` |
 | Build output | `app/dist/` |
 | Deployed folder | `app/docs/` |
@@ -22,10 +24,15 @@ Follow all phases in order — do not skip steps.
 
 ```powershell
 # You MUST be in app repo, not workspace-root specs repo
-$repoRoot = git rev-parse --show-toplevel
-if ($repoRoot -notlike "*\app") {
-  throw "Wrong git repo. Switch to ...\\Kimi_Agent_Untitled Chat\\app before build/deploy."
+$repoRoot = (git rev-parse --show-toplevel).Trim()
+$repoRootNorm = $repoRoot -replace '/', '\\'
+$repoLeaf = Split-Path -Path $repoRootNorm -Leaf
+
+if ($repoLeaf -ne 'app') {
+  throw "Wrong git repo root: $repoRootNorm. Switch to ...\\Kimi_Agent_Untitled Chat\\app before build/deploy."
 }
+
+Write-Output "Repo root OK: $repoRootNorm"
 ```
 
 ### Critical Deployment Invariant (Must Always Hold)
@@ -35,6 +42,31 @@ if ($repoRoot -notlike "*\app") {
 - [ ] Studio route uses `app/docs/studio/index.html`
 - [ ] Both HTML files must point to the latest built asset hash from `app/dist/assets/`
 - [ ] If one route is updated and the other is not, deployment is considered failed
+
+## Build Target Exposure Rules (Public vs Private)
+
+- [ ] Build target is explicitly set before build (`VITE_BUILD_TARGET=public|private`)
+- [ ] Public build does not register internal routes (`/studio`, `/studio/lab`, `/admin`, `/tools`)
+- [ ] Private build registers internal routes and keeps existing studio/admin behavior
+- [ ] Public build is validated using `npm run build:public`
+- [ ] Private build is validated using `npm run build:private`
+
+### Build Commands
+
+```powershell
+# Public storefront-only build
+npm run build:public
+
+# Private internal build
+npm run build:private
+```
+
+## Backend Authority Rules (Sensitive Operations)
+
+- [ ] Frontend sensitive mutations use backend bridge only
+- [ ] No direct GitHub REST write fallback for publish/catalog/lab sync
+- [ ] Backend enforces auth + authorization before mutation
+- [ ] Backend validates payload schema and allowed writable paths
 
 ---
 
@@ -69,7 +101,9 @@ if ($repoRoot -notlike "*\app") {
 ## Phase 3 — Build
 
 ```powershell
-cd "D:\Zepp Watchface maker website\Kimi_Agent_Untitled Chat\app"
+$app = ((git rev-parse --show-toplevel).Trim()) -replace '/', '\\'
+if ((Split-Path -Path $app -Leaf) -ne 'app') { throw "Wrong repo root: $app" }
+Set-Location $app
 npm run build
 ```
 
@@ -85,7 +119,8 @@ npm run build
 ## Phase 4 — Deploy to GitHub Pages
 
 ```powershell
-$app = "D:\Zepp Watchface maker website\Kimi_Agent_Untitled Chat\app"
+$app = ((git rev-parse --show-toplevel).Trim()) -replace '/', '\\'
+if ((Split-Path -Path $app -Leaf) -ne 'app') { throw "Wrong repo root: $app" }
 
 # Copy assets
 Copy-Item "$app\dist\assets\*" "$app\docs\assets\" -Force

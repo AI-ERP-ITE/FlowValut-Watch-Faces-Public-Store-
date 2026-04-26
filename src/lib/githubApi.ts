@@ -38,13 +38,13 @@ export async function uploadToGitHub(
   content: Blob | string,
   message?: string
 ): Promise<GitHubUploadResult> {
-  const { token, owner, repo, branch = 'main' } = config;
+  const { owner, repo, branch = 'main' } = config;
   const useBackendBridge = isBackendBridgeConfigured();
   
   try {
     // Validate parameters
-    if (!useBackendBridge && (!token || !token.trim())) {
-      throw new Error('GitHub token is missing');
+    if (!useBackendBridge) {
+      throw new Error('Backend bridge is required for GitHub writes');
     }
     if (!owner || !owner.trim()) {
       throw new Error('GitHub owner is missing');
@@ -103,133 +103,22 @@ export async function uploadToGitHub(
       body.sha = existingFile.sha;
     }
     
-    if (useBackendBridge) {
-      await bridgeWriteContent({
-        path: filepath,
-        contentBase64: base64Content,
-        message: body.message,
-        branch,
-        sha: body.sha,
-      });
+    await bridgeWriteContent({
+      path: filepath,
+      contentBase64: base64Content,
+      message: body.message,
+      branch,
+      sha: body.sha,
+    });
 
-      const pagesUrl = `https://${owner}.github.io/${repo}/zpk/${filename}`;
-      const folderMatch = filename.match(/^([^\/]+)\//);
-      const watchfaceId = folderMatch ? folderMatch[1] : filename.replace('.zpk', '').replace('-qr.png', '');
-      return {
-        success: true,
-        url: pagesUrl,
-        downloadUrl: pagesUrl,
-        watchfaceId,
-      };
-    }
-
-    // Upload file
-    console.log('[GitHub] Uploading to GitHub API...');
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filepath}`;
-    console.log('[GitHub] API URL:', apiUrl);
-    
-    const response = await fetch(
-      apiUrl,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `token ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    
-    if (!response.ok) {
-      console.error('[GitHub] Upload failed with status:', response.status);
-      let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        errorMsg = errorData.message || errorMsg;
-      } catch {
-        // Response body empty or not JSON — use status text
-      }
-      
-      if (response.status === 413) {
-        throw new Error(`File too large (${contentSize} bytes). Max: ${MAX_FILE_SIZE} bytes. Consider splitting the upload.`);
-      }
-      // 422 with "sha" missing = file exists but getFileSha failed. Retry with SHA.
-      if (response.status === 422 && errorMsg.includes('sha') && !existingFile) {
-        console.warn('[GitHub] 422: file exists but SHA was not fetched. Retrying with direct SHA fetch...');
-        const retrySha = await getFileSha(config, filepath);
-        if (retrySha) {
-          console.log('[GitHub] Retry: got SHA', retrySha.sha.substring(0, 8), '— re-uploading...');
-          body.sha = retrySha.sha;
-          const retryResponse = await fetch(apiUrl, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `token ${token}`,
-              'Accept': 'application/vnd.github.v3+json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
-          });
-          if (!retryResponse.ok) {
-            const retryError = await retryResponse.text().catch(() => '');
-            throw new Error(`Upload retry failed (${retryResponse.status}): ${retryError}`);
-          }
-          // Retry succeeded — parse and return below
-          let retryData: Record<string, unknown> | null = null;
-          try {
-            const text = await retryResponse.text();
-            if (text) retryData = JSON.parse(text);
-          } catch { /* empty */ }
-          const pagesUrl = `https://${owner}.github.io/${repo}/zpk/${filename}`;
-          const folderMatch = filename.match(/^([^\/]+)\//);
-          const watchfaceId = folderMatch ? folderMatch[1] : filename.replace('.zpk', '').replace('-qr.png', '');
-          return {
-            success: true,
-            url: (retryData as Record<string, Record<string, string>> | null)?.content?.html_url || pagesUrl,
-            downloadUrl: pagesUrl,
-            watchfaceId,
-          };
-        }
-        throw new Error(`File exists but could not fetch SHA for update. ${errorMsg}`);
-      }
-      if (response.status === 422) {
-        throw new Error(`Invalid file upload: ${errorMsg}. The file may be corrupted or in wrong format.`);
-      }
-      if (response.status === 401) {
-        throw new Error('GitHub token is invalid or expired.');
-      }
-      
-      throw new Error(`Upload failed: ${errorMsg}`);
-    }
-    
-    // Parse response — guard against empty body (can happen on large uploads)
-    let data: Record<string, unknown> | null = null;
-    try {
-      const text = await response.text();
-      if (text) {
-        data = JSON.parse(text);
-      }
-    } catch {
-      console.warn('[GitHub] Could not parse response body, proceeding with URL construction');
-    }
-    console.log('[GitHub] Upload successful!');
-    
-    // Construct GitHub Pages URL
-    // GitHub Pages serves docs/ folder at root: https://owner.github.io/repo/
-    // So docs/zpk/watchface1/face.zpk is accessible at: https://owner.github.io/repo/zpk/watchface1/face.zpk
     const pagesUrl = `https://${owner}.github.io/${repo}/zpk/${filename}`;
-    console.log('[GitHub] File uploaded to:', filepath);
-    console.log('[GitHub] Accessible at:', pagesUrl);
-    
-    // Extract folder name for watchface ID (e.g., from "watchface1/face.zpk" extract "watchface1")
+
     const folderMatch = filename.match(/^([^\/]+)\//);
     const watchfaceId = folderMatch ? folderMatch[1] : filename.replace('.zpk', '').replace('-qr.png', '');
     
-    console.log('[GitHub] Watchface ID:', watchfaceId);
-    
     return {
       success: true,
-      url: (data as Record<string, Record<string, string>> | null)?.content?.html_url || pagesUrl,
+      url: pagesUrl,
       downloadUrl: pagesUrl,
       watchfaceId: watchfaceId,
     };
@@ -248,49 +137,18 @@ async function getFileSha(
   config: GitHubConfig,
   filename: string
 ): Promise<{ sha: string } | null> {
-  const { token, owner, repo, branch = 'main' } = config;
+  const { branch = 'main' } = config;
   const useBackendBridge = isBackendBridgeConfigured();
   
   try {
-    if (!owner || !repo) {
-      console.warn('[GitHub] Invalid owner or repo for getFileSha, skipping SHA check');
+    if (!useBackendBridge) {
+      console.warn('[GitHub] Backend bridge is not configured, skipping SHA check');
       return null;
     }
 
-    if (useBackendBridge) {
-      const bridged = await bridgeReadContent(filename, branch);
-      if (!bridged.exists || !bridged.sha) return null;
-      return { sha: bridged.sha };
-    }
-
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filename}?ref=${branch}`;
-    console.log('[GitHub] Checking file SHA at:', apiUrl);
-    
-    const response = await fetch(
-      apiUrl,
-      {
-        headers: {
-          'Authorization': `token ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      }
-    );
-    
-    console.log('[GitHub] File check response status:', response.status);
-    
-    if (response.status === 404) {
-      console.log('[GitHub] File does not exist (404), will create new');
-      return null; // File doesn't exist
-    }
-    
-    if (!response.ok) {
-      console.warn(`[GitHub] File check failed with status ${response.status}`);
-      return null;
-    }
-    
-    const data = await response.json();
-    console.log('[GitHub] Existing file found, SHA:', data.sha);
-    return { sha: data.sha };
+    const bridged = await bridgeReadContent(filename, branch);
+    if (!bridged.exists || !bridged.sha) return null;
+    return { sha: bridged.sha };
   } catch (error) {
     console.error('[GitHub] Error checking file SHA:', error);
     return null;
@@ -298,62 +156,26 @@ async function getFileSha(
 }
 
 // Test GitHub connection
-export async function testGitHubConnection(config: GitHubConfig): Promise<boolean> {
-  if (isBackendBridgeConfigured()) {
-    try {
-      await fetchBackendRepoInfo();
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
+export async function testGitHubConnection(_config: GitHubConfig): Promise<boolean> {
   try {
-    const response = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}`,
-      {
-        headers: {
-          'Authorization': `token ${config.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      }
-    );
-    
-    return response.ok;
+    if (!isBackendBridgeConfigured()) return false;
+    await fetchBackendRepoInfo();
+    return true;
   } catch {
     return false;
   }
 }
 
 // Get repository info
-export async function getRepoInfo(config: GitHubConfig): Promise<{
+export async function getRepoInfo(_config: GitHubConfig): Promise<{
   name: string;
   description: string;
   html_url: string;
   has_pages: boolean;
 } | null> {
-  if (isBackendBridgeConfigured()) {
-    try {
-      return await fetchBackendRepoInfo();
-    } catch {
-      return null;
-    }
-  }
-
   try {
-    const response = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}`,
-      {
-        headers: {
-          'Authorization': `token ${config.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      }
-    );
-    
-    if (!response.ok) return null;
-    
-    return await response.json();
+    if (!isBackendBridgeConfigured()) return null;
+    return await fetchBackendRepoInfo();
   } catch {
     return null;
   }
@@ -364,32 +186,10 @@ export async function listFiles(
   config: GitHubConfig,
   path: string = ''
 ): Promise<string[]> {
-  if (isBackendBridgeConfigured() && path) {
-    try {
-      const bridged = await bridgeReadContent(path, config.branch || 'main');
-      return bridged.exists ? [path.split('/').pop() || path] : [];
-    } catch {
-      return [];
-    }
-  }
-
   try {
-    const response = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}`,
-      {
-        headers: {
-          'Authorization': `token ${config.token}`,
-          'Accept': 'application/vnd.github.v3+json',
-        },
-      }
-    );
-    
-    if (!response.ok) return [];
-    
-    const data = await response.json();
-    return data
-      .filter((item: { type: string }) => item.type === 'file')
-      .map((item: { name: string }) => item.name);
+    if (!isBackendBridgeConfigured() || !path) return [];
+    const bridged = await bridgeReadContent(path, config.branch || 'main');
+    return bridged.exists ? [path.split('/').pop() || path] : [];
   } catch {
     return [];
   }
