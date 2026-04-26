@@ -14,8 +14,8 @@
 - [x] T005 Add legacy fallback badge for PNG-only records.
 - [x] T006 Verify export remains PNG-based and deterministic.
 - [x] T007 Build and fix introduced errors.
-- [ ] T008 Run roundtrip verification matrix.
+- [x] T008 Run roundtrip verification matrix.
 
 - [x] P006 BUILD stage completed.
 - [x] P007 DEPLOY stage completed.
-- [ ] P008 VERIFY stage completed.
+- [x] P008 VERIFY stage completed.
