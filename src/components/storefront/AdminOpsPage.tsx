@@ -12,6 +12,7 @@ import {
   writeStorefrontConfigToGitHub,
 } from '@/lib/catalogApi';
 import { Button } from '@/components/ui/button';
+import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
 
 const DEFAULT_OWNER = 'AI-ERP-ITE';
 const DEFAULT_REPO = 'Watch-Faces';
@@ -37,6 +38,7 @@ export function AdminOpsPage() {
   const [catalogOptions, setCatalogOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [featuredFaceId, setFeaturedFaceId] = useState<string>('');
   const [savingFeatured, setSavingFeatured] = useState(false);
+  const backendMode = isBackendBridgeConfigured();
 
   const config = useMemo<GitHubConfig>(
     () => ({ token: token.trim(), owner: owner.trim(), repo: repo.trim(), branch: branch.trim() || 'main' }),
@@ -48,7 +50,7 @@ export function AdminOpsPage() {
     return `https://${owner.trim()}.github.io/${repo.trim()}`;
   }, [owner, repo]);
 
-  const canRun = Boolean(config.token && config.owner && config.repo);
+  const canRun = Boolean((backendMode || config.token) && config.owner && config.repo);
 
   // Keep admin page credentials synced with Studio settings.
   // Studio is the source of truth for saved GitHub token/repo.
@@ -146,8 +148,12 @@ export function AdminOpsPage() {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="ghp_..."
+              disabled={backendMode}
               className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
             />
+            {backendMode && (
+              <p className="text-[11px] text-[#8f9aac]">Backend bridge mode active. Browser token not required.</p>
+            )}
           </div>
           <div className="space-y-1">
             <label className="text-xs uppercase tracking-wider text-[#8b95a6]">Branch</label>

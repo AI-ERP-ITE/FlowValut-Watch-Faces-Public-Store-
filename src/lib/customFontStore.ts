@@ -15,6 +15,13 @@ export interface CustomFontRecord {
   createdAt: number;
 }
 
+export interface SerializableCustomFontRecord {
+  name: string;
+  fileName: string;
+  bufferBase64: string;
+  createdAt: number;
+}
+
 // ── DB open ───────────────────────────────────────────────────────────────────
 
 let _db: IDBDatabase | null = null;
@@ -73,6 +80,56 @@ export async function deleteCustomFont(name: string): Promise<void> {
     const req = tx.objectStore(FONT_STORE).delete(name);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
+  });
+}
+
+export function serializeCustomFonts(records: CustomFontRecord[]): SerializableCustomFontRecord[] {
+  return records.map((record) => {
+    const bytes = new Uint8Array(record.buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return {
+      name: record.name,
+      fileName: record.fileName,
+      bufferBase64: btoa(binary),
+      createdAt: record.createdAt,
+    };
+  });
+}
+
+export function deserializeCustomFonts(records: SerializableCustomFontRecord[]): CustomFontRecord[] {
+  return records.map((record) => {
+    const binary = atob(record.bufferBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return {
+      name: record.name,
+      fileName: record.fileName,
+      buffer: bytes.buffer,
+      createdAt: record.createdAt,
+    };
+  });
+}
+
+export async function replaceCustomFonts(records: CustomFontRecord[]): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FONT_STORE, 'readwrite');
+    const store = tx.objectStore(FONT_STORE);
+    const clearReq = store.clear();
+    clearReq.onerror = () => reject(clearReq.error);
+    clearReq.onsuccess = () => {
+      for (const record of records) {
+        store.put(record);
+      }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
   });
 }
 

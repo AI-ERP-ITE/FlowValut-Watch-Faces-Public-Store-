@@ -146,6 +146,28 @@ export async function deleteCustomIcon(key: string): Promise<void> {
 }
 
 /**
+ * Replace icon library with synced records from cloud.
+ */
+export async function replaceCustomIcons(records: CustomIconRecord[]): Promise<void> {
+  const db = await openDB();
+  const normalized = records.map(normalizeCustomIconRecord);
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ICON_STORE, 'readwrite');
+    const store = tx.objectStore(ICON_STORE);
+    const clearReq = store.clear();
+    clearReq.onerror = () => reject(clearReq.error);
+    clearReq.onsuccess = () => {
+      for (const record of normalized) {
+        store.put(record);
+      }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+/**
  * Render an SVG string to a PNG data-URL at a given size.
  * Used to convert Lab SVG output before saving.
  * Pre-processes SVG to:

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Settings, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,14 +13,32 @@ import { Label } from '@/components/ui/label';
 import { useApp, actions } from '@/context/AppContext';
 import { testGitHubConnection } from '@/lib/githubApi';
 import { toast } from 'sonner';
+import {
+  getCurrentAuthUser,
+  isFirebaseAuthConfigured,
+  signInAdminWithGoogle,
+  signOutAdmin,
+  subscribeAuthState,
+} from '@/lib/firebaseAuthClient';
+import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
 
 export function Header() {
   const { state, dispatch } = useApp();
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<boolean | null>(null);
+  const [authUserEmail, setAuthUserEmail] = useState<string | null>(getCurrentAuthUser()?.email ?? null);
+  const backendMode = isBackendBridgeConfigured();
+  const canUseFirebaseAuth = isFirebaseAuthConfigured();
+
+  useEffect(() => {
+    if (!canUseFirebaseAuth) return;
+    return subscribeAuthState((user) => {
+      setAuthUserEmail(user?.email ?? null);
+    });
+  }, [canUseFirebaseAuth]);
 
   const handleTestConnection = async () => {
-    if (!state.githubToken) {
+    if (!backendMode && !state.githubToken) {
       toast.error('Please enter your GitHub token first');
       return;
     }
@@ -42,6 +60,24 @@ export function Header() {
       toast.success('GitHub connection successful!');
     } else {
       toast.error('GitHub connection failed. Check your token and repo name.');
+    }
+  };
+
+  const handleSignIn = async () => {
+    try {
+      await signInAdminWithGoogle();
+      toast.success('Signed in for backend bridge access.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Sign-in failed');
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOutAdmin();
+      toast.success('Signed out');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Sign-out failed');
     }
   };
 
@@ -91,20 +127,43 @@ export function Header() {
                     setTestResult(null);
                   }}
                   placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                  disabled={backendMode}
                   className="bg-[#0F0F0F] border-zinc-700 text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:ring-cyan-500/20"
                 />
                 <p className="text-xs text-zinc-500">
-                  Create a token with 'repo' scope at{' '}
-                  <a
-                    href="https://github.com/settings/tokens"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyan-500 hover:underline"
-                  >
-                    github.com/settings/tokens
-                  </a>
+                  {backendMode
+                    ? 'Backend bridge mode active: browser token is not used.'
+                    : (
+                      <>
+                        Create a token with 'repo' scope at{' '}
+                        <a
+                          href="https://github.com/settings/tokens"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-500 hover:underline"
+                        >
+                          github.com/settings/tokens
+                        </a>
+                      </>
+                    )}
                 </p>
               </div>
+
+              {backendMode && canUseFirebaseAuth && (
+                <div className="space-y-2 rounded-lg border border-zinc-800 p-3 bg-zinc-900/60">
+                  <Label className="text-sm text-zinc-300">Backend Auth</Label>
+                  <p className="text-xs text-zinc-500">
+                    {authUserEmail ? `Signed in as ${authUserEmail}` : 'Sign in with Firebase to access backend bridge endpoints.'}
+                  </p>
+                  <Button
+                    onClick={authUserEmail ? handleSignOut : handleSignIn}
+                    variant="outline"
+                    className="w-full border-zinc-700 text-white hover:bg-zinc-800"
+                  >
+                    {authUserEmail ? 'Sign Out' : 'Sign In With Google'}
+                  </Button>
+                </div>
+              )}
 
               {/* Repo */}
               <div className="space-y-2">
@@ -129,7 +188,7 @@ export function Header() {
               {/* Test Connection Button */}
               <Button
                 onClick={handleTestConnection}
-                disabled={isTesting || !state.githubToken}
+                disabled={isTesting || (!backendMode && !state.githubToken)}
                 variant="outline"
                 className="w-full border-zinc-700 text-white hover:bg-zinc-800"
               >

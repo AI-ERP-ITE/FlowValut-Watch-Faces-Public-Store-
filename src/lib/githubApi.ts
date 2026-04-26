@@ -1,9 +1,15 @@
 // GitHub API Integration for uploading ZPK files
 
 import type { GitHubUploadResult } from '@/types';
+import {
+  bridgeReadContent,
+  bridgeWriteContent,
+  fetchBackendRepoInfo,
+  isBackendBridgeConfigured,
+} from '@/lib/backendGitHubBridge';
 
 export interface GitHubConfig {
-  token: string;
+  token?: string;
   owner: string;
   repo: string;
   branch?: string;
@@ -33,10 +39,11 @@ export async function uploadToGitHub(
   message?: string
 ): Promise<GitHubUploadResult> {
   const { token, owner, repo, branch = 'main' } = config;
+  const useBackendBridge = isBackendBridgeConfigured();
   
   try {
     // Validate parameters
-    if (!token || !token.trim()) {
+    if (!useBackendBridge && (!token || !token.trim())) {
       throw new Error('GitHub token is missing');
     }
     if (!owner || !owner.trim()) {
@@ -96,6 +103,26 @@ export async function uploadToGitHub(
       body.sha = existingFile.sha;
     }
     
+    if (useBackendBridge) {
+      await bridgeWriteContent({
+        path: filepath,
+        contentBase64: base64Content,
+        message: body.message,
+        branch,
+        sha: body.sha,
+      });
+
+      const pagesUrl = `https://${owner}.github.io/${repo}/zpk/${filename}`;
+      const folderMatch = filename.match(/^([^\/]+)\//);
+      const watchfaceId = folderMatch ? folderMatch[1] : filename.replace('.zpk', '').replace('-qr.png', '');
+      return {
+        success: true,
+        url: pagesUrl,
+        downloadUrl: pagesUrl,
+        watchfaceId,
+      };
+    }
+
     // Upload file
     console.log('[GitHub] Uploading to GitHub API...');
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filepath}`;
@@ -222,11 +249,18 @@ async function getFileSha(
   filename: string
 ): Promise<{ sha: string } | null> {
   const { token, owner, repo, branch = 'main' } = config;
+  const useBackendBridge = isBackendBridgeConfigured();
   
   try {
     if (!owner || !repo) {
       console.warn('[GitHub] Invalid owner or repo for getFileSha, skipping SHA check');
       return null;
+    }
+
+    if (useBackendBridge) {
+      const bridged = await bridgeReadContent(filename, branch);
+      if (!bridged.exists || !bridged.sha) return null;
+      return { sha: bridged.sha };
     }
 
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filename}?ref=${branch}`;
@@ -265,6 +299,15 @@ async function getFileSha(
 
 // Test GitHub connection
 export async function testGitHubConnection(config: GitHubConfig): Promise<boolean> {
+  if (isBackendBridgeConfigured()) {
+    try {
+      await fetchBackendRepoInfo();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   try {
     const response = await fetch(
       `https://api.github.com/repos/${config.owner}/${config.repo}`,
@@ -289,6 +332,14 @@ export async function getRepoInfo(config: GitHubConfig): Promise<{
   html_url: string;
   has_pages: boolean;
 } | null> {
+  if (isBackendBridgeConfigured()) {
+    try {
+      return await fetchBackendRepoInfo();
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const response = await fetch(
       `https://api.github.com/repos/${config.owner}/${config.repo}`,
@@ -313,6 +364,15 @@ export async function listFiles(
   config: GitHubConfig,
   path: string = ''
 ): Promise<string[]> {
+  if (isBackendBridgeConfigured() && path) {
+    try {
+      const bridged = await bridgeReadContent(path, config.branch || 'main');
+      return bridged.exists ? [path.split('/').pop() || path] : [];
+    } catch {
+      return [];
+    }
+  }
+
   try {
     const response = await fetch(
       `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}`,

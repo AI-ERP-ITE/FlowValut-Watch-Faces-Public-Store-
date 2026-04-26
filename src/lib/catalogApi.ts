@@ -1,5 +1,10 @@
 import { uploadToGitHub, type GitHubConfig } from './githubApi';
 import type { CatalogEntry, ModelEntry, SpecGroup } from '@/context/CatalogContext';
+import {
+  bridgeReadContent,
+  bridgeWriteContent,
+  isBackendBridgeConfigured,
+} from '@/lib/backendGitHubBridge';
 
 const CATALOG_PATH = 'docs/catalog.json';
 const STOREFRONT_CONFIG_PATH = 'docs/storeConfig.json';
@@ -33,6 +38,13 @@ async function fetchJsonFromGitHub<T>(
   config: GitHubConfig,
   repoPath: string
 ): Promise<T | null> {
+  if (isBackendBridgeConfigured()) {
+    const bridged = await bridgeReadContent(repoPath, config.branch || 'main');
+    if (!bridged.exists || !bridged.content) return null;
+    const decoded = decodeGitHubFileContent(bridged.content);
+    return JSON.parse(decoded) as T;
+  }
+
   const { token, owner, repo, branch = 'main' } = config;
   const response = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}?ref=${branch}`,
@@ -101,6 +113,13 @@ function inferSpecGroupFromSource(
 export async function fetchCatalogFromGitHub(
   config: GitHubConfig
 ): Promise<CatalogEntry[]> {
+  if (isBackendBridgeConfigured()) {
+    const bridged = await bridgeReadContent(CATALOG_PATH, config.branch || 'main');
+    if (!bridged.exists || !bridged.content) return [];
+    const decoded = decodeGitHubFileContent(bridged.content);
+    return JSON.parse(decoded) as CatalogEntry[];
+  }
+
   const { token, owner, repo, branch = 'main' } = config;
 
   const response = await fetch(
@@ -182,6 +201,19 @@ export async function writeCatalogToGitHub(
   config: GitHubConfig,
   entries: CatalogEntry[]
 ): Promise<void> {
+  if (isBackendBridgeConfigured()) {
+    const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(entries, null, 2))));
+    const current = await bridgeReadContent(CATALOG_PATH, config.branch || 'main');
+    await bridgeWriteContent({
+      path: CATALOG_PATH,
+      contentBase64,
+      message: 'Update catalog.json',
+      branch: config.branch || 'main',
+      sha: current.exists ? current.sha : undefined,
+    });
+    return;
+  }
+
   const { token, owner, repo, branch = 'main' } = config;
 
   const content = btoa(
@@ -237,6 +269,19 @@ export async function writeStorefrontConfigToGitHub(
   config: GitHubConfig,
   storefrontConfig: StorefrontConfig
 ): Promise<void> {
+  if (isBackendBridgeConfigured()) {
+    const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(storefrontConfig, null, 2))));
+    const current = await bridgeReadContent(STOREFRONT_CONFIG_PATH, config.branch || 'main');
+    await bridgeWriteContent({
+      path: STOREFRONT_CONFIG_PATH,
+      contentBase64,
+      message: 'Update storeConfig.json',
+      branch: config.branch || 'main',
+      sha: current.exists ? current.sha : undefined,
+    });
+    return;
+  }
+
   const { token, owner, repo, branch = 'main' } = config;
 
   const content = btoa(

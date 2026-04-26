@@ -456,6 +456,27 @@ export async function deleteCustomHandStyle(key: string): Promise<void> {
   });
 }
 
+/**
+ * Replace all stored hand styles with cloud-synced records.
+ */
+export async function replaceCustomHandStyles(records: CustomHandRecord[]): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const clearReq = store.clear();
+    clearReq.onerror = () => reject(clearReq.error);
+    clearReq.onsuccess = () => {
+      for (const record of records) {
+        store.put(record);
+      }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
 // ── Rendering helpers ─────────────────────────────────────────────────────────
 
 /**

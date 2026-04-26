@@ -35,6 +35,12 @@ import {
   type CustomHandRecord,
 } from '@/lib/customHandStore';
 import { publishLabAssetsChanged, subscribeLabAssetsChanged } from '@/lib/labSync';
+import {
+  isLabCloudSyncEnabled,
+  pullAllLabAssetsFromCloud,
+  pushLabAssetTypeToCloud,
+  type LabAssetType,
+} from '@/lib/labCloudSync';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -300,8 +306,31 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   // ── Iframe ref ─────────────────────────────────────────────────────────────
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cloudSyncTimersRef = useRef<Partial<Record<LabAssetType, ReturnType<typeof setTimeout>>>>({});
+  const cloudPushInFlightRef = useRef<Partial<Record<LabAssetType, boolean>>>({});
   // Track whether user manually picked a mode so generation doesn't override it
   const userPickedModeRef = useRef(false);
+
+  const scheduleCloudPush = useCallback((type: LabAssetType) => {
+    if (!isLabCloudSyncEnabled()) return;
+
+    const existing = cloudSyncTimersRef.current[type];
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    cloudSyncTimersRef.current[type] = setTimeout(() => {
+      if (cloudPushInFlightRef.current[type]) return;
+      cloudPushInFlightRef.current[type] = true;
+      void pushLabAssetTypeToCloud(type)
+        .catch((err) => {
+          console.warn(`[IconLab] Cloud push failed for ${type}:`, err);
+        })
+        .finally(() => {
+          cloudPushInFlightRef.current[type] = false;
+        });
+    }, 800);
+  }, []);
 
   const reloadSavedAssets = useCallback(async () => {
     const [icons, fonts, hands] = await Promise.all([
@@ -317,7 +346,17 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   // ── Load persisted data on open ────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    void reloadSavedAssets();
+    const run = async () => {
+      if (isLabCloudSyncEnabled()) {
+        try {
+          await pullAllLabAssetsFromCloud();
+        } catch (err) {
+          console.warn('[IconLab] Cloud pull failed:', err);
+        }
+      }
+      await reloadSavedAssets();
+    };
+    void run();
   }, [open, reloadSavedAssets]);
 
   useEffect(() => {
@@ -346,6 +385,18 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [open, reloadSavedAssets]);
+
+  useEffect(() => {
+    return () => {
+      const timers = cloudSyncTimersRef.current;
+      (Object.keys(timers) as LabAssetType[]).forEach((key) => {
+        const timer = timers[key];
+        if (timer) {
+          clearTimeout(timer);
+        }
+      });
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(POINTER_COMPOSER_DRAFT_KEY, JSON.stringify(composerDraft));
@@ -523,6 +574,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       });
       setSaveMsg('✓ Saved to library');
       publishLabAssetsChanged('icons');
+      scheduleCloudPush('icons');
       onIconsSaved?.();
     } catch (err) {
       setSaveMsg(`✗ ${(err as Error).message}`);
@@ -537,6 +589,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     await deleteCustomIcon(key);
     setSavedIcons(prev => prev.filter(i => i.key !== key));
     publishLabAssetsChanged('icons');
+    scheduleCloudPush('icons');
     onIconsSaved?.();
   };
 
@@ -611,6 +664,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         setCode('');
       }
       publishLabAssetsChanged('hands');
+      scheduleCloudPush('hands');
       onHandsSaved?.();
     } catch (err) {
       setSaveHandMsg(`✗ ${(err as Error).message}`);
@@ -671,6 +725,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     await deleteCustomHandStyle(key);
     setSavedHands(prev => prev.filter(h => h.key !== key));
     publishLabAssetsChanged('hands');
+    scheduleCloudPush('hands');
     onHandsSaved?.();
   };
 
@@ -699,6 +754,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       setPendingFontFile(null);
       setFontName('');
       publishLabAssetsChanged('fonts');
+      scheduleCloudPush('fonts');
       onFontsSaved?.();
     } catch (err) {
       setFontMsg(`✗ ${(err as Error).message}`);
@@ -711,6 +767,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     await deleteCustomFont(name);
     setSavedFonts(prev => prev.filter(f => f.name !== name));
     publishLabAssetsChanged('fonts');
+    scheduleCloudPush('fonts');
     onFontsSaved?.();
   };
 

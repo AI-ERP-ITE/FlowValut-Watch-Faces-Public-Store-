@@ -18,6 +18,7 @@ import { useApp, actions } from '@/context/AppContext';
 import { buildZPK } from '@/lib/zpkBuilder';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import { uploadZPKWithQR, regenerateSingleQR } from '@/lib/githubApi';
+import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
 import { generateQRCode } from '@/lib/qrGenerator';
 import { getIconByKey } from '@/lib/iconLibrary';
 import { testApiKey, type AIProvider } from '@/lib/aiService';
@@ -1560,6 +1561,7 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
 }
 
 function StudioApp() {
+  const backendMode = isBackendBridgeConfigured();
   const { state, dispatch } = useApp();
   const [watchModel, setWatchModel] = useState('Balance 2');
   const [watchFaceName, setWatchFaceName] = useState('');
@@ -2184,7 +2186,7 @@ function StudioApp() {
       return;
     }
 
-    if (!state.githubToken) {
+    if (!backendMode && !state.githubToken) {
       console.log('[App] ERROR: Missing githubToken');
       toast.error('Please set your GitHub token in settings');
       return;
@@ -2814,7 +2816,7 @@ function StudioApp() {
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
+  }, [backendMode, state.watchFaceConfig, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
 
   // Handle reset
   const handleReset = useCallback(() => {
@@ -3517,8 +3519,8 @@ function StudioApp() {
           {renderContent()}
         </div>
 
-        {/* Admin panel — visible only when GitHub token is configured */}
-        {state.githubToken && (() => {
+        {/* Admin panel — visible when PAT or backend bridge mode is enabled */}
+        {(backendMode || state.githubToken) && (() => {
           const [owner, repo] = state.githubRepo.split('/');
           return (
             <AdminPanel
