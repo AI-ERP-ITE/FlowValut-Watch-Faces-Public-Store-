@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCatalog, type FilterState, type SortOption } from '@/context/CatalogContext';
 import { FilterSidebar } from './FilterSidebar';
 import { SortControls } from './SortControls';
 import { WatchfaceGrid } from './WatchfaceGrid';
 import { EmptyState } from './EmptyState';
-import { readHeroConfig, resolveFeaturedFace } from './heroConfig';
 
 // ── Category metadata ──────────────────────────────────────────────────────
 
@@ -39,11 +38,32 @@ export function HomePage() {
     setFilters((prev) => ({ ...prev, ...partial }));
   }
 
-  const results = useMemo(() => getFiltered(filters), [getFiltered, filters]);
+  const coreResults = useMemo(() => getFiltered(filters), [getFiltered, filters]);
+
+  const [heroStyle, setHeroStyle] = useState<string>('all');
+  const [heroFaceIndex, setHeroFaceIndex] = useState(0);
+
+  const styleOptions = useMemo(() => {
+    const set = new Set<string>();
+    coreResults.forEach((entry) => {
+      entry.categories.forEach((cat) => set.add(cat.toLowerCase()));
+    });
+    return ['all', ...Array.from(set).sort()];
+  }, [coreResults]);
+
+  const results = useMemo(() => {
+    if (heroStyle === 'all') return coreResults;
+    return coreResults.filter((entry) =>
+      entry.categories.some((cat) => cat.toLowerCase() === heroStyle)
+    );
+  }, [coreResults, heroStyle]);
+
   const hasFaces = results.length > 0;
 
   function clearFilters() {
     updateFilter({ brand: null, modelSlug: null, priceFilter: 'all', searchQuery: '' });
+    setHeroStyle('all');
+    setHeroFaceIndex(0);
   }
 
   // ── Model chip list ──────────────────────────────────────────────────────
@@ -55,10 +75,25 @@ export function HomePage() {
     filters.priceFilter !== 'all' ||
     filters.searchQuery !== '';
 
-  const featuredFace = useMemo(() => {
-    if (typeof window === 'undefined') return results[0] ?? null;
-    return resolveFeaturedFace(results, readHeroConfig());
-  }, [results]);
+  const featuredFace = results[heroFaceIndex] ?? null;
+
+  useEffect(() => {
+    setHeroFaceIndex((prev) => {
+      if (results.length === 0) return 0;
+      return prev >= results.length ? 0 : prev;
+    });
+  }, [results.length]);
+
+  useEffect(() => {
+    if (heroStyle !== 'all' && !styleOptions.includes(heroStyle)) {
+      setHeroStyle('all');
+    }
+  }, [heroStyle, styleOptions]);
+
+  function cycleFeaturedFace() {
+    if (!results.length) return;
+    setHeroFaceIndex((prev) => (prev + 1) % results.length);
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -80,32 +115,52 @@ export function HomePage() {
               Designed for clarity, performance, and style.
             </p>
             <div className="mt-7 grid grid-cols-3 gap-2 max-w-sm mx-auto lg:mx-0">
-              <Link
-                to="/admin/hero"
+              <button
+                type="button"
+                onClick={cycleFeaturedFace}
                 className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
-                title="Open hero admin"
+                title="Next featured face"
               >
                 <p className="vault-micro">Faces</p>
                 <p className="text-[#E8D2A8] text-lg font-medium">{results.length}</p>
-              </Link>
-              <Link
-                to="/admin/hero"
-                className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
-                title="Open hero admin"
-              >
+                <p className="text-[10px] text-[#8E9196] mt-0.5">click to cycle</p>
+              </button>
+              <div className="vault-glass rounded-xl px-3 py-2 text-left">
                 <p className="vault-micro">Models</p>
-                <p className="text-[#E8D2A8] text-lg font-medium">{modelList.length}</p>
-              </Link>
-              <Link
-                to="/admin/hero"
-                className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
-                title="Open hero admin"
-              >
+                <select
+                  value={filters.modelSlug ?? 'all'}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    updateFilter({ modelSlug: next === 'all' ? null : next, brand: null });
+                    setHeroFaceIndex(0);
+                  }}
+                  className="mt-1 w-full bg-transparent text-[#E8D2A8] text-sm font-medium focus:outline-none"
+                >
+                  <option value="all" className="bg-[#121418] text-[#E8D2A8]">All ({modelList.length})</option>
+                  {modelList.map(([slug, model]) => (
+                    <option key={slug} value={slug} className="bg-[#121418] text-[#E8D2A8]">
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="vault-glass rounded-xl px-3 py-2 text-left">
                 <p className="vault-micro">Style</p>
-                <p className="text-[#E8D2A8] text-lg font-medium capitalize">
-                  {featuredFace?.categories[0] ?? 'N/A'}
-                </p>
-              </Link>
+                <select
+                  value={heroStyle}
+                  onChange={(e) => {
+                    setHeroStyle(e.target.value);
+                    setHeroFaceIndex(0);
+                  }}
+                  className="mt-1 w-full bg-transparent text-[#E8D2A8] text-sm font-medium focus:outline-none"
+                >
+                  {styleOptions.map((style) => (
+                    <option key={style} value={style} className="bg-[#121418] text-[#E8D2A8]">
+                      {style === 'all' ? 'All' : capitalize(style)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           <div className="hidden lg:flex items-center justify-center">
@@ -231,6 +286,10 @@ export function HomePage() {
       )}
     </div>
   );
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
