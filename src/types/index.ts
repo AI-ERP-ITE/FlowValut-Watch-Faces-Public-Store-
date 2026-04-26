@@ -22,6 +22,9 @@ export interface WatchFaceElement {
   assetFilename?: string;
   dataType?: string;
   images?: string[];
+  // IMG_LEVEL count policy metadata (038)
+  imageSwitcherFrameCount?: number;
+  imageSwitcherStrict?: boolean;
   text?: string;
   fontSize?: number;
   font?: string;
@@ -46,6 +49,8 @@ export interface WatchFaceElement {
   // GAUGE_POINTER normalized pivot (0..1 in local element bounds)
   pivotX?: number;
   pivotY?: number;
+  // Optional logical pairing metadata for gauge composition (ARC_PROGRESS + GAUGE_POINTER)
+  gaugePairId?: string;
 
   // BUTTON specific
   clickAction?: string;

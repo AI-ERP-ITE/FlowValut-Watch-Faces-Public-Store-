@@ -66,6 +66,7 @@ import {
   getAllowedDataTypesForElement,
   getDataTypeLabel,
   getTextImgPrefixForDataType,
+  resolveImageSwitcherFrameCount,
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import type { PointerParityResult, PointerParityStage } from '@/types';
@@ -104,6 +105,60 @@ function weatherTempDigitFilenames(): string[] {
 
 function isWeatherImgLevelDataType(dataType: string | undefined): boolean {
   return dataType === 'WEATHER_CURRENT' || dataType === 'WEATHER_STATUS';
+}
+
+function createImageSwitcherPlaceholderDataUrl(
+  label: string,
+  index: number,
+  width: number,
+  height: number,
+): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(20, width);
+  canvas.height = Math.max(20, height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas.toDataURL('image/png');
+
+  const seed = Array.from(label).reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+  const hue = (seed + index * 37) % 360;
+  const bgA = `hsl(${hue}deg 65% 35%)`;
+  const bgB = `hsl(${(hue + 28) % 360}deg 70% 22%)`;
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, bgA);
+  gradient.addColorStop(1, bgB);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `bold ${Math.max(12, Math.floor(canvas.height * 0.42))}px Arial`;
+  ctx.fillText(String(index + 1), canvas.width / 2, canvas.height / 2);
+
+  return canvas.toDataURL('image/png');
+}
+
+function stampGaugePairIds(elements: WatchFaceElement[]): WatchFaceElement[] {
+  const next = elements.map((el) => ({ ...el }));
+  const arcByType = new Map<string, WatchFaceElement>();
+  const pointerByType = new Map<string, WatchFaceElement>();
+
+  for (const el of next) {
+    if (!el.dataType) continue;
+    if (el.type === 'ARC_PROGRESS' && !arcByType.has(el.dataType)) arcByType.set(el.dataType, el);
+    if (el.type === 'GAUGE_POINTER' && !pointerByType.has(el.dataType)) pointerByType.set(el.dataType, el);
+  }
+
+  for (const [dataType, arc] of arcByType.entries()) {
+    const pointer = pointerByType.get(dataType);
+    if (!pointer) continue;
+    const pairId = arc.gaugePairId ?? pointer.gaugePairId ?? `gauge_pair_${dataType.toLowerCase()}_${arc.id.slice(0, 6)}`;
+    arc.gaugePairId = pairId;
+    pointer.gaugePairId = pairId;
+  }
+
+  return next;
 }
 
 // Mock Kimi analysis - simulates AI analysis
@@ -2222,6 +2277,7 @@ function StudioApp() {
 
       // Ensure weather IMG_LEVEL elements always ship a full 29-image set and image_array filenames.
       const weatherFilesByStyle = new Set<string>();
+      const resolvedImgLevelFrames = new Map<string, string[]>();
       for (const el of state.watchFaceConfig.elements) {
         if (el.type !== 'IMG_LEVEL' || !isWeatherImgLevelDataType(el.dataType)) continue;
         const weatherStyle = ((el.weatherStyle ?? 'flat') as WeatherStyle);
@@ -2240,10 +2296,64 @@ function StudioApp() {
           if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
           else elementFiles.push(newFile);
         }
+        resolvedImgLevelFrames.set(el.id, weatherFiles);
         weatherFilesByStyle.add(styleKey);
       }
       if (weatherFilesByStyle.size > 0) {
         console.log('[App] Weather IMG_LEVEL assets regenerated:', weatherFilesByStyle.size, 'style set(s)');
+      }
+
+      // Resolve non-weather IMG_LEVEL assets with flexible frame counts.
+      for (const el of state.watchFaceConfig.elements) {
+        if (el.type !== 'IMG_LEVEL' || isWeatherImgLevelDataType(el.dataType)) continue;
+
+        const configuredFrames = Array.isArray(el.images)
+          ? el.images.map((name) => (typeof name === 'string' ? name.trim() : '')).filter((name) => name.length > 0)
+          : [];
+        const explicitCount = el.imageSwitcherFrameCount
+          ?? (configuredFrames.length > 0 ? configuredFrames.length : undefined);
+        const policy = resolveImageSwitcherFrameCount(el.dataType, { explicitCount });
+
+        if (policy.expectedCount === null) {
+          resolvedImgLevelFrames.set(el.id, configuredFrames);
+          continue;
+        }
+
+        const targetCount = policy.expectedCount;
+        const strictMode = el.imageSwitcherStrict === true;
+
+        if (strictMode && configuredFrames.length !== targetCount) {
+          throw new Error(
+            `${el.name}: expected ${targetCount} IMG_LEVEL frames for ${getDataTypeLabel(el.dataType ?? 'value')} but got ${configuredFrames.length}.`
+          );
+        }
+
+        const sanitizedBase = (el.name || el.id).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() || 'img_level';
+        const normalizedFrames = configuredFrames.slice(0, targetCount);
+        for (let i = normalizedFrames.length; i < targetCount; i += 1) {
+          normalizedFrames.push(`imglvl_${sanitizedBase}_${i}.png`);
+        }
+
+        for (let i = 0; i < normalizedFrames.length; i += 1) {
+          const frameName = normalizedFrames[i];
+          const existingFile = elementFiles.find((f) => f.src === frameName);
+          if (existingFile) continue;
+
+          if (strictMode) {
+            throw new Error(`${el.name}: missing IMG_LEVEL frame asset '${frameName}' in strict mode.`);
+          }
+
+          const placeholderDataUrl = createImageSwitcherPlaceholderDataUrl(
+            el.name || el.id,
+            i,
+            el.bounds.width || 60,
+            el.bounds.height || 60,
+          );
+          const { bytes } = decodeDataUrlToBytes(placeholderDataUrl, `IMG_LEVEL placeholder ${frameName}`);
+          elementFiles.push({ src: frameName, file: new File([bytes], frameName, { type: 'image/png' }) });
+        }
+
+        resolvedImgLevelFrames.set(el.id, normalizedFrames);
       }
 
       // Pre-warm Tabler icon cache so getIconByKey works synchronously for tabler:* keys
@@ -2322,7 +2432,7 @@ function StudioApp() {
 
       // Build a stable export config snapshot so all bakes/generation use the same element state.
       // This prevents preview/export drift (especially for custom-hand pivots and cover fallback).
-      const exportElements = state.watchFaceConfig.elements.map(el => ({
+      const exportElements = stampGaugePairIds(state.watchFaceConfig.elements).map(el => ({
         ...el,
         bounds: { ...el.bounds },
         ...(el.type === 'GAUGE_POINTER'
@@ -2341,6 +2451,11 @@ function StudioApp() {
       for (const el of exportElements) {
         if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
           el.images = weatherImageFilenames();
+        } else if (el.type === 'IMG_LEVEL') {
+          const resolvedFrames = resolvedImgLevelFrames.get(el.id);
+          if (resolvedFrames) {
+            el.images = [...resolvedFrames];
+          }
         }
         if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT') {
           el.fontArray = weatherTempDigitFilenames();

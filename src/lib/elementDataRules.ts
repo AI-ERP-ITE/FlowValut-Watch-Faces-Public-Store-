@@ -232,12 +232,65 @@ export function getTextImgPrefixForDataType(dataType: string | undefined): strin
   return TEXT_IMG_DATA_TYPE_PREFIXES[normalized];
 }
 
-export function getImageSwitcherExpectedImageCount(dataType: string | undefined): number | null {
-  const normalized = normalizeDataAlias(dataType);
-  if (!normalized) return null;
+export const IMAGE_SWITCHER_MIN_NON_WEATHER_FRAMES = 2;
+export const IMAGE_SWITCHER_WEATHER_FRAME_COUNT = 29;
+export const IMAGE_SWITCHER_LEGACY_DEFAULT_FRAMES = 10;
 
-  if (normalized === 'WEATHER_CURRENT' || normalized === 'WEATHER_STATUS') return 29;
-  if (normalized === 'HEART') return 6;
-  if (ELEMENT_TO_DATA.IMAGE_SWITCHER.includes(normalized)) return 10;
-  return null;
+export interface ImageSwitcherCountResolution {
+  expectedCount: number | null;
+  minCount: number;
+  strictFixed: boolean;
+  source: 'weather-fixed' | 'user-defined' | 'legacy-default' | 'unsupported';
+}
+
+export function resolveImageSwitcherFrameCount(
+  dataType: string | undefined,
+  options?: { explicitCount?: number | null }
+): ImageSwitcherCountResolution {
+  const normalized = normalizeDataAlias(dataType);
+  const explicitRaw = options?.explicitCount;
+  const explicitCount = Number.isFinite(explicitRaw)
+    ? Math.floor(Math.max(0, Number(explicitRaw)))
+    : null;
+
+  if (!normalized || !ELEMENT_TO_DATA.IMAGE_SWITCHER.includes(normalized)) {
+    return {
+      expectedCount: null,
+      minCount: IMAGE_SWITCHER_MIN_NON_WEATHER_FRAMES,
+      strictFixed: false,
+      source: 'unsupported',
+    };
+  }
+
+  if (normalized === 'WEATHER_CURRENT' || normalized === 'WEATHER_STATUS') {
+    return {
+      expectedCount: IMAGE_SWITCHER_WEATHER_FRAME_COUNT,
+      minCount: IMAGE_SWITCHER_WEATHER_FRAME_COUNT,
+      strictFixed: true,
+      source: 'weather-fixed',
+    };
+  }
+
+  if (explicitCount !== null && explicitCount >= IMAGE_SWITCHER_MIN_NON_WEATHER_FRAMES) {
+    return {
+      expectedCount: explicitCount,
+      minCount: IMAGE_SWITCHER_MIN_NON_WEATHER_FRAMES,
+      strictFixed: false,
+      source: 'user-defined',
+    };
+  }
+
+  return {
+    expectedCount: IMAGE_SWITCHER_LEGACY_DEFAULT_FRAMES,
+    minCount: IMAGE_SWITCHER_MIN_NON_WEATHER_FRAMES,
+    strictFixed: false,
+    source: 'legacy-default',
+  };
+}
+
+export function getImageSwitcherExpectedImageCount(
+  dataType: string | undefined,
+  explicitCount?: number | null
+): number | null {
+  return resolveImageSwitcherFrameCount(dataType, { explicitCount }).expectedCount;
 }

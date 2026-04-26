@@ -17,6 +17,7 @@ import {
   getAllowedDataTypesForElement,
   getDataTypeLabel,
   getImageSwitcherExpectedImageCount,
+  resolveImageSwitcherFrameCount,
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
@@ -160,8 +161,14 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
   const allowedDataTypes = element
     ? getAllowedDataTypesForElement(element.type, element.subtype)
     : [];
+  const imageSwitcherExplicitCount = element?.type === 'IMG_LEVEL'
+    ? (element.imageSwitcherFrameCount ?? (Array.isArray(element.images) ? element.images.length : null))
+    : null;
+  const imageSwitcherPolicy = element?.type === 'IMG_LEVEL'
+    ? resolveImageSwitcherFrameCount(element.dataType, { explicitCount: imageSwitcherExplicitCount })
+    : null;
   const expectedImageCount = element?.type === 'IMG_LEVEL'
-    ? getImageSwitcherExpectedImageCount(element.dataType)
+    ? getImageSwitcherExpectedImageCount(element.dataType, imageSwitcherExplicitCount)
     : null;
 
   const update = (changes: Partial<WatchFaceElement>) => {
@@ -746,10 +753,38 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
             </SelectContent>
           </Select>
           {element.type === 'IMG_LEVEL' && expectedImageCount !== null && (
-            <p className="text-[10px] text-white/40 mt-1">
-              Expected images for {getDataTypeLabel(element.dataType ?? '')}: {expectedImageCount}
-              {Array.isArray(element.images) ? `, current: ${element.images.length}` : ''}
-            </p>
+            <div className="mt-1 space-y-1">
+              <p className="text-[10px] text-white/40">
+                Expected images for {getDataTypeLabel(element.dataType ?? '')}: {expectedImageCount}
+                {Array.isArray(element.images) ? `, current: ${element.images.length}` : ''}
+              </p>
+              {imageSwitcherPolicy && !imageSwitcherPolicy.strictFixed && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-white/45 w-18 shrink-0">Frame count</span>
+                    <Input
+                      type="number"
+                      min={imageSwitcherPolicy.minCount}
+                      max={99}
+                      value={element.imageSwitcherFrameCount ?? expectedImageCount}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        if (!Number.isFinite(next)) return;
+                        update({ imageSwitcherFrameCount: Math.max(imageSwitcherPolicy.minCount, Math.floor(next)) });
+                      }}
+                      className="h-7 text-xs bg-white/5 border-white/10 text-white"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <Switch
+                      checked={element.imageSwitcherStrict === true}
+                      onCheckedChange={(checked) => update({ imageSwitcherStrict: !!checked })}
+                    />
+                    <span className="text-[10px] text-white/55">Strict count validation on export</span>
+                  </label>
+                </>
+              )}
+            </div>
           )}
         </Section>
       )}
