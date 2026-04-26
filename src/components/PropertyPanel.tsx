@@ -12,7 +12,7 @@ import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
 import type { CustomHandRecord } from '@/lib/customHandStore';
-import { useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   getAllowedDataTypesForElement,
   getDataTypeLabel,
@@ -82,10 +82,66 @@ interface StyleClipboard {
 }
 let _styleClipboard: StyleClipboard | null = null;
 
+type PanelTab = 'position' | 'style' | 'effects' | 'data' | 'layer';
+const PanelTabContext = createContext<PanelTab>('position');
+
+function resolveSectionTab(label: string): PanelTab | null {
+  if (label === 'Layer') return 'layer';
+  if (label === 'App Shortcut' || label === 'Data Type' || label === 'Status Type') return 'data';
+
+  if (
+    label === 'Hand Scale'
+    || label === 'Hand Effects'
+    || label === 'Pointer Image Effects'
+    || label === 'Drop Shadow'
+    || label === 'Element Frame'
+    || label === 'Mode'
+    || label.startsWith('Depth')
+    || label.startsWith('Light Direction')
+    || label === 'Highlight Color'
+    || label === 'Shadow Color'
+    || label === 'Shape'
+    || label === 'Fill'
+    || label === 'Padding'
+  ) {
+    return 'effects';
+  }
+
+  if (
+    label === 'Hand Style'
+    || label === 'Color'
+    || label === 'Text Content'
+    || label === 'Date Format'
+    || label === 'Weather Style'
+    || label === 'Icon'
+    || label === 'Disconnect Icon'
+    || label === 'Icon Effects'
+    || label === 'Name Format'
+    || label === 'Font Style'
+    || label === 'Curved Text'
+  ) {
+    return 'style';
+  }
+
+  if (
+    label === 'Widget Type'
+    || label === 'Position'
+    || label === 'Size'
+    || label === 'Shape Type'
+    || label === 'Arc Shape'
+    || label === 'Gauge Pointer'
+  ) {
+    return 'position';
+  }
+
+  return null;
+}
+
 export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [] }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
+  const [activeTab, setActiveTab] = useState<PanelTab>('position');
   const tablerLoadedRef = useRef(false);
 
   // Load Tabler icons lazily when an IMG element is selected
@@ -128,6 +184,19 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     element?.subtype,
     element?.type,
   ]);
+
+  useEffect(() => {
+    if (!element) return;
+    if (element.type === 'TIME_POINTER' || element.type === 'IMG' || element.type === 'IMG_STATUS') {
+      setActiveTab('style');
+      return;
+    }
+    if (element.type === 'GAUGE_POINTER') {
+      setActiveTab('effects');
+      return;
+    }
+    setActiveTab('position');
+  }, [element?.id, element?.type]);
 
   if (!element) {
     return (
@@ -413,6 +482,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
   const isSizeLocked = false; // Allow resizing all elements in editor
 
   return (
+    <PanelTabContext.Provider value={activeTab}>
     <div className={`rounded-xl border border-white/10 bg-white/5 p-4 space-y-4 ${className ?? ''}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -441,6 +511,31 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           </button>
         )}
       </div>
+
+      <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-white/10 bg-black/20 p-1 md:grid-cols-5">
+        {([
+          { key: 'position', label: 'Position' },
+          { key: 'style', label: 'Style' },
+          { key: 'effects', label: 'Effects' },
+          { key: 'data', label: 'Data' },
+          { key: 'layer', label: 'Layer' },
+        ] as { key: PanelTab; label: string }[]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              'h-7 rounded-md border text-[11px] font-medium transition-colors',
+              activeTab === tab.key
+                ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200'
+                : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4 xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:pr-1 xl:pb-24">
 
       {/* Widget Type */}
       <Section label="Widget Type">
@@ -1501,13 +1596,19 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           <NumField label="Z" value={element.zIndex} onChange={v => update({ zIndex: v })} />
         </div>
       </Section>
+      </div>
     </div>
+    </PanelTabContext.Provider>
   );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  const activeTab = useContext(PanelTabContext);
+  const sectionTab = resolveSectionTab(label);
+  if (sectionTab && sectionTab !== activeTab) return null;
+
   return (
     <div className="space-y-1.5">
       <span className="text-[10px] text-white/40 uppercase tracking-wider">{label}</span>

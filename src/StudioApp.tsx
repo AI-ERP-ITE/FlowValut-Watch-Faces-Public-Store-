@@ -2916,12 +2916,12 @@ function StudioApp() {
 
       case 'preview':
         return (
-          <div className="space-y-6">
+          <div className="space-y-6 min-h-[calc(100vh-14rem)]">
             {state.backgroundImage && state.watchFaceConfig && (
               <>
                 {/* Interactive canvas + property panel */}
-                <div className="flex flex-col lg:flex-row gap-6">
-                  <div className="flex flex-col items-center shrink-0">
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_minmax(420px,1fr)] gap-6 items-start">
+                  <div className="flex flex-col items-center shrink-0 xl:sticky xl:top-4 self-start">
                     <div className="flex items-center justify-between w-full max-w-sm mb-4">
                       <h4 className="text-sm font-medium text-zinc-400">Live Editor — drag to reposition</h4>
                       <div className="flex items-center gap-1">
@@ -3014,39 +3014,43 @@ function StudioApp() {
                       customHandStyles={customHandStyles}
                     />
                   </div>
-                  <div className="flex-1 space-y-4">
-                    <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
-                    <PropertyPanel
-                      element={state.watchFaceConfig.elements.find(el => el.id === selectedElementId) ?? null}
-                      onUpdateElement={(id, changes) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id, changes } })}
-                      elements={state.watchFaceConfig.elements}
-                      onAddFrame={handleAddFrame}
-                      onRemoveFrame={handleRemoveFrame}
-                      iconLibraryKey={iconLibraryKey}
-                      customHandStyles={customHandStyles}
-                    />
-                    <div className="flex items-center justify-between mt-4">
-                      <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
-                      <button
-                        onClick={() => setShowAddElement(true)}
-                        className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/50 rounded px-2 py-1 transition-colors"
-                        title="Add a new element"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Add
-                      </button>
+                  <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(280px,340px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
+                    <div className="space-y-4 xl:min-h-0 xl:pr-2">
+                      <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
+                      <PropertyPanel
+                        element={state.watchFaceConfig.elements.find(el => el.id === selectedElementId) ?? null}
+                        onUpdateElement={(id, changes) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id, changes } })}
+                        elements={state.watchFaceConfig.elements}
+                        onAddFrame={handleAddFrame}
+                        onRemoveFrame={handleRemoveFrame}
+                        iconLibraryKey={iconLibraryKey}
+                        customHandStyles={customHandStyles}
+                      />
                     </div>
-                    <ElementList
-                      elements={state.watchFaceConfig.elements}
-                      elementWarnings={devicePreviewEnabled ? elementWarnings : {}}
-                      onToggleVisibility={handleToggleElement}
-                      selectedElementId={selectedElementId}
-                      onSelectElement={setSelectedElementId}
-                      onDeleteElement={(id) => {
-                        dispatch({ type: 'DELETE_ELEMENT', payload: id });
-                        if (selectedElementId === id) setSelectedElementId(null);
-                      }}
-                    />
+                    <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] xl:overflow-y-auto 2xl:max-h-[calc(100vh-15rem)]">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
+                        <button
+                          onClick={() => setShowAddElement(true)}
+                          className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/50 rounded px-2 py-1 transition-colors"
+                          title="Add a new element"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add
+                        </button>
+                      </div>
+                      <ElementList
+                        elements={state.watchFaceConfig.elements}
+                        elementWarnings={devicePreviewEnabled ? elementWarnings : {}}
+                        onToggleVisibility={handleToggleElement}
+                        selectedElementId={selectedElementId}
+                        onSelectElement={setSelectedElementId}
+                        onDeleteElement={(id) => {
+                          dispatch({ type: 'DELETE_ELEMENT', payload: id });
+                          if (selectedElementId === id) setSelectedElementId(null);
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -3191,6 +3195,7 @@ function StudioApp() {
             )}
 
             {/* Action buttons */}
+            <div className="mt-6 border-t border-zinc-800/80 pt-4">
             {pointerParityResult && (
               <div className={`rounded-lg border px-3 py-2 text-xs ${pointerParityResult.pass ? 'border-green-600/40 bg-green-900/20 text-green-300' : 'border-amber-600/40 bg-amber-900/20 text-amber-300'}`}>
                 {pointerParityResult.pass
@@ -3212,7 +3217,7 @@ function StudioApp() {
                 )}
               </div>
             )}
-            <div className="flex flex-wrap gap-3 pt-4">
+            <div className="flex flex-wrap gap-3 pt-4 xl:sticky xl:bottom-0 xl:z-20 xl:bg-[#1A1A1A]/95 xl:backdrop-blur xl:pb-2">
               <Button
                 onClick={handleGenerate}
                 className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"
@@ -3235,6 +3240,7 @@ function StudioApp() {
               >
                 Back
               </Button>
+            </div>
             </div>
           </div>
         );
@@ -3367,7 +3373,7 @@ function StudioApp() {
     <div className="min-h-screen bg-[#0F0F0F] text-white">
       <Header />
 
-      <main className="container mx-auto max-w-4xl px-4 py-6">
+      <main className={`container mx-auto px-4 py-6 ${state.currentStep === 'preview' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
         {/* Step indicator */}
         <div className="mb-8">
           <StepIndicator currentStep={state.currentStep} />
