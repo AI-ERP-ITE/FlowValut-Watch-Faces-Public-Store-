@@ -9,6 +9,7 @@ import { ProductPage } from '@/components/storefront/ProductPage';
 import { SearchPage } from '@/components/storefront/SearchPage';
 import { BuyPage } from '@/components/storefront/BuyPage';
 import { SuccessPage } from '@/components/storefront/SuccessPage';
+import { AdminOpsPage } from '@/components/storefront/AdminOpsPage';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="buy/:id" element={<BuyPage />} />
         <Route path="success/:id" element={<SuccessPage />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="admin" element={<AdminOpsPage />} />
         <Route path="*" element={<HomePage />} />
       </Route>
     </Routes>

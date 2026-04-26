@@ -1,7 +1,91 @@
 import { uploadToGitHub, type GitHubConfig } from './githubApi';
-import type { CatalogEntry } from '@/context/CatalogContext';
+import type { CatalogEntry, ModelEntry, SpecGroup } from '@/context/CatalogContext';
 
 const CATALOG_PATH = 'docs/catalog.json';
+
+interface SourceMetadata {
+  specGroup?: string | null;
+  resolution?: string;
+  shape?: 'round' | 'square';
+  watchModel?: string;
+}
+
+export interface SpecGroupPatchResult {
+  totalEntries: number;
+  unknownBefore: number;
+  patched: number;
+  unknownAfter: number;
+  updated: boolean;
+}
+
+function decodeGitHubFileContent(content: string): string {
+  const binary = atob(content.replace(/\n/g, ''));
+  const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+async function fetchJsonFromGitHub<T>(
+  config: GitHubConfig,
+  repoPath: string
+): Promise<T | null> {
+  const { token, owner, repo, branch = 'main' } = config;
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${repoPath}?ref=${branch}`,
+    {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    }
+  );
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${repoPath}: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  const decoded = decodeGitHubFileContent(data.content);
+  return JSON.parse(decoded) as T;
+}
+
+function normalizeModelName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getSourcePathFromZpk(zpkPath: string): string | null {
+  const match = zpkPath.match(/^zpk\/([^/]+)\/face\.zpk$/i);
+  if (!match) return null;
+  return `docs/zpk/${match[1]}/source.json`;
+}
+
+function inferSpecGroupFromSource(
+  source: SourceMetadata,
+  models: Record<string, ModelEntry>,
+  specGroups: Record<string, SpecGroup>
+): string | null {
+  if (source.specGroup && specGroups[source.specGroup]) {
+    return source.specGroup;
+  }
+
+  if (source.watchModel) {
+    const sourceModel = normalizeModelName(source.watchModel);
+    const matched = Object.values(models).find((model) => {
+      const known = normalizeModelName(model.name);
+      return known.includes(sourceModel) || sourceModel.includes(known);
+    });
+    if (matched?.specGroup) return matched.specGroup;
+  }
+
+  if (source.resolution && source.shape) {
+    const candidates = Object.entries(specGroups)
+      .filter(([, sg]) => sg.resolution === source.resolution && sg.shape === source.shape)
+      .map(([key]) => key);
+    if (candidates.length === 1) return candidates[0] ?? null;
+  }
+
+  return null;
+}
 
 // ── Read ─────────────────────────────────────────────────────────────────
 
@@ -31,7 +115,7 @@ export async function fetchCatalogFromGitHub(
 
   const data = await response.json();
   // GitHub returns file content as base64
-  const decoded = atob(data.content.replace(/\n/g, ''));
+  const decoded = decodeGitHubFileContent(data.content);
   return JSON.parse(decoded) as CatalogEntry[];
 }
 
@@ -145,4 +229,82 @@ export async function publishToCatalog(
   }
 
   await writeCatalogToGitHub(config, [entry, ...current]);
+}
+
+/**
+ * Backfill unknown/invalid catalog specGroup values using docs/zpk/{id}/source.json.
+ * Writes docs/catalog.json only when at least one entry is patched.
+ */
+export async function patchCatalogSpecGroups(
+  config: GitHubConfig
+): Promise<SpecGroupPatchResult> {
+  const [catalog, models, specGroups] = await Promise.all([
+    fetchCatalogFromGitHub(config),
+    fetchJsonFromGitHub<Record<string, ModelEntry>>(config, 'docs/models.json'),
+    fetchJsonFromGitHub<Record<string, SpecGroup>>(config, 'docs/specGroups.json'),
+  ]);
+
+  if (!models) {
+    throw new Error('docs/models.json not found in repository');
+  }
+  if (!specGroups) {
+    throw new Error('docs/specGroups.json not found in repository');
+  }
+
+  const unknownBefore = catalog.filter(
+    (entry) => !entry.specGroup || entry.specGroup === 'unknown' || !specGroups[entry.specGroup]
+  ).length;
+
+  if (unknownBefore === 0) {
+    return {
+      totalEntries: catalog.length,
+      unknownBefore: 0,
+      patched: 0,
+      unknownAfter: 0,
+      updated: false,
+    };
+  }
+
+  const patchedById = new Map<string, string>();
+
+  await Promise.all(
+    catalog.map(async (entry) => {
+      if (entry.specGroup && entry.specGroup !== 'unknown' && specGroups[entry.specGroup]) {
+        return;
+      }
+
+      const sourcePath = getSourcePathFromZpk(entry.zpkPath);
+      if (!sourcePath) return;
+
+      const source = await fetchJsonFromGitHub<SourceMetadata>(config, sourcePath);
+      if (!source) return;
+
+      const inferred = inferSpecGroupFromSource(source, models, specGroups);
+      if (inferred) {
+        patchedById.set(entry.id, inferred);
+      }
+    })
+  );
+
+  const patched = patchedById.size;
+  const updatedCatalog = catalog.map((entry) => {
+    const inferred = patchedById.get(entry.id);
+    return inferred ? { ...entry, specGroup: inferred } : entry;
+  });
+
+  const unknownAfter = updatedCatalog.filter(
+    (entry) => !entry.specGroup || entry.specGroup === 'unknown' || !specGroups[entry.specGroup]
+  ).length;
+
+  if (patched > 0) {
+    await writeCatalogToGitHub(config, updatedCatalog);
+  }
+
+  return {
+    totalEntries: catalog.length,
+    unknownBefore,
+    patched,
+    unknownAfter,
+    updated: patched > 0,
+  };
 }

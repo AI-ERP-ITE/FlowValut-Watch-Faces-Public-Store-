@@ -30,6 +30,13 @@ export interface SpecGroup {
   deviceSources: number[];
 }
 
+interface SourceMetadata {
+  specGroup?: string | null;
+  resolution?: string;
+  shape?: 'round' | 'square';
+  watchModel?: string;
+}
+
 export type SortOption =
   | 'latest'
   | 'most-downloaded'
@@ -78,6 +85,84 @@ function buildAssetUrl(relativePath: string): string {
   return `${BASE_URL}${relativePath}`;
 }
 
+function normalizeModelName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function inferSpecGroupFromSource(
+  source: SourceMetadata,
+  models: Record<string, ModelEntry>,
+  specGroups: Record<string, SpecGroup>
+): string | null {
+  if (source.specGroup && specGroups[source.specGroup]) {
+    return source.specGroup;
+  }
+
+  if (source.watchModel) {
+    const sourceModel = normalizeModelName(source.watchModel);
+    const matched = Object.values(models).find((model) => {
+      const known = normalizeModelName(model.name);
+      return known.includes(sourceModel) || sourceModel.includes(known);
+    });
+    if (matched?.specGroup) return matched.specGroup;
+  }
+
+  if (source.resolution && source.shape) {
+    const candidates = Object.entries(specGroups)
+      .filter(([, sg]) => sg.resolution === source.resolution && sg.shape === source.shape)
+      .map(([key]) => key);
+    if (candidates.length === 1) return candidates[0] ?? null;
+  }
+
+  return null;
+}
+
+function getSourcePathFromZpk(zpkPath: string): string | null {
+  const match = zpkPath.match(/^zpk\/([^/]+)\/face\.zpk$/i);
+  if (!match) return null;
+  return `zpk/${match[1]}/source.json`;
+}
+
+async function hydrateCatalogSpecGroups(
+  entries: CatalogEntry[],
+  models: Record<string, ModelEntry>,
+  specGroups: Record<string, SpecGroup>
+): Promise<CatalogEntry[]> {
+  const needsHydration = entries.filter(
+    (entry) => !entry.specGroup || entry.specGroup === 'unknown' || !specGroups[entry.specGroup]
+  );
+
+  if (!needsHydration.length) return entries;
+
+  const patched = new Map<string, string>();
+
+  await Promise.all(
+    needsHydration.map(async (entry) => {
+      const sourcePath = getSourcePathFromZpk(entry.zpkPath);
+      if (!sourcePath) return;
+
+      try {
+        const res = await fetch(buildAssetUrl(sourcePath));
+        if (!res.ok) return;
+
+        const source = (await res.json()) as SourceMetadata;
+        const inferred = inferSpecGroupFromSource(source, models, specGroups);
+        if (inferred) patched.set(entry.id, inferred);
+      } catch {
+        // Silent fallback — keep existing value if source.json is missing or invalid.
+      }
+    })
+  );
+
+  if (!patched.size) return entries;
+
+  return entries.map((entry) => {
+    const next = patched.get(entry.id);
+    if (!next) return entry;
+    return { ...entry, specGroup: next };
+  });
+}
+
 export function CatalogProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [models, setModels] = useState<Record<string, ModelEntry>>({});
@@ -104,7 +189,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           specGroupsRes.json(),
         ]);
 
-        setCatalog(catalogData);
+        const hydratedCatalog = await hydrateCatalogSpecGroups(
+          catalogData as CatalogEntry[],
+          modelsData as Record<string, ModelEntry>,
+          specGroupsData as Record<string, SpecGroup>
+        );
+
+        setCatalog(hydratedCatalog);
         setModels(modelsData);
         setSpecGroups(specGroupsData);
       } catch (err) {
