@@ -80,20 +80,32 @@ export function HomePage() {
               Designed for clarity, performance, and style.
             </p>
             <div className="mt-7 grid grid-cols-3 gap-2 max-w-sm mx-auto lg:mx-0">
-              <div className="vault-glass rounded-xl px-3 py-2 text-left">
+              <Link
+                to="/admin/hero"
+                className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
+                title="Open hero admin"
+              >
                 <p className="vault-micro">Faces</p>
                 <p className="text-[#E8D2A8] text-lg font-medium">{results.length}</p>
-              </div>
-              <div className="vault-glass rounded-xl px-3 py-2 text-left">
+              </Link>
+              <Link
+                to="/admin/hero"
+                className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
+                title="Open hero admin"
+              >
                 <p className="vault-micro">Models</p>
                 <p className="text-[#E8D2A8] text-lg font-medium">{modelList.length}</p>
-              </div>
-              <div className="vault-glass rounded-xl px-3 py-2 text-left">
+              </Link>
+              <Link
+                to="/admin/hero"
+                className="vault-glass rounded-xl px-3 py-2 text-left hover:border-[#C7A86F]/45 transition-colors"
+                title="Open hero admin"
+              >
                 <p className="vault-micro">Style</p>
                 <p className="text-[#E8D2A8] text-lg font-medium capitalize">
                   {featuredFace?.categories[0] ?? 'N/A'}
                 </p>
-              </div>
+              </Link>
             </div>
           </div>
           <div className="hidden lg:flex items-center justify-center">
