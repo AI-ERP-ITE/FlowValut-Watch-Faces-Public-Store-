@@ -2,7 +2,7 @@
   {
     "id": "fleming-orange",
     "name": "Fleming Orange",
-    "specGroup": "unknown",
+    "specGroup": "480-round-v2",
     "categories": [
       "premium"
     ],
@@ -24,7 +24,7 @@
   {
     "id": "34",
     "name": "34",
-    "specGroup": "unknown",
+    "specGroup": "480-round-v2",
     "categories": [
       "simple"
     ],
@@ -40,7 +40,7 @@
   {
     "id": "33",
     "name": "33",
-    "specGroup": "unknown",
+    "specGroup": "480-round-v2",
     "categories": [
       "minimal"
     ],
@@ -62,7 +62,7 @@
   {
     "id": "classic",
     "name": "Classic",
-    "specGroup": "unknown",
+    "specGroup": "480-round-v2",
     "categories": [
       "premium",
       "elegant"
@@ -85,7 +85,7 @@
   {
     "id": "30-test",
     "name": "30 test",
-    "specGroup": "unknown",
+    "specGroup": "480-round-v2",
     "categories": [
       "elegant",
       "premium"
