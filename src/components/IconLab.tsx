@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, FlaskConical, Upload, Key, Wand2, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { X, FlaskConical, Upload, Key, Wand2, Plus, Trash2, ChevronDown, Pencil } from 'lucide-react';
 import {
   saveCustomIcon,
   deleteCustomIcon,
@@ -41,6 +41,8 @@ import { publishLabAssetsChanged, subscribeLabAssetsChanged } from '@/lib/labSyn
 type CodeMode = 'svg' | 'html';
 type AIModel = 'gpt-4o' | 'gemini-2.5-flash';
 type TabId = 'icons' | 'pointers' | 'fonts';
+
+const ICON_SOURCE_VERSION = 1;
 
 interface PointerComposerDraft {
   hourHtml: string;
@@ -510,7 +512,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       }
       if (!dataUrl) throw new Error('Render failed — for HTML icons, paste an SVG tag for best results');
       const cat = showNewCategory && newCategoryInput.trim() ? newCategoryInput.trim() : saveCategory;
-      const record = await saveCustomIcon(saveName.trim(), cat, dataUrl, 64, 64);
+      const record = await saveCustomIcon(saveName.trim(), cat, dataUrl, 64, 64, {
+        sourceMode: codeMode,
+        sourceCode: code,
+        sourceVersion: ICON_SOURCE_VERSION,
+      });
       setSavedIcons(prev => {
         const filtered = prev.filter(i => i.key !== record.key);
         return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
@@ -532,6 +538,27 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavedIcons(prev => prev.filter(i => i.key !== key));
     publishLabAssetsChanged('icons');
     onIconsSaved?.();
+  };
+
+  const canRoundtripEdit = (icon: CustomIconRecord): boolean => {
+    return !!(icon.sourceMode && icon.sourceCode?.trim());
+  };
+
+  const handleEditIcon = (icon: CustomIconRecord) => {
+    if (!canRoundtripEdit(icon)) {
+      setSaveMsg('✗ Source unavailable for this legacy PNG-only icon');
+      return;
+    }
+
+    setCodeMode(icon.sourceMode!);
+    setCode(icon.sourceCode!);
+    setSaveName(icon.name);
+    setSaveCategory(icon.category);
+    setShowNewCategory(false);
+    setNewCategoryInput('');
+    setActiveTab('icons');
+    userPickedModeRef.current = true;
+    setSaveMsg('✓ Loaded saved source into editor');
   };
 
   // ── Save as Clock Hand Style ───────────────────────────────────────────────
@@ -1236,6 +1263,22 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                             title={`${icon.name} (${icon.category})`}
                             className="w-10 h-10 rounded border border-white/10 bg-zinc-800 object-contain p-0.5"
                           />
+                          {canRoundtripEdit(icon) ? (
+                            <button
+                              onClick={() => handleEditIcon(icon)}
+                              className="absolute -bottom-1 left-1/2 -translate-x-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-emerald-600 rounded-full text-white"
+                              title="Edit source in Icon Lab"
+                            >
+                              <Pencil className="h-2.5 w-2.5" />
+                            </button>
+                          ) : (
+                            <span
+                              className="absolute -bottom-1 left-1/2 -translate-x-1/2 hidden group-hover:block px-1 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[8px] text-amber-300 whitespace-nowrap"
+                              title="Legacy PNG-only icon. Source not available for editing."
+                            >
+                              PNG only
+                            </span>
+                          )}
                           <button
                             onClick={() => handleDeleteIcon(icon.key)}
                             className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 bg-red-600 rounded-full text-white"

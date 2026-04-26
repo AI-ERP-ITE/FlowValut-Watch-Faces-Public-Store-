@@ -16,6 +16,15 @@ export interface CustomIconRecord {
   width: number;
   height: number;
   createdAt: number;
+  sourceMode?: 'svg' | 'html';
+  sourceCode?: string;
+  sourceVersion?: number;
+}
+
+export interface CustomIconSourcePayload {
+  sourceMode: 'svg' | 'html';
+  sourceCode: string;
+  sourceVersion?: number;
 }
 
 // ── DB open ───────────────────────────────────────────────────────────────────
@@ -54,6 +63,27 @@ function makeKey(category: string, name: string): string {
   return `custom:${slugify(category)}/${slugify(name)}`;
 }
 
+function normalizeCustomIconRecord(record: CustomIconRecord): CustomIconRecord {
+  const sourceCode = typeof record.sourceCode === 'string' ? record.sourceCode : '';
+  const sourceMode = record.sourceMode === 'svg' || record.sourceMode === 'html' ? record.sourceMode : undefined;
+
+  if (!sourceMode || !sourceCode.trim()) {
+    return {
+      ...record,
+      sourceMode: undefined,
+      sourceCode: undefined,
+      sourceVersion: undefined,
+    };
+  }
+
+  return {
+    ...record,
+    sourceMode,
+    sourceCode,
+    sourceVersion: record.sourceVersion ?? 1,
+  };
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /** Load all stored custom icons. */
@@ -62,7 +92,12 @@ export async function loadCustomIcons(): Promise<CustomIconRecord[]> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ICON_STORE, 'readonly');
     const req = tx.objectStore(ICON_STORE).getAll();
-    req.onsuccess = () => resolve((req.result as CustomIconRecord[]).sort((a, b) => a.createdAt - b.createdAt));
+    req.onsuccess = () => {
+      const records = (req.result as CustomIconRecord[])
+        .map(normalizeCustomIconRecord)
+        .sort((a, b) => a.createdAt - b.createdAt);
+      resolve(records);
+    };
     req.onerror = () => reject(req.error);
   });
 }
@@ -74,8 +109,11 @@ export async function saveCustomIcon(
   dataUrl: string,
   width = 64,
   height = 64,
+  sourcePayload?: CustomIconSourcePayload,
 ): Promise<CustomIconRecord> {
   const db = await openDB();
+  const sourceCode = sourcePayload?.sourceCode?.trim();
+  const hasSource = !!(sourcePayload?.sourceMode && sourceCode);
   const record: CustomIconRecord = {
     key: makeKey(category, name),
     name,
@@ -84,6 +122,9 @@ export async function saveCustomIcon(
     width,
     height,
     createdAt: Date.now(),
+    sourceMode: hasSource ? sourcePayload?.sourceMode : undefined,
+    sourceCode: hasSource ? sourceCode : undefined,
+    sourceVersion: hasSource ? (sourcePayload?.sourceVersion ?? 1) : undefined,
   };
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ICON_STORE, 'readwrite');
