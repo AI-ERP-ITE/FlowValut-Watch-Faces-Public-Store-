@@ -1,5 +1,6 @@
 ﻿import { Routes, Route } from 'react-router-dom';
 import StudioApp from './StudioApp';
+import LabPage from './LabPage';
 import { CatalogProvider } from '@/context/CatalogContext';
 import { StorefrontLayout } from '@/components/storefront/StorefrontLayout';
 import { HomePage } from '@/components/storefront/HomePage';
@@ -16,6 +17,7 @@ function App() {
     <Routes>
       {/* Creator Studio — no catalog needed */}
       <Route path="/studio" element={<StudioApp />} />
+      <Route path="/studio/lab" element={<LabPage />} />
 
       {/* Storefront — wrapped in CatalogProvider */}
       <Route

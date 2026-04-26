@@ -34,6 +34,7 @@ import {
   loadCustomHandStyles,
   type CustomHandRecord,
 } from '@/lib/customHandStore';
+import { publishLabAssetsChanged, subscribeLabAssetsChanged } from '@/lib/labSync';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -300,13 +301,49 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   // Track whether user manually picked a mode so generation doesn't override it
   const userPickedModeRef = useRef(false);
 
+  const reloadSavedAssets = useCallback(async () => {
+    const [icons, fonts, hands] = await Promise.all([
+      loadCustomIcons(),
+      loadCustomFonts(),
+      loadCustomHandStyles(),
+    ]);
+    setSavedIcons(icons);
+    setSavedFonts(fonts);
+    setSavedHands(hands);
+  }, []);
+
   // ── Load persisted data on open ────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    loadCustomIcons().then(setSavedIcons);
-    loadCustomFonts().then(setSavedFonts);
-    loadCustomHandStyles().then(setSavedHands);
-  }, [open]);
+    void reloadSavedAssets();
+  }, [open, reloadSavedAssets]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const unsubscribe = subscribeLabAssetsChanged(() => {
+      void reloadSavedAssets();
+    });
+
+    const handleFocus = () => {
+      void reloadSavedAssets();
+    };
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        void reloadSavedAssets();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [open, reloadSavedAssets]);
 
   useEffect(() => {
     localStorage.setItem(POINTER_COMPOSER_DRAFT_KEY, JSON.stringify(composerDraft));
@@ -479,6 +516,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
       });
       setSaveMsg('✓ Saved to library');
+      publishLabAssetsChanged('icons');
       onIconsSaved?.();
     } catch (err) {
       setSaveMsg(`✗ ${(err as Error).message}`);
@@ -492,6 +530,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const handleDeleteIcon = async (key: string) => {
     await deleteCustomIcon(key);
     setSavedIcons(prev => prev.filter(i => i.key !== key));
+    publishLabAssetsChanged('icons');
     onIconsSaved?.();
   };
 
@@ -544,6 +583,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       if (!hasComposedSources) {
         setCode('');
       }
+      publishLabAssetsChanged('hands');
       onHandsSaved?.();
     } catch (err) {
       setSaveHandMsg(`✗ ${(err as Error).message}`);
@@ -603,6 +643,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const handleDeleteHand = async (key: string) => {
     await deleteCustomHandStyle(key);
     setSavedHands(prev => prev.filter(h => h.key !== key));
+    publishLabAssetsChanged('hands');
     onHandsSaved?.();
   };
 
@@ -630,6 +671,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       setFontMsg('✓ Font loaded into studio');
       setPendingFontFile(null);
       setFontName('');
+      publishLabAssetsChanged('fonts');
       onFontsSaved?.();
     } catch (err) {
       setFontMsg(`✗ ${(err as Error).message}`);
@@ -641,6 +683,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const handleDeleteFont = async (name: string) => {
     await deleteCustomFont(name);
     setSavedFonts(prev => prev.filter(f => f.name !== name));
+    publishLabAssetsChanged('fonts');
     onFontsSaved?.();
   };
 

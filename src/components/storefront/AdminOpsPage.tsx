@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench, Database, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPanel } from '@/components/AdminPanel';
+import { useApp } from '@/context/AppContext';
 import type { GitHubConfig } from '@/lib/githubApi';
 import {
   patchCatalogSpecGroups,
@@ -15,10 +16,21 @@ import { Button } from '@/components/ui/button';
 const DEFAULT_OWNER = 'AI-ERP-ITE';
 const DEFAULT_REPO = 'Watch-Faces';
 
+function splitRepo(value: string): { owner: string; repo: string } {
+  const [owner = '', repo = ''] = value.split('/');
+  return {
+    owner: owner || DEFAULT_OWNER,
+    repo: repo || DEFAULT_REPO,
+  };
+}
+
 export function AdminOpsPage() {
-  const [token, setToken] = useState('');
-  const [owner, setOwner] = useState(DEFAULT_OWNER);
-  const [repo, setRepo] = useState(DEFAULT_REPO);
+  const { state } = useApp();
+  const initialRepo = useMemo(() => splitRepo(state.githubRepo || `${DEFAULT_OWNER}/${DEFAULT_REPO}`), [state.githubRepo]);
+
+  const [token, setToken] = useState(state.githubToken || '');
+  const [owner, setOwner] = useState(initialRepo.owner);
+  const [repo, setRepo] = useState(initialRepo.repo);
   const [branch, setBranch] = useState('main');
   const [patching, setPatching] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
@@ -37,6 +49,18 @@ export function AdminOpsPage() {
   }, [owner, repo]);
 
   const canRun = Boolean(config.token && config.owner && config.repo);
+
+  // Keep admin page credentials synced with Studio settings.
+  // Studio is the source of truth for saved GitHub token/repo.
+  useEffect(() => {
+    if (state.githubToken !== token) {
+      setToken(state.githubToken);
+    }
+
+    const nextRepo = splitRepo(state.githubRepo || `${DEFAULT_OWNER}/${DEFAULT_REPO}`);
+    if (nextRepo.owner !== owner) setOwner(nextRepo.owner);
+    if (nextRepo.repo !== repo) setRepo(nextRepo.repo);
+  }, [owner, repo, state.githubRepo, state.githubToken, token]);
 
   async function loadCatalogData() {
     if (!canRun) return;
