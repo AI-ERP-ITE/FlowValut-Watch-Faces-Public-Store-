@@ -3,6 +3,7 @@ import { SearchBar } from './SearchBar';
 
 export function StorefrontLayout() {
   const location = useLocation();
+  const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
   return (
     <div className="min-h-screen vault-shell flex flex-col">
@@ -15,9 +16,11 @@ export function StorefrontLayout() {
             to="/"
             className="flex items-center gap-3 shrink-0 group"
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#bc9456] via-[#e0c189] to-[#8c6b3f] flex items-center justify-center shadow-lg shadow-[#c7a86f]/30">
-              <span className="text-white font-bold text-xs">FV</span>
-            </div>
+            <img
+              src={logoSrc}
+              alt="Flowvault"
+              className="h-8 w-auto object-contain"
+            />
             <span className="font-sans font-light text-lg tracking-tight text-[#E1E4EA] group-hover:text-white transition-colors">
               Flowvault
             </span>
@@ -52,9 +55,11 @@ export function StorefrontLayout() {
       <footer className="border-t border-[#20252f] mt-16 bg-[#0b0d11]/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[#9198a4]">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#bc9456] via-[#e0c189] to-[#8c6b3f] flex items-center justify-center">
-              <span className="text-white font-bold text-[9px]">FV</span>
-            </div>
+            <img
+              src={logoSrc}
+              alt="Flowvault"
+              className="h-5 w-auto object-contain"
+            />
             <span className="font-sans font-light text-[#E1E4EA]">Flowvault</span>
           </div>
           <p className="font-mono text-xs text-[#9198a4]">
