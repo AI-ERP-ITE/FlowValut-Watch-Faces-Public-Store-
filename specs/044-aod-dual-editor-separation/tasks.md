@@ -30,7 +30,7 @@
 
 - [x] D001 Run full build command(s).
 - [x] D002 Deploy docs artifacts locally (dist -> docs + studio parity).
-- [ ] D003 Verify hosted output after git push.
+- [x] D003 Verify hosted output after git push.
 
 ## Build Verification Log
 
@@ -45,4 +45,5 @@
 - [x] Removed stale hashed files from `docs/assets/` not present in `dist/assets/`.
 - [x] Verified JS hash parity (`index-DcABAnxS.js`) between website/studio entrypoints.
 - [x] Verified CSS hash parity (`index-zZ9NZAdF.css`) between website/studio entrypoints.
-- [ ] Hosted parity check pending push/publication.
+- [x] Hosted homepage serves `assets/index-DcABAnxS.js` and `assets/index-zZ9NZAdF.css`.
+- [x] Hosted studio route resolves via SPA redirect and serves same hashes (`?p=/studio`).
