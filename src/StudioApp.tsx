@@ -1042,6 +1042,9 @@ async function mockKimiAnalysis(
       format: 'TGA-P',
     },
     elements,
+    aodBackgroundMode: 'USE_MAIN_BACKGROUND',
+    aodBackgroundSrc: null,
+    aodSolidColor: '#000000',
     watchModel,
   };
 
@@ -1564,6 +1567,19 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
 }
 
 type EditorMode = 'MAIN' | 'AOD';
+type AodBackgroundMode = 'USE_MAIN_BACKGROUND' | 'UPLOAD_AOD_BACKGROUND' | 'SOLID_COLOR' | 'NONE_BLACK';
+type CropTarget = 'MAIN' | 'AOD';
+
+function buildSolidBackgroundDataUrl(size: number, color: string): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, size, size);
+  return canvas.toDataURL('image/png');
+}
 
 function StudioApp() {
   const backendMode = isBackendBridgeConfigured();
@@ -1572,6 +1588,10 @@ function StudioApp() {
   const [watchFaceName, setWatchFaceName] = useState('');
   const [editorMode, setEditorMode] = useState<EditorMode>('MAIN');
   const [aodElements, setAodElements] = useState<WatchFaceElement[] | null>(null);
+  const [aodBackgroundMode, setAodBackgroundMode] = useState<AodBackgroundMode>('USE_MAIN_BACKGROUND');
+  const [aodBackgroundImage, setAodBackgroundImage] = useState<string | null>(null);
+  const [aodBackgroundFile, setAodBackgroundFile] = useState<File | null>(null);
+  const [aodSolidColor, setAodSolidColor] = useState('#000000');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [devicePreviewEnabled, setDevicePreviewEnabled] = useState(false);
@@ -1593,6 +1613,14 @@ function StudioApp() {
     return state.watchFaceConfig.elements;
   }, [aodElements, editorMode, state.watchFaceConfig]);
   const activeResolution = state.watchFaceConfig?.resolution?.width ?? 480;
+  const aodSolidBackgroundImage = useMemo(() => buildSolidBackgroundDataUrl(activeResolution, aodSolidColor), [activeResolution, aodSolidColor]);
+  const activeBackgroundImage = useMemo(() => {
+    if (editorMode !== 'AOD' || !aodElements) return state.backgroundImage;
+    if (aodBackgroundMode === 'NONE_BLACK') return null;
+    if (aodBackgroundMode === 'SOLID_COLOR') return aodSolidBackgroundImage;
+    if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
+    return state.backgroundImage;
+  }, [editorMode, aodElements, state.backgroundImage, aodBackgroundMode, aodSolidBackgroundImage, aodBackgroundImage]);
   const activeSelectedElement = useMemo(
     () => activeElements.find((el) => el.id === selectedElementId) ?? null,
     [activeElements, selectedElementId]
@@ -1829,11 +1857,19 @@ function StudioApp() {
   useEffect(() => {
     if (!state.watchFaceConfig) {
       setAodElements(null);
+      setAodBackgroundMode('USE_MAIN_BACKGROUND');
+      setAodBackgroundImage(null);
+      setAodBackgroundFile(null);
+      setAodSolidColor('#000000');
       setEditorMode('MAIN');
       setSelectedElementId(null);
       return;
     }
     setAodElements(state.watchFaceConfig.aodElements ? structuredClone(state.watchFaceConfig.aodElements) : null);
+    setAodBackgroundMode((state.watchFaceConfig.aodBackgroundMode as AodBackgroundMode) ?? 'USE_MAIN_BACKGROUND');
+    setAodSolidColor(state.watchFaceConfig.aodSolidColor ?? '#000000');
+    setAodBackgroundImage(null);
+    setAodBackgroundFile(null);
     setEditorMode('MAIN');
     setSelectedElementId(null);
   }, [state.watchFaceConfig?.name]);
@@ -2008,6 +2044,7 @@ function StudioApp() {
 
   // Spec 011 — Background crop tool
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropTarget, setCropTarget] = useState<CropTarget>('MAIN');
 
   // Publish flow
   const [uploadedWatchfaceId, setUploadedWatchfaceId] = useState<string>('');
@@ -2027,7 +2064,10 @@ function StudioApp() {
       .catch(() => setSpecGroups({}));
   }, [state.githubRepo]);
 
-  const openCropTool = (file: File) => { setCropFile(file); };
+  const openCropTool = (file: File, target: CropTarget = 'MAIN') => {
+    setCropTarget(target);
+    setCropFile(file);
+  };
 
   const decodeDataUrlToBytes = (dataUrl: string, label: string): { mimeType: string; bytes: ArrayBuffer } => {
     if (!dataUrl || !dataUrl.startsWith('data:')) {
@@ -2074,18 +2114,30 @@ function StudioApp() {
   };
 
   const handleCropConfirm = (dataUrl: string) => {
-    dispatch(actions.setBackgroundImage(dataUrl));
-    // Convert cropped data URL to File so buildZPK gets the cropped version.
-    const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, 'Background crop');
+    // Convert cropped data URL to File so buildZPK gets cropped bytes.
+    const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, cropTarget === 'AOD' ? 'AOD background crop' : 'Background crop');
     const pngProbe = new Uint8Array(bytes);
     console.log('[Crop] Converted data URL → Uint8Array, size:', pngProbe.length, 'mime:', mimeType, 'PNG magic:', pngProbe[0] === 137 && pngProbe[1] === 80);
-    const croppedFile = new File([bytes], 'background.png', { type: mimeType });
-    console.log('[Crop] Created File:', croppedFile.name, 'size:', croppedFile.size);
-    dispatch(actions.setBackgroundFile(croppedFile));
+
+    if (cropTarget === 'AOD') {
+      const croppedAodFile = new File([bytes], 'aod_background.png', { type: mimeType });
+      setAodBackgroundImage(dataUrl);
+      setAodBackgroundFile(croppedAodFile);
+      toast.success('AOD background updated');
+    } else {
+      const croppedFile = new File([bytes], 'background.png', { type: mimeType });
+      console.log('[Crop] Created File:', croppedFile.name, 'size:', croppedFile.size);
+      dispatch(actions.setBackgroundImage(dataUrl));
+      dispatch(actions.setBackgroundFile(croppedFile));
+    }
+
     setCropFile(null);
   };
 
-  const handleCropCancel = () => { setCropFile(null); };
+  const handleCropCancel = () => {
+    setCropFile(null);
+    setCropTarget('MAIN');
+  };
 
   // Spec 023 — Background photo editor
   // T037: showPhotoEditor flag controls modal visibility
@@ -2223,6 +2275,9 @@ function StudioApp() {
         resolution: { width: 480, height: 480 },
         background: { src: 'background.png', format: 'TGA-P' },
         elements: allElements,
+        aodBackgroundMode: 'USE_MAIN_BACKGROUND',
+        aodBackgroundSrc: null,
+        aodSolidColor: '#000000',
       };
 
       // Generate digit/asset images from element bounds
@@ -2316,6 +2371,22 @@ function StudioApp() {
       pointerParityMissingAssetsRef.current = [];
       const mainEditorElements = state.watchFaceConfig.elements;
       const aodEditorElements = aodElements ?? state.watchFaceConfig.aodElements ?? null;
+      const effectiveAodBackgroundMode: AodBackgroundMode = aodEditorElements ? aodBackgroundMode : 'USE_MAIN_BACKGROUND';
+      let preparedAodBackgroundFile: File | null = null;
+
+      if (aodEditorElements && effectiveAodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') {
+        if (!aodBackgroundFile) {
+          throw new Error('AOD background image is required when AOD Background mode is set to Upload AOD Background.');
+        }
+        preparedAodBackgroundFile = aodBackgroundFile;
+      }
+
+      if (aodEditorElements && effectiveAodBackgroundMode === 'SOLID_COLOR') {
+        const solidDataUrl = buildSolidBackgroundDataUrl(state.watchFaceConfig.resolution.width, aodSolidColor);
+        const { mimeType, bytes } = decodeDataUrlToBytes(solidDataUrl, 'AOD solid background');
+        preparedAodBackgroundFile = new File([bytes], 'aod_background.png', { type: mimeType });
+      }
+
       const allEditorElements = aodEditorElements ? [...mainEditorElements, ...aodEditorElements] : mainEditorElements;
       const hasEngrave = allEditorElements.some((el) => el.type === 'FILL_RECT' && !!el.engraveFrame);
       const hasPointer = allEditorElements.some((el) => el.type === 'TIME_POINTER');
@@ -2620,6 +2691,11 @@ function StudioApp() {
         ...state.watchFaceConfig,
         elements: exportElements,
         aodElements: exportAodElements,
+        aodBackgroundMode: effectiveAodBackgroundMode,
+        aodBackgroundSrc: effectiveAodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' || effectiveAodBackgroundMode === 'SOLID_COLOR'
+          ? 'aod_background.png'
+          : null,
+        aodSolidColor: effectiveAodBackgroundMode === 'SOLID_COLOR' ? aodSolidColor : null,
       };
 
       // Inject engrave/emboss frame PNGs for FILL_RECT elements with engraveFrame
@@ -2853,6 +2929,7 @@ function StudioApp() {
       const zpkResult = await buildZPK({
         config: configForBuild,
         backgroundFile: state.backgroundFile,
+        aodBackgroundFile: preparedAodBackgroundFile,
         elementFiles,
       });
       console.log('[App] ZPK built successfully, size:', zpkResult.size);
@@ -2922,7 +2999,11 @@ function StudioApp() {
 
       if (!uploadResult.success) {
         console.error('[App] Upload error:', uploadResult.error);
-        throw new Error(`GitHub upload failed: ${uploadResult.error || 'Unknown error'}`);
+        const uploadError = uploadResult.error || 'Unknown error';
+        if (/backend bridge is required/i.test(uploadError)) {
+          throw new Error('Upload configuration error: Backend bridge is required for GitHub writes (set VITE_GITHUB_FUNCTIONS_BASE_URL).');
+        }
+        throw new Error(`GitHub upload failed: ${uploadError}`);
       }
       
       console.log('[App] Upload successful!');
@@ -2953,12 +3034,16 @@ function StudioApp() {
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [backendMode, state.watchFaceConfig, aodElements, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
+  }, [backendMode, state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
 
   // Handle reset
   const handleReset = useCallback(() => {
     dispatch(actions.reset());
     setAodElements(null);
+    setAodBackgroundMode('USE_MAIN_BACKGROUND');
+    setAodBackgroundImage(null);
+    setAodBackgroundFile(null);
+    setAodSolidColor('#000000');
     setEditorMode('MAIN');
     setWatchFaceName('');
     setUploadedWatchfaceId('');
@@ -3116,7 +3201,7 @@ function StudioApp() {
               label="Background Image"
               sublabel="Any size — crop to fit"
               value={state.backgroundImage}
-              onFileChange={(file) => { dispatch(actions.setBackgroundFile(file)); if (file) openCropTool(file); }}
+              onFileChange={(file) => { dispatch(actions.setBackgroundFile(file)); if (file) openCropTool(file, 'MAIN'); }}
             />
             {/* T038/T039: Edit Photo button — visible only when a background image is loaded */}
             {state.backgroundImage && (
@@ -3297,9 +3382,56 @@ function StudioApp() {
                         Refresh Warnings
                       </button>
                     </div>
+                    {editorMode === 'AOD' && aodElements && (
+                      <div className="w-full max-w-sm mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                        <p className="text-xs text-amber-200 font-medium">AOD Background</p>
+                        <select
+                          value={aodBackgroundMode}
+                          onChange={(e) => setAodBackgroundMode(e.target.value as AodBackgroundMode)}
+                          className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200"
+                        >
+                          <option value="USE_MAIN_BACKGROUND">Use Main Background</option>
+                          <option value="UPLOAD_AOD_BACKGROUND">Upload AOD Background</option>
+                          <option value="SOLID_COLOR">Solid Color</option>
+                          <option value="NONE_BLACK">No Background (Black)</option>
+                        </select>
+                        {aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' && (
+                          <div className="space-y-2">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] ?? null;
+                                if (!file) return;
+                                setAodBackgroundFile(file);
+                                openCropTool(file, 'AOD');
+                              }}
+                              className="text-xs"
+                            />
+                            <p className="text-[11px] text-zinc-400">Upload + crop applies only to AOD mode.</p>
+                          </div>
+                        )}
+                        {aodBackgroundMode === 'SOLID_COLOR' && (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="color"
+                              value={aodSolidColor}
+                              onChange={(e) => setAodSolidColor(e.target.value)}
+                              className="h-8 w-12 p-1"
+                            />
+                            <Input
+                              type="text"
+                              value={aodSolidColor}
+                              onChange={(e) => setAodSolidColor(e.target.value || '#000000')}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <InteractiveCanvas
                       ref={canvasRef}
-                      backgroundImage={state.backgroundImage}
+                      backgroundImage={activeBackgroundImage ?? undefined}
                       elements={activeElements}
                       selectedElementId={selectedElementId}
                       onSelectElement={setSelectedElementId}
@@ -3754,7 +3886,9 @@ function StudioApp() {
       <Dialog open={!!cropFile} onOpenChange={(open) => { if (!open) handleCropCancel(); }}>
         <DialogContent className="max-w-[560px] bg-[#1a1a1a] border-zinc-700 p-0">
           <DialogHeader className="px-4 pt-4">
-            <DialogTitle className="text-white text-sm font-medium">Crop Background Image</DialogTitle>
+            <DialogTitle className="text-white text-sm font-medium">
+              {cropTarget === 'AOD' ? 'Crop AOD Background Image' : 'Crop Background Image'}
+            </DialogTitle>
           </DialogHeader>
           {cropFile && (
             <BackgroundCropTool

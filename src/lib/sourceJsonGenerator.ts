@@ -12,6 +12,9 @@ export interface SourceJson {
   watchModel: string;
   elements: WatchFaceConfig['elements'];
   aodElements: WatchFaceConfig['aodElements'];
+  aodBackgroundMode?: WatchFaceConfig['aodBackgroundMode'];
+  aodBackgroundSrc?: WatchFaceConfig['aodBackgroundSrc'];
+  aodSolidColor?: WatchFaceConfig['aodSolidColor'];
   background: WatchFaceConfig['background'];
   generatorVersion: string;   // "v2" | "v3"
   createdAt: string;          // ISO date string
@@ -39,6 +42,9 @@ export function buildSourceJson(
     watchModel: config.watchModel,
     elements: config.elements,
     aodElements: config.aodElements ?? null,
+    aodBackgroundMode: config.aodBackgroundMode ?? 'USE_MAIN_BACKGROUND',
+    aodBackgroundSrc: config.aodBackgroundSrc ?? null,
+    aodSolidColor: config.aodSolidColor ?? null,
     background: config.background,
     generatorVersion: `v${GENERATOR_VERSION}`,
     createdAt: new Date().toISOString(),

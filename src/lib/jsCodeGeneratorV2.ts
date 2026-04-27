@@ -271,6 +271,12 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   console.log('[JSGenV2] AOD source:', aodSourceLabel, '| visible AOD elements:', aodElements.length);
   
   const backgroundSrc = 'background.png';
+  const aodBackgroundMode = config.aodBackgroundMode ?? 'USE_MAIN_BACKGROUND';
+  const shouldEmitAodBackground = aodBackgroundMode !== 'NONE_BLACK';
+  const resolvedAodBackgroundSrc =
+    aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' || aodBackgroundMode === 'SOLID_COLOR'
+      ? (config.aodBackgroundSrc || 'aod_background.png')
+      : backgroundSrc;
   
   // Generate NORMAL mode widgets
   let normalWidgetsCode = '';
@@ -417,16 +423,16 @@ try {
                 // ========== NORMAL MODE WIDGETS ==========
 ${normalWidgetsCode}
                 
-                // ========== AOD MODE BACKGROUND ==========
+        ${shouldEmitAodBackground ? `                // ========== AOD MODE BACKGROUND ==========
                 let widget_aod_bg = hmUI.createWidget(hmUI.widget.IMG, {
-                    x: px(0),
-                    y: px(0),
-                    w: px(${config.resolution.width}),
-                    h: px(${config.resolution.height}),
-                    src: '${backgroundSrc}',
-                    alpha: 255,
-                    show_level: hmUI.show_level.ONLY_AOD
-                });
+                  x: px(0),
+                  y: px(0),
+                  w: px(${config.resolution.width}),
+                  h: px(${config.resolution.height}),
+                  src: '${resolvedAodBackgroundSrc}',
+                  alpha: 255,
+                  show_level: hmUI.show_level.ONLY_AOD
+                });` : '                // ========== AOD MODE BACKGROUND =========='}
                 
                 // ========== AOD MODE WIDGETS ==========
 ${aodWidgetsCode}

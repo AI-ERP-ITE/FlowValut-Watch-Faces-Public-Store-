@@ -7,6 +7,7 @@ import { FONT_STYLES } from '@/lib/fontLibrary';
 export interface ZPKBuildOptions {
   config: WatchFaceConfig;
   backgroundFile: File;
+  aodBackgroundFile?: File | null;
   elementFiles: { src: string; file: File }[];
 }
 
@@ -18,7 +19,7 @@ export interface ZPKBuildResult {
 
 export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult> {
   console.log('[ZPK] Starting...');
-  const { config, backgroundFile } = options;
+  const { config, backgroundFile, aodBackgroundFile } = options;
   
   try {
     // Build a set of asset filenames from elementFiles for restoring data URLs
@@ -76,6 +77,11 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       console.log('[ZPK] Step 8: Adding background image...');
       assets.file('background.png', backgroundFile);
       console.log('[ZPK] Step 9: Background image added, size:', backgroundFile.size);
+
+      if (aodBackgroundFile) {
+        assets.file('aod_background.png', aodBackgroundFile);
+        console.log('[ZPK] Step 9a: AOD background image added, size:', aodBackgroundFile.size);
+      }
       
       // Add element images (skip background.png since we already added it directly)
       const filteredElements = options.elementFiles.filter(ef => ef.src !== 'background.png');

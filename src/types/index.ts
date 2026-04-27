@@ -187,6 +187,12 @@ export interface WatchFaceConfig {
   elements: WatchFaceElement[];
   /** Optional AOD-specific editor/export layout, independent from main elements. */
   aodElements?: WatchFaceElement[] | null;
+  /** AOD background strategy selector. */
+  aodBackgroundMode?: 'USE_MAIN_BACKGROUND' | 'UPLOAD_AOD_BACKGROUND' | 'SOLID_COLOR' | 'NONE_BLACK';
+  /** Asset filename used when AOD background mode is upload/solid. */
+  aodBackgroundSrc?: string | null;
+  /** Hex color used when AOD background mode is solid color. */
+  aodSolidColor?: string | null;
   watchModel: string;
 }
 
