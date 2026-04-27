@@ -2,14 +2,17 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { AppProvider } from '@/context/AppContext';
+import AppProviders from '@app-providers';
 import App from './App';
 import './index.css';
 
+const rawBase = import.meta.env.BASE_URL || '/';
+const routerBase = rawBase === '/' ? '/' : rawBase.replace(/\/$/, '');
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename="/Watch-Faces">
-      <AppProvider>
+    <BrowserRouter basename={routerBase}>
+      <AppProviders>
         <App />
         <Toaster
           position="bottom-center"
@@ -21,7 +24,7 @@ createRoot(document.getElementById('root')!).render(
             },
           }}
         />
-      </AppProvider>
+      </AppProviders>
     </BrowserRouter>
   </StrictMode>
 );

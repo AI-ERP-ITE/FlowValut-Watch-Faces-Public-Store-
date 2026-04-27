@@ -2,19 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import StudioApp from './StudioApp';
 import LabPage from './LabPage';
-import { CatalogProvider } from '@/context/CatalogContext';
-import { StorefrontLayout } from '@/components/storefront/StorefrontLayout';
-import { HomePage } from '@/components/storefront/HomePage';
-import { ModelPage } from '@/components/storefront/ModelPage';
-import { CategoryPage } from '@/components/storefront/CategoryPage';
-import { ProductPage } from '@/components/storefront/ProductPage';
-import { SearchPage } from '@/components/storefront/SearchPage';
-import { BuyPage } from '@/components/storefront/BuyPage';
-import { SuccessPage } from '@/components/storefront/SuccessPage';
 import { AdminOpsPage } from '@/components/storefront/AdminOpsPage';
 import {
   getCurrentAuthUser,
   isFirebaseAuthConfigured,
+  signInAdminWithGoogle,
   subscribeAuthState,
 } from '@/lib/firebaseAuthClient';
 
@@ -27,16 +19,77 @@ function PrivateRouteGuard({ children }: { children: ReactNode }) {
     return subscribeAuthState((user) => setHasUser(!!user));
   }, [authConfigured]);
 
-  if (authConfigured && !hasUser) {
-    return <Navigate to="/" replace />;
+  if (!authConfigured || !hasUser) {
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
 }
 
+function PrivateLoginPage() {
+  const authConfigured = isFirebaseAuthConfigured();
+  const [hasUser, setHasUser] = useState(() => !!getCurrentAuthUser());
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  useEffect(() => {
+    if (!authConfigured) return;
+    return subscribeAuthState((user) => setHasUser(!!user));
+  }, [authConfigured]);
+
+  if (hasUser) {
+    return <Navigate to="/studio" replace />;
+  }
+
+  const handleSignIn = async () => {
+    try {
+      setIsSigningIn(true);
+      setErrorMessage(null);
+      await signInAdminWithGoogle();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Sign-in failed.');
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  if (!authConfigured) {
+    return (
+      <main className="min-h-screen grid place-items-center bg-black text-white p-6">
+        <section className="w-full max-w-xl rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+          <h1 className="text-xl font-semibold">Private Console Locked</h1>
+          <p className="mt-3 text-zinc-300">
+            Firebase Auth is not configured for this build. Set VITE_FIREBASE_* vars and redeploy the private bundle.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen grid place-items-center bg-black text-white p-6">
+      <section className="w-full max-w-xl rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+        <h1 className="text-xl font-semibold">Private Console Sign In</h1>
+        <p className="mt-3 text-zinc-300">Sign in with Firebase Google Auth to access Studio, Admin, and Tools.</p>
+        {errorMessage ? <p className="mt-3 text-sm text-red-400">{errorMessage}</p> : null}
+        <button
+          type="button"
+          className="mt-4 inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium hover:bg-zinc-800 disabled:opacity-60"
+          onClick={handleSignIn}
+          disabled={isSigningIn}
+        >
+          {isSigningIn ? 'Signing in...' : 'Sign In With Google'}
+        </button>
+      </section>
+    </main>
+  );
+}
+
 export default function AppPrivate() {
   return (
     <Routes>
+      <Route path="/login" element={<PrivateLoginPage />} />
+      <Route path="/" element={<Navigate to="/studio" replace />} />
       <Route
         path="/studio"
         element={
@@ -53,41 +106,23 @@ export default function AppPrivate() {
           </PrivateRouteGuard>
         }
       />
-
       <Route
+        path="/admin"
         element={
-          <CatalogProvider>
-            <StorefrontLayout />
-          </CatalogProvider>
+          <PrivateRouteGuard>
+            <AdminOpsPage />
+          </PrivateRouteGuard>
         }
-      >
-        <Route path="/store" element={<Navigate to="/" replace />} />
-        <Route index element={<HomePage />} />
-        <Route path="model/:slug" element={<ModelPage />} />
-        <Route path="category/:slug" element={<CategoryPage />} />
-        <Route path="face/:id" element={<ProductPage />} />
-        <Route path="buy/:id" element={<BuyPage />} />
-        <Route path="success/:id" element={<SuccessPage />} />
-        <Route path="search" element={<SearchPage />} />
-        <Route
-          path="admin"
-          element={
-            <PrivateRouteGuard>
-              <AdminOpsPage />
-            </PrivateRouteGuard>
-          }
-        />
-        <Route
-          path="tools"
-          element={
-            <PrivateRouteGuard>
-              <AdminOpsPage />
-            </PrivateRouteGuard>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-
+      />
+      <Route
+        path="/tools"
+        element={
+          <PrivateRouteGuard>
+            <AdminOpsPage />
+          </PrivateRouteGuard>
+        }
+      />
+      <Route path="*" element={<Navigate to="/studio" replace />} />
     </Routes>
   );
 }

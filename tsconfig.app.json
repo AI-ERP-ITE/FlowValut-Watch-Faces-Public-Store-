@@ -15,6 +15,9 @@
       ],
       "@app-routes": [
         "./src/AppPrivate.tsx"
+      ],
+      "@app-providers": [
+        "./src/AppProvidersPrivate.tsx"
       ]
     },
     /* Bundler mode */
