@@ -114,41 +114,42 @@ export function Header() {
               <DialogTitle className="text-lg font-semibold">GitHub Settings</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
-              {/* Token */}
-              <div className="space-y-2">
-                <Label htmlFor="token" className="text-sm text-zinc-300">
-                  GitHub Token
-                </Label>
-                <Input
-                  id="token"
-                  type="password"
-                  value={state.githubToken}
-                  onChange={(e) => {
-                    dispatch(actions.setGithubToken(e.target.value));
-                    setTestResult(null);
-                  }}
-                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                  disabled={backendMode}
-                  className="bg-[#0F0F0F] border-zinc-700 text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:ring-cyan-500/20"
-                />
-                <p className="text-xs text-zinc-500">
-                  {backendMode
-                    ? 'Backend bridge mode active: browser token is not used.'
-                    : (
-                      <>
-                        Create a token with 'repo' scope at{' '}
-                        <a
-                          href="https://github.com/settings/tokens"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-cyan-500 hover:underline"
-                        >
-                          github.com/settings/tokens
-                        </a>
-                      </>
-                    )}
-                </p>
-              </div>
+              {!backendMode && (
+                <div className="space-y-2">
+                  <Label htmlFor="token" className="text-sm text-zinc-300">
+                    GitHub Token
+                  </Label>
+                  <Input
+                    id="token"
+                    type="password"
+                    value={state.githubToken}
+                    onChange={(e) => {
+                      dispatch(actions.setGithubToken(e.target.value));
+                      setTestResult(null);
+                    }}
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    className="bg-[#0F0F0F] border-zinc-700 text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:ring-cyan-500/20"
+                  />
+                  <p className="text-xs text-zinc-500">
+                    Create a token with 'repo' scope at{' '}
+                    <a
+                      href="https://github.com/settings/tokens"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-500 hover:underline"
+                    >
+                      github.com/settings/tokens
+                    </a>
+                  </p>
+                </div>
+              )}
+
+              {backendMode && (
+                <div className="space-y-2 rounded-lg border border-zinc-800 p-3 bg-zinc-900/60">
+                  <Label className="text-sm text-zinc-300">GitHub Token</Label>
+                  <p className="text-xs text-zinc-500">Backend bridge mode active. Browser token storage is disabled.</p>
+                </div>
+              )}
 
               {backendMode && canUseFirebaseAuth && (
                 <div className="space-y-2 rounded-lg border border-zinc-800 p-3 bg-zinc-900/60">

@@ -27,10 +27,11 @@ function splitRepo(value: string): { owner: string; repo: string } {
 
 export function AdminOpsPage() {
   const { state } = useApp();
+  const backendMode = isBackendBridgeConfigured();
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const initialRepo = useMemo(() => splitRepo(state.githubRepo || `${DEFAULT_OWNER}/${DEFAULT_REPO}`), [state.githubRepo]);
 
-  const [token, setToken] = useState(state.githubToken || '');
+  const [token, setToken] = useState(backendMode ? '' : (state.githubToken || ''));
   const [owner, setOwner] = useState(initialRepo.owner);
   const [repo, setRepo] = useState(initialRepo.repo);
   const [branch, setBranch] = useState('main');
@@ -39,7 +40,6 @@ export function AdminOpsPage() {
   const [catalogOptions, setCatalogOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [featuredFaceId, setFeaturedFaceId] = useState<string>('');
   const [savingFeatured, setSavingFeatured] = useState(false);
-  const backendMode = isBackendBridgeConfigured();
 
   const config = useMemo<GitHubConfig>(
     () => ({ token: token.trim(), owner: owner.trim(), repo: repo.trim(), branch: branch.trim() || 'main' }),
@@ -56,14 +56,14 @@ export function AdminOpsPage() {
   // Keep admin page credentials synced with Studio settings.
   // Studio is the source of truth for saved GitHub token/repo.
   useEffect(() => {
-    if (state.githubToken !== token) {
+    if (!backendMode && state.githubToken !== token) {
       setToken(state.githubToken);
     }
 
     const nextRepo = splitRepo(state.githubRepo || `${DEFAULT_OWNER}/${DEFAULT_REPO}`);
     if (nextRepo.owner !== owner) setOwner(nextRepo.owner);
     if (nextRepo.repo !== repo) setRepo(nextRepo.repo);
-  }, [owner, repo, state.githubRepo, state.githubToken, token]);
+  }, [backendMode, owner, repo, state.githubRepo, state.githubToken, token]);
 
   async function loadCatalogData() {
     if (!canRun) return;
@@ -157,20 +157,26 @@ export function AdminOpsPage() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-xs uppercase tracking-wider text-[#8b95a6]">GitHub Token</label>
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="ghp_..."
-              disabled={backendMode}
-              className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
-            />
-            {backendMode && (
-              <p className="text-[11px] text-[#8f9aac]">Backend bridge mode active. Browser token not required.</p>
-            )}
-          </div>
+          {!backendMode && (
+            <div className="space-y-1">
+              <label className="text-xs uppercase tracking-wider text-[#8b95a6]">GitHub Token</label>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="ghp_..."
+                className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
+              />
+            </div>
+          )}
+          {backendMode && (
+            <div className="space-y-1">
+              <label className="text-xs uppercase tracking-wider text-[#8b95a6]">GitHub Token</label>
+              <div className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#8f9aac]">
+                Managed by backend bridge (hidden in browser)
+              </div>
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-xs uppercase tracking-wider text-[#8b95a6]">Branch</label>
             <input
