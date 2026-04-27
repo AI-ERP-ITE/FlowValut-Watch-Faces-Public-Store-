@@ -3001,7 +3001,7 @@ function StudioApp() {
         console.error('[App] Upload error:', uploadResult.error);
         const uploadError = uploadResult.error || 'Unknown error';
         if (/backend bridge is required/i.test(uploadError)) {
-          throw new Error('Upload configuration error: Backend bridge is required for GitHub writes (set VITE_GITHUB_FUNCTIONS_BASE_URL).');
+          throw new Error('Upload configuration error: Backend bridge is required for GitHub writes. Open Settings and set Backend Bridge URL (or set VITE_GITHUB_FUNCTIONS_BASE_URL at build time).');
         }
         throw new Error(`GitHub upload failed: ${uploadError}`);
       }

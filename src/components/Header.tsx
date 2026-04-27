@@ -20,7 +20,7 @@ import {
   signOutAdmin,
   subscribeAuthState,
 } from '@/lib/firebaseAuthClient';
-import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
+import { getBackendBridgeBaseUrl, isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
 
 export function Header() {
   const { state, dispatch } = useApp();
@@ -28,8 +28,29 @@ export function Header() {
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<boolean | null>(null);
   const [authUserEmail, setAuthUserEmail] = useState<string | null>(getCurrentAuthUser()?.email ?? null);
+  const [backendUrlDraft, setBackendUrlDraft] = useState(getBackendBridgeBaseUrl());
   const backendMode = isBackendBridgeConfigured();
   const canUseFirebaseAuth = isFirebaseAuthConfigured();
+
+  const handleSaveBackendUrl = () => {
+    const trimmed = backendUrlDraft.trim();
+    if (!trimmed) {
+      localStorage.removeItem('githubBackendBaseUrl');
+      localStorage.removeItem('zepp-github-backend-base-url');
+      toast.success('Backend bridge URL cleared. Reloading...');
+      window.location.reload();
+      return;
+    }
+    if (!/^https?:\/\//i.test(trimmed)) {
+      toast.error('Backend bridge URL must start with http:// or https://');
+      return;
+    }
+    const normalized = trimmed.replace(/\/$/, '');
+    localStorage.setItem('githubBackendBaseUrl', normalized);
+    localStorage.setItem('zepp-github-backend-base-url', normalized);
+    toast.success('Backend bridge URL saved. Reloading...');
+    window.location.reload();
+  };
 
   useEffect(() => {
     if (!canUseFirebaseAuth) return;
@@ -114,6 +135,31 @@ export function Header() {
               <DialogTitle className="text-lg font-semibold">Backend Settings</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
+              <div className="space-y-2 rounded-lg border border-zinc-800 p-3 bg-zinc-900/60">
+                <Label htmlFor="backend-url" className="text-sm text-zinc-300">
+                  Backend Bridge URL
+                </Label>
+                <Input
+                  id="backend-url"
+                  value={backendUrlDraft}
+                  onChange={(e) => setBackendUrlDraft(e.target.value)}
+                  placeholder="https://<region>-<project>.cloudfunctions.net"
+                  className="bg-[#0F0F0F] border-zinc-700 text-white placeholder:text-zinc-600 focus:border-cyan-500 focus:ring-cyan-500/20"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSaveBackendUrl}
+                    variant="outline"
+                    className="flex-1 border-zinc-700 text-white hover:bg-zinc-800"
+                  >
+                    Save & Reload
+                  </Button>
+                </div>
+                <p className="text-xs text-zinc-500">
+                  Set once here for runtime builds, or define VITE_GITHUB_FUNCTIONS_BASE_URL at build time.
+                </p>
+              </div>
+
               {backendMode ? (
                 <div className="space-y-2 rounded-lg border border-zinc-800 p-3 bg-zinc-900/60">
                   <Label className="text-sm text-zinc-300">GitHub Token</Label>
@@ -123,7 +169,7 @@ export function Header() {
                 <div className="space-y-2 rounded-lg border border-red-900/50 p-3 bg-red-950/30">
                   <Label className="text-sm text-red-200">Backend Bridge Required</Label>
                   <p className="text-xs text-red-200/80">
-                    Private mode blocks browser GitHub tokens. Configure VITE_GITHUB_FUNCTIONS_BASE_URL for this build.
+                    Private mode blocks browser GitHub tokens. Set Backend Bridge URL above (or configure VITE_GITHUB_FUNCTIONS_BASE_URL during build).
                   </p>
                 </div>
               )}
