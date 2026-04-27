@@ -26,7 +26,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     
     // Elements may have data URLs (from preview rendering) instead of filenames.
     // Prefer assetFilename (set by pipeline), fall back to name-based guessing.
-    const fixedElements = config.elements.map(el => {
+    const fixElementSources = (input: WatchFaceConfig['elements']) => input.map(el => {
       if (el.src && el.src.startsWith('data:')) {
         // Prefer the deterministic assetFilename set during pipeline
         if (el.assetFilename && assetFilenames.has(el.assetFilename)) {
@@ -46,8 +46,10 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       }
       return el;
     });
+    const fixedElements = fixElementSources(config.elements);
+    const fixedAodElements = config.aodElements ? fixElementSources(config.aodElements) : config.aodElements;
     
-    const fixedConfig = { ...config, elements: fixedElements };
+    const fixedConfig = { ...config, elements: fixedElements, aodElements: fixedAodElements };
     
     console.log('[ZPK] Step 1: Generating JS code...');
     const code = generateWatchFaceCode(fixedConfig);

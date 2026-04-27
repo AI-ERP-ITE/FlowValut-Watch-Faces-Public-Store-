@@ -185,6 +185,8 @@ export interface WatchFaceConfig {
     format: 'TGA-P' | 'TGA-RLP' | 'TGA-16' | 'TGA-32';
   };
   elements: WatchFaceElement[];
+  /** Optional AOD-specific editor/export layout, independent from main elements. */
+  aodElements?: WatchFaceElement[] | null;
   watchModel: string;
 }
 

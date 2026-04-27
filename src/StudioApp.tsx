@@ -73,26 +73,29 @@ import {
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
 function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig {
+  const normalizeSet = (input: WatchFaceElement[]) => input.map((el) => {
+    if (el.type !== 'TIME_POINTER' && el.type !== 'GAUGE_POINTER') return el;
+    const effects = normalizePointerEffects(el);
+    const gaugePivot = el.type === 'GAUGE_POINTER' ? normalizeGaugePivot(el) : null;
+    return {
+      ...el,
+      pointerBrightness: effects.brightness,
+      pointerContrast: effects.contrast,
+      pointerSaturation: effects.saturation,
+      pointerOpacity: effects.opacity,
+      ...(gaugePivot
+        ? {
+            pivotX: gaugePivot.pivotX,
+            pivotY: gaugePivot.pivotY,
+          }
+        : {}),
+    };
+  });
+
   return {
     ...config,
-    elements: config.elements.map((el) => {
-      if (el.type !== 'TIME_POINTER' && el.type !== 'GAUGE_POINTER') return el;
-      const effects = normalizePointerEffects(el);
-      const gaugePivot = el.type === 'GAUGE_POINTER' ? normalizeGaugePivot(el) : null;
-      return {
-        ...el,
-        pointerBrightness: effects.brightness,
-        pointerContrast: effects.contrast,
-        pointerSaturation: effects.saturation,
-        pointerOpacity: effects.opacity,
-        ...(gaugePivot
-          ? {
-              pivotX: gaugePivot.pivotX,
-              pivotY: gaugePivot.pivotY,
-            }
-          : {}),
-      };
-    }),
+    elements: normalizeSet(config.elements),
+    aodElements: config.aodElements ? normalizeSet(config.aodElements) : config.aodElements,
   };
 }
 
@@ -1560,11 +1563,15 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   return canvas.toDataURL('image/png');
 }
 
+type EditorMode = 'MAIN' | 'AOD';
+
 function StudioApp() {
   const backendMode = isBackendBridgeConfigured();
   const { state, dispatch } = useApp();
   const [watchModel, setWatchModel] = useState('Balance 2');
   const [watchFaceName, setWatchFaceName] = useState('');
+  const [editorMode, setEditorMode] = useState<EditorMode>('MAIN');
+  const [aodElements, setAodElements] = useState<WatchFaceElement[] | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [devicePreviewEnabled, setDevicePreviewEnabled] = useState(false);
@@ -1580,6 +1587,99 @@ function StudioApp() {
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
+  const activeElements = useMemo(() => {
+    if (!state.watchFaceConfig) return [];
+    if (editorMode === 'AOD') return aodElements ?? [];
+    return state.watchFaceConfig.elements;
+  }, [aodElements, editorMode, state.watchFaceConfig]);
+  const activeResolution = state.watchFaceConfig?.resolution?.width ?? 480;
+  const activeSelectedElement = useMemo(
+    () => activeElements.find((el) => el.id === selectedElementId) ?? null,
+    [activeElements, selectedElementId]
+  );
+
+  const setActiveElements = useCallback((nextElements: WatchFaceElement[]) => {
+    if (!state.watchFaceConfig) return;
+    if (editorMode === 'MAIN') {
+      dispatch(
+        actions.setWatchFaceConfig({
+          ...state.watchFaceConfig,
+          elements: nextElements,
+          aodElements,
+        })
+      );
+      return;
+    }
+    setAodElements(nextElements);
+  }, [aodElements, dispatch, editorMode, state.watchFaceConfig]);
+
+  const updateActiveElement = useCallback((id: string, changes: Partial<WatchFaceElement>) => {
+    if (!state.watchFaceConfig) return;
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'UPDATE_ELEMENT', payload: { id, changes } });
+      return;
+    }
+    setAodElements((prev) => {
+      let updated = (prev ?? []).map((el) => (el.id === id ? { ...el, ...changes } : el));
+      if (changes.bounds) {
+        const updatedParent = updated.find((el) => el.id === id);
+        if (updatedParent?.frameElementId) {
+          const frameEl = updated.find((el) => el.id === updatedParent.frameElementId);
+          if (frameEl?.engraveFrame && frameEl.engraveFrame.linked !== false) {
+            const pad = frameEl.engraveFrame.padding;
+            const nb = changes.bounds;
+            updated = updated.map((el) =>
+              el.id === updatedParent.frameElementId
+                ? { ...el, bounds: { x: nb.x - pad, y: nb.y - pad, width: nb.width + pad * 2, height: nb.height + pad * 2 } }
+                : el
+            );
+          }
+        }
+      }
+      return updated;
+    });
+  }, [dispatch, editorMode, state.watchFaceConfig]);
+
+  const addActiveElement = useCallback((element: WatchFaceElement) => {
+    if (!state.watchFaceConfig) return;
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'ADD_ELEMENT', payload: element });
+      return;
+    }
+    setAodElements((prev) => ([...(prev ?? []), element]));
+  }, [dispatch, editorMode, state.watchFaceConfig]);
+
+  const deleteActiveElement = useCallback((id: string) => {
+    if (!state.watchFaceConfig) return;
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'DELETE_ELEMENT', payload: id });
+      return;
+    }
+    setAodElements((prev) => {
+      const elements = prev ?? [];
+      const deletedEl = elements.find((el) => el.id === id);
+      const toDelete = new Set([id]);
+      if (deletedEl?.frameElementId) toDelete.add(deletedEl.frameElementId);
+      const parentOfFrame = elements.find((el) => el.frameElementId === id);
+      return elements
+        .filter((el) => !toDelete.has(el.id))
+        .map((el) => (el.id === parentOfFrame?.id ? { ...el, frameElementId: undefined } : el));
+    });
+  }, [dispatch, editorMode, state.watchFaceConfig]);
+
+  const toggleActiveElementVisibility = useCallback((id: string) => {
+    const next = activeElements.map((el) => (el.id === id ? { ...el, visible: !el.visible } : el));
+    setActiveElements(next);
+  }, [activeElements, setActiveElements]);
+
+  const createAodFromMain = useCallback(() => {
+    if (!state.watchFaceConfig) return;
+    setAodElements(structuredClone(state.watchFaceConfig.elements));
+    setEditorMode('AOD');
+    setSelectedElementId(null);
+    toast.success('AOD layout synced from main and unlocked for independent editing');
+  }, [state.watchFaceConfig]);
+
   const addAllowedDataTypes = useMemo(
     () => getAllowedDataTypesForElement(addElType, addElSubtype),
     [addElType, addElSubtype]
@@ -1726,10 +1826,22 @@ function StudioApp() {
     setPointerParityResult(null);
   }, [state.watchFaceConfig]);
 
+  useEffect(() => {
+    if (!state.watchFaceConfig) {
+      setAodElements(null);
+      setEditorMode('MAIN');
+      setSelectedElementId(null);
+      return;
+    }
+    setAodElements(state.watchFaceConfig.aodElements ? structuredClone(state.watchFaceConfig.aodElements) : null);
+    setEditorMode('MAIN');
+    setSelectedElementId(null);
+  }, [state.watchFaceConfig?.name]);
+
   const handleAddElement = () => {
     if (!state.watchFaceConfig) return;
-    const maxZ = state.watchFaceConfig.elements.reduce((m, e) => Math.max(m, e.zIndex), 0);
-    const canvas = state.watchFaceConfig.resolution?.width ?? 480;
+    const maxZ = activeElements.reduce((m, e) => Math.max(m, e.zIndex), 0);
+    const canvas = activeResolution;
     const cx = Math.floor(canvas / 2);
     // Default sizes per type
     const defaults: Partial<Record<WatchFaceElement['type'], { w: number; h: number }>> = {
@@ -1787,10 +1899,10 @@ function StudioApp() {
       ...(addElType === 'TEXT' ? { text: 'Text', fontSize: 36, color: '#FFFFFF' } : {}),
       ...(addElType === 'CIRCLE' ? { shapeType: addElShapeType, color: '0xFFFFFF', ...(addElShapeType === 'rounded_rect' ? { shapeCornerRadius: 12 } : {}) } : {}),
     };
-    dispatch({ type: 'ADD_ELEMENT', payload: newEl });
+    addActiveElement(newEl);
     setSelectedElementId(newEl.id);
     setShowAddElement(false);
-    toast.success(`Added ${newEl.name}`);
+    toast.success(`Added ${newEl.name} to ${editorMode} layout`);
   };
 
   useEffect(() => {
@@ -1836,16 +1948,16 @@ function StudioApp() {
         linked: true,
       },
     };
-    dispatch({ type: 'ADD_ELEMENT', payload: frameEl });
-    dispatch({ type: 'UPDATE_ELEMENT', payload: { id: parent.id, changes: { frameElementId: frameId } } });
+    addActiveElement(frameEl);
+    updateActiveElement(parent.id, { frameElementId: frameId });
     setSelectedElementId(frameId);
     toast.success('Frame added');
   };
 
   const handleRemoveFrame = (parent: WatchFaceElement) => {
     if (!parent.frameElementId) return;
-    dispatch({ type: 'DELETE_ELEMENT', payload: parent.frameElementId });
-    dispatch({ type: 'UPDATE_ELEMENT', payload: { id: parent.id, changes: { frameElementId: undefined } } });
+    deleteActiveElement(parent.frameElementId);
+    updateActiveElement(parent.id, { frameElementId: undefined });
     toast.success('Frame removed');
   };
 
@@ -1865,6 +1977,7 @@ function StudioApp() {
   const { dispatch: dispatchRef } = { dispatch };
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (editorMode === 'AOD') return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         dispatchRef({ type: 'UNDO' });
@@ -1876,7 +1989,7 @@ function StudioApp() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatchRef]);
+  }, [dispatchRef, editorMode]);
 
   // AI Provider settings (persisted in localStorage)
   const [aiProvider, setAiProvider] = useState<AIProvider>(
@@ -2201,8 +2314,11 @@ function StudioApp() {
 
     try {
       pointerParityMissingAssetsRef.current = [];
-      const hasEngrave = state.watchFaceConfig.elements.some((el) => el.type === 'FILL_RECT' && !!el.engraveFrame);
-      const hasPointer = state.watchFaceConfig.elements.some((el) => el.type === 'TIME_POINTER');
+      const mainEditorElements = state.watchFaceConfig.elements;
+      const aodEditorElements = aodElements ?? state.watchFaceConfig.aodElements ?? null;
+      const allEditorElements = aodEditorElements ? [...mainEditorElements, ...aodEditorElements] : mainEditorElements;
+      const hasEngrave = allEditorElements.some((el) => el.type === 'FILL_RECT' && !!el.engraveFrame);
+      const hasPointer = allEditorElements.some((el) => el.type === 'TIME_POINTER');
       const issueFocus = hasEngrave && hasPointer ? 'both' : hasEngrave ? 'engrave' : 'pointer';
       const runRecord = parityCaptureSession.startRun({
         fixtureId: state.watchFaceConfig.name,
@@ -2220,7 +2336,7 @@ function StudioApp() {
           eventType: 'fixture.snapshot',
           capturePoint: 'fixture_snapshot',
           data: {
-            elementCount: state.watchFaceConfig.elements.length,
+            elementCount: allEditorElements.length,
             backgroundFileName: state.backgroundFile.name,
             previewCaptured: !!previewDataUrl,
           },
@@ -2267,7 +2383,7 @@ function StudioApp() {
 
       // Regenerate digit images with current element colors + font styles.
       // This replaces any stale images from initial generation so UI choices reach the device.
-      const freshDigits = regenerateDigitFilesFromElements(state.watchFaceConfig.elements);
+      const freshDigits = regenerateDigitFilesFromElements(allEditorElements);
       for (const { filename, dataUrl } of freshDigits) {
         const { bytes } = decodeDataUrlToBytes(dataUrl, `Digit image ${filename}`);
         const existing = elementFiles.findIndex(f => f.src === filename);
@@ -2280,7 +2396,7 @@ function StudioApp() {
       // Ensure weather IMG_LEVEL elements always ship a full 29-image set and image_array filenames.
       const weatherFilesByStyle = new Set<string>();
       const resolvedImgLevelFrames = new Map<string, string[]>();
-      for (const el of state.watchFaceConfig.elements) {
+      for (const el of allEditorElements) {
         if (el.type !== 'IMG_LEVEL' || !isWeatherImgLevelDataType(el.dataType)) continue;
         const weatherStyle = ((el.weatherStyle ?? 'flat') as WeatherStyle);
         const weatherFiles = weatherImageFilenames();
@@ -2306,7 +2422,7 @@ function StudioApp() {
       }
 
       // Resolve non-weather IMG_LEVEL assets with flexible frame counts.
-      for (const el of state.watchFaceConfig.elements) {
+      for (const el of allEditorElements) {
         if (el.type !== 'IMG_LEVEL' || isWeatherImgLevelDataType(el.dataType)) continue;
 
         const configuredFrames = Array.isArray(el.images)
@@ -2377,7 +2493,7 @@ function StudioApp() {
       }
 
       // Pre-warm Tabler icon cache so getIconByKey works synchronously for tabler:* keys
-      if (state.watchFaceConfig.elements.some(el => el.iconKey?.startsWith('tabler:'))) {
+      if (allEditorElements.some(el => el.iconKey?.startsWith('tabler:'))) {
         dispatch(actions.setLoadingMessage('Warming icon cache...'));
         const { buildTablerLibrary } = await import('@/lib/tablerIconRenderer');
         await buildTablerLibrary();
@@ -2385,7 +2501,7 @@ function StudioApp() {
 
       // Inject icon assets for elements with iconKey.
       // Apply icon visual effects (hue, saturation, colorize) so what you see = what ships.
-      for (const el of state.watchFaceConfig.elements) {
+      for (const el of allEditorElements) {
         if (el.iconKey) {
           const iconEntry = getIconByKey(el.iconKey);
           if (iconEntry) {
@@ -2402,7 +2518,7 @@ function StudioApp() {
       }
 
       // Inject GAUGE_POINTER assets with deterministic fallback + pointer effects.
-      for (const el of state.watchFaceConfig.elements) {
+      for (const el of allEditorElements) {
         if (el.type !== 'GAUGE_POINTER') continue;
         const filename = gaugePointerAssetName(el);
         let sourceDataUrl: string | null = null;
@@ -2425,7 +2541,7 @@ function StudioApp() {
       }
 
       // Inject curved text PNGs for TEXT elements with curvedText
-      for (const el of state.watchFaceConfig.elements) {
+      for (const el of allEditorElements) {
         if (el.type === 'TEXT' && el.curvedText) {
           const filename = `curved_text_${el.id}.png`;
           // Parse Zepp color format 0xRRGGBBAA → #RRGGBB
@@ -2452,7 +2568,7 @@ function StudioApp() {
 
       // Build a stable export config snapshot so all bakes/generation use the same element state.
       // This prevents preview/export drift (especially for custom-hand pivots and cover fallback).
-      const exportElements = stampGaugePairIds(state.watchFaceConfig.elements).map(el => ({
+      const prepareExportElements = (inputElements: WatchFaceElement[]) => stampGaugePairIds(inputElements).map(el => ({
         ...el,
         bounds: { ...el.bounds },
         ...(el.type === 'GAUGE_POINTER'
@@ -2468,6 +2584,10 @@ function StudioApp() {
         ...(el.minutePos ? { minutePos: { ...el.minutePos } } : {}),
         ...(el.secondPos ? { secondPos: { ...el.secondPos } } : {}),
       }));
+
+      const exportElements = prepareExportElements(mainEditorElements);
+      const exportAodElements = aodEditorElements ? prepareExportElements(aodEditorElements) : null;
+      const exportCombinedElements = exportAodElements ? [...exportElements, ...exportAodElements] : exportElements;
       for (const el of exportElements) {
         if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
           el.images = weatherImageFilenames();
@@ -2481,13 +2601,29 @@ function StudioApp() {
           el.fontArray = weatherTempDigitFilenames();
         }
       }
+      if (exportAodElements) {
+        for (const el of exportAodElements) {
+          if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
+            el.images = weatherImageFilenames();
+          } else if (el.type === 'IMG_LEVEL') {
+            const resolvedFrames = resolvedImgLevelFrames.get(el.id);
+            if (resolvedFrames) {
+              el.images = [...resolvedFrames];
+            }
+          }
+          if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT') {
+            el.fontArray = weatherTempDigitFilenames();
+          }
+        }
+      }
       const configForBuild: WatchFaceConfig = {
         ...state.watchFaceConfig,
         elements: exportElements,
+        aodElements: exportAodElements,
       };
 
       // Inject engrave/emboss frame PNGs for FILL_RECT elements with engraveFrame
-      for (const el of exportElements) {
+      for (const el of exportCombinedElements) {
         if (el.type === 'FILL_RECT' && el.engraveFrame) {
           const safeName = el.name.replace(/[^a-zA-Z0-9_-]/g, '_');
           const filename = `frame_${safeName}.png`;
@@ -2498,7 +2634,7 @@ function StudioApp() {
       }
 
       // ── Drop-shadow baking for IMG / FILL_RECT / STROKE_RECT / CIRCLE ──
-      for (const el of exportElements) {
+      for (const el of exportCombinedElements) {
         if (!el.dropShadow) continue;
         const safeName = el.name.replace(/[^a-zA-Z0-9_-]/g, '_');
         let bakeResult: { dataUrl: string; pad: number } | null = null;
@@ -2570,7 +2706,7 @@ function StudioApp() {
 
       // Inject clock hand images for TIME_POINTER elements
       // Always regenerate from current handStyle so the actual selected style is baked in.
-      const timePointerEl = exportElements.find(el => el.type === 'TIME_POINTER');
+      const timePointerEl = exportCombinedElements.find(el => el.type === 'TIME_POINTER');
       const missingPointerAssets: string[] = [];
       if (timePointerEl) {
         if (timePointerEl.handStyle?.startsWith('custom_hand:')) {
@@ -2708,7 +2844,8 @@ function StudioApp() {
           data: {
             totalElementFiles: elementFiles.length,
             missingPointerAssets,
-            exportElementCount: exportElements.length,
+            exportElementCount: exportCombinedElements.length,
+            exportAodElementCount: exportAodElements?.length ?? 0,
           },
         });
       }
@@ -2765,7 +2902,7 @@ function StudioApp() {
       console.log('[App] QR code generated');
 
       // Build source.json for safe future regeneration
-      const sourceBlob = sourceJsonToBlob(buildSourceJson(withNormalizedPointerEffects(state.watchFaceConfig)));
+      const sourceBlob = sourceJsonToBlob(buildSourceJson(withNormalizedPointerEffects(configForBuild)));
 
       // Step 2: Upload both ZPK and QR code to the same folder on GitHub
       console.log('[App] Starting folder-based upload (ZPK + QR)...');
@@ -2816,11 +2953,13 @@ function StudioApp() {
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [backendMode, state.watchFaceConfig, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
+  }, [backendMode, state.watchFaceConfig, aodElements, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
 
   // Handle reset
   const handleReset = useCallback(() => {
     dispatch(actions.reset());
+    setAodElements(null);
+    setEditorMode('MAIN');
     setWatchFaceName('');
     setUploadedWatchfaceId('');
     setShowPublishForm(false);
@@ -2833,19 +2972,9 @@ function StudioApp() {
   const handleToggleElement = useCallback(
     (id: string) => {
       if (!state.watchFaceConfig) return;
-
-      const updatedElements = state.watchFaceConfig.elements.map((el) =>
-        el.id === id ? { ...el, visible: !el.visible } : el
-      );
-
-      dispatch(
-        actions.setWatchFaceConfig({
-          ...state.watchFaceConfig,
-          elements: updatedElements,
-        })
-      );
+      toggleActiveElementVisibility(id);
     },
-    [state.watchFaceConfig, dispatch]
+    [state.watchFaceConfig, toggleActiveElementVisibility]
   );
 
   // Render different steps
@@ -3058,11 +3187,11 @@ function StudioApp() {
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_minmax(420px,1fr)] gap-6 items-start">
                   <div className="flex flex-col items-center shrink-0 xl:sticky xl:top-4 self-start">
                     <div className="flex items-center justify-between w-full max-w-sm mb-4">
-                      <h4 className="text-sm font-medium text-zinc-400">Live Editor — drag to reposition</h4>
+                      <h4 className="text-sm font-medium text-zinc-400">{editorMode} Editor — drag to reposition</h4>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => dispatch({ type: 'UNDO' })}
-                          disabled={state.undoStack.length === 0}
+                          disabled={editorMode === 'AOD' || state.undoStack.length === 0}
                           className="p-1.5 rounded-lg border transition-colors bg-white/5 border-white/10 text-white/40 disabled:opacity-30"
                           title="Undo (Ctrl+Z)"
                         >
@@ -3070,7 +3199,7 @@ function StudioApp() {
                         </button>
                         <button
                           onClick={() => dispatch({ type: 'REDO' })}
-                          disabled={state.redoStack.length === 0}
+                          disabled={editorMode === 'AOD' || state.redoStack.length === 0}
                           className="p-1.5 rounded-lg border transition-colors bg-white/5 border-white/10 text-white/40 disabled:opacity-30"
                           title="Redo (Ctrl+Y)"
                         >
@@ -3093,6 +3222,45 @@ function StudioApp() {
                           <FlaskConical className="h-4 w-4" />
                         </button>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2 w-full max-w-sm mb-3">
+                      <button
+                        onClick={() => {
+                          setEditorMode('MAIN');
+                          setSelectedElementId(null);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+                          editorMode === 'MAIN'
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                            : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                        }`}
+                        title="Edit normal watchface layout"
+                      >
+                        MAIN
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!aodElements) return;
+                          setEditorMode('AOD');
+                          setSelectedElementId(null);
+                        }}
+                        disabled={!aodElements}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                          editorMode === 'AOD'
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                            : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                        }`}
+                        title={aodElements ? 'Edit AOD layout' : 'Create AOD layout first'}
+                      >
+                        AOD
+                      </button>
+                      <button
+                        onClick={createAodFromMain}
+                        className="px-2.5 py-1.5 rounded-lg border text-xs transition-colors bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25"
+                        title="Create or replace AOD layout from current main layout"
+                      >
+                        {aodElements ? 'Re-Sync AOD from Main' : 'Create AOD from Main'}
+                      </button>
                     </div>
                     <div className="flex items-center gap-2 w-full max-w-sm mb-3">
                       <button
@@ -3132,12 +3300,12 @@ function StudioApp() {
                     <InteractiveCanvas
                       ref={canvasRef}
                       backgroundImage={state.backgroundImage}
-                      elements={state.watchFaceConfig.elements}
+                      elements={activeElements}
                       selectedElementId={selectedElementId}
                       onSelectElement={setSelectedElementId}
-                      onUpdateElement={(id, changes) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id, changes } })}
+                      onUpdateElement={updateActiveElement}
                       onAddElement={(el) => {
-                        dispatch({ type: 'ADD_ELEMENT', payload: el });
+                        addActiveElement(el);
                         setSelectedElementId(el.id);
                       }}
                       showGrid={showGrid}
@@ -3153,9 +3321,9 @@ function StudioApp() {
                     <div className="space-y-4 xl:min-h-0 xl:pr-2">
                       <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
                       <PropertyPanel
-                        element={state.watchFaceConfig.elements.find(el => el.id === selectedElementId) ?? null}
-                        onUpdateElement={(id, changes) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id, changes } })}
-                        elements={state.watchFaceConfig.elements}
+                        element={activeSelectedElement}
+                        onUpdateElement={updateActiveElement}
+                        elements={activeElements}
                         onAddFrame={handleAddFrame}
                         onRemoveFrame={handleRemoveFrame}
                         iconLibraryKey={iconLibraryKey}
@@ -3175,13 +3343,13 @@ function StudioApp() {
                         </button>
                       </div>
                       <ElementList
-                        elements={state.watchFaceConfig.elements}
+                        elements={activeElements}
                         elementWarnings={devicePreviewEnabled ? elementWarnings : {}}
                         onToggleVisibility={handleToggleElement}
                         selectedElementId={selectedElementId}
                         onSelectElement={setSelectedElementId}
                         onDeleteElement={(id) => {
-                          dispatch({ type: 'DELETE_ELEMENT', payload: id });
+                          deleteActiveElement(id);
                           if (selectedElementId === id) setSelectedElementId(null);
                         }}
                       />

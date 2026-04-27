@@ -243,20 +243,32 @@ function generateAppJsV2(config: WatchFaceConfig): string {
 
 // Generate watchface/index.js - V2 format with IMG_TIME, IMG_DATE, IMG_WEEK, and AOD mode
 function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
-  const visibleElements = config.elements.filter((el) => el.visible);
-  const zById = new Map(visibleElements.map(el => [el.id, el.zIndex]));
-  const elements = [...visibleElements].sort((a, b) => {
-    const az = a.engraveFrame
-      ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) + 0.5
-      : a.zIndex;
-    const bz = b.engraveFrame
-      ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) + 0.5
-      : b.zIndex;
-    return az - bz;
-  });
+  const sortVisible = (inputElements: WatchFaceElement[]) => {
+    const visibleElements = inputElements.filter((el) => el.visible);
+    const zById = new Map(visibleElements.map(el => [el.id, el.zIndex]));
+    return [...visibleElements].sort((a, b) => {
+      const az = a.engraveFrame
+        ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) + 0.5
+        : a.zIndex;
+      const bz = b.engraveFrame
+        ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) + 0.5
+        : b.zIndex;
+      return az - bz;
+    });
+  };
+
+  const elements = sortVisible(config.elements);
+  const aodElements = config.aodElements && config.aodElements.length > 0
+    ? sortVisible(config.aodElements)
+    : elements;
+
+  const aodSourceLabel = config.aodElements && config.aodElements.length > 0
+    ? 'dedicated AOD layout'
+    : 'main layout fallback';
   
-  console.log('[JSGenV2] Total elements in config:', config.elements.length);
-  console.log('[JSGenV2] Visible elements after filter:', elements.length);
+  console.log('[JSGenV2] Total main elements in config:', config.elements.length);
+  console.log('[JSGenV2] Visible main elements after filter:', elements.length);
+  console.log('[JSGenV2] AOD source:', aodSourceLabel, '| visible AOD elements:', aodElements.length);
   
   const backgroundSrc = 'background.png';
   
@@ -315,24 +327,36 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   let aodWidgetsCode = '';
   let aodWidgetCounter = 100;
   
-  if (hasTimeWidget) {
-    aodWidgetsCode += generateIMGTimeWidget(hoursElement, minutesElement, secondsElement, aodWidgetCounter++, 'ONLY_AOD');
+  const aodHoursElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'hours')
+    ?? aodElements.find(e => e.type === 'IMG_TIME' && !e.subtype);
+  const aodMinutesElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'minutes');
+  const aodSecondsElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'seconds');
+  const hasAodTimeWidget = !!(aodHoursElement || aodMinutesElement || aodSecondsElement);
+  const aodDateElement = aodElements.find(e => e.type === 'IMG_DATE' && e.subtype !== 'month')
+    ?? aodElements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
+  const aodMonthElement = aodElements.find(e => e.type === 'IMG_DATE' && e.subtype === 'month')
+    ?? aodElements.find(e => e.name.toLowerCase().includes('month'));
+  const aodWeekElement = aodElements.find(e => e.type === 'IMG_WEEK')
+    ?? aodElements.find(e => e.name.toLowerCase().includes('week'));
+
+  if (hasAodTimeWidget) {
+    aodWidgetsCode += generateIMGTimeWidget(aodHoursElement, aodMinutesElement, aodSecondsElement, aodWidgetCounter++, 'ONLY_AOD');
   }
   
-  if (dateElement) {
-    aodWidgetsCode += generateIMGDateWidget(dateElement, aodWidgetCounter++, 'ONLY_AOD');
+  if (aodDateElement) {
+    aodWidgetsCode += generateIMGDateWidget(aodDateElement, aodWidgetCounter++, 'ONLY_AOD');
   }
 
-  if (monthElement) {
-    aodWidgetsCode += generateIMGMonthWidget(monthElement, aodWidgetCounter++, 'ONLY_AOD');
+  if (aodMonthElement) {
+    aodWidgetsCode += generateIMGMonthWidget(aodMonthElement, aodWidgetCounter++, 'ONLY_AOD');
   }
   
-  if (weekElement) {
-    aodWidgetsCode += generateIMGWeekWidget(weekElement, aodWidgetCounter++, 'ONLY_AOD');
+  if (aodWeekElement) {
+    aodWidgetsCode += generateIMGWeekWidget(aodWeekElement, aodWidgetCounter++, 'ONLY_AOD');
   }
   
   // Add other static elements for AOD mode
-  for (const element of elements) {
+  for (const element of aodElements) {
     if (element.type === 'IMG_TIME' || element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') {
       continue;
     }
