@@ -27,6 +27,7 @@ function splitRepo(value: string): { owner: string; repo: string } {
 
 export function AdminOpsPage() {
   const { state } = useApp();
+  const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const initialRepo = useMemo(() => splitRepo(state.githubRepo || `${DEFAULT_OWNER}/${DEFAULT_REPO}`), [state.githubRepo]);
 
   const [token, setToken] = useState(state.githubToken || '');
@@ -126,6 +127,21 @@ export function AdminOpsPage() {
 
   return (
     <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
+      <div className="rounded-2xl border border-[#2f3642] bg-[#0f1318] px-5 py-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <img src={logoSrc} alt="Flowvault logo" className="h-10 w-auto" />
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-[#9ba6b8]">Flowvault</p>
+              <p className="text-sm text-[#e9edf5] font-medium">Private Operations Console</p>
+            </div>
+          </div>
+          <Link to="/studio" className="text-sm text-[#d2b37a] hover:text-[#efd5a7] underline underline-offset-4">
+            Back to studio
+          </Link>
+        </div>
+      </div>
+
       <div className="rounded-2xl border border-[#2f3642] bg-[#11151b] p-6">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>

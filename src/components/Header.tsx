@@ -24,6 +24,7 @@ import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
 
 export function Header() {
   const { state, dispatch } = useApp();
+  const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<boolean | null>(null);
   const [authUserEmail, setAuthUserEmail] = useState<string | null>(getCurrentAuthUser()?.email ?? null);
@@ -86,7 +87,7 @@ export function Header() {
       <div className="flex h-14 items-center justify-between px-4 md:px-6">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <img src="/Watch-Faces/logo.png" alt="Logo" className="h-9 w-auto" />
+          <img src={logoSrc} alt="Logo" className="h-9 w-auto" />
           <div className="flex flex-col">
             <span className="text-base font-semibold text-white leading-tight">
               Watch Face Creator

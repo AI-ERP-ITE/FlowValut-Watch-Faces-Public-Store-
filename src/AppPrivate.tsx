@@ -28,6 +28,7 @@ function PrivateRouteGuard({ children }: { children: ReactNode }) {
 
 function PrivateLoginPage() {
   const authConfigured = isFirebaseAuthConfigured();
+  const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const [hasUser, setHasUser] = useState(() => !!getCurrentAuthUser());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -57,6 +58,10 @@ function PrivateLoginPage() {
     return (
       <main className="min-h-screen grid place-items-center bg-black text-white p-6">
         <section className="w-full max-w-xl rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+          <div className="mb-4 flex items-center gap-3">
+            <img src={logoSrc} alt="Flowvault logo" className="h-10 w-auto" />
+            <span className="text-sm uppercase tracking-widest text-zinc-400">Flowvault Private</span>
+          </div>
           <h1 className="text-xl font-semibold">Private Console Locked</h1>
           <p className="mt-3 text-zinc-300">
             Firebase Auth is not configured for this build. Set VITE_FIREBASE_* vars and redeploy the private bundle.
@@ -69,6 +74,10 @@ function PrivateLoginPage() {
   return (
     <main className="min-h-screen grid place-items-center bg-black text-white p-6">
       <section className="w-full max-w-xl rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <img src={logoSrc} alt="Flowvault logo" className="h-10 w-auto" />
+          <span className="text-sm uppercase tracking-widest text-zinc-400">Flowvault Private</span>
+        </div>
         <h1 className="text-xl font-semibold">Private Console Sign In</h1>
         <p className="mt-3 text-zinc-300">Sign in with Firebase Google Auth to access Studio, Admin, and Tools.</p>
         {errorMessage ? <p className="mt-3 text-sm text-red-400">{errorMessage}</p> : null}

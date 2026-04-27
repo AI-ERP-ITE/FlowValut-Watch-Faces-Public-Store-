@@ -7,6 +7,7 @@ import { trackDownload } from '@/lib/firebaseTracking';
 export function SuccessPage() {
   const { id } = useParams<{ id: string }>();
   const { getById, baseUrl, loading, error } = useCatalog();
+  const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
   const entry = id ? getById(id) : null;
 
@@ -70,6 +71,9 @@ export function SuccessPage() {
 
         {/* Header */}
         <div className="text-center space-y-1">
+          <div className="flex justify-center mb-2">
+            <img src={logoSrc} alt="Flowvault logo" className="h-10 w-auto" />
+          </div>
           <p className="text-xs text-[#8E9196] uppercase tracking-widest font-mono">
             Flowvault
           </p>
