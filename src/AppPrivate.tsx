@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import StudioApp from './StudioApp';
 import LabPage from './LabPage';
 import { AdminOpsPage } from '@/components/storefront/AdminOpsPage';
@@ -12,6 +12,7 @@ import {
 
 function PrivateRouteGuard({ children }: { children: ReactNode }) {
   const authConfigured = isFirebaseAuthConfigured();
+  const location = useLocation();
   const [hasUser, setHasUser] = useState(() => !!getCurrentAuthUser());
 
   useEffect(() => {
@@ -20,7 +21,8 @@ function PrivateRouteGuard({ children }: { children: ReactNode }) {
   }, [authConfigured]);
 
   if (!authConfigured || !hasUser) {
-    return <Navigate to="/login" replace />;
+    const next = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
+    return <Navigate to={`/login?next=${next}`} replace />;
   }
 
   return <>{children}</>;
@@ -28,10 +30,15 @@ function PrivateRouteGuard({ children }: { children: ReactNode }) {
 
 function PrivateLoginPage() {
   const authConfigured = isFirebaseAuthConfigured();
+  const location = useLocation();
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const [hasUser, setHasUser] = useState(() => !!getCurrentAuthUser());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const nextParam = new URLSearchParams(location.search).get('next');
+  const nextPath =
+    nextParam && nextParam.startsWith('/') && !nextParam.startsWith('/login') ? nextParam : '/studio';
 
   useEffect(() => {
     if (!authConfigured) return;
@@ -39,7 +46,7 @@ function PrivateLoginPage() {
   }, [authConfigured]);
 
   if (hasUser) {
-    return <Navigate to="/studio" replace />;
+    return <Navigate to={nextPath} replace />;
   }
 
   const handleSignIn = async () => {
@@ -115,6 +122,8 @@ export default function AppPrivate() {
           </PrivateRouteGuard>
         }
       />
+      <Route path="/lab" element={<Navigate to="/studio/lab" replace />} />
+      <Route path="/labs" element={<Navigate to="/studio/lab" replace />} />
       <Route
         path="/admin"
         element={
