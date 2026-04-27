@@ -31,7 +31,6 @@ export function AdminOpsPage() {
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const initialRepo = useMemo(() => splitRepo(state.githubRepo || `${DEFAULT_OWNER}/${DEFAULT_REPO}`), [state.githubRepo]);
 
-  const [token, setToken] = useState(backendMode ? '' : (state.githubToken || ''));
   const [owner, setOwner] = useState(initialRepo.owner);
   const [repo, setRepo] = useState(initialRepo.repo);
   const [branch, setBranch] = useState('main');
@@ -42,8 +41,8 @@ export function AdminOpsPage() {
   const [savingFeatured, setSavingFeatured] = useState(false);
 
   const config = useMemo<GitHubConfig>(
-    () => ({ token: token.trim(), owner: owner.trim(), repo: repo.trim(), branch: branch.trim() || 'main' }),
-    [token, owner, repo, branch]
+    () => ({ token: '', owner: owner.trim(), repo: repo.trim(), branch: branch.trim() || 'main' }),
+    [owner, repo, branch]
   );
 
   const baseUrl = useMemo(() => {
@@ -51,19 +50,14 @@ export function AdminOpsPage() {
     return `https://${owner.trim()}.github.io/${repo.trim()}`;
   }, [owner, repo]);
 
-  const canRun = Boolean((backendMode || config.token) && config.owner && config.repo);
+  const canRun = Boolean(backendMode && config.owner && config.repo);
 
-  // Keep admin page credentials synced with Studio settings.
-  // Studio is the source of truth for saved GitHub token/repo.
+  // Keep admin page repo settings synced with Studio settings.
   useEffect(() => {
-    if (!backendMode && state.githubToken !== token) {
-      setToken(state.githubToken);
-    }
-
     const nextRepo = splitRepo(state.githubRepo || `${DEFAULT_OWNER}/${DEFAULT_REPO}`);
     if (nextRepo.owner !== owner) setOwner(nextRepo.owner);
     if (nextRepo.repo !== repo) setRepo(nextRepo.repo);
-  }, [backendMode, owner, repo, state.githubRepo, state.githubToken, token]);
+  }, [owner, repo, state.githubRepo]);
 
   async function loadCatalogData() {
     if (!canRun) return;
@@ -87,7 +81,7 @@ export function AdminOpsPage() {
 
   async function handleSaveFeaturedFace() {
     if (!canRun) {
-      toast.error('Set token, owner, and repo first.');
+      toast.error('Configure backend bridge URL, owner, and repo first.');
       return;
     }
 
@@ -106,7 +100,7 @@ export function AdminOpsPage() {
 
   async function handleRunSpecGroupPatch() {
     if (!canRun) {
-      toast.error('Set token, owner, and repo first.');
+      toast.error('Configure backend bridge URL, owner, and repo first.');
       return;
     }
 
@@ -157,26 +151,14 @@ export function AdminOpsPage() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {!backendMode && (
-            <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider text-[#8b95a6]">GitHub Token</label>
-              <input
-                type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="ghp_..."
-                className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
-              />
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs uppercase tracking-wider text-[#8b95a6]">GitHub Token</label>
+            <div className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#8f9aac]">
+              {backendMode
+                ? 'Managed by backend bridge (hidden in browser)'
+                : 'Backend bridge URL is missing for this private build. Token entry is disabled.'}
             </div>
-          )}
-          {backendMode && (
-            <div className="space-y-1">
-              <label className="text-xs uppercase tracking-wider text-[#8b95a6]">GitHub Token</label>
-              <div className="w-full rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#8f9aac]">
-                Managed by backend bridge (hidden in browser)
-              </div>
-            </div>
-          )}
+          </div>
           <div className="space-y-1">
             <label className="text-xs uppercase tracking-wider text-[#8b95a6]">Branch</label>
             <input
