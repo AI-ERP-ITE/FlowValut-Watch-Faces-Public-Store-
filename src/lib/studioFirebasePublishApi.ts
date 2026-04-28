@@ -177,3 +177,19 @@ export async function patchCatalogSpecGroupsInFirebase(input: {
     body: JSON.stringify(input),
   });
 }
+
+export async function fetchAdminCatalogFromFirebase(): Promise<CatalogEntry[]> {
+  return adminFetch<{ entries?: CatalogEntry[] }>('adminCatalogList', {
+    method: 'GET',
+  }).then((payload) => (Array.isArray(payload.entries) ? payload.entries : []));
+}
+
+export async function setCatalogStatusInFirebase(input: {
+  watchfaceId: string;
+  status: 'ENABLED' | 'OFFLINE';
+}): Promise<{ ok: boolean; watchfaceId: string; status: 'ENABLED' | 'OFFLINE'; published: boolean }> {
+  return adminFetch<{ ok: boolean; watchfaceId: string; status: 'ENABLED' | 'OFFLINE'; published: boolean }>('adminCatalogStatus', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}

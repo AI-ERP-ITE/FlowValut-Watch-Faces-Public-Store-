@@ -174,6 +174,12 @@ export interface WatchFaceElement {
   };
 }
 
+export interface BackgroundTransform {
+  angle: number;
+  flipH: boolean;
+  flipV: boolean;
+}
+
 export interface WatchFaceConfig {
   name: string;
   resolution: {
@@ -184,6 +190,8 @@ export interface WatchFaceConfig {
     src: string;
     format: 'TGA-P' | 'TGA-RLP' | 'TGA-16' | 'TGA-32';
   };
+  /** Main background transform used by preview/adjust flows. */
+  backgroundTransform?: BackgroundTransform | null;
   elements: WatchFaceElement[];
   /** Optional AOD-specific editor/export layout, independent from main elements. */
   aodElements?: WatchFaceElement[] | null;
@@ -193,6 +201,8 @@ export interface WatchFaceConfig {
   aodBackgroundSrc?: string | null;
   /** Hex color used when AOD background mode is solid color. */
   aodSolidColor?: string | null;
+  /** Optional AOD background transform state. */
+  aodBackgroundTransform?: BackgroundTransform | null;
   watchModel: string;
 }
 

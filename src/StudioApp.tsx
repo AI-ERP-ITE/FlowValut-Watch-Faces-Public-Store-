@@ -32,7 +32,7 @@ import { buildSourceJson } from '@/lib/sourceJsonGenerator';
 import { PublishForm } from '@/components/PublishForm';
 import { AdminPanel } from '@/components/AdminPanel';
 import type { CatalogEntry, SpecGroup } from '@/context/CatalogContext';
-import type { WatchFaceConfig, WatchFaceElement, ElementImage } from '@/types';
+import type { BackgroundTransform, WatchFaceConfig, WatchFaceElement, ElementImage } from '@/types';
 import { generateId } from '@/lib/utils';
 import { parseDom } from '@/html/parseDom';
 import { mapDomToElements } from '@/html/mapDomToElements';
@@ -55,7 +55,7 @@ import { createParityCaptureSession, isInvestigationModeEnabled } from '@/lib/pa
 import { normalizePointerEffects } from '@/lib/pointerEffects';
 import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
-import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
+import { normalizeDropShadowForBake, pointerEffectPaddingFromIntensity, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
   createDefaultGaugePointerDataUrl,
@@ -95,6 +95,24 @@ function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig 
     ...config,
     elements: normalizeSet(config.elements),
     aodElements: config.aodElements ? normalizeSet(config.aodElements) : config.aodElements,
+    backgroundTransform: normalizeBackgroundTransform(config.backgroundTransform),
+    aodBackgroundTransform: normalizeBackgroundTransform(config.aodBackgroundTransform),
+  };
+}
+
+const DEFAULT_BACKGROUND_TRANSFORM: BackgroundTransform = {
+  angle: 0,
+  flipH: false,
+  flipV: false,
+};
+
+function normalizeBackgroundTransform(input?: BackgroundTransform | null): BackgroundTransform {
+  const angleRaw = Number(input?.angle ?? 0);
+  const clampedAngle = Number.isFinite(angleRaw) ? Math.max(-360, Math.min(360, angleRaw)) : 0;
+  return {
+    angle: clampedAngle,
+    flipH: !!input?.flipH,
+    flipV: !!input?.flipV,
   };
 }
 
@@ -1041,9 +1059,11 @@ async function mockKimiAnalysis(
       format: 'TGA-P',
     },
     elements,
+    backgroundTransform: { ...DEFAULT_BACKGROUND_TRANSFORM },
     aodBackgroundMode: 'USE_MAIN_BACKGROUND',
     aodBackgroundSrc: null,
     aodSolidColor: '#000000',
+    aodBackgroundTransform: { ...DEFAULT_BACKGROUND_TRANSFORM },
     watchModel,
   };
 
@@ -1088,6 +1108,7 @@ async function applyPointerEffectsForZPK(
 ): Promise<string> {
   const effects = normalizePointerEffects(el);
   const shadowIntensity = Math.max(0, Math.min(1, el.handShadow ?? 0));
+  const pointerShadow = pointerShadowToDropShadow(shadowIntensity);
   const glowIntensity = Math.max(0, Math.min(1, el.handGlow ?? 0));
   const trailIntensity = Math.max(0, Math.min(1, el.handTrail ?? 0));
   const tintColor = el.handTint?.trim();
@@ -1136,11 +1157,12 @@ async function applyPointerEffectsForZPK(
   }
 
   ctx.save();
-  if (shadowIntensity > 0) {
-    ctx.shadowColor = `rgba(0,0,0,${0.3 + shadowIntensity * 0.6})`;
-    ctx.shadowBlur = 4 + shadowIntensity * 20;
-    ctx.shadowOffsetX = shadowIntensity * 4;
-    ctx.shadowOffsetY = shadowIntensity * 4;
+  if (pointerShadow) {
+    const { r, g, b } = hexToRgb(pointerShadow.color);
+    ctx.shadowColor = `rgba(${r},${g},${b},${pointerShadow.opacity})`;
+    ctx.shadowBlur = pointerShadow.blur;
+    ctx.shadowOffsetX = pointerShadow.offsetX;
+    ctx.shadowOffsetY = pointerShadow.offsetY;
   }
   ctx.globalAlpha = 1;
   ctx.drawImage(adjustedBase, 0, 0, width, height);
@@ -1303,11 +1325,9 @@ async function preparePointerGeometryForExport(
   const finalPivotY = layer === 'cover' ? POINTER_BASE_METRICS.cover.pivotY : drawPivotY;
 
   // Reserve safe margins so baked pointer shadows/glow are not clipped at export time.
-  const shadowPad = Math.ceil((Math.max(0, el.handShadow ?? 0) * 20) + (Math.max(0, el.handShadow ?? 0) * 4) + 6);
-  const glowPad = Math.ceil((Math.max(0, el.handGlow ?? 0) * 20) + 12);
-  const trailPad = Math.ceil(Math.max(0, el.handTrail ?? 0) * 6);
+  const effectPadRaw = pointerEffectPaddingFromIntensity(el.handShadow ?? 0, el.handGlow ?? 0, el.handTrail ?? 0);
   // Keep hub (cover) placement contract stable at centerX-15/centerY-15 in generators.
-  const effectPad = layer === 'cover' ? 0 : Math.max(0, shadowPad, glowPad, trailPad);
+  const effectPad = layer === 'cover' ? 0 : effectPadRaw;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -1568,6 +1588,7 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
 type EditorMode = 'MAIN' | 'AOD';
 type AodBackgroundMode = 'USE_MAIN_BACKGROUND' | 'UPLOAD_AOD_BACKGROUND' | 'SOLID_COLOR' | 'NONE_BLACK';
 type CropTarget = 'MAIN' | 'AOD';
+type PhotoEditorTarget = 'MAIN' | 'AOD';
 
 function buildSolidBackgroundDataUrl(size: number, color: string): string {
   const canvas = document.createElement('canvas');
@@ -1590,6 +1611,8 @@ function StudioApp() {
   const [aodBackgroundImage, setAodBackgroundImage] = useState<string | null>(null);
   const [aodBackgroundFile, setAodBackgroundFile] = useState<File | null>(null);
   const [aodSolidColor, setAodSolidColor] = useState('#000000');
+  const [mainBackgroundTransform, setMainBackgroundTransform] = useState<BackgroundTransform>({ ...DEFAULT_BACKGROUND_TRANSFORM });
+  const [aodBackgroundTransform, setAodBackgroundTransform] = useState<BackgroundTransform>({ ...DEFAULT_BACKGROUND_TRANSFORM });
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [devicePreviewEnabled, setDevicePreviewEnabled] = useState(false);
@@ -1619,6 +1642,10 @@ function StudioApp() {
     if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
     return state.backgroundImage;
   }, [editorMode, aodElements, state.backgroundImage, aodBackgroundMode, aodSolidBackgroundImage, aodBackgroundImage]);
+  const activeBackgroundTransform = useMemo(
+    () => (editorMode === 'AOD' && aodElements ? aodBackgroundTransform : mainBackgroundTransform),
+    [aodBackgroundTransform, aodElements, editorMode, mainBackgroundTransform],
+  );
   const activeSelectedElement = useMemo(
     () => activeElements.find((el) => el.id === selectedElementId) ?? null,
     [activeElements, selectedElementId]
@@ -1638,6 +1665,42 @@ function StudioApp() {
     }
     setAodElements(nextElements);
   }, [aodElements, dispatch, editorMode, state.watchFaceConfig]);
+
+  const updateMainBackgroundTransform = useCallback((patch: Partial<BackgroundTransform>) => {
+    setMainBackgroundTransform((prev) => {
+      const next = normalizeBackgroundTransform({ ...prev, ...patch });
+      if (state.watchFaceConfig) {
+        dispatch(actions.setWatchFaceConfig({
+          ...state.watchFaceConfig,
+          backgroundTransform: next,
+          aodBackgroundTransform,
+        }));
+      }
+      return next;
+    });
+  }, [aodBackgroundTransform, dispatch, state.watchFaceConfig]);
+
+  const updateAodBackgroundTransform = useCallback((patch: Partial<BackgroundTransform>) => {
+    setAodBackgroundTransform((prev) => {
+      const next = normalizeBackgroundTransform({ ...prev, ...patch });
+      if (state.watchFaceConfig) {
+        dispatch(actions.setWatchFaceConfig({
+          ...state.watchFaceConfig,
+          backgroundTransform: mainBackgroundTransform,
+          aodBackgroundTransform: next,
+        }));
+      }
+      return next;
+    });
+  }, [dispatch, mainBackgroundTransform, state.watchFaceConfig]);
+
+  const updateActiveBackgroundTransform = useCallback((patch: Partial<BackgroundTransform>) => {
+    if (editorMode === 'AOD' && aodElements) {
+      updateAodBackgroundTransform(patch);
+      return;
+    }
+    updateMainBackgroundTransform(patch);
+  }, [aodElements, editorMode, updateAodBackgroundTransform, updateMainBackgroundTransform]);
 
   const updateActiveElement = useCallback((id: string, changes: Partial<WatchFaceElement>) => {
     if (!state.watchFaceConfig) return;
@@ -1701,10 +1764,11 @@ function StudioApp() {
   const createAodFromMain = useCallback(() => {
     if (!state.watchFaceConfig) return;
     setAodElements(structuredClone(state.watchFaceConfig.elements));
+    setAodBackgroundTransform(mainBackgroundTransform);
     setEditorMode('AOD');
     setSelectedElementId(null);
     toast.success('AOD layout synced from main and unlocked for independent editing');
-  }, [state.watchFaceConfig]);
+  }, [mainBackgroundTransform, state.watchFaceConfig]);
 
   const addAllowedDataTypes = useMemo(
     () => getAllowedDataTypesForElement(addElType, addElSubtype),
@@ -1859,6 +1923,8 @@ function StudioApp() {
       setAodBackgroundImage(null);
       setAodBackgroundFile(null);
       setAodSolidColor('#000000');
+      setMainBackgroundTransform({ ...DEFAULT_BACKGROUND_TRANSFORM });
+      setAodBackgroundTransform({ ...DEFAULT_BACKGROUND_TRANSFORM });
       setEditorMode('MAIN');
       setSelectedElementId(null);
       return;
@@ -1866,6 +1932,8 @@ function StudioApp() {
     setAodElements(state.watchFaceConfig.aodElements ? structuredClone(state.watchFaceConfig.aodElements) : null);
     setAodBackgroundMode((state.watchFaceConfig.aodBackgroundMode as AodBackgroundMode) ?? 'USE_MAIN_BACKGROUND');
     setAodSolidColor(state.watchFaceConfig.aodSolidColor ?? '#000000');
+    setMainBackgroundTransform(normalizeBackgroundTransform(state.watchFaceConfig.backgroundTransform));
+    setAodBackgroundTransform(normalizeBackgroundTransform(state.watchFaceConfig.aodBackgroundTransform));
     setAodBackgroundImage(null);
     setAodBackgroundFile(null);
     setEditorMode('MAIN');
@@ -2136,12 +2204,29 @@ function StudioApp() {
   // Spec 023 — Background photo editor
   // T037: showPhotoEditor flag controls modal visibility
   const [showPhotoEditor, setShowPhotoEditor] = useState(false);
+  const [photoEditorTarget, setPhotoEditorTarget] = useState<PhotoEditorTarget>('MAIN');
+  const photoEditorSource = useMemo(() => {
+    if (photoEditorTarget === 'MAIN') return state.backgroundImage;
+    if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
+    if (aodBackgroundMode === 'SOLID_COLOR') return aodSolidBackgroundImage;
+    if (aodBackgroundMode === 'NONE_BLACK') return buildSolidBackgroundDataUrl(activeResolution, '#000000');
+    return state.backgroundImage;
+  }, [activeResolution, aodBackgroundImage, aodBackgroundMode, aodSolidBackgroundImage, photoEditorTarget, state.backgroundImage]);
 
   // T042: on Save → dispatch edited image to state (also rebuild backgroundFile)
   const handlePhotoEditorSave = (dataUrl: string) => {
-    dispatch(actions.setBackgroundImage(dataUrl));
-    const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, 'Photo editor save');
-    dispatch(actions.setBackgroundFile(new File([bytes], 'background.png', { type: mimeType })));
+    const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, photoEditorTarget === 'AOD' ? 'AOD photo editor save' : 'Photo editor save');
+    if (photoEditorTarget === 'AOD') {
+      const editedAodFile = new File([bytes], 'aod_background.png', { type: mimeType });
+      setAodBackgroundImage(dataUrl);
+      setAodBackgroundFile(editedAodFile);
+      if (aodBackgroundMode === 'SOLID_COLOR' || aodBackgroundMode === 'NONE_BLACK') {
+        setAodBackgroundMode('UPLOAD_AOD_BACKGROUND');
+      }
+    } else {
+      dispatch(actions.setBackgroundImage(dataUrl));
+      dispatch(actions.setBackgroundFile(new File([bytes], 'background.png', { type: mimeType })));
+    }
     setShowPhotoEditor(false);
   };
 
@@ -2678,12 +2763,14 @@ function StudioApp() {
       const configForBuild: WatchFaceConfig = {
         ...state.watchFaceConfig,
         elements: exportElements,
+        backgroundTransform: mainBackgroundTransform,
         aodElements: exportAodElements,
         aodBackgroundMode: effectiveAodBackgroundMode,
         aodBackgroundSrc: effectiveAodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' || effectiveAodBackgroundMode === 'SOLID_COLOR'
           ? 'aod_background.png'
           : null,
         aodSolidColor: effectiveAodBackgroundMode === 'SOLID_COLOR' ? aodSolidColor : null,
+        aodBackgroundTransform,
       };
 
       // Inject engrave/emboss frame PNGs for FILL_RECT elements with engraveFrame
@@ -3176,7 +3263,10 @@ function StudioApp() {
             {/* T038/T039: Edit Photo button — visible only when a background image is loaded */}
             {state.backgroundImage && (
               <button
-                onClick={() => setShowPhotoEditor(true)}
+                onClick={() => {
+                  setPhotoEditorTarget('MAIN');
+                  setShowPhotoEditor(true);
+                }}
                 className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md border border-zinc-600 text-zinc-300 hover:text-white hover:border-cyan-500 hover:bg-zinc-800 text-xs font-medium transition-colors"
               >
                 ✏ Edit Photo
@@ -3397,11 +3487,71 @@ function StudioApp() {
                             />
                           </div>
                         )}
+                        <button
+                          onClick={() => {
+                            setPhotoEditorTarget('AOD');
+                            setShowPhotoEditor(true);
+                          }}
+                          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25 text-xs font-medium transition-colors"
+                        >
+                          ✏ Edit AOD Photo
+                        </button>
                       </div>
                     )}
+                    <div className="w-full max-w-sm mb-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-2">
+                      <p className="text-xs text-cyan-200 font-medium">
+                        {editorMode === 'AOD' && aodElements ? 'AOD Background Transform' : 'Main Background Transform'}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="range"
+                          min={-360}
+                          max={360}
+                          step={1}
+                          value={Math.round(activeBackgroundTransform.angle)}
+                          onChange={(e) => updateActiveBackgroundTransform({ angle: Number(e.target.value) })}
+                        />
+                        <Input
+                          type="number"
+                          value={Math.round(activeBackgroundTransform.angle)}
+                          onChange={(e) => updateActiveBackgroundTransform({ angle: Number(e.target.value) || 0 })}
+                          className="h-8 w-20 text-xs"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[90, 180, 270].map((deg) => (
+                          <button
+                            key={deg}
+                            onClick={() => updateActiveBackgroundTransform({ angle: deg })}
+                            className="px-2 py-1 rounded border border-zinc-700 bg-zinc-900 text-[11px] text-zinc-300 hover:border-zinc-500"
+                          >
+                            {deg}deg
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => updateActiveBackgroundTransform({ flipH: !activeBackgroundTransform.flipH })}
+                          className={`px-2 py-1 rounded border text-[11px] ${activeBackgroundTransform.flipH ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500'}`}
+                        >
+                          Flip H
+                        </button>
+                        <button
+                          onClick={() => updateActiveBackgroundTransform({ flipV: !activeBackgroundTransform.flipV })}
+                          className={`px-2 py-1 rounded border text-[11px] ${activeBackgroundTransform.flipV ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500'}`}
+                        >
+                          Flip V
+                        </button>
+                        <button
+                          onClick={() => updateActiveBackgroundTransform({ ...DEFAULT_BACKGROUND_TRANSFORM })}
+                          className="px-2 py-1 rounded border border-zinc-700 bg-zinc-900 text-[11px] text-zinc-300 hover:border-zinc-500"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
                     <InteractiveCanvas
                       ref={canvasRef}
                       backgroundImage={activeBackgroundImage ?? undefined}
+                      backgroundTransform={activeBackgroundTransform}
                       elements={activeElements}
                       selectedElementId={selectedElementId}
                       onSelectElement={setSelectedElementId}
@@ -3833,9 +3983,9 @@ function StudioApp() {
       />
 
       {/* Spec 023 — Background photo editor modal (T040–T043) */}
-      {showPhotoEditor && state.backgroundImage && (
+      {showPhotoEditor && photoEditorSource && (
         <BackgroundPhotoEditor
-          sourceDataUrl={state.backgroundImage}
+          sourceDataUrl={photoEditorSource}
           onSave={handlePhotoEditorSave}
           onCancel={handlePhotoEditorClose}
         />

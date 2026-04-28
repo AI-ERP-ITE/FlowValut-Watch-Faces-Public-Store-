@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
-import type { WatchFaceElement } from '@/types';
+import type { BackgroundTransform, WatchFaceElement } from '@/types';
 import { getIconByKey } from '@/lib/iconLibrary';
 import { getFontStyle } from '@/lib/fontLibrary';
 import { generateWeatherSet } from '@/lib/weatherIconSets';
@@ -11,7 +11,7 @@ import { resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandSt
 import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/pointerEffects';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
-import { normalizeDropShadowForBake } from '@/lib/effectNormalization';
+import { normalizeDropShadowForBake, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import { analyzeFlicker, isFlickerForbiddenRgb } from '@/utils/flickerEngine';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
@@ -30,6 +30,7 @@ const MOCK_SECOND = 30;
 
 export interface InteractiveCanvasProps {
   backgroundImage?: string;
+  backgroundTransform?: BackgroundTransform;
   elements: WatchFaceElement[];
   selectedElementId?: string | null;
   onSelectElement?: (id: string | null) => void;
@@ -56,6 +57,7 @@ export type ElementWarningsMap = Record<string, ElementWarningInfo>;
 
 export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvasProps>(function InteractiveCanvas({
   backgroundImage,
+  backgroundTransform,
   elements,
   selectedElementId,
   onSelectElement,
@@ -119,7 +121,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
     // Background
     if (bgImageRef.current) {
-      drawBackground(ctx, bgImageRef.current);
+      drawBackground(ctx, bgImageRef.current, backgroundTransform);
     } else {
       drawBlackCircle(ctx);
     }
@@ -181,7 +183,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const sel = elements.find((el) => el.id === selectedElementId);
       if (sel) drawSelection(ctx, sel);
     }
-  }, [devicePreviewEnabled, elements, onElementWarningsChange, refreshToken, selectedElementId, showFlickerZones]);
+  }, [backgroundTransform, devicePreviewEnabled, elements, onElementWarningsChange, refreshToken, selectedElementId, showFlickerZones]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Suppress click after a drag
@@ -730,12 +732,19 @@ function drawBlackCircle(ctx: CanvasRenderingContext2D) {
   ctx.restore();
 }
 
-function drawBackground(ctx: CanvasRenderingContext2D, img: HTMLImageElement) {
+function drawBackground(ctx: CanvasRenderingContext2D, img: HTMLImageElement, transform?: BackgroundTransform) {
+  const angle = transform?.angle ?? 0;
+  const flipH = !!transform?.flipH;
+  const flipV = !!transform?.flipV;
+
   ctx.save();
   ctx.beginPath();
   ctx.arc(CX, CY, CX, 0, Math.PI * 2);
   ctx.clip();
-  ctx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+  ctx.translate(CX, CY);
+  ctx.rotate((angle * Math.PI) / 180);
+  ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+  ctx.drawImage(img, -CX, -CY, CANVAS_SIZE, CANVAS_SIZE);
   ctx.restore();
 }
 
@@ -1126,7 +1135,18 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         // Render selected icon if set, otherwise draw status-type-aware placeholder
         ctx.save();
         applyShadow(ctx, el);
-        if (el.iconKey && iconCache) {
+        if (el.src && iconCache) {
+          const cacheKey = `src:${el.id}:${el.src}`;
+          const cached = iconCache.get(cacheKey);
+          if (cached) {
+            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+          } else {
+            const img = new Image();
+            img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
+            img.src = el.src;
+            drawPlaceholder(ctx, el);
+          }
+        } else if (el.iconKey && iconCache) {
           const cached = iconCache.get(el.iconKey);
           if (cached) {
             drawImageWithDeterministicIconEffects(ctx, cached, el);
@@ -1224,7 +1244,19 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'IMG':
         ctx.save();
         applyShadow(ctx, el);
-        if (el.iconKey && iconCache) {          const cached = iconCache.get(el.iconKey);
+        if (el.src && iconCache) {
+          const cacheKey = `src:${el.id}:${el.src}`;
+          const cached = iconCache.get(cacheKey);
+          if (cached) {
+            drawImageWithDeterministicIconEffects(ctx, cached, el);
+          } else {
+            const img = new Image();
+            img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
+            img.src = el.src;
+            drawPlaceholder(ctx, el);
+          }
+        } else if (el.iconKey && iconCache) {
+          const cached = iconCache.get(el.iconKey);
           if (cached) {
             drawImageWithDeterministicIconEffects(ctx, cached, el);
           } else {
@@ -1538,6 +1570,7 @@ function drawTimePointer(
 
   // ── Effects ──────────────────────────────────────────────────────────────
   const shadowIntensity = el.handShadow ?? 0;
+  const pointerShadow = pointerShadowToDropShadow(shadowIntensity);
   const glowIntensity   = el.handGlow   ?? 0;
   const trailIntensity  = el.handTrail  ?? 0;
   const tintColor       = el.handTint;  // e.g. '#4488FF' or undefined
@@ -1620,11 +1653,12 @@ function drawTimePointer(
       if (def.key !== 'cover') ctx.rotate(angle);
 
       // ── Shadow ────────────────────────────────────────────────
-      if (shadowIntensity > 0) {
-        ctx.shadowColor = `rgba(0,0,0,${0.3 + shadowIntensity * 0.6})`;
-        ctx.shadowBlur = 4 + shadowIntensity * 20;
-        ctx.shadowOffsetX = shadowIntensity * 4;
-        ctx.shadowOffsetY = shadowIntensity * 4;
+      if (pointerShadow) {
+        const { r, g, b } = hexToRgb(pointerShadow.color);
+        ctx.shadowColor = `rgba(${r},${g},${b},${pointerShadow.opacity})`;
+        ctx.shadowBlur = pointerShadow.blur;
+        ctx.shadowOffsetX = pointerShadow.offsetX;
+        ctx.shadowOffsetY = pointerShadow.offsetY;
       }
 
       ctx.globalAlpha = 1;

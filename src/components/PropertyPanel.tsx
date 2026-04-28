@@ -147,6 +147,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
   const [activeTab, setActiveTab] = useState<PanelTab>('position');
   const [gaugeMarkup, setGaugeMarkup] = useState('');
   const [switcherMarkup, setSwitcherMarkup] = useState('');
+  const [iconMarkup, setIconMarkup] = useState('');
   const [creatorStatus, setCreatorStatus] = useState('');
   const tablerLoadedRef = useRef(false);
 
@@ -239,6 +240,33 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     setCreatorStatus(`Parsed ${renderedFrames.length} frame(s) via ${extracted.strategy}.${warningSuffix}`);
   };
 
+  const buildIconFromMarkup = async () => {
+    if (!element || (element.type !== 'IMG' && element.type !== 'IMG_STATUS')) return;
+
+    const extracted = extractFramesFromMarkup(iconMarkup);
+    if (extracted.frames.length === 0) {
+      setCreatorStatus('No icon frame detected in markup input.');
+      return;
+    }
+
+    const frame = extracted.frames[0];
+    const dataUrl = frame.trim().startsWith('<svg')
+      ? await renderSvgToDataUrl(frame, 256)
+      : await renderHtmlToDataUrl(frame, 256);
+
+    if (!dataUrl) {
+      setCreatorStatus('Icon markup render failed. Ensure valid SVG/HTML with SVG node.');
+      return;
+    }
+
+    update({
+      src: dataUrl,
+      iconKey: undefined,
+      assetFilename: element.type === 'IMG_STATUS' ? `status_custom_${element.id}.png` : `img_custom_${element.id}.png`,
+    });
+    setCreatorStatus(`Custom icon built from markup (${extracted.strategy}).`);
+  };
+
   useEffect(() => {
     if (!element) return;
     if (allowedDataTypes.length === 0) return;
@@ -257,6 +285,10 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
 
   useEffect(() => {
     if (!element) return;
+    if (element.engraveFrame) {
+      setActiveTab('effects');
+      return;
+    }
     if (element.type === 'TIME_POINTER' || element.type === 'IMG' || element.type === 'IMG_STATUS') {
       setActiveTab('style');
       return;
@@ -272,6 +304,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     setCreatorStatus('');
     setGaugeMarkup('');
     setSwitcherMarkup('');
+    setIconMarkup('');
   }, [element?.id, element?.type]);
 
   if (!element) {
@@ -310,7 +343,27 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     };
 
     return (
+      <PanelTabContext.Provider value={activeTab}>
       <div className={`rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-4 ${className ?? ''}`}>
+        <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-white/10 bg-black/20 p-1">
+          {([
+            { key: 'effects', label: 'Effects' },
+            { key: 'layer', label: 'Layer' },
+          ] as { key: PanelTab; label: string }[]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                'h-7 rounded-md border text-[11px] font-medium transition-colors',
+                activeTab === tab.key
+                  ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">⬚ Frame Effect</span>
@@ -477,6 +530,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           </div>
         </Section>
       </div>
+      </PanelTabContext.Provider>
     );
   }
 
@@ -963,6 +1017,11 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               Paste one HTML/SVG source. Parser auto-splits frames from multiple <code>&lt;svg&gt;</code> tags or frame markers
               (<code>data-frame-index</code>, <code>data-index</code>, <code>id=frame-*</code>, <code>id=imglvl-*</code>).
             </p>
+            {(element.dataType === 'WEATHER_CURRENT' || element.dataType === 'WEATHER_STATUS') && (
+              <p className="text-[10px] text-cyan-300/80">
+                Weather mode detected: parsed frames are used as your custom weather icon/status set.
+              </p>
+            )}
             <textarea
               value={switcherMarkup}
               onChange={(e) => setSwitcherMarkup(e.target.value)}
@@ -1440,6 +1499,23 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 ? `${allIcons.length} icons — violet dot = Tabler`
                 : 'Loading Tabler icons…'}
             </p>
+
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <p className="text-[10px] text-cyan-300/80 uppercase tracking-wider">SVG/HTML Icon Creator</p>
+              <textarea
+                value={iconMarkup}
+                onChange={(e) => setIconMarkup(e.target.value)}
+                placeholder="Paste SVG/HTML for this icon. First detected frame is used."
+                className="w-full h-20 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
+                spellCheck={false}
+              />
+              <button
+                onClick={() => { void buildIconFromMarkup(); }}
+                className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+              >
+                Build Icon From Markup
+              </button>
+            </div>
           </div>
         </Section>
       )}

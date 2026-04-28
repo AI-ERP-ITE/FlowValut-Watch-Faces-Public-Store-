@@ -18,6 +18,9 @@ export interface CatalogEntry {
   zpkPath: string;
   previewPath: string;
   qrPath: string;
+  sourcePath?: string;
+  published?: boolean;
+  storeStatus?: 'ENABLED' | 'OFFLINE';
 }
 
 export interface ModelEntry {

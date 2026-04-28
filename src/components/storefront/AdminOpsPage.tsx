@@ -4,13 +4,16 @@ import { Wrench, Database, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPanel } from '@/components/AdminPanel';
 import {
+  fetchAdminCatalogFromFirebase,
   fetchCatalogFromFirebase,
   fetchStorefrontConfigFromFirebase,
   patchCatalogSpecGroupsInFirebase,
+  setCatalogStatusInFirebase,
   writeStorefrontConfigToFirebase,
 } from '@/lib/studioFirebasePublishApi';
 import { Button } from '@/components/ui/button';
 import { isFirebaseAuthConfigured } from '@/lib/firebaseAuthClient';
+import type { CatalogEntry } from '@/context/CatalogContext';
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -21,6 +24,10 @@ export function AdminOpsPage() {
   const [catalogOptions, setCatalogOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [featuredFaceId, setFeaturedFaceId] = useState<string>('');
   const [savingFeatured, setSavingFeatured] = useState(false);
+  const [adminCatalog, setAdminCatalog] = useState<CatalogEntry[]>([]);
+  const [loadingAdminCatalog, setLoadingAdminCatalog] = useState(false);
+  const [updatingCatalogId, setUpdatingCatalogId] = useState<string | null>(null);
+  const [catalogFilter, setCatalogFilter] = useState<'ALL' | 'ENABLED' | 'OFFLINE'>('ALL');
 
   const canRun = Boolean(backendMode);
 
@@ -89,6 +96,48 @@ export function AdminOpsPage() {
       setSavingFeatured(false);
     }
   }
+
+  async function loadAdminCatalog() {
+    if (!canRun) return;
+
+    setLoadingAdminCatalog(true);
+    try {
+      const entries = await fetchAdminCatalogFromFirebase();
+      setAdminCatalog(entries);
+      toast.success('Admin catalog loaded.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load admin catalog');
+    } finally {
+      setLoadingAdminCatalog(false);
+    }
+  }
+
+  async function setCatalogStatus(watchfaceId: string, status: 'ENABLED' | 'OFFLINE') {
+    if (!canRun) return;
+
+    setUpdatingCatalogId(watchfaceId);
+    try {
+      await setCatalogStatusInFirebase({ watchfaceId, status });
+      setAdminCatalog((prev) =>
+        prev.map((entry) =>
+          entry.id === watchfaceId
+            ? { ...entry, storeStatus: status, published: status === 'ENABLED' }
+            : entry
+        )
+      );
+      toast.success(`${watchfaceId} set to ${status}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update catalog status');
+    } finally {
+      setUpdatingCatalogId(null);
+    }
+  }
+
+  const filteredAdminCatalog = adminCatalog.filter((entry) => {
+    const status = entry.storeStatus ?? (entry.published === false ? 'OFFLINE' : 'ENABLED');
+    if (catalogFilter === 'ALL') return true;
+    return status === catalogFilter;
+  });
 
   return (
     <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
@@ -185,6 +234,87 @@ export function AdminOpsPage() {
             <Wrench className={`h-4 w-4 mr-2 ${patching ? 'animate-spin' : ''}`} />
             {patching ? 'Running SpecGroup Patch...' : 'Run SpecGroup Patch'}
           </Button>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">
+          <div className="flex items-center gap-2 text-[#dce3ee] text-sm font-medium">
+            <Database className="h-4 w-4 text-[#d2b37a]" />
+            Catalog Lifecycle (Soft Delete)
+          </div>
+          <p className="text-xs text-[#8f9aac]">
+            Set watchfaces offline to remove from store without deleting database/storage records. Restore anytime by enabling again.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={loadAdminCatalog}
+              disabled={!canRun || loadingAdminCatalog}
+              variant="outline"
+              className="h-10 border-[#3b4d68] text-[#ecf2ff] hover:bg-[#263448]"
+            >
+              {loadingAdminCatalog ? 'Loading Admin Catalog...' : 'Load Full Catalog'}
+            </Button>
+
+            <select
+              value={catalogFilter}
+              onChange={(e) => setCatalogFilter(e.target.value as 'ALL' | 'ENABLED' | 'OFFLINE')}
+              className="rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
+            >
+              <option value="ALL">All statuses</option>
+              <option value="ENABLED">Enabled only</option>
+              <option value="OFFLINE">Offline only</option>
+            </select>
+          </div>
+
+          {filteredAdminCatalog.length > 0 && (
+            <div className="max-h-72 overflow-auto rounded-lg border border-[#2c3340]">
+              <table className="w-full text-xs">
+                <thead className="bg-[#161d27] text-[#9ba6b8]">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">ID</th>
+                    <th className="px-3 py-2 text-left font-medium">Name</th>
+                    <th className="px-3 py-2 text-left font-medium">Status</th>
+                    <th className="px-3 py-2 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAdminCatalog.map((entry) => {
+                    const status = entry.storeStatus ?? (entry.published === false ? 'OFFLINE' : 'ENABLED');
+                    const rowBusy = updatingCatalogId === entry.id;
+                    return (
+                      <tr key={entry.id} className="border-t border-[#202632] text-[#e9edf5]">
+                        <td className="px-3 py-2 font-mono">{entry.id}</td>
+                        <td className="px-3 py-2">{entry.name}</td>
+                        <td className="px-3 py-2">
+                          <span className={`rounded px-2 py-0.5 ${status === 'ENABLED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                            {status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right space-x-2">
+                          <Button
+                            onClick={() => setCatalogStatus(entry.id, 'ENABLED')}
+                            disabled={!canRun || rowBusy || status === 'ENABLED'}
+                            variant="outline"
+                            className="h-8 border-[#345045] text-[#ccf2de] hover:bg-[#20382f]"
+                          >
+                            Enable
+                          </Button>
+                          <Button
+                            onClick={() => setCatalogStatus(entry.id, 'OFFLINE')}
+                            disabled={!canRun || rowBusy || status === 'OFFLINE'}
+                            variant="outline"
+                            className="h-8 border-[#5a4631] text-[#f5dfc2] hover:bg-[#3a2c1f]"
+                          >
+                            Set Offline
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
