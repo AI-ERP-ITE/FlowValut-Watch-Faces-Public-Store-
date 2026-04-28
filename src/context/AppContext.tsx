@@ -6,12 +6,6 @@ import type { AppState, AppStep, WatchFaceConfig, GeneratedCode, ElementImage, W
 import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
 
 const backendBridgeMode = isBackendBridgeConfigured();
-const persistedGithubToken = localStorage.getItem('githubToken') || '';
-
-if (backendBridgeMode && persistedGithubToken) {
-  // In backend bridge mode, browser-stored PAT must not be retained.
-  localStorage.removeItem('githubToken');
-}
 
 // Initial state
 const initialState: AppState = {
@@ -29,7 +23,7 @@ const initialState: AppState = {
   isLoading: false,
   loadingMessage: '',
   error: null,
-  githubToken: backendBridgeMode ? '' : persistedGithubToken,
+  githubToken: '',
   githubRepo: localStorage.getItem('githubRepo') || 'AI-ERP-ITE/Watch-Faces',
   undoStack: [],
   redoStack: [],
@@ -107,10 +101,8 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, error: action.payload };
     case 'SET_GITHUB_TOKEN':
       if (backendBridgeMode) {
-        localStorage.removeItem('githubToken');
         return { ...state, githubToken: '' };
       }
-      localStorage.setItem('githubToken', action.payload);
       return { ...state, githubToken: action.payload };
     case 'SET_GITHUB_REPO':
       localStorage.setItem('githubRepo', action.payload);

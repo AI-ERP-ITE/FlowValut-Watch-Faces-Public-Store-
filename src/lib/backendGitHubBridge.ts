@@ -1,16 +1,8 @@
 import { getFirebaseIdToken } from '@/lib/firebaseAuthClient';
 
-const BACKEND_URL_STORAGE_KEYS = ['githubBackendBaseUrl', 'zepp-github-backend-base-url'] as const;
-
 export function getBackendBridgeBaseUrl(): string {
   const fromEnv = (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, '');
-
-  for (const key of BACKEND_URL_STORAGE_KEYS) {
-    const value = localStorage.getItem(key)?.trim();
-    if (value) return value.replace(/\/$/, '');
-  }
-
   return '';
 }
 
@@ -29,7 +21,7 @@ async function buildAuthHeaders(extra?: Record<string, string>): Promise<Record<
 async function backendFetch(path: string, init?: RequestInit): Promise<Response> {
   const base = getBackendBridgeBaseUrl();
   if (!base) {
-    throw new Error('Backend bridge URL is not configured');
+    throw new Error('Backend bridge is required for GitHub writes');
   }
   const finalUrl = `${base}/${path.replace(/^\//, '')}`;
   const authHeaders = await buildAuthHeaders();
