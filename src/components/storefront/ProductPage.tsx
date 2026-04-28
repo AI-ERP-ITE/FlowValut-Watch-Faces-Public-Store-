@@ -48,13 +48,8 @@ export function ProductPage() {
   }
 
   function handleAction() {
-    if (isFree) {
-      // Free: go to success page which handles download
-      navigate(`/success/${entry!.id}`);
-    } else {
-      // Paid: go to branded buy page
-      navigate(`/buy/${entry!.id}`);
-    }
+    // Unified backend-authoritative flow starts in buy page for free and paid.
+    navigate(`/buy/${entry!.id}`);
   }
 
   const formattedDate = new Date(entry.createdAt).toLocaleDateString('en-US', {
@@ -148,7 +143,7 @@ export function ProductPage() {
                 }
               `}
             >
-              {isFree ? 'Download Free' : `Buy for $${entry.price.toFixed(2)}`}
+              {isFree ? 'Get for Free' : `Buy for $${entry.price.toFixed(2)}`}
             </button>
 
             {/* Compatible models */}

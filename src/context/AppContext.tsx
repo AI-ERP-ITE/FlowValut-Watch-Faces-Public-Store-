@@ -3,9 +3,6 @@
 import React, { createContext, useContext, useReducer } from 'react';
 import type { ReactNode } from 'react';
 import type { AppState, AppStep, WatchFaceConfig, GeneratedCode, ElementImage, WatchFaceElement } from '@/types';
-import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
-
-const backendBridgeMode = isBackendBridgeConfigured();
 
 // Initial state
 const initialState: AppState = {
@@ -23,7 +20,6 @@ const initialState: AppState = {
   isLoading: false,
   loadingMessage: '',
   error: null,
-  githubToken: '',
   githubRepo: localStorage.getItem('githubRepo') || 'AI-ERP-ITE/Watch-Faces',
   undoStack: [],
   redoStack: [],
@@ -45,7 +41,6 @@ type Action =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LOADING_MESSAGE'; payload: string }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_GITHUB_TOKEN'; payload: string }
   | { type: 'SET_GITHUB_REPO'; payload: string }
   | { type: 'UPDATE_ELEMENT'; payload: { id: string; changes: Partial<WatchFaceElement> } }
   | { type: 'UPDATE_ELEMENTS_BATCH'; payload: Array<{ id: string; changes: Partial<WatchFaceElement> }> }
@@ -99,11 +94,6 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, loadingMessage: action.payload };
     case 'SET_ERROR':
       return { ...state, error: action.payload };
-    case 'SET_GITHUB_TOKEN':
-      if (backendBridgeMode) {
-        return { ...state, githubToken: '' };
-      }
-      return { ...state, githubToken: action.payload };
     case 'SET_GITHUB_REPO':
       localStorage.setItem('githubRepo', action.payload);
       return { ...state, githubRepo: action.payload };
@@ -207,7 +197,6 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'RESET':
       return {
         ...initialState,
-        githubToken: state.githubToken,
         githubRepo: state.githubRepo,
       };
     default:
@@ -259,7 +248,6 @@ export const actions = {
   setLoading: (loading: boolean) => ({ type: 'SET_LOADING' as const, payload: loading }),
   setLoadingMessage: (message: string) => ({ type: 'SET_LOADING_MESSAGE' as const, payload: message }),
   setError: (error: string | null) => ({ type: 'SET_ERROR' as const, payload: error }),
-  setGithubToken: (token: string) => ({ type: 'SET_GITHUB_TOKEN' as const, payload: token }),
   setGithubRepo: (repo: string) => ({ type: 'SET_GITHUB_REPO' as const, payload: repo }),
   updateElement: (id: string, changes: Partial<WatchFaceElement>) => ({ type: 'UPDATE_ELEMENT' as const, payload: { id, changes } }),
   updateElementsBatch: (updates: Array<{ id: string; changes: Partial<WatchFaceElement> }>) => ({ type: 'UPDATE_ELEMENTS_BATCH' as const, payload: updates }),

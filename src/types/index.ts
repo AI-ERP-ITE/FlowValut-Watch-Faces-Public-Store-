@@ -270,7 +270,6 @@ export interface AppState {
   isLoading: boolean;
   loadingMessage: string;
   error: string | null;
-  githubToken: string;
   githubRepo: string;
   undoStack: WatchFaceElement[][];
   redoStack: WatchFaceElement[][];

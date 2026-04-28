@@ -53,7 +53,6 @@ export function Header() {
 
     const [owner, repo] = state.githubRepo.split('/');
     const result = await testGitHubConnection({
-      token: state.githubToken,
       owner,
       repo,
     });
