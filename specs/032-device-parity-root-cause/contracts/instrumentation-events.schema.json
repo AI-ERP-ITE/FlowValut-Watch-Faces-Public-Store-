@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://watch-faces/specs/032/contracts/instrumentation-events.schema.json",
+  "title": "InstrumentationEvents",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "required": [
+      "eventId",
+      "runId",
+      "stage",
+      "eventType",
+      "eventTs",
+      "fixtureId",
+      "buildHash",
+      "payload"
+    ],
+    "properties": {
+      "eventId": { "type": "string", "minLength": 1 },
+      "runId": { "type": "string", "minLength": 1 },
+      "stage": {
+        "type": "string",
+        "enum": ["fixture_setup", "preview", "export", "extraction", "device", "synthesis"]
+      },
+      "eventType": { "type": "string", "minLength": 1 },
+      "eventTs": { "type": "string", "format": "date-time" },
+      "fixtureId": { "type": "string", "minLength": 1 },
+      "buildHash": { "type": "string", "minLength": 7 },
+      "payload": {
+        "type": "object",
+        "required": ["capturePoint", "data"],
+        "properties": {
+          "capturePoint": {
+            "type": "string",
+            "enum": [
+              "fixture_snapshot",
+              "preview_metrics",
+              "export_manifest",
+              "extraction_checks",
+              "device_observation",
+              "verdict_synthesis"
+            ]
+          },
+          "data": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -56,6 +56,14 @@ Add explicit AOD background strategy selection with four modes:
 3. When `NONE_BLACK`, generator MUST not inject fallback background image for AOD.
 4. Existing main mode rendering/export MUST remain behaviorally unchanged.
 
+## Deployment/Validation Clarifications
+1. Feature verification is invalid if production HTML references `/src/main.tsx`.
+2. Verification must include both entry routes:
+   - `/Watch-Faces/`
+   - `/Watch-Faces/studio/`
+3. A route-level 404 log must be triaged with script-source inspection before attributing issue to AOD feature logic.
+4. If script source is hashed assets and UI still fails, then investigate feature/runtime state.
+
 ## UX Requirements
 1. AOD background controls appear only when editor mode is `AOD` and AOD is initialized.
 2. Controls must include concise descriptions for each mode.

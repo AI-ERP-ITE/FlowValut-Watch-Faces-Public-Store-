@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://watch-faces/specs/032/contracts/evidence-pack-manifest.schema.json",
+  "title": "EvidencePackManifest",
+  "type": "object",
+  "required": [
+    "bundleId",
+    "featureId",
+    "generatedAt",
+    "runIds",
+    "artifacts",
+    "completenessScore",
+    "gates"
+  ],
+  "properties": {
+    "bundleId": { "type": "string", "minLength": 1 },
+    "featureId": { "type": "string", "const": "032-device-parity-root-cause" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "runIds": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "previewScreenshots",
+        "exportScreenshots",
+        "deviceScreenshots",
+        "extractionReport",
+        "manifestReport",
+        "matrixExport",
+        "hypothesisLog"
+      ],
+      "properties": {
+        "previewScreenshots": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "exportScreenshots": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "deviceScreenshots": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "extractionReport": { "type": "string", "minLength": 1 },
+        "manifestReport": { "type": "string", "minLength": 1 },
+        "matrixExport": { "type": "string", "minLength": 1 },
+        "hypothesisLog": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "completenessScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "gates": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["gateId", "status", "evidenceRef"],
+        "properties": {
+          "gateId": { "type": "string", "pattern": "^AG-[1-6]$" },
+          "status": { "type": "string", "enum": ["pass", "fail"] },
+          "evidenceRef": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "completenessScore": { "minimum": 0.95 }
+        },
+        "required": ["completenessScore"]
+      },
+      "then": true,
+      "else": {
+        "not": true
+      }
+    }
+  ],
+  "additionalProperties": false
+}

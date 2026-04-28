@@ -1,0 +1,34 @@
+{
+  "bundleId": "bundle-20260422-001",
+  "featureId": "032-device-parity-root-cause",
+  "generatedAt": "2026-04-22T00:00:00Z",
+  "runIds": [
+    "run-20260422-000001-operator-a"
+  ],
+  "artifacts": {
+    "previewScreenshots": [
+      "evidence/preview/run-20260422-000001-before.png",
+      "evidence/preview/run-20260422-000001-after.png"
+    ],
+    "exportScreenshots": [
+      "evidence/export/run-20260422-000001-before.png",
+      "evidence/export/run-20260422-000001-after.png"
+    ],
+    "deviceScreenshots": [
+      "evidence/device/run-20260422-000001-startup.png"
+    ],
+    "extractionReport": "evidence/zpk-validation.md",
+    "manifestReport": "evidence/asset-manifest-report.md",
+    "matrixExport": "device-matrix-filled.csv",
+    "hypothesisLog": "hypothesis-verdicts.md"
+  },
+  "completenessScore": 0.95,
+  "gates": [
+    { "gateId": "AG-1", "status": "pass", "evidenceRef": "sc001-matrix-integrity-report.md" },
+    { "gateId": "AG-2", "status": "pass", "evidenceRef": "repro-summary.md" },
+    { "gateId": "AG-3", "status": "pass", "evidenceRef": "hypothesis-verdicts.md" },
+    { "gateId": "AG-4", "status": "pass", "evidenceRef": "parity-verdict.md" },
+    { "gateId": "AG-5", "status": "pass", "evidenceRef": "device-coverage-gate-report.md" },
+    { "gateId": "AG-6", "status": "pass", "evidenceRef": "run-minimums-report.md" }
+  ]
+}

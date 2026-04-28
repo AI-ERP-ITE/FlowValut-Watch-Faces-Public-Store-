@@ -1,0 +1,13 @@
+{
+  "runId": "run-20260422063720-operator-a",
+  "featureId": "032-device-parity-root-cause",
+  "fixtureId": "engrave-low-01",
+  "issueFocus": "engrave",
+  "buildHash": "local-dev",
+  "operator": "operator-a",
+  "startedAt": "2026-04-22T06:37:20.925Z",
+  "runStatus": "in_progress",
+  "stageCaptures": [],
+  "matrixRows": [],
+  "hypothesisResults": []
+}

@@ -1,0 +1,47 @@
+version: 1
+featureId: 032-device-parity-root-cause
+frozenAt: 2026-04-22T00:00:00Z
+
+engraveFixtures:
+  - fixtureId: engrave-low-01
+    issueFocus: engrave
+    assetComplexityClass: low
+    sourceTemplateRef: baseline/engrave-low
+    notes: Low contrast rectangular frame, static layout.
+  - fixtureId: engrave-medium-01
+    issueFocus: engrave
+    assetComplexityClass: medium
+    sourceTemplateRef: baseline/engrave-medium
+    notes: Mixed contrast frame with icons.
+  - fixtureId: engrave-high-01
+    issueFocus: engrave
+    assetComplexityClass: high
+    sourceTemplateRef: baseline/engrave-high
+    notes: High texture/high contrast stress fixture.
+
+pointerFixtures:
+  - fixtureId: pointer-pack-01
+    issueFocus: pointer
+    handPackPattern: H+M+S+Cover
+    sourceTemplateRef: baseline/pointer-full
+  - fixtureId: pointer-pack-02
+    issueFocus: pointer
+    handPackPattern: H+M+S
+    sourceTemplateRef: baseline/pointer-no-cover
+  - fixtureId: pointer-pack-03
+    issueFocus: pointer
+    handPackPattern: H+M+Cover
+    sourceTemplateRef: baseline/pointer-no-second
+  - fixtureId: pointer-pack-04
+    issueFocus: pointer
+    handPackPattern: H+M
+    sourceTemplateRef: baseline/pointer-minimal
+
+runOrder:
+  - engrave-low-01
+  - engrave-medium-01
+  - engrave-high-01
+  - pointer-pack-01
+  - pointer-pack-02
+  - pointer-pack-03
+  - pointer-pack-04

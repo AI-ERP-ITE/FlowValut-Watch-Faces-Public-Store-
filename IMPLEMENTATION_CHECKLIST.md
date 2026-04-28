@@ -43,6 +43,20 @@ Write-Output "Repo root OK: $repoRootNorm"
 - [ ] Both HTML files must point to the latest built asset hash from `app/dist/assets/`
 - [ ] If one route is updated and the other is not, deployment is considered failed
 
+### Entry Surface Clarification (Prevent White/Blank Page)
+
+- [ ] If hosting serves from root `index.html`, root `assets/` must mirror `dist/` hashes
+- [ ] If hosting serves from `docs/`, both `docs/index.html` and `docs/studio/index.html` must mirror `dist/` hashes
+- [ ] Never leave production HTML with `/src/main.tsx` source entry
+- [ ] Production HTML must reference `/Watch-Faces/assets/index-*.js` and matching CSS hash
+
+### 404 Triage Guard (Do Not Misdiagnose)
+
+- [ ] A route-level 404 alone is not root cause on GitHub Pages SPA fallback
+- [ ] First inspect loaded script src in rendered HTML before concluding failure reason
+- [ ] If script src is `/src/main.tsx`, treat as deployment mismatch immediately
+- [ ] If script src is hashed asset and still failing, then investigate auth/route/runtime logic
+
 ## Build Target Exposure Rules (Public vs Private)
 
 - [ ] Build target is explicitly set before build (`VITE_BUILD_TARGET=public|private`)
@@ -107,6 +121,16 @@ Set-Location $app
 npm run build
 ```
 
+Target-aware build clarification (preferred):
+
+```powershell
+# Public storefront-only validation
+npm run build:public
+
+# Private internal validation (after env preflight)
+npm run build:private
+```
+
 - [ ] Exit code 0, no TypeScript errors
 - [ ] `dist/assets/index-*.js` has a new hash (different from the previous build)
 - [ ] Search compiled output to confirm the fix is present:
@@ -128,6 +152,11 @@ Copy-Item "$app\dist\assets\*" "$app\docs\assets\" -Force
 # Copy both HTML entry points  ← BOTH are required
 Copy-Item "$app\dist\index.html" "$app\docs\index.html" -Force
 Copy-Item "$app\dist\index.html" "$app\docs\studio\index.html" -Force
+
+# Optional hotfix parity when root index is observed serving production traffic
+Copy-Item "$app\dist\index.html" "$app\index.html" -Force
+Copy-Item "$app\dist\assets\*" "$app\assets\" -Force
+Get-ChildItem "$app\assets\" | Where-Object { -not (Test-Path "$app\dist\assets\$($_.Name)") } | Remove-Item -Force
 
 # Remove stale hashed assets that no longer exist in dist
 Get-ChildItem "$app\docs\assets\" | Where-Object { -not (Test-Path "$app\dist\assets\$($_.Name)") } | Remove-Item -Force

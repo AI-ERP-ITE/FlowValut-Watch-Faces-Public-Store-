@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://watch-faces/specs/032/contracts/investigation-run-record.schema.json",
+  "title": "InvestigationRunRecord",
+  "type": "object",
+  "required": [
+    "runId",
+    "featureId",
+    "fixtureId",
+    "issueFocus",
+    "buildHash",
+    "operator",
+    "startedAt",
+    "runStatus",
+    "stageCaptures",
+    "matrixRows",
+    "hypothesisResults"
+  ],
+  "properties": {
+    "runId": { "type": "string", "minLength": 1 },
+    "featureId": { "type": "string", "const": "032-device-parity-root-cause" },
+    "fixtureId": { "type": "string", "minLength": 1 },
+    "issueFocus": { "type": "string", "enum": ["engrave", "pointer", "both"] },
+    "buildHash": { "type": "string", "minLength": 7 },
+    "operator": { "type": "string", "minLength": 1 },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "runStatus": { "type": "string", "enum": ["in_progress", "completed", "invalidated"] },
+    "invalidationReason": { "type": "string" },
+    "stageCaptures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["stage", "capturedAt", "evidenceRefIds"],
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": ["fixture_setup", "preview", "export", "extraction", "device", "synthesis"]
+          },
+          "capturedAt": { "type": "string", "format": "date-time" },
+          "metrics": { "type": "object" },
+          "evidenceRefIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "matrixRows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "matrixRowId",
+          "issueFocus",
+          "deviceModel",
+          "firmwareVersion",
+          "launchCondition",
+          "transitionPhase",
+          "runIndex",
+          "observedResult",
+          "measuredDeltaOrFailureRate",
+          "evidenceRefIds"
+        ],
+        "properties": {
+          "matrixRowId": { "type": "string" },
+          "issueFocus": { "type": "string", "enum": ["engrave", "pointer"] },
+          "deviceModel": { "type": "string" },
+          "firmwareVersion": { "type": "string" },
+          "launchCondition": { "type": "string", "enum": ["fresh_launch", "resume", "repeated_cycle"] },
+          "transitionPhase": { "type": "string", "enum": ["startup", "resume", "time_transition"] },
+          "runIndex": { "type": "integer", "minimum": 1 },
+          "observedResult": { "type": "string", "enum": ["pass", "fail", "partial"] },
+          "measuredDeltaOrFailureRate": { "type": "number" },
+          "evidenceRefIds": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          },
+          "anomalyTags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "hypothesisResults": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["hypothesisId", "outcomeStatus", "measuredSummary", "outcomeEvidenceRefs"],
+        "properties": {
+          "hypothesisId": { "type": "string", "pattern": "^H[12]-[1-3]$" },
+          "outcomeStatus": { "type": "string", "enum": ["confirmed", "refuted", "inconclusive"] },
+          "measuredSummary": { "type": "object" },
+          "outcomeEvidenceRefs": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "runStatus": { "const": "invalidated" } },
+        "required": ["runStatus"]
+      },
+      "then": {
+        "required": ["invalidationReason"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "runStatus": { "const": "completed" } },
+        "required": ["runStatus"]
+      },
+      "then": {
+        "required": ["completedAt"]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

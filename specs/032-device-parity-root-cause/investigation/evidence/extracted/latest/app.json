@@ -1,0 +1,12 @@
+{
+  "configVersion": "v3",
+  "targets": {
+    "default": {
+      "module": {
+        "watchface": {
+          "path": "watchface/index.js"
+        }
+      }
+    }
+  }
+}

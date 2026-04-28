@@ -1,0 +1,7 @@
+matrixRowId,issueFocus,fixtureId,handPackPattern,deviceClass,deviceModel,firmwareVersion,launchCondition,transitionPhase,runIndex,observedResult,measuredDeltaOrFailureRate,evidenceRefIds,anomalyTags,operator,executedAt
+MX-ENG-L-PRI-001,engrave,engrave-low-01,,primary,Primary-Device-A,FW-x.y,fresh_launch,startup,1,pass,0.03,EV-001|EV-002,,operator-a,2026-04-22T00:00:00Z
+MX-ENG-L-PRI-002,engrave,engrave-low-01,,primary,Primary-Device-A,FW-x.y,resume,resume,1,partial,0.08,EV-003|EV-004,heavier-on-resume,operator-a,2026-04-22T00:05:00Z
+MX-ENG-L-SEC-001,engrave,engrave-low-01,,secondary,Secondary-Device-B,FW-z.w,repeated_cycle,time_transition,1,fail,0.12,EV-005|EV-006,transition-heavy,operator-a,2026-04-22T00:10:00Z
+MX-POI-P1-PRI-001,pointer,pointer-pack-01,H+M+S+Cover,primary,Primary-Device-A,FW-x.y,fresh_launch,startup,1,pass,0.00,EV-101|EV-102,,operator-a,2026-04-22T00:15:00Z
+MX-POI-P1-PRI-002,pointer,pointer-pack-01,H+M+S+Cover,primary,Primary-Device-A,FW-x.y,resume,resume,2,partial,0.20,EV-103|EV-104,minute-hand-missing,operator-a,2026-04-22T00:20:00Z
+MX-POI-P1-SEC-001,pointer,pointer-pack-01,H+M+S+Cover,secondary,Secondary-Device-B,FW-z.w,repeated_cycle,time_transition,1,fail,0.40,EV-105|EV-106,second-hand-missing,operator-a,2026-04-22T00:25:00Z

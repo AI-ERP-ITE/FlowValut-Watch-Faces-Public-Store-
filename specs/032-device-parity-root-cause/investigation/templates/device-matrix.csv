@@ -1,0 +1,3 @@
+matrixRowId,issueFocus,fixtureId,handPackPattern,deviceClass,deviceModel,firmwareVersion,launchCondition,transitionPhase,runIndex,observedResult,measuredDeltaOrFailureRate,evidenceRefIds,anomalyTags,operator,executedAt
+MX-ENGRAVE-L1-PRIMARY-001,engrave,engrave-low-01,,primary,Primary-Device-A,FW-x.y,fresh_launch,startup,1,pass,0.03,EV-preview-001|EV-device-001,,operator-a,2026-04-22T00:00:00Z
+MX-POINTER-P1-SECONDARY-001,pointer,pointer-pack-01,H+M+S+Cover,secondary,Secondary-Device-B,FW-z.w,resume,resume,1,partial,0.20,EV-preview-101|EV-device-101,pointer-intermittent,operator-a,2026-04-22T00:00:00Z
