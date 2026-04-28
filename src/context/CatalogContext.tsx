@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react';
+import { fetchCatalogFromFirebase } from '@/lib/studioFirebasePublishApi';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -8,6 +9,8 @@ export interface CatalogEntry {
   specGroup: string;
   categories: string[];
   hashtags: string[];
+  basePrice?: number;
+  discountPercent?: number;
   price: number;
   stripeLink: string | null;
   createdAt: string;
@@ -82,6 +85,9 @@ const CatalogContext = createContext<CatalogContextValue | null>(null);
 const BASE_URL = import.meta.env.BASE_URL; // e.g. '/Watch-Faces/'
 
 function buildAssetUrl(relativePath: string): string {
+  if (/^(https?:)?\/\//i.test(relativePath) || relativePath.startsWith('data:')) {
+    return relativePath;
+  }
   return `${BASE_URL}${relativePath}`;
 }
 
@@ -173,6 +179,20 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function fetchAll() {
       try {
+        let backendCatalogEntries: CatalogEntry[] = [];
+        const backendBase =
+          (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
+          (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
+          (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+
+        if (backendBase) {
+          try {
+            backendCatalogEntries = await fetchCatalogFromFirebase();
+          } catch {
+            backendCatalogEntries = [];
+          }
+        }
+
         const [catalogRes, modelsRes, specGroupsRes] = await Promise.all([
           fetch(buildAssetUrl('catalog.json')),
           fetch(buildAssetUrl('models.json')),
@@ -190,7 +210,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         ]);
 
         const hydratedCatalog = await hydrateCatalogSpecGroups(
-          catalogData as CatalogEntry[],
+          (backendCatalogEntries.length > 0 ? backendCatalogEntries : (catalogData as CatalogEntry[])),
           modelsData as Record<string, ModelEntry>,
           specGroupsData as Record<string, SpecGroup>
         );

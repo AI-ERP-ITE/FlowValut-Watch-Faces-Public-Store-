@@ -17,8 +17,7 @@ import { PropertyPanel } from '@/components/PropertyPanel';
 import { useApp, actions } from '@/context/AppContext';
 import { buildZPK } from '@/lib/zpkBuilder';
 import { FONT_STYLES } from '@/lib/fontLibrary';
-import { uploadZPKWithQR, regenerateSingleQR } from '@/lib/githubApi';
-import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
+import { uploadStudioArtifactsToFirebase } from '@/lib/studioFirebasePublishApi';
 import { generateQRCode } from '@/lib/qrGenerator';
 import { getIconByKey } from '@/lib/iconLibrary';
 import { testApiKey, type AIProvider } from '@/lib/aiService';
@@ -29,7 +28,7 @@ import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
-import { buildSourceJson, sourceJsonToBlob } from '@/lib/sourceJsonGenerator';
+import { buildSourceJson } from '@/lib/sourceJsonGenerator';
 import { PublishForm } from '@/components/PublishForm';
 import { AdminPanel } from '@/components/AdminPanel';
 import type { CatalogEntry, SpecGroup } from '@/context/CatalogContext';
@@ -1582,7 +1581,6 @@ function buildSolidBackgroundDataUrl(size: number, color: string): string {
 }
 
 function StudioApp() {
-  const backendMode = isBackendBridgeConfigured();
   const { state, dispatch } = useApp();
   const [watchModel, setWatchModel] = useState('Balance 2');
   const [watchFaceName, setWatchFaceName] = useState('');
@@ -2051,18 +2049,14 @@ function StudioApp() {
   const [showPublishForm, setShowPublishForm] = useState(false);
   const [publishedEntry, setPublishedEntry] = useState<CatalogEntry | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
-  const [regenQrLoading, setRegenQrLoading] = useState(false);
 
-  // Fetch specGroups.json from GitHub Pages whenever repo changes
+  // Fetch spec groups from same-origin static asset.
   useEffect(() => {
-    if (!state.githubRepo) return;
-    const [owner, repo] = state.githubRepo.split('/');
-    if (!owner || !repo) return;
-    fetch(`https://${owner}.github.io/${repo}/specGroups.json`)
+    fetch('/specGroups.json')
       .then((r) => r.ok ? r.json() : {})
       .then((data) => setSpecGroups(data as Record<string, SpecGroup>))
       .catch(() => setSpecGroups({}));
-  }, [state.githubRepo]);
+  }, []);
 
   const openCropTool = (file: File, target: CropTarget = 'MAIN') => {
     setCropTarget(target);
@@ -2351,12 +2345,6 @@ function StudioApp() {
     if (!state.backgroundFile) {
       console.log('[App] ERROR: Missing backgroundFile');
       toast.error('Missing background file');
-      return;
-    }
-
-    if (!backendMode && !state.githubToken) {
-      console.log('[App] ERROR: Missing githubToken');
-      toast.error('Please set your GitHub token in settings');
       return;
     }
 
@@ -2954,62 +2942,45 @@ function StudioApp() {
 
       dispatch(actions.setZpkBlob(zpkResult.blob));
 
-      // Upload to GitHub with folder-based structure
-      dispatch(actions.setLoadingMessage('Uploading to GitHub...'));
+      // Upload to Firebase storage through backend bridge.
+      dispatch(actions.setLoadingMessage('Uploading to Firebase...'));
 
-      const repoParts = state.githubRepo.split('/');
-      const owner = repoParts[0];
-      const repo = repoParts[1];
-      
-      console.log('[App] GitHub repo split:', { original: state.githubRepo, owner, repo, parts: repoParts });
-      
-      if (!owner || !repo || repoParts.length !== 2) {
-        throw new Error(`Invalid GitHub repository format: "${state.githubRepo}". Expected format: "owner/repo"`);
-      }
-
-      // Step 1: Generate QR code with the expected GitHub Pages URL
-      //  We use the watchface ID (timestamp-based) to create a predictable URL
-      const watchfaceId = state.watchFaceConfig.name.replace(/\s+/g, '_');
+      const watchfaceId = `${state.watchFaceConfig.name.replace(/\s+/g, '_').replace(/[^a-z0-9_-]/gi, '').slice(0, 48) || 'watchface'}_${Date.now()}`;
       setUploadedWatchfaceId(watchfaceId);
-      const expectedZpkUrl = `https://${owner}.github.io/${repo}/zpk/${watchfaceId}/face.zpk`;
+      const backendBase = (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
+        (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
+        (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+      const expectedZpkUrl = backendBase
+        ? `${backendBase.replace(/\/$/, '')}/publicAsset?kind=zpk&id=${encodeURIComponent(watchfaceId)}`
+        : '';
       
       dispatch(actions.setLoadingMessage('Generating QR code...'));
-      console.log('[App] Generating QR with expected URL:', expectedZpkUrl);
-      const qrDataUrl = await generateQRCode(expectedZpkUrl);
-      console.log('[App] QR code generated');
+      const qrDataUrl = expectedZpkUrl ? await generateQRCode(expectedZpkUrl) : null;
 
       // Build source.json for safe future regeneration
-      const sourceBlob = sourceJsonToBlob(buildSourceJson(withNormalizedPointerEffects(configForBuild)));
+      const sourceJson = buildSourceJson(withNormalizedPointerEffects(configForBuild));
 
-      // Step 2: Upload both ZPK and QR code to the same folder on GitHub
-      console.log('[App] Starting folder-based upload (ZPK + QR)...');
-      const uploadResult = await uploadZPKWithQR(
-        {
-          token: state.githubToken,
-          owner,
-          repo,
-        },
+      const uploadResult = await uploadStudioArtifactsToFirebase({
         watchfaceId,
-        zpkResult.blob,
-        qrDataUrl,
-        state.watchFaceConfig.name,
-        previewDataUrl ?? undefined,
-        sourceBlob
-      );
+        zpkBlob: zpkResult.blob,
+        qrDataUrl: qrDataUrl ?? undefined,
+        previewDataUrl: previewDataUrl ?? undefined,
+        sourceJson,
+      });
 
-      if (!uploadResult.success) {
-        console.error('[App] Upload error:', uploadResult.error);
-        const uploadError = uploadResult.error || 'Unknown error';
+      if (!uploadResult.ok) {
+        const uploadError = 'Upload failed';
+        dispatch(actions.setGithubUrl(''));
+        dispatch(actions.setQrCode(null));
+        dispatch(actions.setStep('success'));
         if (/backend bridge is required/i.test(uploadError)) {
-          throw new Error('Upload configuration error: Backend bridge is required for GitHub writes. Open Settings and set Backend Bridge URL (or set VITE_GITHUB_FUNCTIONS_BASE_URL at build time).');
+          toast.error('Upload skipped: backend bridge URL is not configured. ZPK generated locally — download it below.');
+        } else {
+          toast.error(`Upload skipped: ${uploadError}. ZPK generated locally — download it below.`);
         }
-        throw new Error(`GitHub upload failed: ${uploadError}`);
+        return;
       }
       
-      console.log('[App] Upload successful!');
-      console.log('[App] ZPK URL:', uploadResult.downloadUrl);
-      console.log('[App] QR URL:', uploadResult.qrUrl);
-
       dispatch(actions.setGithubUrl(uploadResult.downloadUrl || ''));
       dispatch(actions.setQrCode(qrDataUrl));
       dispatch(actions.setStep('success'));
@@ -3034,7 +3005,7 @@ function StudioApp() {
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [backendMode, state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubToken, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
+  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
 
   // Handle reset
   const handleReset = useCallback(() => {
@@ -3049,7 +3020,6 @@ function StudioApp() {
     setUploadedWatchfaceId('');
     setShowPublishForm(false);
     setPublishedEntry(null);
-    setRegenQrLoading(false);
     toast.info('Started new watch face');
   }, [dispatch]);
 
@@ -3703,16 +3673,14 @@ function StudioApp() {
               </div>
               <div className="flex items-center gap-2 text-sm text-zinc-500">
                 <div className="h-2 w-2 rounded-full bg-zinc-700" />
-                Uploading to GitHub
+                Uploading to Firebase
               </div>
             </div>
           </div>
         );
 
       case 'success': {
-        const [owner, repo] = state.githubRepo.split('/');
-        const ghConfig = { token: state.githubToken, owner, repo };
-        const baseUrl = `https://${owner}.github.io/${repo}`;
+        const [, repo] = state.githubRepo.split('/');
         return (
           <div className="space-y-6">
             {state.qrCodeDataUrl && state.githubUrl && (
@@ -3725,27 +3693,27 @@ function StudioApp() {
               />
             )}
 
-            {/* Regenerate QR button */}
-            {uploadedWatchfaceId && (
-              <Button
-                onClick={async () => {
-                  setRegenQrLoading(true);
-                  const result = await regenerateSingleQR(ghConfig, uploadedWatchfaceId, baseUrl);
-                  if (result.success && result.qrDataUrl) {
-                    dispatch(actions.setQrCode(result.qrDataUrl));
-                    toast.success('QR code regenerated!');
-                  } else {
-                    toast.error('QR regen failed: ' + (result.error ?? 'unknown'));
-                  }
-                  setRegenQrLoading(false);
-                }}
-                disabled={regenQrLoading}
-                variant="outline"
-                className="w-full h-10 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white text-sm"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${regenQrLoading ? 'animate-spin' : ''}`} />
-                {regenQrLoading ? 'Regenerating QR…' : 'Regenerate QR Code'}
-              </Button>
+            {state.zpkBlob && (!state.qrCodeDataUrl || !state.githubUrl) && (
+              <div className="rounded-xl border border-amber-700 bg-amber-950/30 p-4 space-y-3">
+                <p className="text-amber-300 text-sm font-medium">ZPK created locally. Upload did not complete.</p>
+                <p className="text-zinc-400 text-xs">You can still download and use the generated ZPK file.</p>
+                <Button
+                  onClick={() => {
+                    const blobUrl = URL.createObjectURL(state.zpkBlob!);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = `${state.watchFaceConfig?.name ?? 'watchface'}.zpk`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(blobUrl);
+                  }}
+                  variant="outline"
+                  className="w-full h-10 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white text-sm"
+                >
+                  Download ZPK
+                </Button>
+              </div>
             )}
 
             {/* Publish flow */}
@@ -3768,7 +3736,6 @@ function StudioApp() {
               <PublishForm
                 watchFaceConfig={state.watchFaceConfig}
                 watchfaceId={uploadedWatchfaceId}
-                githubConfig={ghConfig}
                 apiVersion="v3"
                 specGroups={specGroups}
                 onPublished={(entry) => {
@@ -3819,16 +3786,8 @@ function StudioApp() {
           {renderContent()}
         </div>
 
-        {/* Admin panel — visible when PAT or backend bridge mode is enabled */}
-        {(backendMode || state.githubToken) && (() => {
-          const [owner, repo] = state.githubRepo.split('/');
-          return (
-            <AdminPanel
-              githubConfig={{ token: state.githubToken, owner, repo }}
-              defaultBaseUrl={`https://${owner}.github.io/${repo}`}
-            />
-          );
-        })()}
+        {/* Admin panel */}
+        <AdminPanel />
 
         {/* Studio Lab drawer — icon & font creator */}
         <IconLab

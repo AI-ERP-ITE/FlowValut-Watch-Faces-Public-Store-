@@ -5,6 +5,7 @@ import { FilterSidebar } from './FilterSidebar';
 import { SortControls } from './SortControls';
 import { WatchfaceGrid } from './WatchfaceGrid';
 import { EmptyState } from './EmptyState';
+import { fetchStorefrontConfigFromFirebase } from '@/lib/studioFirebasePublishApi';
 
 // ── Category metadata ──────────────────────────────────────────────────────
 
@@ -94,6 +95,19 @@ export function HomePage() {
 
     async function loadStoreConfig() {
       try {
+        const backendBase =
+          (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
+          (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
+          (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+
+        if (backendBase) {
+          const cfg = await fetchStorefrontConfigFromFirebase();
+          if (!cancelled) {
+            setFeaturedFaceId(cfg.featuredFaceId ?? null);
+          }
+          return;
+        }
+
         const response = await fetch(`${baseUrl}storeConfig.json`);
         if (!response.ok) return;
         const data = (await response.json()) as { featuredFaceId?: string | null };
@@ -179,7 +193,7 @@ export function HomePage() {
               <div className="store-hero-watch-inner">
                 {featuredFace?.previewPath && (
                   <img
-                    src={`${baseUrl}${featuredFace.previewPath}`}
+                    src={/^(https?:)?\/\//i.test(featuredFace.previewPath) ? featuredFace.previewPath : `${baseUrl}${featuredFace.previewPath}`}
                     alt={`${featuredFace.name} preview`}
                     className="absolute inset-0 w-full h-full object-cover"
                   />

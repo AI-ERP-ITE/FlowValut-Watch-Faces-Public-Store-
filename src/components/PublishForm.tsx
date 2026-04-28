@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { WatchFaceConfig } from '@/types';
 import type { CatalogEntry, SpecGroup } from '@/context/CatalogContext';
-import type { GitHubConfig } from '@/lib/githubApi';
 import { uniqueSlug } from '@/lib/slugify';
 import { detectSpecGroup, describeSpecGroup } from '@/lib/specGroupDetector';
-import { publishToCatalog, fetchCatalogFromGitHub } from '@/lib/catalogApi';
+import { fetchCatalogFromFirebase, publishStudioWatchfaceToFirebase } from '@/lib/studioFirebasePublishApi';
 
 // ── Category options (must stay in sync with CategoryPage CATEGORY_META) ──
 
@@ -26,8 +25,6 @@ export interface PublishFormProps {
   watchFaceConfig: WatchFaceConfig;
   /** The folder ID already uploaded to docs/zpk/{watchfaceId}/ */
   watchfaceId: string;
-  /** GitHub credentials (token, owner, repo, branch) */
-  githubConfig: GitHubConfig;
   /** Called on successful publish with the final CatalogEntry */
   onPublished: (entry: CatalogEntry) => void;
   /** Called when the user clicks Cancel */
@@ -43,7 +40,6 @@ export interface PublishFormProps {
 export function PublishForm({
   watchFaceConfig,
   watchfaceId,
-  githubConfig,
   onPublished,
   onCancel,
   apiVersion = 'v3',
@@ -64,7 +60,7 @@ export function PublishForm({
 
   // ── Derived / computed values ───────────────────────────────────────────
 
-  // Slug preview — collision-aware
+  // Slug preview for user visibility only.
   const slug = useMemo(
     () => (name.trim() ? uniqueSlug(name.trim(), existingIds) : ''),
     [name, existingIds]
@@ -102,10 +98,10 @@ export function PublishForm({
 
   // ── Load existing catalog IDs for collision detection ───────────────────
   useEffect(() => {
-    fetchCatalogFromGitHub(githubConfig)
+    fetchCatalogFromFirebase()
       .then((entries) => setExistingIds(entries.map((e) => e.id)))
       .catch(() => setExistingIds([]));
-  }, [githubConfig]);
+  }, []);
 
   // ── Category toggle ─────────────────────────────────────────────────────
   function toggleCategory(value: string) {
@@ -117,7 +113,6 @@ export function PublishForm({
   // ── Publish handler ─────────────────────────────────────────────────────
   async function handlePublish() {
     if (!name.trim()) { setPublishError('Name is required.'); return; }
-    if (!slug)        { setPublishError('Could not generate a slug.'); return; }
     if (isPaid && !stripeLink.trim()) {
       setPublishError('Stripe link is required for paid watchfaces.');
       return;
@@ -135,22 +130,34 @@ export function PublishForm({
     setPublishError(null);
 
     const entry: CatalogEntry = {
-      id:          slug,
+      id:          watchfaceId,
       name:        name.trim(),
       specGroup:   detectedSpecGroupKey ?? 'unknown',
       categories,
       hashtags,
+      basePrice:   isPaid ? parseFloat(price) : 0,
+      discountPercent: 0,
       price:       isPaid ? parseFloat(price) : 0,
       stripeLink:  isPaid ? stripeLink.trim() : null,
       createdAt:   new Date().toISOString(),
       downloads:   0,
-      zpkPath:     `zpk/${watchfaceId}/face.zpk`,
-      previewPath: `zpk/${watchfaceId}/preview.png`,
-      qrPath:      `zpk/${watchfaceId}/qr.png`,
+      zpkPath:     `zpk/${watchfaceId}.zpk`,
+      previewPath: `preview/${watchfaceId}.png`,
+      qrPath:      `qr/${watchfaceId}.png`,
     };
 
     try {
-      await publishToCatalog(githubConfig, entry);
+      await publishStudioWatchfaceToFirebase({
+        id: entry.id,
+        name: entry.name,
+        specGroup: entry.specGroup,
+        categories: entry.categories,
+        hashtags: entry.hashtags,
+        basePrice: entry.basePrice ?? entry.price,
+        discountPercent: entry.discountPercent ?? 0,
+        price: entry.price,
+        stripeLink: entry.stripeLink,
+      });
       onPublished(entry);
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : 'Publish failed.');

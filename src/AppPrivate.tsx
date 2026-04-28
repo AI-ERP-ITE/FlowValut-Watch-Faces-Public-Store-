@@ -4,8 +4,10 @@ import StudioApp from './StudioApp';
 import LabPage from './LabPage';
 import { AdminOpsPage } from '@/components/storefront/AdminOpsPage';
 import {
+  completeRedirectSignIn,
   getCurrentAuthUser,
   isFirebaseAuthConfigured,
+  startGoogleRedirectSignIn,
   signInAdminWithGoogle,
   subscribeAuthState,
 } from '@/lib/firebaseAuthClient';
@@ -45,18 +47,68 @@ function PrivateLoginPage() {
     return subscribeAuthState((user) => setHasUser(!!user));
   }, [authConfigured]);
 
+  useEffect(() => {
+    let active = true;
+    if (!authConfigured) return;
+
+    (async () => {
+      try {
+        setIsSigningIn(true);
+        await completeRedirectSignIn();
+      } catch (error) {
+        if (!active) return;
+        setErrorMessage(error instanceof Error ? error.message : 'Sign-in failed.');
+      } finally {
+        if (active) setIsSigningIn(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [authConfigured]);
+
   if (hasUser) {
     return <Navigate to={nextPath} replace />;
   }
 
   const handleSignIn = async () => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
       setIsSigningIn(true);
       setErrorMessage(null);
-      await signInAdminWithGoogle();
+      const popupAttempt = signInAdminWithGoogle();
+      const timeoutFallback = new Promise<{ method: 'redirect' }>((resolve, reject) => {
+        timeoutId = setTimeout(async () => {
+          try {
+            setErrorMessage('Popup did not complete. Switching to redirect sign-in...');
+            await startGoogleRedirectSignIn();
+            resolve({ method: 'redirect' });
+          } catch (error) {
+            reject(error);
+          }
+        }, 7000);
+      });
+
+      const result = await Promise.race([popupAttempt, timeoutFallback]);
+      if (result.method === 'redirect') {
+        setErrorMessage('Continuing sign-in using redirect...');
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Sign-in failed.');
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleRedirectOnly = async () => {
+    try {
+      setIsSigningIn(true);
+      setErrorMessage('Starting redirect sign-in...');
+      await startGoogleRedirectSignIn();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Redirect sign-in failed.');
       setIsSigningIn(false);
     }
   };
@@ -87,7 +139,12 @@ function PrivateLoginPage() {
         </div>
         <h1 className="text-xl font-semibold">Private Console Sign In</h1>
         <p className="mt-3 text-zinc-300">Sign in with Firebase Google Auth to access Studio, Admin, and Tools.</p>
-        {errorMessage ? <p className="mt-3 text-sm text-red-400">{errorMessage}</p> : null}
+        {errorMessage ? (
+          <div className="mt-3 rounded-md border border-red-800 bg-red-950/40 p-3">
+            <p className="text-xs uppercase tracking-wide text-red-300">Sign-In Error</p>
+            <p className="mt-1 text-sm text-red-200">{errorMessage}</p>
+          </div>
+        ) : null}
         <button
           type="button"
           className="mt-4 inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium hover:bg-zinc-800 disabled:opacity-60"
@@ -95,6 +152,14 @@ function PrivateLoginPage() {
           disabled={isSigningIn}
         >
           {isSigningIn ? 'Signing in...' : 'Sign In With Google'}
+        </button>
+        <button
+          type="button"
+          className="mt-3 inline-flex items-center rounded-md border border-zinc-800 bg-zinc-950 px-4 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-900 disabled:opacity-60"
+          onClick={handleRedirectOnly}
+          disabled={isSigningIn}
+        >
+          Use Redirect Instead
         </button>
       </section>
     </main>

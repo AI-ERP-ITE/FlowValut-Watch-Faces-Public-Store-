@@ -1,22 +1,17 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { batchRegenerateQRCodes, type GitHubConfig } from '@/lib/githubApi';
-import { fetchCatalogFromGitHub } from '@/lib/catalogApi';
+import { generateQRCode } from '@/lib/qrGenerator';
+import { fetchCatalogFromFirebase, upsertQrAssetInFirebase } from '@/lib/studioFirebasePublishApi';
 
-interface AdminPanelProps {
-  githubConfig: GitHubConfig;
-  /** e.g. 'https://owner.github.io/repo' — editable by user */
-  defaultBaseUrl: string;
-}
+interface AdminPanelProps {}
 
 type LogEntry =
   | { status: 'ok';  id: string }
   | { status: 'err'; id: string; error: string };
 
-export function AdminPanel({ githubConfig, defaultBaseUrl }: AdminPanelProps) {
+export function AdminPanel({}: AdminPanelProps) {
   const [open, setOpen]         = useState(false);
-  const [baseUrl, setBaseUrl]   = useState(defaultBaseUrl);
   const [running, setRunning]   = useState(false);
   const [done, setDone]         = useState(0);
   const [total, setTotal]       = useState(0);
@@ -33,8 +28,7 @@ export function AdminPanel({ githubConfig, defaultBaseUrl }: AdminPanelProps) {
     setCurrent('');
 
     try {
-      // Fetch catalog to get all IDs
-      const catalog = await fetchCatalogFromGitHub(githubConfig);
+      const catalog = await fetchCatalogFromFirebase();
       const ids = catalog.map((e) => e.id);
       setTotal(ids.length);
 
@@ -44,32 +38,27 @@ export function AdminPanel({ githubConfig, defaultBaseUrl }: AdminPanelProps) {
         return;
       }
 
-      const result = await batchRegenerateQRCodes(
-        githubConfig,
-        ids,
-        baseUrl,
-        (d, t, id) => {
-          setDone(d);
-          setTotal(t);
-          setCurrent(id);
-          // Append completed entry to log when d > 0
-          if (d > 0 && id !== '') {
-            // The entry that just finished is ids[d-1]
-            const justDone = ids[d - 1];
-            // We'll update log after the call completes below
-            void justDone;
-          }
-        }
-      );
+      const entries: LogEntry[] = [];
+      for (let i = 0; i < catalog.length; i += 1) {
+        const entry = catalog[i];
+        const id = entry.id;
+        setCurrent(id);
 
-      // Build log from results
-      const entries: LogEntry[] = [
-        ...result.success.map((id) => ({ status: 'ok' as const, id })),
-        ...result.failed.map(({ id, error }) => ({ status: 'err' as const, id, error })),
-      ];
-      // Sort to match original catalog order
-      const order = catalog.map((e) => e.id);
-      entries.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+        try {
+          const qrDataUrl = await generateQRCode(entry.zpkPath);
+          await upsertQrAssetInFirebase({ watchfaceId: id, qrDataUrl });
+          entries.push({ status: 'ok', id });
+        } catch (err) {
+          entries.push({
+            status: 'err',
+            id,
+            error: err instanceof Error ? err.message : 'Unknown error',
+          });
+        }
+
+        setDone(i + 1);
+      }
+
       setLog(entries);
     } catch (err) {
       setLog([{
@@ -105,25 +94,10 @@ export function AdminPanel({ githubConfig, defaultBaseUrl }: AdminPanelProps) {
 
       {open && (
         <div className="bg-zinc-950 px-4 py-5 space-y-5">
-          {/* Base URL field */}
-          <div className="space-y-1">
-            <label className="text-zinc-500 text-xs uppercase tracking-wider">
-              Base URL{' '}
-              <span className="normal-case text-zinc-600">(update if domain changed)</span>
-            </label>
-            <input
-              type="text"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              disabled={running}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-200 text-sm font-mono placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-            />
-          </div>
-
           {/* Batch regen button */}
           <Button
             onClick={handleBatchRegen}
-            disabled={running || !baseUrl.trim()}
+            disabled={running}
             variant="outline"
             className="w-full h-10 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white text-sm"
           >

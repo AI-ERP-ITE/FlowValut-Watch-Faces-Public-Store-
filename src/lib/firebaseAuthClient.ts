@@ -2,8 +2,10 @@ import { initializeApp, getApps } from 'firebase/app';
 import {
   GoogleAuthProvider,
   getAuth,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -48,10 +50,58 @@ export function subscribeAuthState(listener: (user: User | null) => void): () =>
   return onAuthStateChanged(auth, listener);
 }
 
-export async function signInAdminWithGoogle(): Promise<void> {
+function toAuthErrorMessage(error: unknown): string {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+
+  if (code === 'auth/popup-blocked') {
+    return 'Popup was blocked by the browser. Retrying with redirect sign-in...';
+  }
+  if (code === 'auth/popup-closed-by-user') {
+    return 'Sign-in popup was closed before completion. Retrying with redirect sign-in...';
+  }
+  if (code === 'auth/cancelled-popup-request') {
+    return 'Another sign-in popup request was already in progress. Please try again.';
+  }
+  if (code === 'auth/unauthorized-domain') {
+    return 'This domain is not authorized in Firebase Authentication settings.';
+  }
+
+  return error instanceof Error ? error.message : 'Sign-in failed.';
+}
+
+export async function signInAdminWithGoogle(): Promise<{ method: 'popup' | 'redirect' }> {
   const auth = ensureFirebaseApp();
   const provider = new GoogleAuthProvider();
-  await signInWithPopup(auth, provider);
+
+  try {
+    await signInWithPopup(auth, provider);
+    return { method: 'popup' };
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code || '')
+      : '';
+
+    // Embedded browsers can block popup close/handshake; redirect is a safe fallback.
+    if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
+      await signInWithRedirect(auth, provider);
+      return { method: 'redirect' };
+    }
+
+    throw new Error(toAuthErrorMessage(error));
+  }
+}
+
+export async function startGoogleRedirectSignIn(): Promise<void> {
+  const auth = ensureFirebaseApp();
+  const provider = new GoogleAuthProvider();
+  await signInWithRedirect(auth, provider);
+}
+
+export async function completeRedirectSignIn(): Promise<void> {
+  const auth = ensureFirebaseApp();
+  await getRedirectResult(auth);
 }
 
 export async function signOutAdmin(): Promise<void> {
