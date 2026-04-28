@@ -43,24 +43,28 @@ export function Header() {
       toast.error('Backend bridge URL is not configured for this private build.');
       return;
     }
+    if (canUseFirebaseAuth && !authUserEmail) {
+      toast.error('Sign in with Google first to test backend bridge connection.');
+      return;
+    }
 
     setIsTesting(true);
     setTestResult(null);
 
     const [owner, repo] = state.githubRepo.split('/');
-    const success = await testGitHubConnection({
+    const result = await testGitHubConnection({
       token: state.githubToken,
       owner,
       repo,
     });
 
-    setTestResult(success);
+    setTestResult(result.ok);
     setIsTesting(false);
 
-    if (success) {
+    if (result.ok) {
       toast.success('GitHub connection successful!');
     } else {
-      toast.error('GitHub connection failed. Check your token and repo name.');
+      toast.error(result.reason || 'GitHub backend connection failed.');
     }
   };
 

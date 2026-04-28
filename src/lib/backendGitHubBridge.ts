@@ -40,7 +40,8 @@ async function backendFetch(path: string, init?: RequestInit): Promise<Response>
 export async function fetchBackendRepoInfo(): Promise<{ name: string; description: string; html_url: string; has_pages: boolean }> {
   const response = await backendFetch('githubRepoInfo');
   if (!response.ok) {
-    throw new Error(`Backend repo info failed: HTTP ${response.status}`);
+    const text = await response.text().catch(() => '');
+    throw new Error(`Backend repo info failed: HTTP ${response.status} ${text}`.trim());
   }
   return response.json() as Promise<{ name: string; description: string; html_url: string; has_pages: boolean }>;
 }

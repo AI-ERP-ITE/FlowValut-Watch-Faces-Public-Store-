@@ -15,6 +15,11 @@ export interface GitHubConfig {
   branch?: string;
 }
 
+export interface GitHubConnectionTestResult {
+  ok: boolean;
+  reason?: string;
+}
+
 const MAX_FILE_SIZE = 6 * 1024 * 1024; // 6MB limit for GitHub API
 
 // Convert ArrayBuffer to base64 in chunks to avoid stack overflow
@@ -44,7 +49,7 @@ export async function uploadToGitHub(
   try {
     // Validate parameters
     if (!useBackendBridge) {
-      throw new Error('Backend bridge is required for GitHub writes');
+      throw new Error('Backend bridge is required for GitHub writes (configure Backend Bridge URL in Settings or VITE_GITHUB_FUNCTIONS_BASE_URL at build time)');
     }
     if (!owner || !owner.trim()) {
       throw new Error('GitHub owner is missing');
@@ -156,13 +161,16 @@ async function getFileSha(
 }
 
 // Test GitHub connection
-export async function testGitHubConnection(_config: GitHubConfig): Promise<boolean> {
+export async function testGitHubConnection(_config: GitHubConfig): Promise<GitHubConnectionTestResult> {
   try {
-    if (!isBackendBridgeConfigured()) return false;
+    if (!isBackendBridgeConfigured()) {
+      return { ok: false, reason: 'Backend bridge URL is not configured in this build.' };
+    }
     await fetchBackendRepoInfo();
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Unknown connection error';
+    return { ok: false, reason };
   }
 }
 
