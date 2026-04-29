@@ -12,7 +12,7 @@ import { normalizeEngraveFrameForParity, renderEngraveFrameEffect } from '@/lib/
 import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/pointerEffects';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake, pointerShadowToDropShadow } from '@/lib/effectNormalization';
-import { analyzeFlicker, isFlickerForbiddenRgb } from '@/utils/flickerEngine';
+import { analyzeFlicker } from '@/utils/flickerEngine';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
   createDefaultGaugePointerDataUrl,
@@ -28,11 +28,11 @@ const MOCK_HOUR = 10;
 const MOCK_MINUTE = 10;
 const MOCK_SECOND = 30;
 
-const DEVICE_SIM_GAMMA = 0.8;
-const DEVICE_SIM_CONTRAST = 1.22;
-const DEVICE_SIM_DITHER = 0.75;
-const DEVICE_SIM_SHARPEN_CENTER = 1.16;
-const DEVICE_SIM_SHARPEN_NEIGHBOR = 0.04;
+const DEVICE_SIM_GAMMA = 0.92;
+const DEVICE_SIM_CONTRAST = 1.08;
+const DEVICE_SIM_DITHER = 0.35;
+const DEVICE_SIM_SHARPEN_CENTER = 1.07;
+const DEVICE_SIM_SHARPEN_NEIGHBOR = 0.0175;
 
 export interface InteractiveCanvasProps {
   backgroundImage?: string;
@@ -956,7 +956,8 @@ function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
-  // Pipeline order (strict): gamma -> forbidden clamp -> contrast -> quantization -> dither -> clamp -> sharpen.
+  // Calibration simulates panel response only; anti-flicker suppression stays in analysis/overlay logic.
+  // Pipeline order: gamma -> contrast -> quantization -> dither -> sharpen.
   for (let i = 0; i < data.length; i += 4) {
     const alpha = data[i + 3];
     if (alpha === 0) continue;
@@ -964,12 +965,6 @@ function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
     data[i] = clampByte(Math.pow(data[i] / 255, DEVICE_SIM_GAMMA) * 255);
     data[i + 1] = clampByte(Math.pow(data[i + 1] / 255, DEVICE_SIM_GAMMA) * 255);
     data[i + 2] = clampByte(Math.pow(data[i + 2] / 255, DEVICE_SIM_GAMMA) * 255);
-
-    if (isFlickerForbiddenRgb(data[i], data[i + 1], data[i + 2])) {
-      if (data[i] > 0 && data[i] < 47) data[i] = 0;
-      if (data[i + 1] > 0 && data[i + 1] < 47) data[i + 1] = 0;
-      if (data[i + 2] > 0 && data[i + 2] < 47) data[i + 2] = 0;
-    }
 
     data[i] = clampByte((data[i] - 128) * DEVICE_SIM_CONTRAST + 128);
     data[i + 1] = clampByte((data[i + 1] - 128) * DEVICE_SIM_CONTRAST + 128);
@@ -990,9 +985,6 @@ function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
       data[idx + 1] = clampByte(toRgb565Green(qg));
       data[idx + 2] = clampByte(toRgb565(qb));
 
-      if (data[idx] > 0 && data[idx] < 47) data[idx] = 0;
-      if (data[idx + 1] > 0 && data[idx + 1] < 47) data[idx + 1] = 0;
-      if (data[idx + 2] > 0 && data[idx + 2] < 47) data[idx + 2] = 0;
     }
   }
 
