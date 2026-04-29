@@ -1672,6 +1672,41 @@ function expandSvgUseElements(svgSource: string): string {
       return { x: parts[0], y: parts[1], w: parts[2], h: parts[3] };
     };
 
+    const uniquifySubtreeIds = (node: Element, prefix: string): void => {
+      const nodes = [node, ...Array.from(node.querySelectorAll('*'))];
+      const idMap = new Map<string, string>();
+
+      for (const el of nodes) {
+        const id = el.getAttribute('id');
+        if (!id) continue;
+        idMap.set(id, `${prefix}${id}`);
+      }
+
+      if (idMap.size === 0) return;
+
+      for (const el of nodes) {
+        const id = el.getAttribute('id');
+        if (id && idMap.has(id)) {
+          el.setAttribute('id', idMap.get(id)!);
+        }
+
+        for (const attr of Array.from(el.attributes)) {
+          const name = attr.name;
+          const value = attr.value;
+          let next = value;
+
+          for (const [oldId, newId] of idMap.entries()) {
+            next = next.replace(new RegExp(`url\\(#${oldId}\\)`, 'g'), `url(#${newId})`);
+            if (next === `#${oldId}`) next = `#${newId}`;
+          }
+
+          if (next !== value) {
+            el.setAttribute(name, next);
+          }
+        }
+      }
+    };
+
     // Ensure namespaces are present for broad SVG href compatibility.
     if (!root.getAttribute('xmlns')) root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     if (!root.getAttribute('xmlns:xlink')) root.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
@@ -1723,6 +1758,8 @@ function expandSvgUseElements(svgSource: string): string {
         })();
 
         // Avoid duplicate IDs when cloning template nodes many times.
+        const clonePrefix = `use_${pass}_${replacedInPass}_`;
+        uniquifySubtreeIds(replacement, clonePrefix);
         replacement.removeAttribute('id');
 
         // Preserve per-instance placement/transform from <use>.
