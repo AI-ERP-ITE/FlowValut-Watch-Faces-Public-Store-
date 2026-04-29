@@ -52,6 +52,12 @@ interface RectSpec {
   cornerRadius?: number;
 }
 
+interface PaintSpec {
+  stroke: string;
+  fill: string;
+  opacity?: number;
+}
+
 function geometryIndex(analysis: WatchfaceAnalysisContract): Map<string, GeometryEl> {
   return new Map(
     analysis.geometryModel.elements.map((el) => [el.id, el as GeometryEl]),
@@ -64,12 +70,14 @@ function drawTimePointer(el: GeometryEl, color: string): string {
   const hourLen = Math.max(24, Math.min(el.width, el.height) * 0.18);
   const minLen = Math.max(34, Math.min(el.width, el.height) * 0.27);
   const secLen = Math.max(42, Math.min(el.width, el.height) * 0.34);
+  const handStroke = 'url(#grad-metal-warm)';
+  const secStroke = 'url(#grad-accent)';
 
   return [
-    `<circle cx="${cx}" cy="${cy}" r="3" fill="${color}"/>`,
-    `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - hourLen}" stroke="${color}" stroke-width="4" stroke-linecap="round"/>`,
-    `<line x1="${cx}" y1="${cy}" x2="${cx + minLen * 0.4}" y2="${cy - minLen}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`,
-    `<line x1="${cx}" y1="${cy}" x2="${cx - secLen * 0.35}" y2="${cy - secLen}" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>`,
+    `<circle cx="${cx}" cy="${cy}" r="3" fill="${color}" opacity="0.8"/>`,
+    `<line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - hourLen}" stroke="${handStroke}" stroke-width="4" stroke-linecap="round"/>`,
+    `<line x1="${cx}" y1="${cy}" x2="${cx + minLen * 0.4}" y2="${cy - minLen}" stroke="${handStroke}" stroke-width="3" stroke-linecap="round"/>`,
+    `<line x1="${cx}" y1="${cy}" x2="${cx - secLen * 0.35}" y2="${cy - secLen}" stroke="${secStroke}" stroke-width="1.5" stroke-linecap="round"/>`,
   ].join('');
 }
 
@@ -80,15 +88,18 @@ function drawGenericElement(el: GeometryEl, color: string): string {
   ].join('');
 }
 
-function drawRing(el: GeometryEl, color: string): string {
+function drawRing(el: GeometryEl, color: string, paint?: PaintSpec): string {
   const cx = el.centerX ?? el.x + el.width / 2;
   const cy = el.centerY ?? el.y + el.height / 2;
   const radius = asNumber(el.radius) ?? Math.max(6, Math.min(el.width, el.height) / 2 - 2);
   const thickness = asNumber(el.thickness) ?? Math.max(1.5, radius * 0.08);
-  return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${color}" stroke-width="${thickness}" opacity="0.85"/>`;
+  const stroke = paint?.stroke ?? color;
+  const fill = paint?.fill ?? 'none';
+  const opacity = paint?.opacity ?? 0.9;
+  return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="${thickness}" opacity="${opacity}"/>`;
 }
 
-function drawRadialTicks(el: GeometryEl, color: string): string {
+function drawRadialTicks(el: GeometryEl, color: string, paint?: PaintSpec): string {
   const cx = el.centerX ?? el.x + el.width / 2;
   const cy = el.centerY ?? el.y + el.height / 2;
   const count = Math.max(1, Math.floor(asNumber(el.count) ?? 12));
@@ -99,6 +110,7 @@ function drawRadialTicks(el: GeometryEl, color: string): string {
   const majorWidth = asNumber(el.majorWidth) ?? 2;
   const minorWidth = asNumber(el.minorWidth) ?? 1;
 
+  const stroke = paint?.stroke ?? color;
   const parts: string[] = [];
   for (let i = 0; i < count; i += 1) {
     const deg = -90 + i * (360 / count);
@@ -107,13 +119,13 @@ function drawRadialTicks(el: GeometryEl, color: string): string {
     const p1 = polar(cx, cy, radius, deg);
     const p2 = polar(cx, cy, Math.max(1, radius - len), deg);
     parts.push(
-      `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${color}" stroke-width="${isMajor ? majorWidth : minorWidth}" opacity="${isMajor ? 0.95 : 0.7}"/>`,
+      `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${stroke}" stroke-width="${isMajor ? majorWidth : minorWidth}" opacity="${isMajor ? 0.95 : 0.7}"/>`,
     );
   }
   return parts.join('');
 }
 
-function drawRadialRectangles(el: GeometryEl, color: string): string {
+function drawRadialRectangles(el: GeometryEl, color: string, paint?: PaintSpec): string {
   const cx = el.centerX ?? el.x + el.width / 2;
   const cy = el.centerY ?? el.y + el.height / 2;
   const count = Math.max(1, Math.floor(asNumber(el.count) ?? 12));
@@ -121,18 +133,19 @@ function drawRadialRectangles(el: GeometryEl, color: string): string {
   const rectW = asNumber(el.rectWidth) ?? 6;
   const rectH = asNumber(el.rectHeight) ?? 14;
 
+  const fill = paint?.fill ?? paint?.stroke ?? color;
   const parts: string[] = [];
   for (let i = 0; i < count; i += 1) {
     const deg = -90 + i * (360 / count);
     const p = polar(cx, cy, radius, deg);
     parts.push(
-      `<rect x="${p.x - rectW / 2}" y="${p.y - rectH / 2}" width="${rectW}" height="${rectH}" fill="${color}" opacity="0.78" transform="rotate(${deg + 90} ${p.x} ${p.y})"/>`,
+      `<rect x="${p.x - rectW / 2}" y="${p.y - rectH / 2}" width="${rectW}" height="${rectH}" fill="${fill}" opacity="0.82" transform="rotate(${deg + 90} ${p.x} ${p.y})"/>`,
     );
   }
   return parts.join('');
 }
 
-function drawRadialText(el: GeometryEl, color: string): string {
+function drawRadialText(el: GeometryEl, color: string, paint?: PaintSpec): string {
   const cx = el.centerX ?? el.x + el.width / 2;
   const cy = el.centerY ?? el.y + el.height / 2;
   const count = Math.max(1, Math.floor(asNumber(el.count) ?? 12));
@@ -140,13 +153,14 @@ function drawRadialText(el: GeometryEl, color: string): string {
   const labels = Array.isArray(el.labels) ? (el.labels as unknown[]) : [];
   const fontSize = asNumber(el.fontSize) ?? 12;
 
+  const fill = paint?.fill ?? paint?.stroke ?? color;
   const parts: string[] = [];
   for (let i = 0; i < count; i += 1) {
     const deg = -90 + i * (360 / count);
     const p = polar(cx, cy, radius, deg);
     const label = labels[i] ?? `${i + 1}`;
     parts.push(
-      `<text x="${p.x}" y="${p.y}" fill="${color}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="middle" opacity="0.92">${escapeXml(String(label))}</text>`,
+      `<text x="${p.x}" y="${p.y}" fill="${fill}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="middle" opacity="0.94">${escapeXml(String(label))}</text>`,
     );
   }
   return parts.join('');
@@ -154,6 +168,104 @@ function drawRadialText(el: GeometryEl, color: string): string {
 
 function drawPointerSet(el: GeometryEl, color: string): string {
   return drawTimePointer(el, color);
+}
+
+function buildStyleDefs(palette: string[]): string {
+  const dark0 = colorOrFallback(palette[0], '#0b0b0d');
+  const dark1 = colorOrFallback(palette[1], '#15171b');
+  const dark2 = colorOrFallback(palette[2], '#23262c');
+  const accent0 = colorOrFallback(palette[3], '#a56e3d');
+  const accent1 = colorOrFallback(palette[4], '#c48a58');
+  const light = colorOrFallback(palette[5], '#e3d2bd');
+
+  return [
+    '<radialGradient id="grad-dial-bg" cx="50%" cy="42%" r="64%">',
+    `  <stop offset="0%" stop-color="${dark1}"/>`,
+    `  <stop offset="72%" stop-color="${dark0}"/>`,
+    `  <stop offset="100%" stop-color="${dark2}"/>`,
+    '</radialGradient>',
+    '<linearGradient id="grad-metal-warm" x1="0%" y1="0%" x2="100%" y2="100%">',
+    `  <stop offset="0%" stop-color="${light}"/>`,
+    `  <stop offset="45%" stop-color="${accent1}"/>`,
+    `  <stop offset="100%" stop-color="${accent0}"/>`,
+    '</linearGradient>',
+    '<linearGradient id="grad-accent" x1="0%" y1="0%" x2="0%" y2="100%">',
+    `  <stop offset="0%" stop-color="${light}"/>`,
+    `  <stop offset="100%" stop-color="${accent0}"/>`,
+    '</linearGradient>',
+    '<filter id="fx-soft-noise" x="-20%" y="-20%" width="140%" height="140%">',
+    '  <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" stitchTiles="stitch" result="noise"/>',
+    '  <feColorMatrix in="noise" type="saturate" values="0" result="mono"/>',
+    '  <feComponentTransfer in="mono" result="faint">',
+    '    <feFuncA type="table" tableValues="0 0.045"/>',
+    '  </feComponentTransfer>',
+    '  <feBlend in="SourceGraphic" in2="faint" mode="overlay"/>',
+    '</filter>',
+  ].join('');
+}
+
+function resolvePaint(effectiveType: string, materialType: string | undefined, fallback: string): PaintSpec {
+  const material = (materialType ?? '').toLowerCase();
+  const isWarm = material.includes('copper') || material.includes('bronze') || material.includes('gold');
+  const isMetal = material.includes('metal') || material.includes('steel') || material.includes('anodized');
+
+  if (effectiveType === 'background') {
+    return { stroke: 'none', fill: 'url(#grad-dial-bg)', opacity: 1 };
+  }
+
+  if (effectiveType === 'ring' || effectiveType === 'radial_ticks' || effectiveType === 'radial_rectangles') {
+    if (isWarm) return { stroke: 'url(#grad-metal-warm)', fill: 'url(#grad-metal-warm)', opacity: 0.95 };
+    if (isMetal) return { stroke: 'url(#grad-metal-warm)', fill: 'none', opacity: 0.88 };
+  }
+
+  if (effectiveType === 'radial_text') {
+    return { stroke: 'none', fill: isWarm ? 'url(#grad-metal-warm)' : fallback, opacity: 0.96 };
+  }
+
+  return { stroke: fallback, fill: 'none', opacity: 0.9 };
+}
+
+function findMaterialForElement(
+  analysis: WatchfaceAnalysisContract,
+): Map<string, string> {
+  const materialById = new Map<string, string>();
+  for (const material of analysis.textureModel.materials) {
+    materialById.set(material.elementId, material.materialType);
+  }
+  return materialById;
+}
+
+function adjustRadialTextLane(el: GeometryEl, allGeometry: Map<string, GeometryEl>): GeometryEl {
+  const textRadius = asNumber(el.radius);
+  if (textRadius === null) return el;
+
+  const cx = el.centerX ?? el.x + el.width / 2;
+  const cy = el.centerY ?? el.y + el.height / 2;
+  const fontSize = asNumber(el.fontSize) ?? 12;
+
+  let adjustedRadius = textRadius;
+  for (const candidate of allGeometry.values()) {
+    if (String(candidate.type).toLowerCase() !== 'radial_ticks') continue;
+    const tcx = candidate.centerX ?? candidate.x + candidate.width / 2;
+    const tcy = candidate.centerY ?? candidate.y + candidate.height / 2;
+    if (Math.abs(tcx - cx) > 1 || Math.abs(tcy - cy) > 1) continue;
+
+    const tickRadius = asNumber(candidate.radius) ?? Math.min(candidate.width, candidate.height) / 2;
+    const majorLen = asNumber(candidate.majorLength) ?? 10;
+    const minorLen = asNumber(candidate.minorLength) ?? 5;
+    const tickLen = Math.max(majorLen, minorLen);
+    const minGap = fontSize * 0.85 + 6;
+
+    if (Math.abs(adjustedRadius - tickRadius) < tickLen + minGap) {
+      const placeOutside = adjustedRadius >= tickRadius;
+      adjustedRadius = placeOutside
+        ? tickRadius + tickLen + minGap
+        : Math.max(14, tickRadius - tickLen - minGap);
+    }
+  }
+
+  if (adjustedRadius === textRadius) return el;
+  return { ...el, radius: adjustedRadius };
 }
 
 function polar(cx: number, cy: number, r: number, deg: number): { x: number; y: number } {
@@ -213,8 +325,8 @@ function buildDialScaffold(analysis: WatchfaceAnalysisContract, palette: string[
   const bezelInnerR = asNumber(radii.bezelInner) ?? Math.max(30, outerR - 18);
 
   const base = [
-    `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="${colorOrFallback(analysis.colorModel.dominantColor, layerColor(0, palette))}"/>`,
-    `<circle cx="${cx}" cy="${cy}" r="${bezelInnerR}" fill="none" stroke="${layerColor(1, palette)}" stroke-width="5" opacity="0.9"/>`,
+    `<circle cx="${cx}" cy="${cy}" r="${outerR}" fill="url(#grad-dial-bg)" filter="url(#fx-soft-noise)"/>`,
+    `<circle cx="${cx}" cy="${cy}" r="${bezelInnerR}" fill="none" stroke="url(#grad-metal-warm)" stroke-width="5" opacity="0.88"/>`,
     `<circle cx="${cx}" cy="${cy}" r="${dialR}" fill="none" stroke="${layerColor(2, palette)}" stroke-width="2" opacity="0.8"/>`,
   ];
 
@@ -223,7 +335,7 @@ function buildDialScaffold(analysis: WatchfaceAnalysisContract, palette: string[
   const minuteRadius = asNumber(minuteTicksRaw?.radius) ?? Math.max(20, outerR - 18);
   const majorLen = asNumber(minuteTicksRaw?.lengthMajor) ?? 12;
   const minorLen = asNumber(minuteTicksRaw?.lengthMinor) ?? 6;
-  const tickColor = layerColor(3, palette);
+  const tickColor = 'url(#grad-metal-warm)';
   for (let i = 0; i < minuteCount; i += 1) {
     const deg = -90 + i * (360 / minuteCount);
     const isMajor = i % 5 === 0;
@@ -239,7 +351,7 @@ function buildDialScaffold(analysis: WatchfaceAnalysisContract, palette: string[
   const idxCount = asNumber(idxRaw?.count) ?? 12;
   const idxRadius = asNumber(idxRaw?.radius) ?? Math.max(20, dialR - 16);
   const idxLen = asNumber(idxRaw?.length) ?? 20;
-  const idxColor = layerColor(4, palette);
+  const idxColor = 'url(#grad-metal-warm)';
   for (let i = 0; i < idxCount; i += 1) {
     const deg = -90 + i * (360 / idxCount);
     const p1 = polar(cx, cy, idxRadius, deg);
@@ -285,9 +397,10 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
   const width = analysis.geometryModel.canvas.width;
   const height = analysis.geometryModel.canvas.height;
   const palette = analysis.colorModel.palette;
-  const dominant = colorOrFallback(analysis.colorModel.dominantColor, layerColor(0, palette));
   const geoById = geometryIndex(analysis);
+  const materialByElementId = findMaterialForElement(analysis);
   const scaffold = buildDialScaffold(analysis, palette);
+  const styleDefs = buildStyleDefs(palette);
 
   const clipDefs = analysis.layerModel.layerStack
     .flatMap((layer) => layer.clipRefs)
@@ -303,7 +416,7 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
     .map((layer, index) => {
       const stroke = layerColor(index, palette);
       const bgOverlay = layer.role === 'background'
-        ? `<rect x="0" y="0" width="${width}" height="${height}" fill="${dominant}"/>`
+        ? `<rect x="0" y="0" width="${width}" height="${height}" fill="url(#grad-dial-bg)"/>`
         : '';
 
       const renderedElements = layer.elements
@@ -314,15 +427,21 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
           }
 
           const effectiveType = String(found.type || element.type || '').toLowerCase();
+          const materialType = materialByElementId.get(element.id);
+          const paint = resolvePaint(effectiveType, materialType, stroke);
+          const geometryForDraw = effectiveType === 'radial_text'
+            ? adjustRadialTextLane(found, geoById)
+            : found;
 
           if (
             effectiveType === 'time_pointer'
             || effectiveType === 'pointer_set'
-            || /time[_-]?pointer|hands?/i.test(`${found.type}:${element.type}:${element.id}`)
+            || /^(time[_-]?pointer|hands?)$/i.test(String(found.type || ''))
+            || /^(time[_-]?pointer|hands?)$/i.test(String(element.type || ''))
           ) {
             return effectiveType === 'pointer_set'
-              ? drawPointerSet(found, stroke)
-              : drawTimePointer(found, stroke);
+              ? drawPointerSet(geometryForDraw, stroke)
+              : drawTimePointer(geometryForDraw, stroke);
           }
 
           if (effectiveType === 'background') {
@@ -330,22 +449,22 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
           }
 
           if (effectiveType === 'ring') {
-            return drawRing(found, stroke);
+            return drawRing(geometryForDraw, stroke, paint);
           }
 
           if (effectiveType === 'radial_ticks') {
-            return drawRadialTicks(found, stroke);
+            return drawRadialTicks(geometryForDraw, stroke, paint);
           }
 
           if (effectiveType === 'radial_rectangles') {
-            return drawRadialRectangles(found, stroke);
+            return drawRadialRectangles(geometryForDraw, stroke, paint);
           }
 
           if (effectiveType === 'radial_text') {
-            return drawRadialText(found, stroke);
+            return drawRadialText(geometryForDraw, stroke, paint);
           }
 
-          return drawGenericElement(found, stroke);
+          return drawGenericElement(geometryForDraw, stroke);
         })
         .join('');
 
@@ -361,7 +480,8 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
     })
     .join('');
 
-  const defs = clipDefs ? `<defs>${clipDefs}</defs>` : '';
+  const defsBody = [styleDefs, clipDefs].filter(Boolean).join('');
+  const defs = defsBody ? `<defs>${defsBody}</defs>` : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${defs}<g id="dial-scaffold">${scaffold}</g>${layers}</svg>`;
 }
 
