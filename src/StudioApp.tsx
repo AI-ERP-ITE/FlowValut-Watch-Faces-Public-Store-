@@ -1645,13 +1645,21 @@ function buildSolidBackgroundDataUrl(size: number, color: string): string {
 }
 
 async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, height: number): Promise<string> {
+  const sanitizedHtml = rawHtml
+    // Scripts are not needed for static background rasterization.
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    // Remote href/src can taint canvas when drawn through foreignObject.
+    .replace(/\s(?:src|href)=(["'])(https?:)?\/\/[^"']+\1/gi, '')
+    // Remote CSS urls can taint canvas too.
+    .replace(/url\((['"]?)(https?:)?\/\/[^\)]+\1\)/gi, 'none');
+
   const safeWidth = Math.max(1, Math.floor(width));
   const safeHeight = Math.max(1, Math.floor(height));
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}">
   <foreignObject width="100%" height="100%">
     <div xmlns="http://www.w3.org/1999/xhtml" style="width:${safeWidth}px;height:${safeHeight}px;overflow:hidden;background:transparent;">
-      ${rawHtml}
+      ${sanitizedHtml}
     </div>
   </foreignObject>
 </svg>`;
@@ -1674,7 +1682,15 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
     if (!ctx) throw new Error('Canvas context unavailable');
     ctx.clearRect(0, 0, safeWidth, safeHeight);
     ctx.drawImage(img, 0, 0, safeWidth, safeHeight);
-    return canvas.toDataURL('image/png');
+    try {
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      // Browser throws SecurityError when any external resource taints the canvas.
+      if (err instanceof DOMException && err.name === 'SecurityError') {
+        throw new Error('HTML contains external assets that cannot be rasterized. Use inline CSS/SVG/data URLs only.');
+      }
+      throw err;
+    }
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
