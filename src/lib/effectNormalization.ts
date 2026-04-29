@@ -6,9 +6,40 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
+function parseHexColor(hex: string): { r: number; g: number; b: number } {
+  const normalized = (hex || '#000000').replace('#', '').padStart(6, '0').slice(0, 6);
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16) || 0,
+    g: Number.parseInt(normalized.slice(2, 4), 16) || 0,
+    b: Number.parseInt(normalized.slice(4, 6), 16) || 0,
+  };
+}
+
+function toHexColor(r: number, g: number, b: number): string {
+  const toHex = (v: number) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function quantizeShadowChannel(v: number): number {
+  // Zepp previews frequently diverge on low channel values; quantize and lift low non-zero values.
+  const q = Math.round(v / 8) * 8;
+  if (q > 0 && q < 47) return 47;
+  return clamp(q, 0, 255);
+}
+
+function normalizeShadowColorForDevice(hex: string): string {
+  const rgb = parseHexColor(hex);
+  return toHexColor(
+    quantizeShadowChannel(rgb.r),
+    quantizeShadowChannel(rgb.g),
+    quantizeShadowChannel(rgb.b),
+  );
+}
+
 export function normalizeDropShadowForBake(ds: DropShadowConfig): DropShadowConfig {
   return {
     ...ds,
+    color: normalizeShadowColorForDevice(ds.color),
     blur: Math.max(0, Math.round(ds.blur)),
     offsetX: Math.round(ds.offsetX),
     offsetY: Math.round(ds.offsetY),

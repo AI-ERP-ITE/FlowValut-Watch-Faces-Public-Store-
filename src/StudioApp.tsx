@@ -17,7 +17,7 @@ import { PropertyPanel } from '@/components/PropertyPanel';
 import { useApp, actions } from '@/context/AppContext';
 import { buildZPK } from '@/lib/zpkBuilder';
 import { FONT_STYLES } from '@/lib/fontLibrary';
-import { uploadStudioArtifactsToFirebase } from '@/lib/studioFirebasePublishApi';
+import { uploadStudioArtifactsToFirebase, fetchAdminCatalogFromFirebase, type StudioUploadResult } from '@/lib/studioFirebasePublishApi';
 import { generateQRCode } from '@/lib/qrGenerator';
 import { getIconByKey } from '@/lib/iconLibrary';
 import { testApiKey, type AIProvider } from '@/lib/aiService';
@@ -53,7 +53,7 @@ import {
 } from '@/lib/pointerParity';
 import { createParityCaptureSession, isInvestigationModeEnabled } from '@/lib/parityCapture';
 import { normalizePointerEffects } from '@/lib/pointerEffects';
-import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
+import { normalizeEngraveFrameForParity, renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake, pointerEffectPaddingFromIntensity, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import {
@@ -1562,6 +1562,55 @@ function renderCircleWithShadowToPng(el: WatchFaceElement): { dataUrl: string; p
   return { dataUrl: canvas.toDataURL('image/png'), pad };
 }
 
+async function imageFromDataUrl(dataUrl: string): Promise<HTMLImageElement | null> {
+  if (!dataUrl) return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+async function imageFromElementFile(
+  src: string,
+  elementFiles: Array<{ src: string; file: File }>,
+): Promise<HTMLImageElement | null> {
+  if (!src) return null;
+  if (src.startsWith('data:')) return imageFromDataUrl(src);
+
+  const existingFile = elementFiles.find((f) => f.src === src);
+  if (!existingFile) return null;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(existingFile.file);
+  });
+}
+
+async function dataUrlFromElementFile(
+  src: string,
+  elementFiles: Array<{ src: string; file: File }>,
+): Promise<string | null> {
+  if (!src) return null;
+  if (src.startsWith('data:')) return src;
+  const existingFile = elementFiles.find((f) => f.src === src);
+  if (!existingFile) return null;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(existingFile.file);
+  });
+}
+
 /** Renders a FILL_RECT element with engraveFrame effect to a PNG data URL (for ZPK export). */
 function renderEngraveFrameToPng(el: WatchFaceElement): string {
   const w = el.bounds?.width ?? 100;
@@ -1572,14 +1621,7 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, w, h);
   const cfg = el.engraveFrame!;
-  // Preview canvas is typically CSS-downscaled, which visually softens edges.
-  // Apply stronger export compensation so device output better matches preview perception.
-  const compensatedCfg = {
-    ...cfg,
-    depth: Math.max(1, (cfg.depth ?? 6) * 0.68),
-    highlightOpacity: Math.max(0, Math.min(1, (cfg.highlightOpacity ?? 0.6) * 0.72)),
-    shadowOpacity: Math.max(0, Math.min(1, (cfg.shadowOpacity ?? 0.6) * 0.72)),
-  };
+  const compensatedCfg = normalizeEngraveFrameForParity(cfg);
   renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, compensatedCfg);
 
   return canvas.toDataURL('image/png');
@@ -1615,8 +1657,9 @@ function StudioApp() {
   const [aodBackgroundTransform, setAodBackgroundTransform] = useState<BackgroundTransform>({ ...DEFAULT_BACKGROUND_TRANSFORM });
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
-  const [devicePreviewEnabled, setDevicePreviewEnabled] = useState(false);
-  const [showFlickerZones, setShowFlickerZones] = useState(false);
+  const [calibrationEnabled, setCalibrationEnabled] = useState(true);
+  const [flickerAnalysisEnabled, setFlickerAnalysisEnabled] = useState(true);
+  const [flickerOverlayEnabled, setFlickerOverlayEnabled] = useState(false);
   const [elementWarnings, setElementWarnings] = useState<ElementWarningsMap>({});
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -2116,6 +2159,10 @@ function StudioApp() {
   const [uploadedWatchfaceId, setUploadedWatchfaceId] = useState<string>('');
   const [showPublishForm, setShowPublishForm] = useState(false);
   const [publishedEntry, setPublishedEntry] = useState<CatalogEntry | null>(null);
+  const [republishCatalog, setRepublishCatalog] = useState<Array<{ id: string; name: string }>>([]);
+  const [republishTargetId, setRepublishTargetId] = useState('');
+  const [republishMode, setRepublishMode] = useState<'KEEP_QR' | 'REGENERATE_ALL'>('REGENERATE_ALL');
+  const [latestUploadResult, setLatestUploadResult] = useState<StudioUploadResult | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
 
   // Fetch spec groups from same-origin static asset.
@@ -2124,6 +2171,16 @@ function StudioApp() {
       .then((r) => r.ok ? r.json() : {})
       .then((data) => setSpecGroups(data as Record<string, SpecGroup>))
       .catch(() => setSpecGroups({}));
+  }, []);
+
+  useEffect(() => {
+    fetchAdminCatalogFromFirebase()
+      .then((entries) => {
+        setRepublishCatalog(entries.map((entry) => ({ id: entry.id, name: entry.name })));
+      })
+      .catch(() => {
+        setRepublishCatalog([]);
+      });
   }, []);
 
   const openCropTool = (file: File, target: CropTarget = 'MAIN') => {
@@ -2393,6 +2450,7 @@ function StudioApp() {
   // Handle generate ZPK
   const handleGenerate = useCallback(async () => {
     console.log('[App] handleGenerate called');
+    setLatestUploadResult(null);
 
     // Deselect any selected element so the selection rectangle doesn't appear in the preview
     setSelectedElementId(null);
@@ -2544,22 +2602,53 @@ function StudioApp() {
         if (el.type !== 'IMG_LEVEL' || !isWeatherImgLevelDataType(el.dataType)) continue;
         const weatherStyle = ((el.weatherStyle ?? 'flat') as WeatherStyle);
         const weatherFiles = weatherImageFilenames();
+        const configuredFrames = Array.isArray(el.images)
+          ? el.images.map((frame) => (typeof frame === 'string' ? frame.trim() : '')).filter((frame) => frame.length > 0)
+          : [];
+
+        if (configuredFrames.length > 0) {
+          const safeBase = (el.name || el.id).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() || 'weather_custom';
+          const normalizedFrames: string[] = [];
+
+          for (let i = 0; i < weatherFiles.length; i += 1) {
+            const configuredFrame = configuredFrames[i] ?? configuredFrames[configuredFrames.length - 1];
+            if (!configuredFrame) continue;
+
+            if (configuredFrame.startsWith('data:')) {
+              const generatedName = `weather_${safeBase}_${i}.png`;
+              const { bytes } = decodeDataUrlToBytes(configuredFrame, `Weather custom frame ${generatedName}`);
+              const newFile = { src: generatedName, file: new File([bytes], generatedName, { type: 'image/png' }) };
+              const existingIndex = elementFiles.findIndex((f) => f.src === generatedName);
+              if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
+              else elementFiles.push(newFile);
+              normalizedFrames.push(generatedName);
+            } else {
+              normalizedFrames.push(configuredFrame);
+            }
+          }
+
+          if (normalizedFrames.length > 0) {
+            resolvedImgLevelFrames.set(el.id, normalizedFrames);
+            continue;
+          }
+        }
 
         const styleKey = `weather_${weatherStyle}`;
-        if (weatherFilesByStyle.has(styleKey)) continue;
-
-        const dataUrls = generateWeatherSet(weatherStyle);
-        for (let i = 0; i < weatherFiles.length; i++) {
-          const filename = weatherFiles[i];
-          const dataUrl = dataUrls[i] ?? dataUrls[0];
-          const { bytes } = decodeDataUrlToBytes(dataUrl, `Weather image ${filename}`);
-          const newFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
-          const existingIndex = elementFiles.findIndex(f => f.src === filename);
-          if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
-          else elementFiles.push(newFile);
+        if (!weatherFilesByStyle.has(styleKey)) {
+          const dataUrls = generateWeatherSet(weatherStyle);
+          for (let i = 0; i < weatherFiles.length; i++) {
+            const filename = weatherFiles[i];
+            const dataUrl = dataUrls[i] ?? dataUrls[0];
+            const { bytes } = decodeDataUrlToBytes(dataUrl, `Weather image ${filename}`);
+            const newFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
+            const existingIndex = elementFiles.findIndex(f => f.src === filename);
+            if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
+            else elementFiles.push(newFile);
+          }
+          weatherFilesByStyle.add(styleKey);
         }
+
         resolvedImgLevelFrames.set(el.id, weatherFiles);
-        weatherFilesByStyle.add(styleKey);
       }
       if (weatherFilesByStyle.size > 0) {
         console.log('[App] Weather IMG_LEVEL assets regenerated:', weatherFilesByStyle.size, 'style set(s)');
@@ -2643,21 +2732,44 @@ function StudioApp() {
         await buildTablerLibrary();
       }
 
-      // Inject icon assets for elements with iconKey.
-      // Apply icon visual effects (hue, saturation, colorize) so what you see = what ships.
+      // Inject icon assets for image-like widgets and apply visual effects (hue/saturation/colorize)
+      // so what you see = what ships in ZPK.
       for (const el of allEditorElements) {
+        const supportsIconEffects = el.type === 'IMG' || el.type === 'IMG_STATUS';
+        if (!supportsIconEffects) continue;
+        const hasEffects = (el.iconHue ?? 0) !== 0 || (el.iconSaturation ?? 100) !== 100 || !!el.iconColorize;
+
         if (el.iconKey) {
           const iconEntry = getIconByKey(el.iconKey);
           if (iconEntry) {
             const safeKey = el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_');
             const filename = `icon_${safeKey}.png`;
-            const hasEffects = (el.iconHue ?? 0) !== 0 || (el.iconSaturation ?? 100) !== 100 || !!el.iconColorize;
             const finalDataUrl = hasEffects
               ? await applyIconEffectsForZPK(iconEntry.dataUrl, el, el.bounds.width || 48, el.bounds.height || 48)
               : iconEntry.dataUrl;
             const { bytes } = decodeDataUrlToBytes(finalDataUrl, `Icon image ${filename}`);
             elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
+            if (el.type === 'IMG_STATUS') {
+              el.src = filename;
+              el.assetFilename = filename;
+              el.iconKey = undefined;
+            }
           }
+          continue;
+        }
+
+        if (hasEffects && el.src) {
+          const sourceDataUrl = await dataUrlFromElementFile(el.src, elementFiles);
+          if (!sourceDataUrl) continue;
+          const filename = `iconfx_${el.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_${el.id}.png`;
+          const finalDataUrl = await applyIconEffectsForZPK(sourceDataUrl, el, el.bounds.width || 48, el.bounds.height || 48);
+          const { bytes } = decodeDataUrlToBytes(finalDataUrl, `Icon image ${filename}`);
+          const newFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
+          const existingIndex = elementFiles.findIndex((f) => f.src === filename);
+          if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
+          else elementFiles.push(newFile);
+          el.src = filename;
+          el.assetFilename = filename;
         }
       }
 
@@ -2734,7 +2846,12 @@ function StudioApp() {
       const exportCombinedElements = exportAodElements ? [...exportElements, ...exportAodElements] : exportElements;
       for (const el of exportElements) {
         if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
-          el.images = weatherImageFilenames();
+          const resolvedFrames = resolvedImgLevelFrames.get(el.id);
+          if (resolvedFrames) {
+            el.images = [...resolvedFrames];
+          } else {
+            el.images = weatherImageFilenames();
+          }
         } else if (el.type === 'IMG_LEVEL') {
           const resolvedFrames = resolvedImgLevelFrames.get(el.id);
           if (resolvedFrames) {
@@ -2748,7 +2865,12 @@ function StudioApp() {
       if (exportAodElements) {
         for (const el of exportAodElements) {
           if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
-            el.images = weatherImageFilenames();
+            const resolvedFrames = resolvedImgLevelFrames.get(el.id);
+            if (resolvedFrames) {
+              el.images = [...resolvedFrames];
+            } else {
+              el.images = weatherImageFilenames();
+            }
           } else if (el.type === 'IMG_LEVEL') {
             const resolvedFrames = resolvedImgLevelFrames.get(el.id);
             if (resolvedFrames) {
@@ -2795,29 +2917,39 @@ function StudioApp() {
           const safeKey = el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_');
           const existingFile = elementFiles.find(f => f.src === `icon_${safeKey}.png`);
           if (existingFile) {
-            const imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
-              const img = new Image();
-              img.onload = () => resolve(img);
-              img.onerror = reject;
-              const reader = new FileReader();
-              reader.onload = () => { img.src = reader.result as string; };
-              reader.readAsDataURL(existingFile.file);
-            });
-            bakeResult = renderImgWithShadowToPng(el, imgEl);
+            const imgEl = await imageFromElementFile(existingFile.src, elementFiles);
+            if (imgEl) bakeResult = renderImgWithShadowToPng(el, imgEl);
           }
+        } else if (el.type === 'IMG_STATUS' && el.src) {
+          const imgEl = await imageFromElementFile(el.src, elementFiles);
+          if (imgEl) bakeResult = renderImgWithShadowToPng(el, imgEl);
         } else if (el.type === 'GAUGE_POINTER') {
           const filename = gaugePointerAssetName(el);
-          const existingFile = elementFiles.find(f => f.src === filename);
-          if (existingFile) {
-            const imgEl = await new Promise<HTMLImageElement>((resolve, reject) => {
-              const img = new Image();
-              img.onload = () => resolve(img);
-              img.onerror = reject;
-              const reader = new FileReader();
-              reader.onload = () => { img.src = reader.result as string; };
-              reader.readAsDataURL(existingFile.file);
-            });
-            bakeResult = renderImgWithShadowToPng(el, imgEl);
+          const imgEl = await imageFromElementFile(filename, elementFiles);
+          if (imgEl) bakeResult = renderImgWithShadowToPng(el, imgEl);
+        } else if ((el.type === 'IMG_LEVEL' || el.type === 'IMG_PROGRESS') && Array.isArray(el.images) && el.images.length > 0) {
+          const bakedFrames: string[] = [];
+          for (let i = 0; i < el.images.length; i += 1) {
+            const src = el.images[i];
+            if (typeof src !== 'string' || src.trim().length === 0) continue;
+
+            const imgEl = await imageFromElementFile(src, elementFiles);
+            if (!imgEl) {
+              bakedFrames.push(src);
+              continue;
+            }
+
+            const frameBake = renderImgWithShadowToPng(el, imgEl);
+            const bakedName = `shadow_${safeName}_${i}.png`;
+            const { bytes } = decodeDataUrlToBytes(frameBake.dataUrl, `Drop shadow image ${bakedName}`);
+            const newFile = { src: bakedName, file: new File([bytes], bakedName, { type: 'image/png' }) };
+            const existingIndex = elementFiles.findIndex((f) => f.src === bakedName);
+            if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
+            else elementFiles.push(newFile);
+            bakedFrames.push(bakedName);
+          }
+          if (bakedFrames.length > 0) {
+            el.images = bakedFrames;
           }
         } else if (el.type === 'FILL_RECT' && !el.engraveFrame) {
           bakeResult = renderFillRectWithShadowToPng(el);
@@ -2831,6 +2963,10 @@ function StudioApp() {
           const filename = `shadow_${safeName}.png`;
           const { bytes } = decodeDataUrlToBytes(bakeResult.dataUrl, `Drop shadow image ${filename}`);
           elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
+          if (el.type === 'IMG_STATUS') {
+            el.src = filename;
+            el.assetFilename = filename;
+          }
           if (el.type === 'GAUGE_POINTER') {
             const pivot = normalizeGaugePivot(el);
             const oldW = Math.max(1, el.bounds.width || 1);
@@ -3032,7 +3168,11 @@ function StudioApp() {
       // Upload to Firebase storage through backend bridge.
       dispatch(actions.setLoadingMessage('Uploading to Firebase...'));
 
-      const watchfaceId = `${state.watchFaceConfig.name.replace(/\s+/g, '_').replace(/[^a-z0-9_-]/gi, '').slice(0, 48) || 'watchface'}_${Date.now()}`;
+      const normalizedTargetId = republishTargetId.trim();
+      const isRepublishExisting = normalizedTargetId.length > 0;
+      const watchfaceId = isRepublishExisting
+        ? normalizedTargetId
+        : `${state.watchFaceConfig.name.replace(/\s+/g, '_').replace(/[^a-z0-9_-]/gi, '').slice(0, 48) || 'watchface'}_${Date.now()}`;
       setUploadedWatchfaceId(watchfaceId);
       const backendBase = (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
         (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
@@ -3042,7 +3182,8 @@ function StudioApp() {
         : '';
       
       dispatch(actions.setLoadingMessage('Generating QR code...'));
-      const qrDataUrl = expectedZpkUrl ? await generateQRCode(expectedZpkUrl) : null;
+      const shouldGenerateQr = !isRepublishExisting || republishMode === 'REGENERATE_ALL';
+      const qrDataUrl = shouldGenerateQr && expectedZpkUrl ? await generateQRCode(expectedZpkUrl) : null;
 
       // Build source.json for safe future regeneration
       const sourceJson = buildSourceJson(withNormalizedPointerEffects(configForBuild));
@@ -3050,10 +3191,13 @@ function StudioApp() {
       const uploadResult = await uploadStudioArtifactsToFirebase({
         watchfaceId,
         zpkBlob: zpkResult.blob,
+        qrMode: shouldGenerateQr ? 'REGENERATE' : 'KEEP_EXISTING',
         qrDataUrl: qrDataUrl ?? undefined,
         previewDataUrl: previewDataUrl ?? undefined,
         sourceJson,
       });
+
+      setLatestUploadResult(uploadResult);
 
       if (!uploadResult.ok) {
         const uploadError = 'Upload failed';
@@ -3092,7 +3236,7 @@ function StudioApp() {
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid]);
+  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId]);
 
   // Handle reset
   const handleReset = useCallback(() => {
@@ -3107,6 +3251,7 @@ function StudioApp() {
     setUploadedWatchfaceId('');
     setShowPublishForm(false);
     setPublishedEntry(null);
+    setLatestUploadResult(null);
     toast.info('Started new watch face');
   }, [dispatch]);
 
@@ -3409,21 +3554,32 @@ function StudioApp() {
                     </div>
                     <div className="flex items-center gap-2 w-full max-w-sm mb-3">
                       <button
-                        onClick={() => setDevicePreviewEnabled((v) => !v)}
+                        onClick={() => setCalibrationEnabled((v) => !v)}
                         className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
-                          devicePreviewEnabled
+                          calibrationEnabled
                             ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
                             : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
                         }`}
-                        title="Simulate Zepp device rendering constraints in preview"
+                        title="Simulate watch display calibration in preview"
                       >
-                        Device Preview Mode
+                        Display Calibration
                       </button>
                       <button
-                        onClick={() => setShowFlickerZones((v) => !v)}
-                        disabled={!devicePreviewEnabled}
+                        onClick={() => setFlickerAnalysisEnabled((v) => !v)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+                          flickerAnalysisEnabled
+                            ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                            : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
+                        }`}
+                        title="Run anti-flicker analysis and warnings"
+                      >
+                        Anti-Flicker Analysis
+                      </button>
+                      <button
+                        onClick={() => setFlickerOverlayEnabled((v) => !v)}
+                        disabled={!flickerAnalysisEnabled}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                          showFlickerZones && devicePreviewEnabled
+                          flickerOverlayEnabled && flickerAnalysisEnabled
                             ? 'bg-red-500/20 border-red-500 text-red-300'
                             : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
                         }`}
@@ -3434,7 +3590,7 @@ function StudioApp() {
                       </button>
                       <button
                         onClick={() => setPreviewRefreshToken((v) => v + 1)}
-                        disabled={!devicePreviewEnabled}
+                        disabled={!flickerAnalysisEnabled}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-white/5 border-white/10 text-white/50 hover:text-white/70"
                         title="Force refresh of per-element warning analysis"
                       >
@@ -3561,8 +3717,9 @@ function StudioApp() {
                         setSelectedElementId(el.id);
                       }}
                       showGrid={showGrid}
-                      devicePreviewEnabled={devicePreviewEnabled}
-                      showFlickerZones={showFlickerZones}
+                      calibrationEnabled={calibrationEnabled}
+                      flickerAnalysisEnabled={flickerAnalysisEnabled}
+                      flickerOverlayEnabled={flickerOverlayEnabled}
                       refreshToken={previewRefreshToken}
                       onElementWarningsChange={setElementWarnings}
                       className="w-full max-w-sm"
@@ -3596,7 +3753,7 @@ function StudioApp() {
                       </div>
                       <ElementList
                         elements={activeElements}
-                        elementWarnings={devicePreviewEnabled ? elementWarnings : {}}
+                        elementWarnings={flickerAnalysisEnabled ? elementWarnings : {}}
                         onToggleVisibility={handleToggleElement}
                         selectedElementId={selectedElementId}
                         onSelectElement={setSelectedElementId}
@@ -3772,6 +3929,43 @@ function StudioApp() {
                 )}
               </div>
             )}
+            <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-3">
+              <p className="text-[11px] text-zinc-400 uppercase tracking-wide">Republish Options</p>
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-zinc-500">Target watchface ID (optional)</label>
+                  <input
+                    list="republish-watchface-ids"
+                    value={republishTargetId}
+                    onChange={(e) => setRepublishTargetId(e.target.value.trim())}
+                    placeholder="Leave empty to create new ID"
+                    className="h-9 w-full rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-200"
+                  />
+                  <datalist id="republish-watchface-ids">
+                    {republishCatalog.map((entry) => (
+                      <option key={entry.id} value={entry.id}>{entry.name}</option>
+                    ))}
+                  </datalist>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-zinc-500">Republish mode</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => setRepublishMode('KEEP_QR')}
+                      className={`h-9 rounded border text-[11px] ${republishMode === 'KEEP_QR' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'}`}
+                    >
+                      Keep QR
+                    </button>
+                    <button
+                      onClick={() => setRepublishMode('REGENERATE_ALL')}
+                      className={`h-9 rounded border text-[11px] ${republishMode === 'REGENERATE_ALL' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'}`}
+                    >
+                      Regenerate All
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-3 pt-4 xl:sticky xl:bottom-0 xl:z-20 xl:bg-[#1A1A1A]/95 xl:backdrop-blur xl:pb-2">
               <Button
                 onClick={handleGenerate}
@@ -3888,6 +4082,8 @@ function StudioApp() {
                 watchfaceId={uploadedWatchfaceId}
                 apiVersion="v3"
                 specGroups={specGroups}
+                publishMode={republishMode}
+                replacedAssets={latestUploadResult?.replacedAssets ?? ['zpk', 'source', 'preview', ...(republishMode === 'REGENERATE_ALL' ? (['qr'] as const) : [])]}
                 onPublished={(entry) => {
                   setPublishedEntry(entry);
                   setShowPublishForm(false);

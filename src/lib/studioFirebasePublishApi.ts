@@ -72,6 +72,8 @@ export interface StudioUploadResult {
   ok: boolean;
   watchfaceId: string;
   downloadUrl?: string;
+  qrMode?: 'KEEP_EXISTING' | 'REGENERATE';
+  replacedAssets?: Array<'zpk' | 'source' | 'preview' | 'qr'>;
   paths: {
     zpkPath: string;
     previewPath: string;
@@ -84,6 +86,7 @@ export async function uploadStudioArtifactsToFirebase(input: {
   watchfaceId: string;
   zpkBlob: Blob;
   qrDataUrl?: string;
+  qrMode?: 'KEEP_EXISTING' | 'REGENERATE';
   previewDataUrl?: string;
   sourceJson: unknown;
 }): Promise<StudioUploadResult> {
@@ -92,6 +95,7 @@ export async function uploadStudioArtifactsToFirebase(input: {
   const payload = {
     watchfaceId: input.watchfaceId,
     zpkBase64,
+    qrMode: input.qrMode || 'REGENERATE',
     qrBase64: input.qrDataUrl || null,
     previewBase64: input.previewDataUrl || null,
     sourceJson: input.sourceJson,
@@ -113,8 +117,22 @@ export async function publishStudioWatchfaceToFirebase(entry: {
   discountPercent: number;
   price: number;
   stripeLink: string | null;
-}): Promise<{ ok: boolean; id: string; published: boolean }> {
-  return adminFetch<{ ok: boolean; id: string; published: boolean }>('studioPublishWatchface', {
+  publishMode?: 'KEEP_QR' | 'REGENERATE_ALL';
+  replacedAssets?: Array<'zpk' | 'source' | 'preview' | 'qr'>;
+}): Promise<{
+  ok: boolean;
+  id: string;
+  published: boolean;
+  publishMode: 'KEEP_QR' | 'REGENERATE_ALL';
+  replacedAssets: Array<'zpk' | 'source' | 'preview' | 'qr'>;
+}> {
+  return adminFetch<{
+    ok: boolean;
+    id: string;
+    published: boolean;
+    publishMode: 'KEEP_QR' | 'REGENERATE_ALL';
+    replacedAssets: Array<'zpk' | 'source' | 'preview' | 'qr'>;
+  }>('studioPublishWatchface', {
     method: 'POST',
     body: JSON.stringify(entry),
   });

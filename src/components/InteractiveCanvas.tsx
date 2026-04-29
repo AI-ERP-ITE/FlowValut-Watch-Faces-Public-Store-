@@ -8,7 +8,7 @@ import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
-import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
+import { normalizeEngraveFrameForParity, renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/pointerEffects';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake, pointerShadowToDropShadow } from '@/lib/effectNormalization';
@@ -28,6 +28,12 @@ const MOCK_HOUR = 10;
 const MOCK_MINUTE = 10;
 const MOCK_SECOND = 30;
 
+const DEVICE_SIM_GAMMA = 0.8;
+const DEVICE_SIM_CONTRAST = 1.22;
+const DEVICE_SIM_DITHER = 0.75;
+const DEVICE_SIM_SHARPEN_CENTER = 1.16;
+const DEVICE_SIM_SHARPEN_NEIGHBOR = 0.04;
+
 export interface InteractiveCanvasProps {
   backgroundImage?: string;
   backgroundTransform?: BackgroundTransform;
@@ -37,8 +43,9 @@ export interface InteractiveCanvasProps {
   onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
   onAddElement?: (el: WatchFaceElement) => void;
   showGrid?: boolean;
-  devicePreviewEnabled?: boolean;
-  showFlickerZones?: boolean;
+  calibrationEnabled?: boolean;
+  flickerAnalysisEnabled?: boolean;
+  flickerOverlayEnabled?: boolean;
   refreshToken?: number;
   onElementWarningsChange?: (warnings: ElementWarningsMap) => void;
   className?: string;
@@ -64,8 +71,9 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   onUpdateElement,
   onAddElement: _onAddElement,
   showGrid,
-  devicePreviewEnabled,
-  showFlickerZones,
+  calibrationEnabled,
+  flickerAnalysisEnabled,
+  flickerOverlayEnabled,
   refreshToken,
   onElementWarningsChange,
   className,
@@ -94,8 +102,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   const lastWarningsKeyRef = useRef<string>('');
   const lastWarningPayloadRef = useRef<ElementWarningsMap>({});
   const lastComputedVersionRef = useRef<Record<string, number>>({});
-  const lastDevicePreviewEnabledRef = useRef<boolean>(!!devicePreviewEnabled);
-  const lastShowFlickerZonesRef = useRef<boolean>(!!showFlickerZones);
+  const lastFlickerAnalysisEnabledRef = useRef<boolean>(!!flickerAnalysisEnabled);
   const lastRefreshTokenRef = useRef<number>(refreshToken ?? 0);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const analysisCtxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -118,6 +125,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     if (!ctx) return;
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.imageSmoothingEnabled = !calibrationEnabled;
 
     // Background
     if (bgImageRef.current) {
@@ -132,10 +140,11 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     // Elements
     drawElements(ctx, elements, iconImageCache.current, digitImageCache.current, draw, handImageCache.current, customHandStylesRef.current);
 
-    if (devicePreviewEnabled) {
+    let sceneFlickerMask: Uint8Array | null = null;
+
+    if (flickerAnalysisEnabled) {
       const forceRecompute =
-        !lastDevicePreviewEnabledRef.current
-        || lastShowFlickerZonesRef.current !== !!showFlickerZones
+        !lastFlickerAnalysisEnabledRef.current
         || lastRefreshTokenRef.current !== (refreshToken ?? 0);
 
       const warningPayload = computeElementWarningsIsolated(elements, {
@@ -158,14 +167,9 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         lastWarningPayloadRef.current = warningPayload;
         onElementWarningsChange?.(warningPayload);
       }
-
-      applyDeviceSimulation(ctx, {
-        showFlickerZones: !!showFlickerZones,
-      });
-
-      lastDevicePreviewEnabledRef.current = true;
-      lastShowFlickerZonesRef.current = !!showFlickerZones;
-      lastRefreshTokenRef.current = refreshToken ?? 0;
+      if (flickerOverlayEnabled) {
+        sceneFlickerMask = computeSceneFlickerMask(ctx);
+      }
     } else {
       if (lastWarningsKeyRef.current !== '{}') {
         lastWarningsKeyRef.current = '{}';
@@ -173,17 +177,25 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         lastComputedVersionRef.current = {};
         onElementWarningsChange?.({});
       }
-      lastDevicePreviewEnabledRef.current = false;
-      lastShowFlickerZonesRef.current = !!showFlickerZones;
-      lastRefreshTokenRef.current = refreshToken ?? 0;
     }
+
+    if (calibrationEnabled) {
+      applyCalibrationSimulation(ctx);
+    }
+
+    if (flickerOverlayEnabled && sceneFlickerMask) {
+      applyFlickerOverlayWithMask(ctx, sceneFlickerMask);
+    }
+
+    lastFlickerAnalysisEnabledRef.current = !!flickerAnalysisEnabled;
+    lastRefreshTokenRef.current = refreshToken ?? 0;
 
     // Selection highlight (drawn after simulation so editor controls remain readable)
     if (selectedElementId) {
       const sel = elements.find((el) => el.id === selectedElementId);
       if (sel) drawSelection(ctx, sel);
     }
-  }, [backgroundTransform, devicePreviewEnabled, elements, onElementWarningsChange, refreshToken, selectedElementId, showFlickerZones]);
+  }, [backgroundTransform, calibrationEnabled, elements, flickerAnalysisEnabled, flickerOverlayEnabled, onElementWarningsChange, refreshToken, selectedElementId]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Suppress click after a drag
@@ -390,7 +402,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
   useEffect(() => {
     draw();
-  }, [devicePreviewEnabled, showFlickerZones, draw]);
+  }, [calibrationEnabled, flickerAnalysisEnabled, flickerOverlayEnabled, draw]);
 
   return (
     <canvas
@@ -405,6 +417,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       style={{
         maxWidth: '100%',
         height: 'auto',
+        imageRendering: calibrationEnabled ? 'pixelated' : 'auto',
         touchAction: 'none',
         boxShadow: '0 0 60px rgba(0, 212, 255, 0.15), inset 0 0 30px rgba(0, 0, 0, 0.5)',
       }}
@@ -930,30 +943,27 @@ function computeElementWarningsIsolated(
   return warnings;
 }
 
-function applyDeviceSimulation(
-  ctx: CanvasRenderingContext2D,
-  options: {
-    showFlickerZones: boolean;
-  },
-): void {
+function computeSceneFlickerMask(ctx: CanvasRenderingContext2D): Uint8Array {
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  return analyzeFlicker(imageData).mask;
+}
+
+function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
   const width = ctx.canvas.width;
   const height = ctx.canvas.height;
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
 
-  // Scene-level invalid mask for optional global red overlay.
-  const originalData = new Uint8ClampedArray(imageData.data);
-  const sourceImageData = new ImageData(new Uint8ClampedArray(originalData), width, height);
-  const flickerAnalysis = analyzeFlicker(sourceImageData);
-
-  // Pipeline order (strict): gamma -> forbidden clamp -> contrast -> quantization -> dither -> clamp -> sharpen
+  // Pipeline order (strict): gamma -> forbidden clamp -> contrast -> quantization -> dither -> clamp -> sharpen.
   for (let i = 0; i < data.length; i += 4) {
     const alpha = data[i + 3];
     if (alpha === 0) continue;
 
-    data[i] = clampByte(Math.pow(data[i] / 255, 0.85) * 255);
-    data[i + 1] = clampByte(Math.pow(data[i + 1] / 255, 0.85) * 255);
-    data[i + 2] = clampByte(Math.pow(data[i + 2] / 255, 0.85) * 255);
+    data[i] = clampByte(Math.pow(data[i] / 255, DEVICE_SIM_GAMMA) * 255);
+    data[i + 1] = clampByte(Math.pow(data[i + 1] / 255, DEVICE_SIM_GAMMA) * 255);
+    data[i + 2] = clampByte(Math.pow(data[i + 2] / 255, DEVICE_SIM_GAMMA) * 255);
 
     if (isFlickerForbiddenRgb(data[i], data[i + 1], data[i + 2])) {
       if (data[i] > 0 && data[i] < 47) data[i] = 0;
@@ -961,9 +971,9 @@ function applyDeviceSimulation(
       if (data[i + 2] > 0 && data[i + 2] < 47) data[i + 2] = 0;
     }
 
-    data[i] = clampByte((data[i] - 128) * 1.15 + 128);
-    data[i + 1] = clampByte((data[i + 1] - 128) * 1.15 + 128);
-    data[i + 2] = clampByte((data[i + 2] - 128) * 1.15 + 128);
+    data[i] = clampByte((data[i] - 128) * DEVICE_SIM_CONTRAST + 128);
+    data[i + 1] = clampByte((data[i + 1] - 128) * DEVICE_SIM_CONTRAST + 128);
+    data[i + 2] = clampByte((data[i + 2] - 128) * DEVICE_SIM_CONTRAST + 128);
   }
 
   for (let y = 0; y < height; y += 1) {
@@ -971,7 +981,7 @@ function applyDeviceSimulation(
       const idx = (y * width + x) * 4;
       if (data[idx + 3] === 0) continue;
 
-      const dither = (BAYER_4X4[y & 3][x & 3] - 7.5) * 0.9;
+      const dither = (BAYER_4X4[y & 3][x & 3] - 7.5) * DEVICE_SIM_DITHER;
       const qr = clampByte(data[idx] + dither);
       const qg = clampByte(data[idx + 1] + dither);
       const qb = clampByte(data[idx + 2] + dither);
@@ -998,15 +1008,21 @@ function applyDeviceSimulation(
         const bottom = sharpenSource[((y + 1) * width + x) * 4 + c];
         const left = sharpenSource[(y * width + (x - 1)) * 4 + c];
         const right = sharpenSource[(y * width + (x + 1)) * 4 + c];
-        const sharpened = center * 1.08 - (top + bottom + left + right) * 0.02;
+        const sharpened = center * DEVICE_SIM_SHARPEN_CENTER - (top + bottom + left + right) * DEVICE_SIM_SHARPEN_NEIGHBOR;
         data[idx + c] = clampByte(sharpened);
       }
     }
   }
 
-  if (options.showFlickerZones) {
-    addFlickerOverlay(data, flickerAnalysis.mask);
-  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function applyFlickerOverlayWithMask(ctx: CanvasRenderingContext2D, invalidMask: Uint8Array): void {
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  addFlickerOverlay(data, invalidMask);
 
   ctx.putImageData(imageData, 0, 0);
 }
@@ -1113,16 +1129,29 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           const wStyle = (el.weatherStyle ?? 'flat') as WeatherStyle;
           // Deterministic preview fallback until live weather code simulation is wired.
           const simulatedWeatherCode = 0;
-          const cacheKey = `__weather_${wStyle}_${simulatedWeatherCode}`;
+          const configuredFrames = Array.isArray(el.images)
+            ? el.images.filter((frame): frame is string => typeof frame === 'string' && frame.trim().length > 0)
+            : [];
+          const sourceFrame = configuredFrames.length > 0
+            ? configuredFrames[Math.max(0, Math.min(configuredFrames.length - 1, simulatedWeatherCode))]
+            : null;
+
+          const cacheKey = sourceFrame
+            ? `__weather_custom_${el.id}_${simulatedWeatherCode}_${sourceFrame}`
+            : `__weather_builtin_${wStyle}_${simulatedWeatherCode}`;
+
           const cached = iconCache.get(cacheKey);
           if (cached) {
             ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
           } else {
             const dataUrls = generateWeatherSet(wStyle);
             const clampedIndex = Math.max(0, Math.min(dataUrls.length - 1, simulatedWeatherCode));
-            const img = new Image();
-            img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
-            img.src = dataUrls[clampedIndex] || dataUrls[0];
+            const candidateSrc = sourceFrame || dataUrls[clampedIndex] || dataUrls[0];
+            if (candidateSrc) {
+              const img = new Image();
+              img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
+              img.src = candidateSrc;
+            }
             drawPlaceholder(ctx, el);
           }
         } else {
@@ -1139,7 +1168,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           const cacheKey = `src:${el.id}:${el.src}`;
           const cached = iconCache.get(cacheKey);
           if (cached) {
-            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+            drawImageWithDeterministicIconEffects(ctx, cached, el);
           } else {
             const img = new Image();
             img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
@@ -1339,7 +1368,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
 // ─── Engrave / Emboss frame ────────────────────────────────────────────────────
 
 function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
-  renderEngraveFrameEffect(ctx, el.bounds, el.engraveFrame!);
+  renderEngraveFrameEffect(ctx, el.bounds, normalizeEngraveFrameForParity(el.engraveFrame!));
 }
 
 // ─── Digit element: IMG_TIME, IMG_DATE, IMG_WEEK, TEXT_IMG ──────────────────────
@@ -1369,6 +1398,8 @@ function getPlaceholderText(el: WatchFaceElement): string {
   if (el.dataType === 'BATTERY') return '85%';
   if (el.dataType === 'STEP') return '8432';
   if (el.dataType === 'HEART') return '72';
+  if (el.dataType === 'WEATHER_CURRENT') return '24°';
+  if (el.dataType === 'WEATHER_STATUS') return '☀';
   return el.dataType ?? '123';
 }
 

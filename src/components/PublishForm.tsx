@@ -33,6 +33,8 @@ export interface PublishFormProps {
   apiVersion?: 'v2' | 'v3';
   /** All spec groups (from docs/specGroups.json) */
   specGroups?: Record<string, SpecGroup>;
+  publishMode?: 'KEEP_QR' | 'REGENERATE_ALL';
+  replacedAssets?: Array<'zpk' | 'source' | 'preview' | 'qr'>;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -44,6 +46,8 @@ export function PublishForm({
   onCancel,
   apiVersion = 'v3',
   specGroups = {},
+  publishMode = 'REGENERATE_ALL',
+  replacedAssets = ['zpk', 'source', 'preview', 'qr'],
 }: PublishFormProps) {
   // ── Form field state ────────────────────────────────────────────────────
   const [name, setName]               = useState(watchFaceConfig.name ?? '');
@@ -157,6 +161,8 @@ export function PublishForm({
         discountPercent: entry.discountPercent ?? 0,
         price: entry.price,
         stripeLink: entry.stripeLink,
+        publishMode,
+        replacedAssets,
       });
       onPublished(entry);
     } catch (err) {
@@ -339,6 +345,13 @@ export function PublishForm({
       )}
 
       {/* ── Submit ── */}
+      <div className="rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-xs text-zinc-300">
+        <span className="text-zinc-500">Republish mode:</span>{' '}
+        <span className="font-medium">{publishMode === 'KEEP_QR' ? 'Keep existing QR' : 'Regenerate all assets'}</span>
+        <span className="ml-2 text-zinc-500">assets:</span>{' '}
+        <span className="font-mono text-zinc-200">{replacedAssets.join(', ')}</span>
+      </div>
+
       <button
         onClick={handlePublish}
         disabled={publishing || !name.trim()}

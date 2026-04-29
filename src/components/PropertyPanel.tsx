@@ -1520,8 +1520,8 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
-      {/* Icon Effects — only for IMG elements that have an icon selected */}
-      {element.type === 'IMG' && element.iconKey && (() => {
+      {/* Icon Effects — for image-like icon widgets supported by deterministic effects pipeline */}
+      {(element.type === 'IMG' || element.type === 'IMG_STATUS') && (element.iconKey || element.src) && (() => {
         const updateEffect = (patch: Partial<Pick<WatchFaceElement, 'iconHue' | 'iconSaturation' | 'iconColorize' | 'iconColorizeOpacity'>>) =>
           update(patch);
         const hue = element.iconHue ?? 0;
@@ -1739,7 +1739,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
             const ds = element.dropShadow;
             const updateShadow = (patch: Partial<NonNullable<typeof element.dropShadow>>) =>
               update({ dropShadow: { ...ds, ...patch } });
-            const previewOnly = ['TEXT', 'ARC_PROGRESS', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK', 'TEXT_IMG', 'IMG_STATUS', 'IMG_LEVEL', 'IMG_PROGRESS', 'IMG_ANIM'].includes(element.type);
+            const previewOnly = ['TEXT', 'ARC_PROGRESS', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK', 'TEXT_IMG', 'IMG_ANIM'].includes(element.type);
             return (
               <div className="space-y-2">
                 {/* Color */}
@@ -1784,7 +1784,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                   <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetY}px</span>
                 </div>
                 {previewOnly && (
-                  <p className="text-[9px] text-yellow-500/70 mt-1">⚠ Preview only — shadow not baked into .zpk for this element type</p>
+                  <p className="text-[9px] text-yellow-500/70 mt-1">⚠ Preview only for this runtime widget type — export keeps native widget behavior.</p>
                 )}
               </div>
             );

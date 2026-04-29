@@ -7,6 +7,8 @@ interface Rect {
   height: number;
 }
 
+type EngraveFrameConfig = NonNullable<WatchFaceElement['engraveFrame']>;
+
 function hexToRgba(hex: string, alpha: number): string {
   const safe = (hex || '#000000').replace('#', '').padEnd(6, '0').slice(0, 6);
   const r = parseInt(safe.slice(0, 2), 16) || 0;
@@ -18,7 +20,7 @@ function hexToRgba(hex: string, alpha: number): string {
 export function renderEngraveFrameEffect(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
-  cfg: NonNullable<WatchFaceElement['engraveFrame']>,
+  cfg: EngraveFrameConfig,
 ): void {
   const { x, y, width: w, height: h } = rect;
   const depth = typeof cfg.depth === 'number' ? cfg.depth : 6;
@@ -115,4 +117,16 @@ export function renderEngraveFrameEffect(
     ctx.stroke();
     ctx.restore();
   }
+}
+
+/**
+ * Keep preview and export aligned with the same edge-strength compensation.
+ */
+export function normalizeEngraveFrameForParity(cfg: EngraveFrameConfig): EngraveFrameConfig {
+  return {
+    ...cfg,
+    depth: Math.max(1, (cfg.depth ?? 6) * 0.68),
+    highlightOpacity: Math.max(0, Math.min(1, (cfg.highlightOpacity ?? 0.6) * 0.72)),
+    shadowOpacity: Math.max(0, Math.min(1, (cfg.shadowOpacity ?? 0.6) * 0.72)),
+  };
 }
