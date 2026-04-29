@@ -1629,6 +1629,7 @@ function renderEngraveFrameToPng(el: WatchFaceElement): string {
 
 type EditorMode = 'MAIN' | 'AOD';
 type AodBackgroundMode = 'USE_MAIN_BACKGROUND' | 'UPLOAD_AOD_BACKGROUND' | 'SOLID_COLOR' | 'NONE_BLACK';
+type BackgroundSourceType = 'image' | 'html';
 type CropTarget = 'MAIN' | 'AOD';
 type PhotoEditorTarget = 'MAIN' | 'AOD';
 
@@ -1641,6 +1642,42 @@ function buildSolidBackgroundDataUrl(size: number, color: string): string {
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, size, size);
   return canvas.toDataURL('image/png');
+}
+
+async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, height: number): Promise<string> {
+  const safeWidth = Math.max(1, Math.floor(width));
+  const safeHeight = Math.max(1, Math.floor(height));
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}">
+  <foreignObject width="100%" height="100%">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="width:${safeWidth}px;height:${safeHeight}px;overflow:hidden;background:transparent;">
+      ${rawHtml}
+    </div>
+  </foreignObject>
+</svg>`;
+
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const objectUrl = URL.createObjectURL(blob);
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const next = new Image();
+      next.onload = () => resolve(next);
+      next.onerror = () => reject(new Error('Failed to render HTML background'));
+      next.src = objectUrl;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = safeWidth;
+    canvas.height = safeHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas context unavailable');
+    ctx.clearRect(0, 0, safeWidth, safeHeight);
+    ctx.drawImage(img, 0, 0, safeWidth, safeHeight);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function StudioApp() {
@@ -1971,6 +2008,10 @@ function StudioApp() {
       setAodBackgroundTransform({ ...DEFAULT_BACKGROUND_TRANSFORM });
       setEditorMode('MAIN');
       setSelectedElementId(null);
+      setMainBackgroundSource('image');
+      setMainBackgroundHtml('');
+      setAodBackgroundSource('image');
+      setAodBackgroundHtml('');
       return;
     }
     setAodElements(state.watchFaceConfig.aodElements ? structuredClone(state.watchFaceConfig.aodElements) : null);
@@ -1982,6 +2023,8 @@ function StudioApp() {
     setAodBackgroundFile(null);
     setEditorMode('MAIN');
     setSelectedElementId(null);
+    setAodBackgroundSource('image');
+    setAodBackgroundHtml('');
   }, [state.watchFaceConfig?.name]);
 
   const handleAddElement = () => {
@@ -2147,6 +2190,10 @@ function StudioApp() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [useMockAnalysis, setUseMockAnalysis] = useState(false);
+  const [mainBackgroundSource, setMainBackgroundSource] = useState<BackgroundSourceType>('image');
+  const [mainBackgroundHtml, setMainBackgroundHtml] = useState('');
+  const [aodBackgroundSource, setAodBackgroundSource] = useState<BackgroundSourceType>('image');
+  const [aodBackgroundHtml, setAodBackgroundHtml] = useState('');
 
   // Spec 012 — unified design input tab
   const [designTab, setDesignTab] = useState<'image' | 'html'>('image');
@@ -2230,6 +2277,33 @@ function StudioApp() {
       return { mimeType, bytes };
     } catch {
       throw new Error(`${label}: invalid URI-encoded payload`);
+    }
+  };
+
+  const applyHtmlBackground = async (target: CropTarget) => {
+    const html = (target === 'MAIN' ? mainBackgroundHtml : aodBackgroundHtml).trim();
+    if (!html) {
+      toast.error(`${target} background HTML is empty`);
+      return;
+    }
+
+    try {
+      const dataUrl = await renderHtmlBackgroundToDataUrl(html, activeResolution, activeResolution);
+      const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, `${target} HTML background`);
+
+      if (target === 'MAIN') {
+        dispatch(actions.setBackgroundImage(dataUrl));
+        dispatch(actions.setBackgroundFile(new File([bytes], 'background.png', { type: mimeType })));
+        toast.success('Main background rendered from HTML');
+        return;
+      }
+
+      setAodBackgroundImage(dataUrl);
+      setAodBackgroundFile(new File([bytes], 'aod_background.png', { type: mimeType }));
+      setAodBackgroundMode('UPLOAD_AOD_BACKGROUND');
+      toast.success('AOD background rendered from HTML');
+    } catch (err) {
+      toast.error('Failed to render HTML background: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
@@ -3253,6 +3327,10 @@ function StudioApp() {
     setShowPublishForm(false);
     setPublishedEntry(null);
     setLatestUploadResult(null);
+    setMainBackgroundSource('image');
+    setMainBackgroundHtml('');
+    setAodBackgroundSource('image');
+    setAodBackgroundHtml('');
     toast.info('Started new watch face');
   }, [dispatch]);
 
@@ -3399,13 +3477,49 @@ function StudioApp() {
               )}
             </div>
 
-            {/* Background upload — always visible */}
-            <UploadZone
-              label="Background Image"
-              sublabel="Any size — crop to fit"
-              value={state.backgroundImage}
-              onFileChange={(file) => { dispatch(actions.setBackgroundFile(file)); if (file) openCropTool(file, 'MAIN'); }}
-            />
+            {/* Background source */}
+            <div className="space-y-2">
+              <Label className="text-sm text-zinc-300">Background Source</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setMainBackgroundSource('image')}
+                  className={`h-9 rounded border text-xs transition-colors ${mainBackgroundSource === 'image' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'}`}
+                >
+                  Image
+                </button>
+                <button
+                  onClick={() => setMainBackgroundSource('html')}
+                  className={`h-9 rounded border text-xs transition-colors ${mainBackgroundSource === 'html' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'}`}
+                >
+                  HTML
+                </button>
+              </div>
+            </div>
+            {mainBackgroundSource === 'image' ? (
+              <UploadZone
+                label="Background Image"
+                sublabel="Any size — crop to fit"
+                value={state.backgroundImage}
+                onFileChange={(file) => { dispatch(actions.setBackgroundFile(file)); if (file) openCropTool(file, 'MAIN'); }}
+              />
+            ) : (
+              <div className="space-y-2">
+                <Label className="text-sm text-zinc-300">Background HTML</Label>
+                <textarea
+                  value={mainBackgroundHtml}
+                  onChange={(e) => setMainBackgroundHtml(e.target.value)}
+                  placeholder="Paste HTML for main background..."
+                  className="w-full h-32 px-3 py-2 rounded-md bg-[#0F0F0F] border border-zinc-700 text-white text-xs font-mono placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none resize-y"
+                />
+                <Button
+                  onClick={() => { void applyHtmlBackground('MAIN'); }}
+                  variant="outline"
+                  className="w-full h-9 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white text-xs"
+                >
+                  Apply HTML Background
+                </Button>
+              </div>
+            )}
             {/* T038/T039: Edit Photo button — visible only when a background image is loaded */}
             {state.backgroundImage && (
               <button
@@ -3624,18 +3738,52 @@ function StudioApp() {
                         </select>
                         {aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' && (
                           <div className="space-y-2">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0] ?? null;
-                                if (!file) return;
-                                setAodBackgroundFile(file);
-                                openCropTool(file, 'AOD');
-                              }}
-                              className="text-xs"
-                            />
-                            <p className="text-[11px] text-zinc-400">Upload + crop applies only to AOD mode.</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => setAodBackgroundSource('image')}
+                                className={`h-8 rounded border text-xs transition-colors ${aodBackgroundSource === 'image' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'}`}
+                              >
+                                Image
+                              </button>
+                              <button
+                                onClick={() => setAodBackgroundSource('html')}
+                                className={`h-8 rounded border text-xs transition-colors ${aodBackgroundSource === 'html' ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200' : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'}`}
+                              >
+                                HTML
+                              </button>
+                            </div>
+                            {aodBackgroundSource === 'image' ? (
+                              <>
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0] ?? null;
+                                    if (!file) return;
+                                    setAodBackgroundFile(file);
+                                    openCropTool(file, 'AOD');
+                                  }}
+                                  className="text-xs"
+                                />
+                                <p className="text-[11px] text-zinc-400">Upload + crop applies only to AOD mode.</p>
+                              </>
+                            ) : (
+                              <>
+                                <textarea
+                                  value={aodBackgroundHtml}
+                                  onChange={(e) => setAodBackgroundHtml(e.target.value)}
+                                  placeholder="Paste HTML for AOD background..."
+                                  className="w-full h-24 px-2 py-1.5 rounded-md bg-[#0F0F0F] border border-zinc-700 text-white text-[11px] font-mono placeholder:text-zinc-600 focus:border-cyan-500 focus:outline-none resize-y"
+                                />
+                                <Button
+                                  onClick={() => { void applyHtmlBackground('AOD'); }}
+                                  variant="outline"
+                                  className="w-full h-8 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white text-[11px]"
+                                >
+                                  Apply AOD HTML Background
+                                </Button>
+                              </>
+                            )}
                           </div>
                         )}
                         {aodBackgroundMode === 'SOLID_COLOR' && (
