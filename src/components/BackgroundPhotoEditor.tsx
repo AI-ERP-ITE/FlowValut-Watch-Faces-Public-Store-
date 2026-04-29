@@ -41,6 +41,7 @@ const DEFAULT_SHADOW_CLAMP_ENABLED = false;
 
 function applyShadowClampToImageData(imageData: ImageData, threshold: number): void {
   const data = imageData.data;
+  const midpoint = threshold / 2;
   for (let i = 0; i < data.length; i += 4) {
     let r = data[i];
     let g = data[i + 1];
@@ -49,9 +50,10 @@ function applyShadowClampToImageData(imageData: ImageData, threshold: number): v
 
     if (a === 0) continue;
 
-    if (r > 0 && r < threshold) r = 0;
-    if (g > 0 && g < threshold) g = 0;
-    if (b > 0 && b < threshold) b = 0;
+    // Remap low-band channels to nearest allowed edge instead of hard-zeroing.
+    if (r > 0 && r < threshold) r = r <= midpoint ? 0 : threshold;
+    if (g > 0 && g < threshold) g = g <= midpoint ? 0 : threshold;
+    if (b > 0 && b < threshold) b = b <= midpoint ? 0 : threshold;
 
     data[i] = r;
     data[i + 1] = g;
