@@ -1644,6 +1644,88 @@ function buildSolidBackgroundDataUrl(size: number, color: string): string {
   return canvas.toDataURL('image/png');
 }
 
+function expandSvgUseElements(svgSource: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(svgSource, 'image/svg+xml');
+    const root = doc.documentElement;
+    if (!root || root.nodeName.toLowerCase() !== 'svg') return svgSource;
+
+    // Ensure namespaces are present for broad SVG href compatibility.
+    if (!root.getAttribute('xmlns')) root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    if (!root.getAttribute('xmlns:xlink')) root.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+    const uses = Array.from(doc.querySelectorAll('use'));
+    if (uses.length === 0) return svgSource;
+
+    for (const useEl of uses) {
+      const href = useEl.getAttribute('href') || useEl.getAttribute('xlink:href') || '';
+      if (!href.startsWith('#')) continue;
+      const refId = href.slice(1);
+      if (!refId) continue;
+
+      // CSS.escape is not guaranteed in all engines; use id lookup first.
+      const target = doc.getElementById(refId);
+      if (!target) continue;
+
+      const replacement = (() => {
+        const tag = target.tagName.toLowerCase();
+        // <symbol> is not directly renderable like graphics elements; materialize children.
+        if (tag === 'symbol') {
+          const g = doc.createElementNS('http://www.w3.org/2000/svg', 'g');
+          for (const child of Array.from(target.childNodes)) {
+            g.appendChild(child.cloneNode(true));
+          }
+          return g;
+        }
+        return target.cloneNode(true) as Element;
+      })();
+
+      // Avoid duplicate IDs when cloning template nodes many times.
+      replacement.removeAttribute('id');
+
+      // Preserve per-instance placement/transform from <use>.
+      const tx = Number.parseFloat(useEl.getAttribute('x') || '0');
+      const ty = Number.parseFloat(useEl.getAttribute('y') || '0');
+      const tAttr = useEl.getAttribute('transform') || '';
+      const translate = (tx || ty) ? ` translate(${tx} ${ty})` : '';
+      const mergedTransform = `${tAttr}${translate}`.trim();
+      if (mergedTransform) {
+        const existing = replacement.getAttribute('transform') || '';
+        replacement.setAttribute('transform', `${existing} ${mergedTransform}`.trim());
+      }
+
+      // Copy presentation attributes from <use> to replacement instance.
+      for (const attr of Array.from(useEl.attributes)) {
+        const name = attr.name;
+        if (name === 'href' || name === 'xlink:href' || name === 'x' || name === 'y' || name === 'transform') {
+          continue;
+        }
+        replacement.setAttribute(name, attr.value);
+      }
+
+      useEl.replaceWith(replacement);
+    }
+
+    // Normalize href usage for engines preferring one form.
+    for (const el of Array.from(doc.querySelectorAll('[xlink\\:href]'))) {
+      const xlinkHref = el.getAttribute('xlink:href');
+      if (xlinkHref && !el.getAttribute('href')) {
+        el.setAttribute('href', xlinkHref);
+      }
+    }
+    for (const el of Array.from(doc.querySelectorAll('[href]'))) {
+      const href = el.getAttribute('href');
+      if (href && !el.getAttribute('xlink:href')) {
+        el.setAttribute('xlink:href', href);
+      }
+    }
+
+    return new XMLSerializer().serializeToString(root);
+  } catch {
+    return svgSource;
+  }
+}
+
 async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, height: number): Promise<string> {
   const sanitizedHtml = rawHtml
     // Scripts are not needed for static background rasterization.
@@ -1679,12 +1761,12 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
   const svg = looksLikeSvg
     ? (() => {
       if (svgMatch) {
-        return svgMatch[0];
+        return expandSvgUseElements(svgMatch[0]);
       }
-      return `
+      return expandSvgUseElements(`
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}" viewBox="0 0 ${safeWidth} ${safeHeight}">
   ${normalizedHtml}
-</svg>`;
+</svg>`);
     })()
     : `
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}">
