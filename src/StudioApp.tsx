@@ -11,7 +11,7 @@ import { QRDisplay } from '@/components/QRDisplay';
 import { StepIndicator } from '@/components/StepIndicator';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { ElementList } from '@/components/ElementList';
-import { InteractiveCanvas, type ElementWarningsMap } from '@/components/InteractiveCanvas';
+import { InteractiveCanvas, type CalibrationMode, type ElementWarningsMap } from '@/components/InteractiveCanvas';
 import { PropertyPanel } from '@/components/PropertyPanel';
 
 import { useApp, actions } from '@/context/AppContext';
@@ -1658,6 +1658,7 @@ function StudioApp() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [calibrationEnabled, setCalibrationEnabled] = useState(true);
+  const [calibrationMode, setCalibrationMode] = useState<CalibrationMode>('perceptual-nearest');
   const [flickerAnalysisEnabled, setFlickerAnalysisEnabled] = useState(true);
   const [flickerOverlayEnabled, setFlickerOverlayEnabled] = useState(false);
   const [elementWarnings, setElementWarnings] = useState<ElementWarningsMap>({});
@@ -3564,6 +3565,16 @@ function StudioApp() {
                       >
                         Display Calibration
                       </button>
+                      <select
+                        value={calibrationMode}
+                        onChange={(e) => setCalibrationMode(e.target.value as CalibrationMode)}
+                        disabled={!calibrationEnabled}
+                        className="px-2 py-1.5 rounded-lg border text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-white/15 bg-white/[0.04] text-zinc-200"
+                        title="Calibration profile for display simulation"
+                      >
+                        <option value="perceptual-nearest">Perceptual Nearest</option>
+                        <option value="legacy">Legacy</option>
+                      </select>
                       <button
                         onClick={() => setFlickerAnalysisEnabled((v) => !v)}
                         className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
@@ -3718,6 +3729,7 @@ function StudioApp() {
                       }}
                       showGrid={showGrid}
                       calibrationEnabled={calibrationEnabled}
+                      calibrationMode={calibrationMode}
                       flickerAnalysisEnabled={flickerAnalysisEnabled}
                       flickerOverlayEnabled={flickerOverlayEnabled}
                       refreshToken={previewRefreshToken}

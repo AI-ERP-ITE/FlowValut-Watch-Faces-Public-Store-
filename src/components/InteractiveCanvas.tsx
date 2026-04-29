@@ -28,11 +28,33 @@ const MOCK_HOUR = 10;
 const MOCK_MINUTE = 10;
 const MOCK_SECOND = 30;
 
-const DEVICE_SIM_GAMMA = 0.92;
-const DEVICE_SIM_CONTRAST = 1.08;
-const DEVICE_SIM_DITHER = 0.35;
-const DEVICE_SIM_SHARPEN_CENTER = 1.07;
-const DEVICE_SIM_SHARPEN_NEIGHBOR = 0.0175;
+export type CalibrationMode = 'legacy' | 'perceptual-nearest';
+
+const CALIBRATION_PROFILES: Record<CalibrationMode, {
+  gamma: number;
+  contrast: number;
+  dither: number;
+  sharpenCenter: number;
+  sharpenNeighbor: number;
+  lumaCompensation: number;
+}> = {
+  legacy: {
+    gamma: 0.92,
+    contrast: 1.08,
+    dither: 0.35,
+    sharpenCenter: 1.07,
+    sharpenNeighbor: 0.0175,
+    lumaCompensation: 0,
+  },
+  'perceptual-nearest': {
+    gamma: 0.96,
+    contrast: 1.03,
+    dither: 0,
+    sharpenCenter: 1.04,
+    sharpenNeighbor: 0.01,
+    lumaCompensation: 0.35,
+  },
+};
 
 export interface InteractiveCanvasProps {
   backgroundImage?: string;
@@ -44,6 +66,7 @@ export interface InteractiveCanvasProps {
   onAddElement?: (el: WatchFaceElement) => void;
   showGrid?: boolean;
   calibrationEnabled?: boolean;
+  calibrationMode?: CalibrationMode;
   flickerAnalysisEnabled?: boolean;
   flickerOverlayEnabled?: boolean;
   refreshToken?: number;
@@ -72,6 +95,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   onAddElement: _onAddElement,
   showGrid,
   calibrationEnabled,
+  calibrationMode,
   flickerAnalysisEnabled,
   flickerOverlayEnabled,
   refreshToken,
@@ -180,7 +204,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     }
 
     if (calibrationEnabled) {
-      applyCalibrationSimulation(ctx);
+      applyCalibrationSimulation(ctx, calibrationMode ?? 'perceptual-nearest');
     }
 
     if (flickerOverlayEnabled && sceneFlickerMask) {
@@ -195,7 +219,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const sel = elements.find((el) => el.id === selectedElementId);
       if (sel) drawSelection(ctx, sel);
     }
-  }, [backgroundTransform, calibrationEnabled, elements, flickerAnalysisEnabled, flickerOverlayEnabled, onElementWarningsChange, refreshToken, selectedElementId]);
+  }, [backgroundTransform, calibrationEnabled, calibrationMode, elements, flickerAnalysisEnabled, flickerOverlayEnabled, onElementWarningsChange, refreshToken, selectedElementId]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Suppress click after a drag
@@ -950,7 +974,8 @@ function computeSceneFlickerMask(ctx: CanvasRenderingContext2D): Uint8Array {
   return analyzeFlicker(imageData).mask;
 }
 
-function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
+function applyCalibrationSimulation(ctx: CanvasRenderingContext2D, mode: CalibrationMode): void {
+  const profile = CALIBRATION_PROFILES[mode];
   const width = ctx.canvas.width;
   const height = ctx.canvas.height;
   const imageData = ctx.getImageData(0, 0, width, height);
@@ -962,13 +987,13 @@ function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
     const alpha = data[i + 3];
     if (alpha === 0) continue;
 
-    data[i] = clampByte(Math.pow(data[i] / 255, DEVICE_SIM_GAMMA) * 255);
-    data[i + 1] = clampByte(Math.pow(data[i + 1] / 255, DEVICE_SIM_GAMMA) * 255);
-    data[i + 2] = clampByte(Math.pow(data[i + 2] / 255, DEVICE_SIM_GAMMA) * 255);
+    data[i] = clampByte(Math.pow(data[i] / 255, profile.gamma) * 255);
+    data[i + 1] = clampByte(Math.pow(data[i + 1] / 255, profile.gamma) * 255);
+    data[i + 2] = clampByte(Math.pow(data[i + 2] / 255, profile.gamma) * 255);
 
-    data[i] = clampByte((data[i] - 128) * DEVICE_SIM_CONTRAST + 128);
-    data[i + 1] = clampByte((data[i + 1] - 128) * DEVICE_SIM_CONTRAST + 128);
-    data[i + 2] = clampByte((data[i + 2] - 128) * DEVICE_SIM_CONTRAST + 128);
+    data[i] = clampByte((data[i] - 128) * profile.contrast + 128);
+    data[i + 1] = clampByte((data[i + 1] - 128) * profile.contrast + 128);
+    data[i + 2] = clampByte((data[i + 2] - 128) * profile.contrast + 128);
   }
 
   for (let y = 0; y < height; y += 1) {
@@ -976,14 +1001,27 @@ function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
       const idx = (y * width + x) * 4;
       if (data[idx + 3] === 0) continue;
 
-      const dither = (BAYER_4X4[y & 3][x & 3] - 7.5) * DEVICE_SIM_DITHER;
-      const qr = clampByte(data[idx] + dither);
-      const qg = clampByte(data[idx + 1] + dither);
-      const qb = clampByte(data[idx + 2] + dither);
+      const dither = profile.dither === 0 ? 0 : (BAYER_4X4[y & 3][x & 3] - 7.5) * profile.dither;
+      const sr = clampByte(data[idx] + dither);
+      const sg = clampByte(data[idx + 1] + dither);
+      const sb = clampByte(data[idx + 2] + dither);
 
-      data[idx] = clampByte(toRgb565(qr));
-      data[idx + 1] = clampByte(toRgb565Green(qg));
-      data[idx + 2] = clampByte(toRgb565(qb));
+      let qr = clampByte(toRgb565(sr));
+      let qg = clampByte(toRgb565Green(sg));
+      let qb = clampByte(toRgb565(sb));
+
+      if (profile.lumaCompensation > 0) {
+        const srcLuma = sr * 0.2126 + sg * 0.7152 + sb * 0.0722;
+        const qLuma = qr * 0.2126 + qg * 0.7152 + qb * 0.0722;
+        const delta = (srcLuma - qLuma) * profile.lumaCompensation;
+        qr = clampByte(qr + delta);
+        qg = clampByte(qg + delta);
+        qb = clampByte(qb + delta);
+      }
+
+      data[idx] = qr;
+      data[idx + 1] = qg;
+      data[idx + 2] = qb;
 
     }
   }
@@ -1000,7 +1038,7 @@ function applyCalibrationSimulation(ctx: CanvasRenderingContext2D): void {
         const bottom = sharpenSource[((y + 1) * width + x) * 4 + c];
         const left = sharpenSource[(y * width + (x - 1)) * 4 + c];
         const right = sharpenSource[(y * width + (x + 1)) * 4 + c];
-        const sharpened = center * DEVICE_SIM_SHARPEN_CENTER - (top + bottom + left + right) * DEVICE_SIM_SHARPEN_NEIGHBOR;
+        const sharpened = center * profile.sharpenCenter - (top + bottom + left + right) * profile.sharpenNeighbor;
         data[idx + c] = clampByte(sharpened);
       }
     }
