@@ -1667,10 +1667,22 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
 
   const safeWidth = Math.max(1, Math.floor(width));
   const safeHeight = Math.max(1, Math.floor(height));
-  const svg = `
+  const looksLikeSvg = /<svg[\s>]|<defs[\s>]|<g[\s>]|<circle[\s>]|<rect[\s>]|<path[\s>]|<line[\s>]|<polygon[\s>]|<polyline[\s>]|<ellipse[\s>]/i.test(normalizedHtml);
+
+  const svg = looksLikeSvg
+    ? (() => {
+      if (/<svg[\s>]/i.test(normalizedHtml)) {
+        return normalizedHtml;
+      }
+      return `
+<svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}" viewBox="0 0 ${safeWidth} ${safeHeight}">
+  ${normalizedHtml}
+</svg>`;
+    })()
+    : `
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}">
   <foreignObject width="100%" height="100%">
-    <div xmlns="http://www.w3.org/1999/xhtml" style="width:${safeWidth}px;height:${safeHeight}px;overflow:hidden;background:transparent;">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="all:initial;width:${safeWidth}px;height:${safeHeight}px;overflow:hidden;background:transparent;font-family:Arial,sans-serif;">
       ${normalizedHtml}
     </div>
   </foreignObject>
