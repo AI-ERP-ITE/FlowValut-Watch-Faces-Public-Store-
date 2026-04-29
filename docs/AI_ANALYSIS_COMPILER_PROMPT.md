@@ -21,6 +21,9 @@ Rules:
 8. Use explicit layer dependencies and unique increasing zIndex.
 9. If uncertain, keep valid JSON and report uncertainty in complianceHints.riskyZones.
 10. Keep top-level object strict, but allow flexible nested fields where needed.
+11. Never use `layerModel` as an array. It must be an object with `layerStack` array.
+12. Always include detailed `geometryModel.elements` rows for every visible part you want rendered.
+13. Do not output giant non-background bounding boxes near full canvas size unless truly required.
 
 ## User Prompt Template
 Analyze the watchface and return one strict JSON object following the manual docs/AI_ANALYSIS_COMPILER_GUIDE.md.
@@ -38,8 +41,26 @@ Output requirements:
 - Layer roles must follow canonical order:
   background, texture_base, decorative_base, dial_markers, complications, hands, hand_cover, foreground_fx.
 - Keep schema strict at top-level but flexible inside each required model.
+- Compiler-shape strictness:
+  - `geometryModel` MUST include `canvas` and `elements`.
+  - `layerModel` MUST be `{ "layerStack": [...] }`.
+  - `colorModel.palette` MUST be an array of hex colors, not an object map.
+  - `lightingModel.highlights` and `lightingModel.shadows` MUST be arrays.
+  - `complianceHints` MUST include both `notes` and `riskyZones`.
+- Anti-fallback rendering rules:
+  - Include one geometry element row per visible part (ticks, numerals, subdials, bridge, slot, screws, hands).
+  - Keep part bounds tight around each part; avoid full-canvas generic bounds.
+  - Use `background` as the only full-canvas geometry element.
 - No prose, no markdown, no comments.
 - Return JSON object only.
+
+## Pre-Paste Checklist
+Before pasting into compiler, quickly verify:
+1. JSON parses with no syntax errors.
+2. `layerModel.layerStack` exists.
+3. `geometryModel.elements.length > 0`.
+4. At least one `time_pointer` element exists.
+5. Only `background` is full-canvas.
 
 ## Copy-Paste Quick Version
 SYSTEM:

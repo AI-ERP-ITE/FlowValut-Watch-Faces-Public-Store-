@@ -95,6 +95,12 @@ Must contain:
   - `id`, `type`, `x`, `y`, `width`, `height`
   - optional `centerX`, `centerY`
 
+Rendering guidance for stable preview quality:
+- Add geometry rows for visible subparts (ticks, numerals, subdials, bridge, slot, screws, hands).
+- Use tight bounds around each part.
+- Avoid generic near-full-canvas bounds for non-background elements.
+- Reserve full-canvas bounds primarily for the `background` element.
+
 ### layerModel
 Must contain:
 - `layerStack`: ordered array
@@ -106,6 +112,9 @@ Must contain:
   - `clipRefs`
   - `mustContain`
   - `elements`
+
+Important shape constraint:
+- `layerModel` is an object containing `layerStack`; it is not a raw array.
 
 ### lightingModel
 Must contain:

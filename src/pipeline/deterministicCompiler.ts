@@ -72,12 +72,10 @@ function drawTimePointer(el: GeometryEl, color: string): string {
   ].join('');
 }
 
-function drawGenericElement(el: GeometryEl, color: string, label: string): string {
+function drawGenericElement(el: GeometryEl, color: string): string {
   const rx = Math.max(4, Math.min(el.width, el.height) * 0.08);
-  const labelY = Math.max(12, el.y + Math.min(16, el.height * 0.35));
   return [
-    `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${rx}" fill="none" stroke="${color}" stroke-width="2"/>`,
-    `<text x="${el.x + 6}" y="${labelY}" fill="${color}" font-size="10">${escapeXml(label)}</text>`,
+    `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${rx}" fill="none" stroke="${color}" stroke-width="2" opacity="0.5"/>`,
   ].join('');
 }
 
@@ -217,11 +215,11 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
         : '';
 
       const renderedElements = layer.elements
-        .map((element, elementIndex) => {
+        .map((element) => {
           const found = geoById.get(element.id);
+          const scaffoldDriven = /^(dial_base|bezel_ring|minute_ticks|minute_numerals|hour_indices|triangle_marker|central_bridge|subdial_|slot_window|screw)/i.test(element.id);
           if (!found) {
-            const y = 18 + (index * 14) + elementIndex * 12;
-            return `<text x="8" y="${y}" fill="${stroke}" font-size="9">${escapeXml(element.type)}:${escapeXml(element.id)}</text>`;
+            return '';
           }
 
           if (
@@ -236,19 +234,22 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
             return '';
           }
 
-          // Avoid giant full-canvas fallback boxes that hide all detail.
-          if (found.width >= width * 0.9 && found.height >= height * 0.9) {
-            return `<text x="8" y="${18 + index * 11}" fill="${stroke}" font-size="9">${escapeXml(element.type)}:${escapeXml(element.id)}</text>`;
+          if (scaffoldDriven) {
+            return '';
           }
 
-          const shortLabel = `${element.type}:${element.id}`;
-          return drawGenericElement(found, stroke, shortLabel);
+          // Avoid giant full-canvas fallback boxes that hide all detail.
+          if (found.width >= width * 0.9 && found.height >= height * 0.9) {
+            return '';
+          }
+
+          return drawGenericElement(found, stroke);
         })
         .join('');
 
       const layerGuide = layer.role === 'background'
         ? ''
-        : `<text x="8" y="${height - 8 - index * 11}" fill="${stroke}" opacity="0.65" font-size="9">${escapeXml(layer.role)}</text>`;
+        : '';
 
       const groupOpen = layer.clipRefs.length > 0
         ? `<g id="${escapeXml(layer.id)}" clip-path="url(#${escapeXml(layer.clipRefs[0])})">`
