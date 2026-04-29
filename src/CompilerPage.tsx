@@ -177,7 +177,7 @@ export default function CompilerPage() {
                     dangerouslySetInnerHTML={{ __html: compiledSvg }}
                   />
                 ) : (
-                  <p className="text-xs text-zinc-500">Run compile to preview deterministic output.</p>
+                  <p className="text-xs text-zinc-500">Run compile to preview deterministic output (v2 renderer).</p>
                 )}
               </div>
             </div>
