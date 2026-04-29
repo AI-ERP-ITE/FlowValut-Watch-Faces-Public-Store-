@@ -1657,17 +1657,23 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
     // Remote CSS urls can taint canvas too.
     .replace(/url\((['"]?)(https?:)?\/\/[^\)]+\1\)/gi, 'none');
 
-  // Convert permissive HTML into normalized body markup so invalid/unclosed tags
-  // do not break XML parsing when embedded in SVG foreignObject.
-  const parsed = new DOMParser().parseFromString(`<body>${sanitizedHtml}</body>`, 'text/html');
-  const normalizedHtml = parsed.body?.innerHTML?.trim() || '';
-  if (!normalizedHtml) {
+  const source = sanitizedHtml.trim();
+  if (!source) {
     throw new Error('HTML is empty after sanitization. Use inline HTML/CSS or data URLs.');
   }
 
   const safeWidth = Math.max(1, Math.floor(width));
   const safeHeight = Math.max(1, Math.floor(height));
-  const looksLikeSvg = /<svg[\s>]|<defs[\s>]|<g[\s>]|<circle[\s>]|<rect[\s>]|<path[\s>]|<line[\s>]|<polygon[\s>]|<polyline[\s>]|<ellipse[\s>]/i.test(normalizedHtml);
+  const looksLikeSvg = /<svg[\s>]|<defs[\s>]|<g[\s>]|<circle[\s>]|<rect[\s>]|<path[\s>]|<line[\s>]|<polygon[\s>]|<polyline[\s>]|<ellipse[\s>]/i.test(source);
+
+  // Important: keep SVG input as XML text. Parsing as text/html rewrites self-closing
+  // tags (e.g. <stop />), which can make SVG invalid and fail image decode.
+  const normalizedHtml = looksLikeSvg
+    ? source
+    : (() => {
+      const parsed = new DOMParser().parseFromString(`<body>${source}</body>`, 'text/html');
+      return parsed.body?.innerHTML?.trim() || '';
+    })();
 
   const svg = looksLikeSvg
     ? (() => {
