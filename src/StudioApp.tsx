@@ -1795,6 +1795,29 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
   const looksLikeSvg = /<svg[\s>]|<defs[\s>]|<g[\s>]|<circle[\s>]|<rect[\s>]|<path[\s>]|<line[\s>]|<polygon[\s>]|<polyline[\s>]|<ellipse[\s>]/i.test(source);
   const svgMatch = source.match(/<svg[\s\S]*?<\/svg>/i);
 
+  const collectInlineStyles = (html: string): string => {
+    try {
+      const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+      const css = Array.from(parsed.querySelectorAll('style'))
+        .map((node) => node.textContent || '')
+        .join('\n')
+        .trim();
+      return css;
+    } catch {
+      return '';
+    }
+  };
+
+  const inlineCss = collectInlineStyles(source);
+  const mergeInlineCssIntoSvg = (svgText: string, cssText: string): string => {
+    if (!cssText.trim()) return svgText;
+    const styleBlock = `<style><![CDATA[${cssText}]]></style>`;
+    if (/<defs[\s>]/i.test(svgText)) {
+      return svgText.replace(/<defs([^>]*)>/i, `<defs$1>${styleBlock}`);
+    }
+    return svgText.replace(/<svg([^>]*)>/i, `<svg$1><defs>${styleBlock}</defs>`);
+  };
+
   // Important: keep SVG input as XML text. Parsing as text/html rewrites self-closing
   // tags (e.g. <stop />), which can make SVG invalid and fail image decode.
   const normalizedHtml = looksLikeSvg
@@ -1807,12 +1830,12 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
   const svg = looksLikeSvg
     ? (() => {
       if (svgMatch) {
-        return expandSvgUseElements(svgMatch[0]);
+        return expandSvgUseElements(mergeInlineCssIntoSvg(svgMatch[0], inlineCss));
       }
-      return expandSvgUseElements(`
+      return expandSvgUseElements(mergeInlineCssIntoSvg(`
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}" viewBox="0 0 ${safeWidth} ${safeHeight}">
   ${normalizedHtml}
-</svg>`);
+</svg>`, inlineCss));
     })()
     : `
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}">
