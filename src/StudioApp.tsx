@@ -1657,13 +1657,21 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
     // Remote CSS urls can taint canvas too.
     .replace(/url\((['"]?)(https?:)?\/\/[^\)]+\1\)/gi, 'none');
 
+  // Convert permissive HTML into normalized body markup so invalid/unclosed tags
+  // do not break XML parsing when embedded in SVG foreignObject.
+  const parsed = new DOMParser().parseFromString(`<body>${sanitizedHtml}</body>`, 'text/html');
+  const normalizedHtml = parsed.body?.innerHTML?.trim() || '';
+  if (!normalizedHtml) {
+    throw new Error('HTML is empty after sanitization. Use inline HTML/CSS or data URLs.');
+  }
+
   const safeWidth = Math.max(1, Math.floor(width));
   const safeHeight = Math.max(1, Math.floor(height));
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}">
   <foreignObject width="100%" height="100%">
     <div xmlns="http://www.w3.org/1999/xhtml" style="width:${safeWidth}px;height:${safeHeight}px;overflow:hidden;background:transparent;">
-      ${sanitizedHtml}
+      ${normalizedHtml}
     </div>
   </foreignObject>
 </svg>`;
@@ -1675,7 +1683,7 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const next = new Image();
       next.onload = () => resolve(next);
-      next.onerror = () => reject(new Error('Failed to render HTML background'));
+      next.onerror = () => reject(new Error('HTML could not be rasterized. Ensure valid inline HTML/CSS and avoid scripts/remote assets.'));
       next.src = objectUrl;
     });
 
