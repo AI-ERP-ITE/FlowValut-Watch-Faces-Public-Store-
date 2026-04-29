@@ -35,6 +35,7 @@ interface GeometryEl {
   height: number;
   centerX?: number;
   centerY?: number;
+  [key: string]: unknown;
 }
 
 interface CircleSpec {
@@ -79,6 +80,82 @@ function drawGenericElement(el: GeometryEl, color: string): string {
   ].join('');
 }
 
+function drawRing(el: GeometryEl, color: string): string {
+  const cx = el.centerX ?? el.x + el.width / 2;
+  const cy = el.centerY ?? el.y + el.height / 2;
+  const radius = asNumber(el.radius) ?? Math.max(6, Math.min(el.width, el.height) / 2 - 2);
+  const thickness = asNumber(el.thickness) ?? Math.max(1.5, radius * 0.08);
+  return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${color}" stroke-width="${thickness}" opacity="0.85"/>`;
+}
+
+function drawRadialTicks(el: GeometryEl, color: string): string {
+  const cx = el.centerX ?? el.x + el.width / 2;
+  const cy = el.centerY ?? el.y + el.height / 2;
+  const count = Math.max(1, Math.floor(asNumber(el.count) ?? 12));
+  const radius = asNumber(el.radius) ?? Math.max(12, Math.min(el.width, el.height) / 2 - 2);
+  const majorEvery = Math.max(1, Math.floor(asNumber(el.majorEvery) ?? 5));
+  const majorLength = asNumber(el.majorLength) ?? Math.max(8, radius * 0.1);
+  const minorLength = asNumber(el.minorLength) ?? Math.max(4, radius * 0.05);
+  const majorWidth = asNumber(el.majorWidth) ?? 2;
+  const minorWidth = asNumber(el.minorWidth) ?? 1;
+
+  const parts: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const deg = -90 + i * (360 / count);
+    const isMajor = i % majorEvery === 0;
+    const len = isMajor ? majorLength : minorLength;
+    const p1 = polar(cx, cy, radius, deg);
+    const p2 = polar(cx, cy, Math.max(1, radius - len), deg);
+    parts.push(
+      `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${color}" stroke-width="${isMajor ? majorWidth : minorWidth}" opacity="${isMajor ? 0.95 : 0.7}"/>`,
+    );
+  }
+  return parts.join('');
+}
+
+function drawRadialRectangles(el: GeometryEl, color: string): string {
+  const cx = el.centerX ?? el.x + el.width / 2;
+  const cy = el.centerY ?? el.y + el.height / 2;
+  const count = Math.max(1, Math.floor(asNumber(el.count) ?? 12));
+  const radius = asNumber(el.radius) ?? Math.max(12, Math.min(el.width, el.height) / 2 - 6);
+  const rectW = asNumber(el.rectWidth) ?? 6;
+  const rectH = asNumber(el.rectHeight) ?? 14;
+
+  const parts: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const deg = -90 + i * (360 / count);
+    const p = polar(cx, cy, radius, deg);
+    parts.push(
+      `<rect x="${p.x - rectW / 2}" y="${p.y - rectH / 2}" width="${rectW}" height="${rectH}" fill="${color}" opacity="0.78" transform="rotate(${deg + 90} ${p.x} ${p.y})"/>`,
+    );
+  }
+  return parts.join('');
+}
+
+function drawRadialText(el: GeometryEl, color: string): string {
+  const cx = el.centerX ?? el.x + el.width / 2;
+  const cy = el.centerY ?? el.y + el.height / 2;
+  const count = Math.max(1, Math.floor(asNumber(el.count) ?? 12));
+  const radius = asNumber(el.radius) ?? Math.max(16, Math.min(el.width, el.height) / 2 - 10);
+  const labels = Array.isArray(el.labels) ? (el.labels as unknown[]) : [];
+  const fontSize = asNumber(el.fontSize) ?? 12;
+
+  const parts: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const deg = -90 + i * (360 / count);
+    const p = polar(cx, cy, radius, deg);
+    const label = labels[i] ?? `${i + 1}`;
+    parts.push(
+      `<text x="${p.x}" y="${p.y}" fill="${color}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="middle" opacity="0.92">${escapeXml(String(label))}</text>`,
+    );
+  }
+  return parts.join('');
+}
+
+function drawPointerSet(el: GeometryEl, color: string): string {
+  return drawTimePointer(el, color);
+}
+
 function polar(cx: number, cy: number, r: number, deg: number): { x: number; y: number } {
   const rad = (deg * Math.PI) / 180;
   return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r };
@@ -112,6 +189,21 @@ function parseRect(raw: unknown): RectSpec | null {
 
 function buildDialScaffold(analysis: WatchfaceAnalysisContract, palette: string[]): string {
   const gm = analysis.geometryModel as unknown as Record<string, unknown>;
+  const hasScaffoldHints = [
+    gm.center,
+    gm.radii,
+    gm.minuteTicks,
+    gm.indices,
+    gm.subdials,
+    gm.bridge,
+    gm.slot,
+    gm.screws,
+  ].some((value) => value !== undefined);
+
+  if (!hasScaffoldHints) {
+    return '';
+  }
+
   const centerRaw = gm.center as Record<string, unknown> | undefined;
   const cx = asNumber(centerRaw?.x) ?? analysis.geometryModel.canvas.width / 2;
   const cy = asNumber(centerRaw?.y) ?? analysis.geometryModel.canvas.height / 2;
@@ -217,30 +309,40 @@ export function compileAnalysisToInlineSvg(analysis: WatchfaceAnalysisContract):
       const renderedElements = layer.elements
         .map((element) => {
           const found = geoById.get(element.id);
-          const scaffoldDriven = /^(dial_base|bezel_ring|minute_ticks|minute_numerals|hour_indices|triangle_marker|central_bridge|subdial_|slot_window|screw)/i.test(element.id);
           if (!found) {
-            return '';
+            return `<g><title>missing-geometry:${escapeXml(element.id)}</title></g>`;
           }
+
+          const effectiveType = String(found.type || element.type || '').toLowerCase();
 
           if (
-            found.type === 'time_pointer'
-            || element.type === 'time_pointer'
+            effectiveType === 'time_pointer'
+            || effectiveType === 'pointer_set'
             || /time[_-]?pointer|hands?/i.test(`${found.type}:${element.type}:${element.id}`)
           ) {
-            return drawTimePointer(found, stroke);
+            return effectiveType === 'pointer_set'
+              ? drawPointerSet(found, stroke)
+              : drawTimePointer(found, stroke);
           }
 
-          if (found.type === 'background' || element.type === 'background') {
+          if (effectiveType === 'background') {
             return '';
           }
 
-          if (scaffoldDriven) {
-            return '';
+          if (effectiveType === 'ring') {
+            return drawRing(found, stroke);
           }
 
-          // Avoid giant full-canvas fallback boxes that hide all detail.
-          if (found.width >= width * 0.9 && found.height >= height * 0.9) {
-            return '';
+          if (effectiveType === 'radial_ticks') {
+            return drawRadialTicks(found, stroke);
+          }
+
+          if (effectiveType === 'radial_rectangles') {
+            return drawRadialRectangles(found, stroke);
+          }
+
+          if (effectiveType === 'radial_text') {
+            return drawRadialText(found, stroke);
           }
 
           return drawGenericElement(found, stroke);

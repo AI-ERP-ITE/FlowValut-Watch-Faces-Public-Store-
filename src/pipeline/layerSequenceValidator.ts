@@ -1,5 +1,6 @@
 import type {
   AnalysisLayer,
+  AnalysisGeometryModel,
   AnalysisLayerModel,
   AnalysisRequirementsModel,
   LayerRole,
@@ -15,6 +16,8 @@ export const CANONICAL_LAYER_ROLES: LayerRole[] = [
   'hand_cover',
   'foreground_fx',
 ];
+
+const ESSENTIAL_LAYER_ROLES: LayerRole[] = ['background', 'hands'];
 
 export interface LayerSequenceValidationResult {
   isValid: boolean;
@@ -58,6 +61,7 @@ function validateMustContainRules(layer: AnalysisLayer): string[] {
 export function validateLayerSequence(
   layerModel: AnalysisLayerModel,
   requirementsModel?: AnalysisRequirementsModel,
+  geometryModel?: AnalysisGeometryModel,
 ): LayerSequenceValidationResult {
   const missingRoles: string[] = [];
   const orderErrors: string[] = [];
@@ -89,7 +93,7 @@ export function validateLayerSequence(
     contentErrors.push(...validateMustContainRules(layer));
   }
 
-  for (const requiredRole of CANONICAL_LAYER_ROLES) {
+  for (const requiredRole of ESSENTIAL_LAYER_ROLES) {
     if (!stack.some(layer => layer.role === requiredRole)) {
       missingRoles.push(`Missing required layer role '${requiredRole}'`);
     }
@@ -138,6 +142,19 @@ export function validateLayerSequence(
         contentErrors.push(
           `Global requirement allows at most ${req.maxCount} '${req.elementType}', found ${actual}`,
         );
+      }
+    }
+  }
+
+  if (geometryModel) {
+    const geometryIds = new Set(geometryModel.elements.map((el) => el.id));
+    for (const layer of stack) {
+      for (const element of layer.elements) {
+        if (!geometryIds.has(element.id)) {
+          contentErrors.push(
+            `Layer '${layer.id}' references element '${element.id}' not found in geometryModel.elements`,
+          );
+        }
       }
     }
   }

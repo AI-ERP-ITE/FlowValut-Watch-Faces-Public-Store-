@@ -38,8 +38,9 @@ Context:
 Output requirements:
 - Include: requirementsModel, geometryModel, layerModel, lightingModel, colorModel, textureModel, complianceHints.
 - Apply hybrid matrix logic (global + per-element).
-- Layer roles must follow canonical order:
-  background, texture_base, decorative_base, dial_markers, complications, hands, hand_cover, foreground_fx.
+- Layer roles must respect canonical order when present.
+- Essential roles: background, hands.
+- Optional roles when design needs them: texture_base, decorative_base, dial_markers, complications, hand_cover, foreground_fx.
 - Keep schema strict at top-level but flexible inside each required model.
 - Compiler-shape strictness:
   - `geometryModel` MUST include `canvas` and `elements`.

@@ -26,7 +26,11 @@ export function validateAnalysisCompliance(
   if (!analysis.textureModel) schemaErrors.push('textureModel is missing');
   if (!analysis.complianceHints) schemaErrors.push('complianceHints is missing');
 
-  const layerResult = validateLayerSequence(analysis.layerModel, analysis.requirementsModel);
+  const layerResult = validateLayerSequence(
+    analysis.layerModel,
+    analysis.requirementsModel,
+    analysis.geometryModel,
+  );
 
   const gates: ComplianceGateResult[] = [
     makeGate('schema-presence', 'Contract Schema Presence', schemaErrors),

@@ -36,15 +36,15 @@ Use this balance to avoid over-restriction:
 This policy is: schema strict, semantics soft.
 
 ## Canonical Layer Order
-Layer stack is back-to-front and must follow this order by semantic role:
-1. `background`
-2. `texture_base`
-3. `decorative_base`
-4. `dial_markers`
-5. `complications`
-6. `hands`
-7. `hand_cover`
-8. `foreground_fx`
+Layer stack is back-to-front and uses this semantic order when roles are present:
+1. `background` (essential)
+2. `texture_base` (optional)
+3. `decorative_base` (optional)
+4. `dial_markers` (optional)
+5. `complications` (optional)
+6. `hands` (essential)
+7. `hand_cover` (optional)
+8. `foreground_fx` (optional)
 
 ## Matrix Design
 Use a hybrid matrix:
