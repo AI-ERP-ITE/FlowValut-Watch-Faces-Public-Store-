@@ -188,26 +188,26 @@ export default function CompilerPage() {
               </div>
               {errorMessage ? <p className="mt-2 text-xs text-red-400">{errorMessage}</p> : null}
             </div>
-
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-zinc-300">Compiled Preview (SVG)</h2>
-              {isPreviewStale ? (
-                <p className="mb-2 text-xs text-amber-400">Input changed after last compile. Compile again to refresh preview.</p>
-              ) : null}
-              <div className="rounded border border-zinc-800 bg-black/30 p-2">
-                {compiledSvg ? (
-                  <div
-                    key={lastCompiledInputHash ?? 'compiled-preview'}
-                    className="mx-auto h-[320px] w-[320px] overflow-hidden rounded border border-zinc-700"
-                    dangerouslySetInnerHTML={{ __html: compiledSvg }}
-                  />
-                ) : (
-                  <p className="text-xs text-zinc-500">Run compile to preview deterministic output (v2 renderer).</p>
-                )}
-              </div>
-            </div>
           </section>
         </div>
+
+        <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-zinc-300">Compiled Preview (SVG)</h2>
+          {isPreviewStale ? (
+            <p className="mb-2 text-xs text-amber-400">Input changed after last compile. Compile again to refresh preview.</p>
+          ) : null}
+          <div className="rounded border border-zinc-800 bg-black/30 p-3">
+            {compiledSvg ? (
+              <div
+                key={lastCompiledInputHash ?? 'compiled-preview'}
+                className="mx-auto aspect-square w-full max-w-[600px] overflow-hidden rounded border border-zinc-700 [&>svg]:h-full [&>svg]:w-full"
+                dangerouslySetInnerHTML={{ __html: compiledSvg }}
+              />
+            ) : (
+              <p className="text-xs text-zinc-500">Run compile to preview deterministic output (v2 renderer).</p>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
