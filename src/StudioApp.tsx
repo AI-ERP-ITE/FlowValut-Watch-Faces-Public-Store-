@@ -1650,60 +1650,106 @@ function expandSvgUseElements(svgSource: string): string {
     const root = doc.documentElement;
     if (!root || root.nodeName.toLowerCase() !== 'svg') return svgSource;
 
+    const parseLength = (value: string | null): number | null => {
+      if (!value) return null;
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const match = trimmed.match(/^(-?\d+(?:\.\d+)?)(px)?$/i);
+      if (!match) return null;
+      const parsed = Number.parseFloat(match[1]);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const parseViewBox = (value: string | null): { x: number; y: number; w: number; h: number } | null => {
+      if (!value) return null;
+      const parts = value
+        .trim()
+        .split(/[\s,]+/)
+        .map((part) => Number.parseFloat(part))
+        .filter((part) => Number.isFinite(part));
+      if (parts.length !== 4) return null;
+      if (parts[2] <= 0 || parts[3] <= 0) return null;
+      return { x: parts[0], y: parts[1], w: parts[2], h: parts[3] };
+    };
+
     // Ensure namespaces are present for broad SVG href compatibility.
     if (!root.getAttribute('xmlns')) root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     if (!root.getAttribute('xmlns:xlink')) root.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
 
-    const uses = Array.from(doc.querySelectorAll('use'));
-    if (uses.length === 0) return svgSource;
+    // Expand recursively because many SVGs chain <use> refs through multiple templates.
+    for (let pass = 0; pass < 8; pass += 1) {
+      const uses = Array.from(doc.querySelectorAll('use'));
+      if (uses.length === 0) break;
+      let replacedInPass = 0;
 
-    for (const useEl of uses) {
-      const href = useEl.getAttribute('href') || useEl.getAttribute('xlink:href') || '';
-      if (!href.startsWith('#')) continue;
-      const refId = href.slice(1);
-      if (!refId) continue;
+      for (const useEl of uses) {
+        const hrefRaw = useEl.getAttribute('href') || useEl.getAttribute('xlink:href') || '';
+        const hashIndex = hrefRaw.lastIndexOf('#');
+        const refId = hashIndex >= 0 ? hrefRaw.slice(hashIndex + 1) : '';
+        if (!refId) continue;
 
-      // CSS.escape is not guaranteed in all engines; use id lookup first.
-      const target = doc.getElementById(refId);
-      if (!target) continue;
+        // CSS.escape is not guaranteed in all engines; use id lookup first.
+        const target = doc.getElementById(refId);
+        if (!target) continue;
 
-      const replacement = (() => {
-        const tag = target.tagName.toLowerCase();
-        // <symbol> is not directly renderable like graphics elements; materialize children.
-        if (tag === 'symbol') {
-          const g = doc.createElementNS('http://www.w3.org/2000/svg', 'g');
-          for (const child of Array.from(target.childNodes)) {
-            g.appendChild(child.cloneNode(true));
+        let handledPositioning = false;
+        const replacement = (() => {
+          const tag = target.tagName.toLowerCase();
+          // <symbol> is not directly renderable like graphics elements; materialize children.
+          if (tag === 'symbol') {
+            const g = doc.createElementNS('http://www.w3.org/2000/svg', 'g');
+            for (const child of Array.from(target.childNodes)) {
+              g.appendChild(child.cloneNode(true));
+            }
+
+            const viewBox = parseViewBox(target.getAttribute('viewBox'));
+            const x = parseLength(useEl.getAttribute('x')) ?? 0;
+            const y = parseLength(useEl.getAttribute('y')) ?? 0;
+            const widthAttr = parseLength(useEl.getAttribute('width'));
+            const heightAttr = parseLength(useEl.getAttribute('height'));
+
+            if (viewBox && widthAttr !== null && heightAttr !== null) {
+              const sx = widthAttr / viewBox.w;
+              const sy = heightAttr / viewBox.h;
+              const tx = x - viewBox.x * sx;
+              const ty = y - viewBox.y * sy;
+              g.setAttribute('transform', `translate(${tx} ${ty}) scale(${sx} ${sy})`);
+              handledPositioning = true;
+            }
+
+            return g;
           }
-          return g;
+          return target.cloneNode(true) as Element;
+        })();
+
+        // Avoid duplicate IDs when cloning template nodes many times.
+        replacement.removeAttribute('id');
+
+        // Preserve per-instance placement/transform from <use>.
+        const tx = Number.parseFloat(useEl.getAttribute('x') || '0');
+        const ty = Number.parseFloat(useEl.getAttribute('y') || '0');
+        const tAttr = useEl.getAttribute('transform') || '';
+        const translate = handledPositioning || (!tx && !ty) ? '' : ` translate(${tx} ${ty})`;
+        const mergedTransform = `${tAttr}${translate}`.trim();
+        if (mergedTransform) {
+          const existing = replacement.getAttribute('transform') || '';
+          replacement.setAttribute('transform', `${existing} ${mergedTransform}`.trim());
         }
-        return target.cloneNode(true) as Element;
-      })();
 
-      // Avoid duplicate IDs when cloning template nodes many times.
-      replacement.removeAttribute('id');
+        // Copy presentation attributes from <use> to replacement instance.
+        for (const attr of Array.from(useEl.attributes)) {
+          const name = attr.name;
+          if (name === 'href' || name === 'xlink:href' || name === 'x' || name === 'y' || name === 'transform' || name === 'width' || name === 'height') {
+            continue;
+          }
+          replacement.setAttribute(name, attr.value);
+        }
 
-      // Preserve per-instance placement/transform from <use>.
-      const tx = Number.parseFloat(useEl.getAttribute('x') || '0');
-      const ty = Number.parseFloat(useEl.getAttribute('y') || '0');
-      const tAttr = useEl.getAttribute('transform') || '';
-      const translate = (tx || ty) ? ` translate(${tx} ${ty})` : '';
-      const mergedTransform = `${tAttr}${translate}`.trim();
-      if (mergedTransform) {
-        const existing = replacement.getAttribute('transform') || '';
-        replacement.setAttribute('transform', `${existing} ${mergedTransform}`.trim());
+        useEl.replaceWith(replacement);
+        replacedInPass += 1;
       }
 
-      // Copy presentation attributes from <use> to replacement instance.
-      for (const attr of Array.from(useEl.attributes)) {
-        const name = attr.name;
-        if (name === 'href' || name === 'xlink:href' || name === 'x' || name === 'y' || name === 'transform') {
-          continue;
-        }
-        replacement.setAttribute(name, attr.value);
-      }
-
-      useEl.replaceWith(replacement);
+      if (replacedInPass === 0) break;
     }
 
     // Normalize href usage for engines preferring one form.
