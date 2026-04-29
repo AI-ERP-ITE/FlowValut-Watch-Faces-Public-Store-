@@ -1650,6 +1650,10 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     // Remote href/src can taint canvas when drawn through foreignObject.
     .replace(/\s(?:src|href)=(["'])(https?:)?\/\/[^"']+\1/gi, '')
+    // Remove remote srcset references.
+    .replace(/\ssrcset=(["'])([\s\S]*?)\1/gi, '')
+    // Remove CSS @import remote styles.
+    .replace(/@import\s+url\((['"]?)(https?:)?\/\/[^\)]+\1\)\s*;?/gi, '')
     // Remote CSS urls can taint canvas too.
     .replace(/url\((['"]?)(https?:)?\/\/[^\)]+\1\)/gi, 'none');
 
@@ -1685,8 +1689,8 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
     try {
       return canvas.toDataURL('image/png');
     } catch (err) {
-      // Browser throws SecurityError when any external resource taints the canvas.
-      if (err instanceof DOMException && err.name === 'SecurityError') {
+      const raw = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      if (/SecurityError|tainted canvas|Tainted canvases/i.test(raw)) {
         throw new Error('HTML contains external assets that cannot be rasterized. Use inline CSS/SVG/data URLs only.');
       }
       throw err;
