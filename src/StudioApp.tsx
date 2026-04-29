@@ -1665,6 +1665,7 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
   const safeWidth = Math.max(1, Math.floor(width));
   const safeHeight = Math.max(1, Math.floor(height));
   const looksLikeSvg = /<svg[\s>]|<defs[\s>]|<g[\s>]|<circle[\s>]|<rect[\s>]|<path[\s>]|<line[\s>]|<polygon[\s>]|<polyline[\s>]|<ellipse[\s>]/i.test(source);
+  const svgMatch = source.match(/<svg[\s\S]*?<\/svg>/i);
 
   // Important: keep SVG input as XML text. Parsing as text/html rewrites self-closing
   // tags (e.g. <stop />), which can make SVG invalid and fail image decode.
@@ -1677,8 +1678,8 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
 
   const svg = looksLikeSvg
     ? (() => {
-      if (/<svg[\s>]/i.test(normalizedHtml)) {
-        return normalizedHtml;
+      if (svgMatch) {
+        return svgMatch[0];
       }
       return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${safeWidth}" height="${safeHeight}" viewBox="0 0 ${safeWidth} ${safeHeight}">
