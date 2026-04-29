@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, AlertTriangle, Hammer } from 'lucide-react';
 import type { WatchfaceAnalysisContract } from '@/types/analysisCompiler';
@@ -56,6 +56,17 @@ export default function CompilerPage() {
   const [analysisText, setAnalysisText] = useState(() => JSON.stringify(SAMPLE_ANALYSIS, null, 2));
   const [compiledSvg, setCompiledSvg] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastCompiledInput, setLastCompiledInput] = useState<string | null>(null);
+  const [lastCompiledInputHash, setLastCompiledInputHash] = useState<string | null>(null);
+
+  const hashInput = (input: string): string => {
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i += 1) {
+      hash ^= input.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `h${(hash >>> 0).toString(16)}`;
+  };
 
   const parsed = useMemo(() => {
     try {
@@ -85,17 +96,27 @@ export default function CompilerPage() {
     }
   }, [parsed.value]);
 
+  useEffect(() => {
+    if (lastCompiledInput !== null && analysisText !== lastCompiledInput && compiledSvg) {
+      setCompiledSvg('');
+    }
+  }, [analysisText, compiledSvg, lastCompiledInput]);
+
   const handleCompile = () => {
     if (!parsed.value || !compliance) return;
     try {
       const result = compileValidatedAnalysis(parsed.value, compliance);
       setCompiledSvg(result.svg);
+      setLastCompiledInput(analysisText);
+      setLastCompiledInputHash(hashInput(analysisText));
       setErrorMessage(null);
     } catch (error) {
       setCompiledSvg('');
       setErrorMessage(error instanceof Error ? error.message : 'Compilation failed');
     }
   };
+
+  const isPreviewStale = Boolean(lastCompiledInput) && analysisText !== lastCompiledInput;
 
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white p-4 md:p-6">
@@ -170,9 +191,13 @@ export default function CompilerPage() {
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-zinc-300">Compiled Preview (SVG)</h2>
+              {isPreviewStale ? (
+                <p className="mb-2 text-xs text-amber-400">Input changed after last compile. Compile again to refresh preview.</p>
+              ) : null}
               <div className="rounded border border-zinc-800 bg-black/30 p-2">
                 {compiledSvg ? (
                   <div
+                    key={lastCompiledInputHash ?? 'compiled-preview'}
                     className="mx-auto h-[320px] w-[320px] overflow-hidden rounded border border-zinc-700"
                     dangerouslySetInnerHTML={{ __html: compiledSvg }}
                   />
