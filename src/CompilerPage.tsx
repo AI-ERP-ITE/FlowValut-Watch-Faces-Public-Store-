@@ -59,7 +59,7 @@ export default function CompilerPage() {
 
   const parsed = useMemo(() => {
     try {
-      return { value: JSON.parse(analysisText) as WatchfaceAnalysisContract, error: null };
+      return { value: JSON.parse(analysisText) as unknown as WatchfaceAnalysisContract, error: null };
     } catch (error) {
       return {
         value: null,
@@ -68,9 +68,21 @@ export default function CompilerPage() {
     }
   }, [analysisText]);
 
+  const layerStack = useMemo(() => {
+    if (!parsed.value || typeof parsed.value !== 'object') return [];
+    const candidate = (parsed.value as { layerModel?: { layerStack?: unknown } }).layerModel?.layerStack;
+    return Array.isArray(candidate)
+      ? candidate as Array<{ id: string; role: string; zIndex: number }>
+      : [];
+  }, [parsed.value]);
+
   const compliance = useMemo(() => {
     if (!parsed.value) return null;
-    return validateAnalysisCompliance(parsed.value);
+    try {
+      return validateAnalysisCompliance(parsed.value);
+    } catch {
+      return null;
+    }
   }, [parsed.value]);
 
   const handleCompile = () => {
@@ -124,12 +136,15 @@ export default function CompilerPage() {
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-zinc-300">Layer Sequence</h2>
               <div className="space-y-1 text-xs text-zinc-300">
-                {parsed.value?.layerModel.layerStack.map((layer) => (
+                {layerStack.map((layer) => (
                   <div key={layer.id} className="flex items-center justify-between rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1">
                     <span>{layer.role}</span>
                     <span className="text-zinc-500">z{layer.zIndex}</span>
                   </div>
                 ))}
+                {!parsed.error && layerStack.length === 0 ? (
+                  <p className="text-xs text-zinc-500">No valid layerStack found in pasted JSON.</p>
+                ) : null}
               </div>
             </div>
 
