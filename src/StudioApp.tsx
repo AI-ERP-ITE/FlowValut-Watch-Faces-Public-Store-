@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1632,6 +1633,47 @@ type AodBackgroundMode = 'USE_MAIN_BACKGROUND' | 'UPLOAD_AOD_BACKGROUND' | 'SOLI
 type BackgroundSourceType = 'image' | 'html';
 type CropTarget = 'MAIN' | 'AOD';
 type PhotoEditorTarget = 'MAIN' | 'AOD';
+type HtmlLibraryTarget = 'background' | 'icon' | 'time_pointer' | 'gauge_pointer' | 'weather_status' | 'all';
+type HtmlLibrarySlot =
+  | 'auto'
+  | 'icon_general'
+  | 'icon_status'
+  | 'time_analog'
+  | 'time_digital'
+  | 'gauge_arc'
+  | 'gauge_pointer'
+  | 'weather_text'
+  | 'weather_icon';
+
+interface HtmlLibrarySlotOption {
+  value: HtmlLibrarySlot;
+  label: string;
+}
+
+const HTML_CREATOR_SLOT_OPTIONS: Record<HtmlLibraryTarget, HtmlLibrarySlotOption[]> = {
+  background: [{ value: 'auto', label: 'Auto' }],
+  icon: [
+    { value: 'auto', label: 'Auto' },
+    { value: 'icon_general', label: 'General Icons (IMG)' },
+    { value: 'icon_status', label: 'Status Icons (IMG_STATUS)' },
+  ],
+  time_pointer: [
+    { value: 'auto', label: 'Auto' },
+    { value: 'time_analog', label: 'Analog Hands (TIME_POINTER)' },
+    { value: 'time_digital', label: 'Digital Time (IMG_TIME)' },
+  ],
+  gauge_pointer: [
+    { value: 'auto', label: 'Auto' },
+    { value: 'gauge_arc', label: 'Arc Progress (ARC_PROGRESS)' },
+    { value: 'gauge_pointer', label: 'Gauge Pointer (GAUGE_POINTER)' },
+  ],
+  weather_status: [
+    { value: 'auto', label: 'Auto' },
+    { value: 'weather_text', label: 'Weather Text (TEXT_IMG)' },
+    { value: 'weather_icon', label: 'Weather Icon (IMG_LEVEL)' },
+  ],
+  all: [{ value: 'auto', label: 'Auto (All)' }],
+};
 
 function buildSolidBackgroundDataUrl(size: number, color: string): string {
   const canvas = document.createElement('canvas');
@@ -1916,6 +1958,7 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
 }
 
 function StudioApp() {
+  const navigate = useNavigate();
   const { state, dispatch } = useApp();
   const [watchModel, setWatchModel] = useState('Balance 2');
   const [watchFaceName, setWatchFaceName] = useState('');
@@ -2431,8 +2474,10 @@ function StudioApp() {
   const [aodBackgroundHtml, setAodBackgroundHtml] = useState('');
 
   // Spec 012 — unified design input tab
-  const [designTab, setDesignTab] = useState<'image' | 'html'>('image');
+  const [designTab, setDesignTab] = useState<'image' | 'html' | 'html_creator'>('image');
   const [htmlInput, setHtmlInput] = useState('');
+  const [htmlInjectTarget, setHtmlInjectTarget] = useState<HtmlLibraryTarget>('icon');
+  const [htmlInjectSlot, setHtmlInjectSlot] = useState<HtmlLibrarySlot>('auto');
 
   // Spec 011 — Background crop tool
   const [cropFile, setCropFile] = useState<File | null>(null);
@@ -2755,6 +2800,131 @@ function StudioApp() {
       dispatch(actions.setLoading(false));
     }
   }, [htmlInput, state.backgroundImage, watchFaceName, watchModel, dispatch]);
+
+  const matchesHtmlTarget = useCallback((el: WatchFaceElement, target: HtmlLibraryTarget): boolean => {
+    if (target === 'all') return true;
+    if (target === 'icon') return el.type === 'IMG' || el.type === 'IMG_STATUS';
+    if (target === 'time_pointer') return el.type === 'TIME_POINTER' || el.type === 'IMG_TIME';
+    if (target === 'gauge_pointer') return el.type === 'GAUGE_POINTER' || el.type === 'ARC_PROGRESS';
+    if (target === 'weather_status') {
+      return (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType))
+        || (el.type === 'TEXT_IMG' && (el.dataType === 'WEATHER_CURRENT' || el.dataType === 'WEATHER_STATUS'));
+    }
+    return false;
+  }, []);
+
+  const matchesHtmlSlot = useCallback((el: WatchFaceElement, slot: HtmlLibrarySlot): boolean => {
+    if (slot === 'auto') return true;
+    if (slot === 'icon_general') return el.type === 'IMG';
+    if (slot === 'icon_status') return el.type === 'IMG_STATUS';
+    if (slot === 'time_analog') return el.type === 'TIME_POINTER';
+    if (slot === 'time_digital') return el.type === 'IMG_TIME';
+    if (slot === 'gauge_arc') return el.type === 'ARC_PROGRESS';
+    if (slot === 'gauge_pointer') return el.type === 'GAUGE_POINTER';
+    if (slot === 'weather_text') {
+      return el.type === 'TEXT_IMG' && (el.dataType === 'WEATHER_CURRENT' || el.dataType === 'WEATHER_STATUS');
+    }
+    if (slot === 'weather_icon') {
+      return el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType);
+    }
+    return false;
+  }, []);
+
+  const htmlCreatorSlotOptions = useMemo(
+    () => HTML_CREATOR_SLOT_OPTIONS[htmlInjectTarget] ?? HTML_CREATOR_SLOT_OPTIONS.all,
+    [htmlInjectTarget],
+  );
+
+  const handleInjectHtmlToLibrary = useCallback(async () => {
+    if (!htmlInput.trim()) {
+      toast.error('HTML Creator input is empty');
+      return;
+    }
+
+    dispatch(actions.setLoading(true));
+    dispatch(actions.setLoadingMessage('Injecting HTML into selected library...'));
+    try {
+      if (htmlInjectTarget === 'background') {
+        const dataUrl = await renderHtmlBackgroundToDataUrl(htmlInput, activeResolution, activeResolution);
+        const { mimeType, bytes } = decodeDataUrlToBytes(dataUrl, 'HTML Creator background');
+        dispatch(actions.setBackgroundImage(dataUrl));
+        dispatch(actions.setBackgroundFile(new File([bytes], 'background.png', { type: mimeType })));
+        toast.success('Background library updated from HTML Creator');
+        return;
+      }
+
+      const domEls = await parseDom(htmlInput);
+      const mappedElements = mapDomToElements(domEls);
+      const selectedElements = mappedElements.filter(
+        (el) => matchesHtmlTarget(el, htmlInjectTarget) && matchesHtmlSlot(el, htmlInjectSlot),
+      );
+      if (selectedElements.length === 0) {
+        toast.error('No matching elements found for selected target library');
+        return;
+      }
+
+      const baseConfig: WatchFaceConfig = state.watchFaceConfig
+        ? { ...state.watchFaceConfig, elements: [...state.watchFaceConfig.elements] }
+        : {
+            name: watchFaceName || 'HTML Creator Watch Face',
+            watchModel: watchModel || 'Balance 2',
+            resolution: { width: 480, height: 480 },
+            background: { src: 'background.png', format: 'TGA-P' },
+            elements: [],
+            aodBackgroundMode: 'USE_MAIN_BACKGROUND',
+            aodBackgroundSrc: null,
+            aodSolidColor: '#000000',
+          };
+
+      const retained = baseConfig.elements.filter(
+        (el) => !(matchesHtmlTarget(el, htmlInjectTarget) && matchesHtmlSlot(el, htmlInjectSlot)),
+      );
+      let nextZ = retained.reduce((maxZ, el) => Math.max(maxZ, el.zIndex), 0) + 1;
+      const injected = selectedElements.map((el) => ({ ...el, zIndex: nextZ++ }));
+      const nextElements = [...retained, ...injected];
+
+      const resolvedElements = nextElements.map((el) => ({
+        widget: el.type,
+        dataType: el.dataType,
+        x: el.bounds.x,
+        y: el.bounds.y,
+        w: el.bounds.width,
+        h: el.bounds.height,
+        color: el.color,
+        iconKey: el.iconKey,
+        assets: el.iconKey
+          ? { src: `icon_${el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png` }
+          : {},
+      })) as unknown as Parameters<typeof generatePipelineAssets>[0];
+
+      const elementImages: ElementImage[] = generatePipelineAssets(resolvedElements);
+      const nextConfig: WatchFaceConfig = {
+        ...baseConfig,
+        elements: nextElements,
+      };
+
+      dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects(nextConfig)));
+      dispatch(actions.setElementImages(elementImages));
+      dispatch(actions.setStep('preview'));
+      const slotLabel = htmlInjectSlot === 'auto' ? 'auto-slot' : htmlInjectSlot;
+      toast.success(`Injected ${injected.length} element(s) into ${htmlInjectTarget}/${slotLabel}`);
+    } catch (err) {
+      toast.error('HTML Creator inject failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      dispatch(actions.setLoading(false));
+    }
+  }, [
+    htmlInput,
+    htmlInjectTarget,
+    htmlInjectSlot,
+    activeResolution,
+    dispatch,
+    state.watchFaceConfig,
+    watchFaceName,
+    watchModel,
+    matchesHtmlTarget,
+    matchesHtmlSlot,
+  ]);
 
   // Handle regenerate ZPK (local download, no GitHub upload)
   // Handle generate ZPK
@@ -3780,9 +3950,41 @@ function StudioApp() {
               bgImage={state.backgroundImage}
             />
 
+            {designTab === 'html_creator' && (
+              <div className="space-y-2">
+                <Label className="text-sm text-zinc-300">HTML Creator Target Library</Label>
+                <select
+                  value={htmlInjectTarget}
+                  onChange={(e) => {
+                    setHtmlInjectTarget(e.target.value as HtmlLibraryTarget);
+                    setHtmlInjectSlot('auto');
+                  }}
+                  className="w-full h-10 px-3 rounded-md bg-[#0F0F0F] border border-zinc-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
+                >
+                  <option value="background">Background</option>
+                  <option value="icon">Icon</option>
+                  <option value="time_pointer">Time Pointer</option>
+                  <option value="gauge_pointer">Gauge Pointer</option>
+                  <option value="weather_status">Weather Status</option>
+                  <option value="all">All Types</option>
+                </select>
+
+                <Label className="text-sm text-zinc-300">HTML Creator Sub-Library Slot</Label>
+                <select
+                  value={htmlInjectSlot}
+                  onChange={(e) => setHtmlInjectSlot(e.target.value as HtmlLibrarySlot)}
+                  className="w-full h-10 px-3 rounded-md bg-[#0F0F0F] border border-zinc-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
+                >
+                  {htmlCreatorSlotOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Action button */}
             <Button
-              onClick={designTab === 'image' ? handleAnalyze : handleLoadLayout}
+              onClick={designTab === 'image' ? handleAnalyze : designTab === 'html' ? handleLoadLayout : handleInjectHtmlToLibrary}
               disabled={
                 designTab === 'image'
                   ? !state.backgroundImage || !state.fullDesignImage
@@ -3796,8 +3998,10 @@ function StudioApp() {
             >
               {designTab === 'image' ? (
                 <><Sparkles className="h-5 w-5 mr-2" />Analyze with AI</>
-              ) : (
+              ) : designTab === 'html' ? (
                 <>{'</>'} Load Layout</>
+              ) : (
+                <><Sparkles className="h-5 w-5 mr-2" />Inject to Library</>
               )}
               <ArrowRight className="h-5 w-5 ml-2" />
             </Button>
@@ -3860,6 +4064,13 @@ function StudioApp() {
                           title="Studio Lab — create icons & upload fonts"
                         >
                           <FlaskConical className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => navigate('/studio/compiler')}
+                          className="p-1.5 rounded-lg border text-xs transition-colors bg-cyan-500/10 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20"
+                          title="Open Compiler Screen"
+                        >
+                          C
                         </button>
                       </div>
                     </div>

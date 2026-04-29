@@ -3,8 +3,8 @@ import { Label } from '@/components/ui/label';
 import { UploadZone } from '@/components/UploadZone';
 
 interface Props {
-  activeTab: 'image' | 'html';
-  onTabChange: (tab: 'image' | 'html') => void;
+  activeTab: 'image' | 'html' | 'html_creator';
+  onTabChange: (tab: 'image' | 'html' | 'html_creator') => void;
   // Image tab
   imageValue: string | null;
   onImageChange: (img: string | null) => void;
@@ -49,6 +49,16 @@ export function DesignInput({
           }`}
         >
           {'</>'} HTML
+        </button>
+        <button
+          onClick={() => onTabChange('html_creator')}
+          className={`flex-1 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'html_creator'
+              ? 'bg-cyan-600 text-white'
+              : 'bg-[#141414] text-zinc-400 hover:text-white'
+          }`}
+        >
+          HTML Creator
         </button>
       </div>
 

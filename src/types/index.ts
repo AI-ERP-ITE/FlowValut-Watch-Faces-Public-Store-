@@ -284,3 +284,5 @@ export interface AppState {
   undoStack: WatchFaceElement[][];
   redoStack: WatchFaceElement[][];
 }
+
+export * from './analysisCompiler';
