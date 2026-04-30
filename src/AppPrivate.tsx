@@ -189,11 +189,7 @@ export default function AppPrivate() {
       />
       <Route
         path="/studio/compiler"
-        element={
-          <PrivateRouteGuard>
-            <Navigate to="/studio" replace />
-          </PrivateRouteGuard>
-        }
+        element={<Navigate to="/studio" replace />}
       />
       <Route path="/lab" element={<Navigate to="/studio/lab" replace />} />
       <Route path="/labs" element={<Navigate to="/studio/lab" replace />} />
