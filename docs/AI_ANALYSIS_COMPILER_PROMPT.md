@@ -10,6 +10,92 @@
 
 ---
 
+## Quick Paste Contract (JSON-Only)
+
+Use this when generating envelopes to avoid parser errors and reduce overhead.
+
+1. Output must be one raw JSON object only.
+2. First non-whitespace char must be `{`.
+3. Last non-whitespace char must be `}`.
+4. No markdown fences, labels, notes, or prefixes/suffixes.
+5. Top-level keys must be exactly: `inventory`, `geometry`, `appearance`.
+6. `inventory.canvas.width/height` must equal source image size.
+7. `inventory.elements.length === geometry.length === appearance.length`.
+8. ID sets must match exactly across all three stages.
+
+Minimal envelope skeleton:
+
+```json
+{
+  "inventory": {
+    "canvas": { "width": 0, "height": 0, "shape": "rect" },
+    "elements": []
+  },
+  "geometry": [],
+  "appearance": []
+}
+```
+
+If parser shows `Unexpected token ...`, response is not raw JSON.
+
+---
+
+## Full-Fidelity Policy (No Compaction)
+
+This compiler workflow is detail-preserving by design.
+
+1. Do not compact or simplify visible details to reduce envelope size.
+2. Envelope size has no practical cap when required to preserve source fidelity.
+3. Dense repeated motifs must be fully enumerated.
+4. Radial text must preserve clearance from nearby marker bands (no overlap).
+5. If boundary depth cues are visible, include seam/highlight/shadow layer support.
+6. Texture labels alone are insufficient; textured materials require supporting overlays.
+
+---
+
+## Universal Renderability Policy
+
+The pipeline is universal and domain-agnostic. For any input image:
+
+1. Every emitted element must be renderable by current compiler primitives.
+2. If a visible detail cannot be represented with existing vector primitives alone,
+  emit an explicit raster patch using supported `shape: "image"` geometry.
+3. Do not use semantic/domain naming to justify element decisions.
+4. Keep the canonical `element` definition as pure visual decomposition only.
+
+---
+
+## End-to-End Fidelity Gate
+
+Schema-valid output is necessary but not sufficient. Final acceptance requires:
+
+1. Structural pass: envelope validates against contract.
+2. Visual pass: rendered output compared against source image using deterministic metrics.
+3. Recommended minimum thresholds:
+  - Pixel similarity >= 0.94
+  - Edge similarity >= 0.90
+  - Color similarity >= 0.92
+  - Weighted score >= 0.94
+
+If visual gate fails, revise inventory/geometry/appearance and re-emit.
+
+---
+
+## Local Artifact Paths (Safe Folder)
+
+When running tool-assisted local generation, write envelope artifacts only to:
+
+1. `app/exports/compiler/temp_env.json` (full verbose envelope)
+2. `app/exports/compiler/visual_envelope_full.json` (single copy source for paste)
+
+Rules:
+
+1. Do not write these artifacts in app root.
+2. `visual_envelope_full.json` must be raw JSON only.
+3. Validate with JSON parse before paste.
+
+---
+
 ## 0. Pipeline overview
 
 ```
@@ -22,266 +108,184 @@ image  ──▶  speckit.compile.master.prompt.md  (chat)
                 └─▶ speckit.compile.emit.agent.md        → VisualEnvelope (JSON)
                                                               │
                                                               ▼
-                                                    paste into CompilerPage
-                                                              │
-                                                  app/src/pipeline/visualValidator.ts   (gates G1–G6)
-                                                  app/src/pipeline/visualRenderer.ts    (deterministic SVG)
-```
+                                                    # Visual Envelope Canonical Contract
 
-The chat side is **purely visual**: shapes, fills, strokes, transforms,
-layering. No watchface semantics (no hour hand, no bezel, no battery, no
-complications). The renderer treats the envelope as a generic illustration.
+                                                    This file is the single source of truth for Visual Envelope JSON accepted by
+                                                    the compiler flow. Speckit master prompt and all compile agents must reference
+                                                    this file and must not redefine conflicting schema variants.
 
----
+                                                    ---
 
-## 1. Top-level shape
+                                                    ## 0. Canonical principles
 
-```ts
-interface VisualEnvelope {
-  inventory:  InventoryDoc;
-  geometry:   GeometryEntry[];
-  appearance: AppearanceEntry[];
-}
-```
+                                                    1. Pure visual only: describe what is seen, not what it means.
+                                                    2. One envelope shape only:
+                                                       - `inventory`
+                                                       - `geometry`
+                                                       - `appearance`
+                                                    3. IDs are immutable across stages: exact one-to-one parity.
+                                                    4. Canvas units are source-image pixel units.
+                                                    5. Canvas width and height must match attached source image resolution.
+                                                    6. Transform fields are flat keys only (no nested `transform` object).
+                                                    7. Polygon points are tuple arrays only: `[[x,y], ...]`.
 
-Every element is identified by an opaque `id` matching the regex
-`^[a-z][a-z0-9_]{0,63}$` (e.g. `el_001`, `bg_layer`, `dot_center`). The same
-`id` set MUST appear identically in `inventory.elements`, `geometry`, and
-`appearance`.
+                                                    ---
 
----
+                                                    ## 1. Envelope shape
 
-## 2. Inventory
+                                                    ```ts
+                                                    interface VisualEnvelope {
+                                                      inventory: InventoryDoc;
+                                                      geometry: GeometryEntry[];
+                                                      appearance: AppearanceEntry[];
+                                                    }
+                                                    ```
 
-```ts
-interface InventoryDoc {
-  canvas: { width: number; height: number; shape: 'rect' | 'circle' };
-  elements: InventoryElement[];
-}
+                                                    ID pattern:
 
-interface InventoryElement {
-  id: string;
-  kind: 'shape' | 'text' | 'image' | 'group';
-  bbox: { x: number; y: number; w: number; h: number };  // axis-aligned, canvas units
-  zOrder: number;          // unique integer, ascending = drawn later (on top)
-  groupId: string | null;  // parent group id, or null
-}
-```
+                                                    `^[a-z][a-z0-9_]{0,63}$`
 
-Rules (gate **G2**):
-- `id` unique across all elements.
-- `zOrder` unique across all elements.
-- If `groupId` is non-null it must reference an element with `kind: 'group'`.
-- Group nesting is **flat** — a `group` element may not have `groupId` set
-  (no nested groups in v1).
-- Every `group` must have at least one child whose `groupId` points to it.
+                                                    The same ID set must exist in all three stages.
 
----
+                                                    ---
 
-## 3. Geometry
+                                                    ## 2. Inventory
 
-```ts
-type GeometryEntry =
-  | GeometryCircle
-  | GeometryArc
-  | GeometryLine
-  | GeometryRect
-  | GeometryPolygon
-  | GeometryPath
-  | GeometryText
-  | GeometryImage
-  | GeometryGroup
-  | GeometryInherit;
-```
+                                                    ```ts
+                                                    interface InventoryDoc {
+                                                      canvas: { width: number; height: number; shape: 'rect' | 'circle' };
+                                                      elements: InventoryElement[];
+                                                    }
 
-Each entry carries `id` plus a `shape` tag. Coordinates are in canvas units.
+                                                    interface InventoryElement {
+                                                      id: string;
+                                                      kind: 'shape' | 'text' | 'image' | 'group';
+                                                      bbox: { x: number; y: number; w: number; h: number };
+                                                      zOrder: number;
+                                                      groupId: string | null;
+                                                    }
+                                                    ```
 
-| shape     | required fields                                                            |
-| --------- | -------------------------------------------------------------------------- |
-| `circle`  | `cx`, `cy`, `r`                                                            |
-| `arc`     | `cx`, `cy`, `rOuter`, `rInner`, `startAngle`, `endAngle` (deg, 0 = 3 o'clock, CW) |
-| `line`    | `x1`, `y1`, `x2`, `y2`                                                     |
-| `rect`    | `x`, `y`, `w`, `h`, optional `rx`                                          |
-| `polygon` | `points: Array<{x,y}>` (≥3)                                                |
-| `path`    | `d` (SVG path data)                                                        |
-| `text`    | `x`, `y`, `content`, `fontSize`, optional `anchor` (`start`/`middle`/`end`), `fontFamily` |
-| `image`   | `x`, `y`, `w`, `h`, `href` (data URI or asset id)                          |
-| `group`   | (no shape geometry — children carry their own)                             |
-| `inherit` | `{ id, inherit: true }` — renderer falls back to bbox + kind defaults      |
+                                                    Inventory rules:
 
-Optional on every non-inherit entry:
+                                                    1. `id` unique.
+                                                    2. `zOrder` unique integer >= 0.
+                                                    3. `groupId` is `null` or references an existing `kind: 'group'` id.
+                                                    4. No nested groups in v1 (`group` entries must have `groupId: null`).
+                                                    5. Every group has at least one child.
 
-```ts
-transform?: {
-  rotateDeg?: number;
-  rotateOrigin?: { x: number; y: number };
-  translate?: { x: number; y: number };
-  scale?: { x: number; y: number };
-};
-```
+                                                    ---
 
-Gate **G3** validates numeric fields are finite, radii ≥ 0, polygons have ≥3
-points, arc inner radius ≤ outer radius.
+                                                    ## 3. Geometry
 
----
+                                                    Allowed entries:
 
-## 4. Appearance
+                                                    ```ts
+                                                    type GeometryEntry =
+                                                      | { id: string; shape: 'circle';  cx: number; cy: number; r: number; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'arc';     cx: number; cy: number; rOuter: number; rInner: number; startDeg: number; sweepDeg: number; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'line';    x1: number; y1: number; x2: number; y2: number; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'rect';    x: number; y: number; w: number; h: number; rx?: number; ry?: number; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'polygon'; points: Array<[number, number]>; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'path';    d: string; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'text';    x: number; y: number; content: string; fontSize: number; anchor: 'start' | 'middle' | 'end'; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'image';   x: number; y: number; w: number; h: number; rotation?: number; scaleX?: number; scaleY?: number; pivotX?: number; pivotY?: number }
+                                                      | { id: string; shape: 'group' }
+                                                      | { id: string; inherit: true };
+                                                    ```
 
-```ts
-type AppearanceEntry = AppearanceItem | AppearanceInherit;
+                                                    Geometry rules:
 
-interface AppearanceItem {
-  id: string;
-  fill: Fill;
-  stroke: Stroke;
-  opacity?: number;          // 0..1, applied to whole element
-  blend?: BlendMode;         // 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten'
-  texture?: Texture;         // 'none' | 'brushed' | 'matte' | 'glossy' | 'metallic'
-  clipPath?: string;         // id of another inventory element used as a clip mask
-}
-```
+                                                    1. One entry per inventory id.
+                                                    2. Numeric fields finite.
+                                                    3. `rInner <= rOuter` for arcs.
+                                                    4. Polygon has >= 3 points and each point is `[number, number]`.
+                                                    5. Do not emit nested `transform` object variants.
 
-### Fill
+                                                    ---
 
-```ts
-type Fill =
-  | { kind: 'solid';  color: HexColor; opacity?: number }
-  | { kind: 'linear'; stops: GradientStop[]; angleDeg: number; opacity?: number }
-  | { kind: 'radial'; cx: number; cy: number; r: number; stops: GradientStop[]; opacity?: number }
-  | { kind: 'none' };
+                                                    ## 4. Appearance
 
-interface GradientStop { offset: number /* 0..1 */; color: HexColor; opacity?: number }
-```
+                                                    ```ts
+                                                    type Fill =
+                                                      | { kind: 'solid'; color: string; opacity?: number }
+                                                      | { kind: 'linear'; angleDeg: number; stops: Array<{ offset: number; color: string; opacity?: number }> }
+                                                      | { kind: 'radial'; cx: number; cy: number; r: number; stops: Array<{ offset: number; color: string; opacity?: number }> }
+                                                      | { kind: 'none' };
 
-### Stroke
+                                                    type Stroke =
+                                                      | 'none'
+                                                      | {
+                                                          color: string;
+                                                          width: number;
+                                                          opacity?: number;
+                                                          dash?: number[];
+                                                          cap?: 'butt' | 'round' | 'square';
+                                                          join?: 'miter' | 'round' | 'bevel';
+                                                        };
 
-```ts
-type Stroke =
-  | 'none'
-  | {
-      color: HexColor;
-      width: number;
-      cap?: 'butt' | 'round' | 'square';
-      join?: 'miter' | 'round' | 'bevel';
-      dashArray?: number[];
-      opacity?: number;
-    };
-```
+                                                    type AppearanceEntry =
+                                                      | {
+                                                          id: string;
+                                                          fill: Fill;
+                                                          stroke: Stroke;
+                                                          opacity?: number;
+                                                          texture?: 'matte' | 'brushed' | 'polished' | 'anodized' | 'lume' | 'printed' | null;
+                                                          blendMode?: 'normal' | 'multiply' | 'screen' | 'overlay' | null;
+                                                          clipPath?: string | null;
+                                                          filter?: 'shadow' | 'glow' | 'blur' | null;
+                                                        }
+                                                      | { id: string; inherit: true };
+                                                    ```
 
-`HexColor` matches `^#([0-9a-f]{6}|[0-9a-f]{8})$` (lowercase, 6 or 8 digit).
-Gate **G4** enforces color format, fill kind discriminator, stroke width ≥ 0,
-gradient stops in `[0,1]` and ≥2 stops, and that any `clipPath` id exists in
-inventory.
+                                                    Appearance rules:
 
-`AppearanceInherit = { id, inherit: true }` — renderer applies the default
-solid mid-grey fill, no stroke.
+                                                    1. One entry per inventory id.
+                                                    2. Colors are lowercase `#rrggbb` or `#rrggbbaa`.
+                                                    3. Gradient stops count >= 2 and each `offset` in `[0,1]`.
+                                                    4. `clipPath`, if present, references an existing inventory id.
+                                                    5. Texture tags must match visible overlays from geometry/inventory when texture is obvious.
 
----
+                                                    ---
 
-## 5. Cross-stage + vocabulary gates
+                                                    ## 5. Validation gates (compiler and audit)
 
-- **G5 cross-stage:** `inventory.elements[].id` ⇔ `geometry[].id` ⇔
-  `appearance[].id` must be identical sets. No extras, no missing ids.
-- **G6 vocabulary:** the envelope must be **shape-only**. The validator
-  rejects any of these tokens anywhere in the JSON (case-insensitive):
+                                                    1. G1: top-level envelope shape.
+                                                    2. G2: inventory integrity.
+                                                    3. G3: geometry coverage and field shape.
+                                                    4. G4: appearance coverage and field shape.
+                                                    5. G5: cross-stage id parity.
+                                                    6. G6: vocabulary anti-leak.
 
-  ```
-  bezel, dial, crown, pusher, subdial, complication,
-  hour_hand, minute_hand, second_hand, pointer, tick, marker,
-  numeral, screw, lume_pip,
-  time_pointer, arc_progress, battery, steps, heart_rate,
-  time_hour, time_minute, time_second
-  ```
+                                                    Forbidden tokens include:
 
-  Use neutral ids like `el_001`, `ring_outer`, `dot_a`, `text_top`. If you
-  catch yourself naming for purpose, rename for shape.
+                                                    `bezel, dial, crown, pusher, subdial, complication, hour_hand, minute_hand, second_hand, pointer, tick, marker, numeral, screw, lume_pip, time_pointer, arc_progress, battery, steps, heart_rate, time_hour, time_minute, time_second`
 
----
+                                                    ---
 
-## 6. Worked example
+                                                    ## 6. Pre-paste checklist
 
-A 480×480 dark dial with a centred radial-gradient circle, a vertical line,
-and a single text label.
+                                                    1. Top-level keys are exactly `inventory`, `geometry`, `appearance`.
+                                                    2. `inventory.canvas.width/height` equals source image width/height.
+                                                    3. All three stages contain the same id set.
+                                                    4. IDs satisfy regex and are purpose-neutral.
+                                                    5. No duplicate `zOrder`.
+                                                    6. All polygon points use tuple format.
+                                                    7. Only flat transform keys are used.
+                                                    8. Colors are lowercase hex.
+                                                    9. No forbidden semantic vocabulary appears.
+                                                    10. JSON starts with `{` and ends with `}` with no extra text.
 
-```json
-{
-  "inventory": {
-    "canvas": { "width": 480, "height": 480, "shape": "circle" },
-    "elements": [
-      { "id": "el_001", "kind": "shape", "bbox": { "x": 0,   "y": 0,   "w": 480, "h": 480 }, "zOrder": 0, "groupId": null },
-      { "id": "el_002", "kind": "shape", "bbox": { "x": 40,  "y": 40,  "w": 400, "h": 400 }, "zOrder": 1, "groupId": null },
-      { "id": "el_003", "kind": "shape", "bbox": { "x": 230, "y": 100, "w": 20,  "h": 280 }, "zOrder": 2, "groupId": null },
-      { "id": "el_004", "kind": "text",  "bbox": { "x": 200, "y": 220, "w": 80,  "h": 40  }, "zOrder": 3, "groupId": null }
-    ]
-  },
-  "geometry": [
-    { "id": "el_001", "shape": "rect",   "x": 0, "y": 0, "w": 480, "h": 480 },
-    { "id": "el_002", "shape": "circle", "cx": 240, "cy": 240, "r": 200 },
-    { "id": "el_003", "shape": "line",   "x1": 240, "y1": 100, "x2": 240, "y2": 380 },
-    { "id": "el_004", "shape": "text",   "x": 240, "y": 250, "content": "SAMPLE", "fontSize": 32, "anchor": "middle" }
-  ],
-  "appearance": [
-    { "id": "el_001", "fill": { "kind": "solid", "color": "#0f172a" }, "stroke": "none" },
-    { "id": "el_002", "fill": { "kind": "radial", "cx": 240, "cy": 240, "r": 200,
-                                "stops": [
-                                  { "offset": 0, "color": "#1e293b" },
-                                  { "offset": 1, "color": "#0f172a" }
-                                ] },
-                       "stroke": { "color": "#475569", "width": 4 } },
-    { "id": "el_003", "fill": { "kind": "none" },
-                       "stroke": { "color": "#e2e8f0", "width": 6, "cap": "round" } },
-    { "id": "el_004", "fill": { "kind": "solid", "color": "#e2e8f0" }, "stroke": "none" }
-  ]
-}
-```
+                                                    ---
 
-This same envelope is used as `SAMPLE_ENVELOPE` inside
-`app/src/CompilerPage.tsx` and is what loads when the page first opens.
+                                                    ## 7. Lock-step files
 
----
+                                                    Update these together for any contract change:
 
-## 7. Pre-paste checklist
-
-Before pasting into the Compiler page, confirm:
-
-1. ☐ Top-level keys are exactly `inventory`, `geometry`, `appearance`.
-2. ☐ `inventory.canvas` has `width`, `height`, `shape`.
-3. ☐ Every `id` matches `^[a-z][a-z0-9_]{0,63}$` and is **shape-named**, not
-   purpose-named.
-4. ☐ `inventory.elements`, `geometry`, `appearance` contain the **same id
-   set** (compare lengths and check pairwise).
-5. ☐ Every `zOrder` is a unique integer.
-6. ☐ Every `groupId` either is `null` or references a `kind: 'group'` element.
-7. ☐ All colors are lowercase hex `#rrggbb` or `#rrggbbaa`.
-8. ☐ Fills carry the right discriminator (`solid` / `linear` / `radial` /
-   `none`); gradients have ≥2 stops with `offset ∈ [0,1]`.
-9. ☐ Strokes are either `'none'` or `{ color, width }` (width ≥ 0).
-10. ☐ `clipPath` references (if any) point to an existing inventory id.
-11. ☐ JSON is valid (paste into a JSON linter if unsure) — the page also shows
-    a parse error inline.
-12. ☐ Forbidden vocabulary scan is clean (see §5).
-
-If validator gates G1–G6 all return PASS, the **Compile Visual Envelope**
-button activates. The renderer then emits a deterministic SVG into the
-preview pane.
-
-If any gate FAILS, copy the validation report **and** the envelope back into
-chat using `use:speckit.compile.patch.prompt.md`; that prompt produces a
-patched envelope for re-paste.
-
----
-
-## 8. Authoritative source files
-
-| concern        | file                                                           |
-| -------------- | -------------------------------------------------------------- |
-| TS types       | `app/src/types/visualSpec.ts`                                  |
-| Validator      | `app/src/pipeline/visualValidator.ts`                          |
-| Renderer       | `app/src/pipeline/visualRenderer.ts`                           |
-| UI             | `app/src/CompilerPage.tsx`                                     |
-| Chat prompts   | `.github/prompts/speckit.compile.*.prompt.md`                  |
-| Chat agents    | `.github/agents/speckit.compile.*.agent.md`                    |
-
-Any change to the contract must update **all** of: types, validator,
-renderer, CompilerPage sample, this doc, and the `speckit.compile.*` agents
-in lock-step.
+                                                    1. `app/src/types/visualSpec.ts`
+                                                    2. `app/src/pipeline/visualValidator.ts`
+                                                    3. `app/src/pipeline/visualRenderer.ts`
+                                                    4. `app/src/CompilerPage.tsx`
+                                                    5. `.github/prompts/speckit.compile.master.prompt.md`
+                                                    6. `.github/agents/speckit.compile.*.agent.md`
+                                                    7. `app/docs/AI_ANALYSIS_COMPILER_GUIDE.md`
