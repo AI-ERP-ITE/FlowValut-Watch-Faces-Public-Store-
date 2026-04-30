@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
+type TemplateElement = Record<string, unknown> & {
+  name?: string;
+};
 type TemplateModel = {
   layout?: Record<string, unknown>;
   scale?: Record<string, unknown>;
@@ -12,8 +15,103 @@ type TemplateModel = {
   effects3d?: Record<string, unknown>;
   styleAdjust?: Record<string, unknown>;
   texture?: Record<string, unknown>;
-  elements: Array<Record<string, unknown>>;
+  elements: Array<TemplateElement>;
 };
+
+const SAMPLE_ELEMENTS: Array<{ name: string; element: TemplateElement }> = [
+  {
+    name: 'Base Bezel Ring',
+    element: {
+      type: 'bezel',
+      role: 'bezel',
+      name: 'Base Bezel Ring',
+      params: { radius: 0.48, thickness: 0.02, stroke: '#d2b879' },
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+    },
+  },
+  {
+    name: 'Main Radial Ticks',
+    element: {
+      type: 'ticks_radial',
+      role: 'ticks',
+      name: 'Main Radial Ticks',
+      params: { count: 60, radius: 0.42, length: 0.02, width: 0.003, majorEvery: 5, majorLength: 0.035 },
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+    },
+  },
+  {
+    name: 'Free Circle Marker',
+    element: {
+      type: 'free_circle',
+      role: 'free_circle',
+      name: 'Free Circle Marker',
+      placement: { mode: 'anchor', config: { anchor: 'top', offset: [0, 16], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+      params: { radius: 0.06, thickness: 0.008, fill: '#4b5a78', stroke: '#d9e4ff' },
+    },
+  },
+  {
+    name: 'Free Bottom Card',
+    element: {
+      type: 'free_rect',
+      role: 'free_rect',
+      name: 'Free Bottom Card',
+      placement: { mode: 'anchor', config: { anchor: 'bottom', offset: [0, -20], rotation: 18 } },
+      symmetry: { mode: 'none', config: {} },
+      params: { width: 0.28, height: 0.11, cornerRadius: 0.03, thickness: 0.008, fill: '#5f536e', stroke: '#e5dcf1' },
+    },
+  },
+  {
+    name: 'Outline Ring',
+    element: {
+      type: 'outline_ring',
+      role: 'outline_ring',
+      name: 'Outline Ring',
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+      params: { radius: 0.44, thickness: 0.016, stroke: '#d6bb6a' },
+    },
+  },
+  {
+    name: 'Outline Frame',
+    element: {
+      type: 'outline_rect',
+      role: 'outline_rect',
+      name: 'Outline Frame',
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+      params: { width: 0.75, height: 0.9, cornerRadius: 0.06, thickness: 0.01, stroke: '#8ca0bf' },
+    },
+  },
+  {
+    name: 'Texture Grain Layer',
+    element: {
+      type: 'texture_layer',
+      role: 'grain_top',
+      name: 'Texture Grain Layer',
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+      params: {
+        shape: 'ring',
+        radius: 0.44,
+        thickness: 0.03,
+        opacity: 0.35,
+        gradient: {
+          from: [0, 0],
+          to: [100, 100],
+          stops: [
+            { offset: 0, color: '#f5e6b0', opacity: 0.3 },
+            { offset: 0.5, color: '#8b7a4e', opacity: 0.22 },
+            { offset: 1, color: '#1b150b', opacity: 0.36 },
+          ],
+        },
+        noise: { density: 0.72, effectRadius: 14 },
+      },
+    },
+  },
+];
 
 const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
 
@@ -53,7 +151,9 @@ export default function ParametricPage() {
     ),
   );
   const [draftError, setDraftError] = useState<string | null>(null);
-  const [previewCandidate, setPreviewCandidate] = useState<Record<string, unknown> | null>(null);
+  const [previewCandidate, setPreviewCandidate] = useState<TemplateElement | null>(null);
+  const [editingNameIndex, setEditingNameIndex] = useState<number | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState('');
   const [svgMarkup, setSvgMarkup] = useState('');
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,19 +178,29 @@ export default function ParametricPage() {
     }
   };
 
-  const parseDraftElement = (): Record<string, unknown> | null => {
+  const ensureElementName = (element: TemplateElement, fallbackIndex = 0): TemplateElement => {
+    const role = typeof element.role === 'string' ? element.role : 'element';
+    const type = typeof element.type === 'string' ? element.type : 'item';
+    const existing = typeof element.name === 'string' ? element.name.trim() : '';
+    return {
+      ...element,
+      name: existing.length > 0 ? existing : `${type}-${role}-${fallbackIndex + 1}`,
+    };
+  };
+
+  const parseDraftElement = (): TemplateElement | null => {
     if (!draftJson.trim()) {
       setDraftError('JSON field is empty. Paste an element object first.');
       return null;
     }
 
     try {
-      const parsed = JSON.parse(draftJson) as Record<string, unknown>;
+      const parsed = JSON.parse(draftJson) as TemplateElement;
       if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
         throw new Error('Element JSON must be an object with string field: type');
       }
       setDraftError(null);
-      return parsed;
+      return ensureElementName(parsed);
     } catch (e) {
       setDraftError(e instanceof Error ? e.message : 'Invalid element JSON.');
       return null;
@@ -105,8 +215,12 @@ export default function ParametricPage() {
       if (!parsed || typeof parsed !== 'object') return null;
       if (!Array.isArray(parsed.elements)) return null;
 
+      const normalizedElements = parsed.elements
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry, index) => ensureElementName(entry as TemplateElement, index));
+
       const normalized: TemplateModel = {
-        elements: parsed.elements.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>,
+        elements: normalizedElements,
       };
       if (parsed.layout && typeof parsed.layout === 'object') normalized.layout = parsed.layout as Record<string, unknown>;
       if (parsed.scale && typeof parsed.scale === 'object') normalized.scale = parsed.scale as Record<string, unknown>;
@@ -218,10 +332,60 @@ export default function ParametricPage() {
 
     setWorkingTemplate((prev) => {
       const base = prev ?? { elements: [] };
-      const next = { ...base, elements: [...base.elements, previewCandidate] };
+      const next = { ...base, elements: [...base.elements, ensureElementName(previewCandidate, base.elements.length)] };
       saveStoredTemplate(next);
       return next;
     });
+  };
+
+  const injectAllSampleElements = () => {
+    setWorkingTemplate((prev) => {
+      const base = prev ?? { elements: [] };
+      const startIndex = base.elements.length;
+      const injected = SAMPLE_ELEMENTS.map((sample, i) => ensureElementName(sample.element, startIndex + i));
+      const next = { ...base, elements: [...base.elements, ...injected] };
+      saveStoredTemplate(next);
+      return next;
+    });
+  };
+
+  const loadSampleToDraft = (sample: TemplateElement) => {
+    setDraftJson(JSON.stringify(sample, null, 2));
+    setDraftError(null);
+  };
+
+  const beginRenameElement = (index: number) => {
+    const element = workingTemplate?.elements[index];
+    if (!element) return;
+    setEditingNameIndex(index);
+    setEditingNameValue(typeof element.name === 'string' ? element.name : '');
+  };
+
+  const saveRenameElement = (index: number) => {
+    const nextName = editingNameValue.trim();
+    setWorkingTemplate((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        elements: prev.elements.map((element, i) =>
+          i === index
+            ? {
+                ...element,
+                name: nextName.length > 0 ? nextName : ensureElementName(element, index).name,
+              }
+            : element,
+        ),
+      };
+      saveStoredTemplate(next);
+      return next;
+    });
+    setEditingNameIndex(null);
+    setEditingNameValue('');
+  };
+
+  const cancelRenameElement = () => {
+    setEditingNameIndex(null);
+    setEditingNameValue('');
   };
 
   const removeElementAt = (index: number) => {
@@ -362,6 +526,7 @@ export default function ParametricPage() {
 
               <div className="mt-3 max-h-56 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/70">
                 {(workingTemplate?.elements ?? []).map((element, index) => {
+                  const name = typeof element.name === 'string' ? element.name : `element-${index + 1}`;
                   const role = typeof element.role === 'string' ? element.role : 'no-role';
                   const type = typeof element.type === 'string' ? element.type : 'unknown';
                   const placement =
@@ -374,18 +539,54 @@ export default function ParametricPage() {
                       : 'none';
 
                   return (
-                    <div key={`${type}-${role}-${index}`} className="flex items-center justify-between border-b border-zinc-800 px-3 py-2 text-xs">
-                      <div className="space-y-0.5">
-                        <p className="font-medium text-zinc-200">{type} · {role}</p>
+                    <div key={`${type}-${role}-${index}`} className="flex items-center justify-between border-b border-zinc-800 px-3 py-2 text-xs gap-2">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        {editingNameIndex === index ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={editingNameValue}
+                              onChange={(e) => setEditingNameValue(e.target.value)}
+                              className="h-7 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                              placeholder="Element name"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => saveRenameElement(index)}
+                              className="rounded border border-emerald-700 px-2 py-1 text-emerald-300 hover:bg-emerald-900/30"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelRenameElement}
+                              className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="font-medium text-zinc-200 truncate">{name} · {type} · {role}</p>
+                        )}
                         <p className="text-zinc-500">placement: {placement} · symmetry: {symmetry}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeElementAt(index)}
-                        className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
-                      >
-                        Remove
-                      </button>
+                      {editingNameIndex !== index ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => beginRenameElement(index)}
+                            className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeElementAt(index)}
+                            className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -395,6 +596,27 @@ export default function ParametricPage() {
               </div>
 
               <h3 className="mt-4 text-xs uppercase tracking-wide text-zinc-400">Draft Element JSON</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                  onClick={injectAllSampleElements}
+                >
+                  Inject All Samples
+                </Button>
+                {SAMPLE_ELEMENTS.map((sample) => (
+                  <Button
+                    key={sample.name}
+                    type="button"
+                    variant="outline"
+                    className="h-8 border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                    onClick={() => loadSampleToDraft(sample.element)}
+                  >
+                    {sample.name}
+                  </Button>
+                ))}
+              </div>
               <textarea
                 value={draftJson}
                 onChange={(e) => setDraftJson(e.target.value)}
