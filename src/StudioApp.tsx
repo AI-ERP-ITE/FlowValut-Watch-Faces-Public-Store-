@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1958,7 +1957,6 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
 }
 
 function StudioApp() {
-  const navigate = useNavigate();
   const { state, dispatch } = useApp();
   const [watchModel, setWatchModel] = useState('Balance 2');
   const [watchFaceName, setWatchFaceName] = useState('');
@@ -4064,13 +4062,6 @@ function StudioApp() {
                           title="Studio Lab — create icons & upload fonts"
                         >
                           <FlaskConical className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => navigate('/studio/compiler')}
-                          className="p-1.5 rounded-lg border text-xs transition-colors bg-cyan-500/10 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20"
-                          title="Open Compiler Screen"
-                        >
-                          C
                         </button>
                       </div>
                     </div>

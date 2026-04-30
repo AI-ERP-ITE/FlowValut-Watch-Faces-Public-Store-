@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import StudioApp from './StudioApp';
 import LabPage from './LabPage';
-import CompilerPage from './CompilerPage';
 import { AdminOpsPage } from '@/components/storefront/AdminOpsPage';
 import {
   completeRedirectSignIn,
@@ -192,7 +191,7 @@ export default function AppPrivate() {
         path="/studio/compiler"
         element={
           <PrivateRouteGuard>
-            <CompilerPage />
+            <Navigate to="/studio" replace />
           </PrivateRouteGuard>
         }
       />
