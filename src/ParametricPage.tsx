@@ -9,6 +9,8 @@ type TemplateModel = {
   elements: Array<Record<string, unknown>>;
 };
 
+const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
+
 const DEFAULT_COLOR_CONTROL = {
   colorControl: {
     mode: 'off' as ColorMode,
@@ -30,7 +32,7 @@ export default function ParametricPage() {
   const [ringRadius, setRingRadius] = useState(44);
   const [tickWidth, setTickWidth] = useState(0.8);
   const [workingTemplate, setWorkingTemplate] = useState<TemplateModel | null>(null);
-  const [injectJson, setInjectJson] = useState(
+  const [draftJson, setDraftJson] = useState(
     JSON.stringify(
       {
         type: 'circle',
@@ -44,10 +46,50 @@ export default function ParametricPage() {
       2,
     ),
   );
-  const [injectError, setInjectError] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [previewCandidate, setPreviewCandidate] = useState<Record<string, unknown> | null>(null);
   const [svgMarkup, setSvgMarkup] = useState('');
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const loadStoredTemplate = (): TemplateModel | null => {
+    try {
+      const raw = window.localStorage.getItem(PARAMETRIC_TEMPLATE_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as TemplateModel;
+      if (!parsed || !Array.isArray(parsed.elements)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveStoredTemplate = (template: TemplateModel) => {
+    try {
+      window.localStorage.setItem(PARAMETRIC_TEMPLATE_STORAGE_KEY, JSON.stringify(template));
+    } catch {
+      // Ignore storage write failures and keep in-memory state.
+    }
+  };
+
+  const parseDraftElement = (): Record<string, unknown> | null => {
+    if (!draftJson.trim()) {
+      setDraftError('JSON field is empty. Paste an element object first.');
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(draftJson) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
+        throw new Error('Element JSON must be an object with string field: type');
+      }
+      setDraftError(null);
+      return parsed;
+    } catch (e) {
+      setDraftError(e instanceof Error ? e.message : 'Invalid element JSON.');
+      return null;
+    }
+  };
 
   const renderPreview = async () => {
     setIsRendering(true);
@@ -66,14 +108,27 @@ export default function ParametricPage() {
         }) => string;
       };
 
-      const snapshot = workingTemplate ?? engineModule.getTemplateSnapshot();
-      if (!workingTemplate) {
+      const storedTemplate = loadStoredTemplate();
+      const snapshot = workingTemplate ?? storedTemplate ?? engineModule.getTemplateSnapshot();
+      if (!workingTemplate && snapshot) {
         setWorkingTemplate(snapshot);
       }
 
+      const candidate = parseDraftElement();
+      if (!candidate) {
+        setIsRendering(false);
+        return;
+      }
+      setPreviewCandidate(candidate);
+
+      const previewTemplate: TemplateModel = {
+        ...snapshot,
+        elements: [...(snapshot.elements ?? []), candidate],
+      };
+
       const svg = engineModule.runEngine({
         activeStyle,
-        templateInput: snapshot,
+        templateInput: previewTemplate,
         paramOverrides: {
           ring: { radius: ringRadius },
           tick: { width: tickWidth },
@@ -95,27 +150,26 @@ export default function ParametricPage() {
     }
   };
 
-  const handleInjectElement = () => {
-    try {
-      const parsed = JSON.parse(injectJson) as Record<string, unknown>;
-      if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
-        throw new Error('Injected element must be a JSON object with a string type field.');
-      }
-
-      setWorkingTemplate((prev) => {
-        if (!prev) return { elements: [parsed] };
-        return { ...prev, elements: [...prev.elements, parsed] };
-      });
-      setInjectError(null);
-    } catch (e) {
-      setInjectError(e instanceof Error ? e.message : 'Invalid JSON for injected element.');
+  const handleSaveCandidate = () => {
+    if (!previewCandidate) {
+      setDraftError('Preview an element first, then click Save Element.');
+      return;
     }
+
+    setWorkingTemplate((prev) => {
+      const base = prev ?? { elements: [] };
+      const next = { ...base, elements: [...base.elements, previewCandidate] };
+      saveStoredTemplate(next);
+      return next;
+    });
   };
 
   const removeElementAt = (index: number) => {
     setWorkingTemplate((prev) => {
       if (!prev) return prev;
-      return { ...prev, elements: prev.elements.filter((_, i) => i !== index) };
+      const next = { ...prev, elements: prev.elements.filter((_, i) => i !== index) };
+      saveStoredTemplate(next);
+      return next;
     });
   };
 
@@ -208,7 +262,7 @@ export default function ParametricPage() {
               disabled={isRendering}
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${isRendering ? 'animate-spin' : ''}`} />
-              {isRendering ? 'Rendering...' : 'Render Preview'}
+              {isRendering ? 'Rendering...' : 'Apply To Preview'}
             </Button>
 
             {error ? <p className="text-xs text-red-400">{error}</p> : null}
@@ -280,23 +334,16 @@ export default function ParametricPage() {
                 ) : null}
               </div>
 
-              <h3 className="mt-4 text-xs uppercase tracking-wide text-zinc-400">Inject Element JSON</h3>
+              <h3 className="mt-4 text-xs uppercase tracking-wide text-zinc-400">Draft Element JSON</h3>
               <textarea
-                value={injectJson}
-                onChange={(e) => setInjectJson(e.target.value)}
+                value={draftJson}
+                onChange={(e) => setDraftJson(e.target.value)}
                 className="mt-2 h-40 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] leading-5 text-zinc-300"
               />
-              {injectError ? <p className="mt-2 text-xs text-red-400">{injectError}</p> : null}
+              {draftError ? <p className="mt-2 text-xs text-red-400">{draftError}</p> : null}
+              {previewCandidate ? <p className="mt-2 text-xs text-emerald-400">Preview ready. Click Save Element to add it to the Elements list.</p> : null}
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
-                  onClick={handleInjectElement}
-                >
-                  Add Element
-                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -304,6 +351,14 @@ export default function ParametricPage() {
                   onClick={() => void renderPreview()}
                 >
                   Apply To Preview
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                  onClick={handleSaveCandidate}
+                >
+                  Save Element
                 </Button>
               </div>
             </section>

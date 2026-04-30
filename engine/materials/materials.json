@@ -1,0 +1,33 @@
+{
+	"matte_black": {
+		"fill": "#0f0f10",
+		"stroke": "#232427",
+		"strokeWidth": 0.8,
+		"shadow": 0.35,
+		"highlight": 0.15
+	},
+	"brushed_gold": {
+		"fill": "#8f6e28",
+		"stroke": "#d7b66a",
+		"strokeWidth": 1.1,
+		"gradient": "gold_brushed_linear",
+		"shadow": 0.42,
+		"highlight": 0.58
+	},
+	"polished_gold": {
+		"fill": "#dcbf79",
+		"stroke": "#f7e7b2",
+		"strokeWidth": 0.9,
+		"gradient": "gold_polished_radial",
+		"shadow": 0.3,
+		"highlight": 0.72
+	},
+	"brushed_steel": {
+		"fill": "#80868f",
+		"stroke": "#d4d9df",
+		"strokeWidth": 0.9,
+		"gradient": "steel_brushed_linear",
+		"shadow": 0.28,
+		"highlight": 0.49
+	}
+}

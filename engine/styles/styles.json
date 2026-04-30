@@ -1,0 +1,14 @@
+{
+	"gold_dark": {
+		"base": "matte_black",
+		"ring": "brushed_gold",
+		"tick": "polished_gold",
+		"engrave": "brushed_steel"
+	},
+	"steel_night": {
+		"base": "matte_black",
+		"ring": "brushed_steel",
+		"tick": "brushed_steel",
+		"engrave": "polished_gold"
+	}
+}
