@@ -56,7 +56,8 @@ What this guide does NOT do:
 5. Polygon uses tuple points only.
 6. Geometry uses flat transform keys only.
 7. No forbidden semantic words.
-8. JSON starts with `{` and ends with `}` with no extra text.
+8. Nullable optional fields are `null`/omitted, never empty string (`""`) (especially `blendMode`, `filter`, `clipPath`).
+9. JSON starts with `{` and ends with `}` with no extra text.
 
 ---
 

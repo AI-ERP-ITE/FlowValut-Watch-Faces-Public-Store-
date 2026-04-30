@@ -24,6 +24,7 @@ Use this when generating envelopes to avoid parser errors and reduce overhead.
 8. If source width/height is uncertain, fail generation instead of guessing.
 9. `inventory.elements.length === decomposition.length === geometry.length === appearance.length`.
 10. ID sets must match exactly across all four stages.
+11. Nullable optional fields must use `null` (or be omitted), never empty string `""`.
 
 Minimal envelope skeleton:
 
@@ -280,6 +281,9 @@ image  ──▶  speckit.compile.master.prompt.md  (chat)
                                                     3. Gradient stops count >= 2 and each `offset` in `[0,1]`.
                                                     4. `clipPath`, if present, references an existing inventory id.
                                                     5. Texture tags must match visible overlays from geometry/inventory when texture is obvious.
+                                                     6. Nullable optional fields must not use empty string (`""`).
+                                                       - Use `null` or omit the field.
+                                                       - Applies to `blendMode`, `filter`, `clipPath`, and `compositionRecipe.blendIntent`.
 
                                                     ---
 
@@ -310,7 +314,8 @@ image  ──▶  speckit.compile.master.prompt.md  (chat)
                                                     8. Only flat transform keys are used.
                                                     9. Colors are lowercase hex.
                                                     10. No forbidden semantic vocabulary appears.
-                                                    11. JSON starts with `{` and ends with `}` with no extra text.
+                                                    11. Nullable optional fields are `null`/omitted, never empty string (`""`).
+                                                    12. JSON starts with `{` and ends with `}` with no extra text.
 
                                                     ---
 
