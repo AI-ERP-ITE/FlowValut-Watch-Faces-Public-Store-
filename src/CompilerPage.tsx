@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, AlertTriangle, Hammer } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, AlertTriangle, Hammer, Minus, Plus } from 'lucide-react';
 import type { VisualEnvelope } from '@/types/visualSpec';
 import type { VisualFidelityResult } from '@/pipeline/visualFidelity';
 import { validateVisualEnvelope, validateVisualFidelity } from '@/pipeline/visualValidator';
@@ -16,6 +16,44 @@ const SAMPLE_ENVELOPE: VisualEnvelope = {
       { id: 'el_004', kind: 'text',  bbox: { x: 200, y: 220, w: 80, h: 40 },  zOrder: 3, groupId: null },
     ],
   },
+  decomposition: [
+    {
+      id: 'el_001',
+      basePrimitiveIntent: 'full background base region',
+      materialClass: 'matte',
+      textureRecipe: { pattern: 'micro_noise', density: 0.35, scale: 0.25, roughness: 0.6 },
+      depthRecipe: { innerShadow: false, outerShadow: false, seamBand: false, rimHighlight: false, aoBand: false },
+      colorRoleSet: { base: '#0f172a', edgeDark: '#0b1220', edgeLight: '#1e293b' },
+      compositionRecipe: { clipTarget: null, blendIntent: 'normal', opacityStack: [1] },
+    },
+    {
+      id: 'el_002',
+      basePrimitiveIntent: 'main circular field',
+      materialClass: 'matte',
+      textureRecipe: { pattern: 'none' },
+      depthRecipe: { innerShadow: true, outerShadow: false, seamBand: false, rimHighlight: true, aoBand: true },
+      colorRoleSet: { base: '#1e293b', edgeDark: '#0f172a', edgeLight: '#475569' },
+      compositionRecipe: { clipTarget: null, blendIntent: 'normal', opacityStack: [1] },
+    },
+    {
+      id: 'el_003',
+      basePrimitiveIntent: 'central stroke-like hand',
+      materialClass: 'painted',
+      textureRecipe: { pattern: 'none' },
+      depthRecipe: { innerShadow: false, outerShadow: false, seamBand: false, rimHighlight: false, aoBand: false },
+      colorRoleSet: { base: '#e2e8f0' },
+      compositionRecipe: { clipTarget: null, blendIntent: 'normal', opacityStack: [1] },
+    },
+    {
+      id: 'el_004',
+      basePrimitiveIntent: 'foreground text glyph group',
+      materialClass: 'printed',
+      textureRecipe: { pattern: 'none' },
+      depthRecipe: { innerShadow: false, outerShadow: false, seamBand: false, rimHighlight: false, aoBand: false },
+      colorRoleSet: { base: '#e2e8f0' },
+      compositionRecipe: { clipTarget: null, blendIntent: 'normal', opacityStack: [1] },
+    },
+  ],
   geometry: [
     { id: 'el_001', shape: 'rect',   x: 0,   y: 0,   w: 480, h: 480 },
     { id: 'el_002', shape: 'circle', cx: 240, cy: 240, r: 200 },
@@ -49,11 +87,14 @@ export default function CompilerPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sourceImageDataUrl, setSourceImageDataUrl] = useState<string | null>(null);
   const [sourceImageName, setSourceImageName] = useState<string | null>(null);
+  const [sourceImageDims, setSourceImageDims] = useState<{ width: number; height: number } | null>(null);
   const [fidelityResult, setFidelityResult] = useState<VisualFidelityResult | null>(null);
   const [fidelityError, setFidelityError] = useState<string | null>(null);
   const [fidelityPending, setFidelityPending] = useState(false);
   const [lastCompiledInput, setLastCompiledInput] = useState<string | null>(null);
   const [lastCompiledInputHash, setLastCompiledInputHash] = useState<string | null>(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewFit, setPreviewFit] = useState(true);
 
   const parsed = useMemo(() => {
     try {
@@ -69,6 +110,12 @@ export default function CompilerPage() {
   const inventoryElements = useMemo(() => {
     if (!parsed.value || typeof parsed.value !== 'object') return [];
     const candidate = parsed.value.inventory?.elements;
+    return Array.isArray(candidate) ? candidate : [];
+  }, [parsed.value]);
+
+  const decompositionEntries = useMemo(() => {
+    if (!parsed.value || typeof parsed.value !== 'object') return [];
+    const candidate = parsed.value.decomposition;
     return Array.isArray(candidate) ? candidate : [];
   }, [parsed.value]);
 
@@ -89,6 +136,21 @@ export default function CompilerPage() {
 
   const handleCompile = async () => {
     if (!parsed.value || !report || !report.isValid) return;
+
+    if (
+      sourceImageDims &&
+      (parsed.value.inventory.canvas.width !== sourceImageDims.width ||
+        parsed.value.inventory.canvas.height !== sourceImageDims.height)
+    ) {
+      setCompiledSvg('');
+      setErrorMessage(
+        `Canvas mismatch: envelope is ${parsed.value.inventory.canvas.width}x${parsed.value.inventory.canvas.height}, source image is ${sourceImageDims.width}x${sourceImageDims.height}. Use native source dimensions.`,
+      );
+      setFidelityResult(null);
+      setFidelityPending(false);
+      return;
+    }
+
     try {
       const result = renderVisualSpec(parsed.value);
       setCompiledSvg(result.svg);
@@ -133,6 +195,7 @@ export default function CompilerPage() {
     if (!file) {
       setSourceImageDataUrl(null);
       setSourceImageName(null);
+      setSourceImageDims(null);
       setFidelityResult(null);
       setFidelityError(null);
       return;
@@ -140,14 +203,37 @@ export default function CompilerPage() {
 
     const reader = new FileReader();
     reader.onload = () => {
-      setSourceImageDataUrl(typeof reader.result === 'string' ? reader.result : null);
-      setSourceImageName(file.name);
-      setFidelityResult(null);
-      setFidelityError(null);
+      const dataUrl = typeof reader.result === 'string' ? reader.result : null;
+      if (!dataUrl) {
+        setSourceImageDataUrl(null);
+        setSourceImageName(null);
+        setSourceImageDims(null);
+        setFidelityResult(null);
+        setFidelityError('Could not read selected source image.');
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        setSourceImageDataUrl(dataUrl);
+        setSourceImageName(file.name);
+        setSourceImageDims({ width: img.naturalWidth, height: img.naturalHeight });
+        setFidelityResult(null);
+        setFidelityError(null);
+      };
+      img.onerror = () => {
+        setSourceImageDataUrl(null);
+        setSourceImageName(null);
+        setSourceImageDims(null);
+        setFidelityResult(null);
+        setFidelityError('Could not decode selected source image.');
+      };
+      img.src = dataUrl;
     };
     reader.onerror = () => {
       setSourceImageDataUrl(null);
       setSourceImageName(null);
+      setSourceImageDims(null);
       setFidelityResult(null);
       setFidelityError('Could not read selected source image.');
     };
@@ -220,6 +306,29 @@ export default function CompilerPage() {
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-zinc-300">
+                Decomposition ({decompositionEntries.length})
+              </h2>
+              <div className="max-h-[200px] space-y-1 overflow-y-auto text-xs text-zinc-300">
+                {decompositionEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="rounded border border-zinc-800 bg-zinc-900/40 px-2 py-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-cyan-400">{entry.id}</span>
+                      <span className="text-zinc-400">{entry.materialClass}</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500">{entry.basePrimitiveIntent}</p>
+                  </div>
+                ))}
+                {!parsed.error && decompositionEntries.length === 0 ? (
+                  <p className="text-xs text-zinc-500">No decomposition entries found in pasted JSON.</p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-zinc-300">
                 Validation Report
               </h2>
               <div className="space-y-2 text-xs">
@@ -276,7 +385,10 @@ export default function CompilerPage() {
               className="mt-1 block w-full text-xs text-zinc-300 file:mr-3 file:rounded file:border file:border-zinc-700 file:bg-zinc-800 file:px-2 file:py-1 file:text-xs file:text-zinc-200"
             />
             {sourceImageName ? (
-              <p className="mt-1 text-[11px] text-zinc-500">Loaded: {sourceImageName}</p>
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Loaded: {sourceImageName}
+                {sourceImageDims ? ` (${sourceImageDims.width}x${sourceImageDims.height})` : ''}
+              </p>
             ) : (
               <p className="mt-1 text-[11px] text-zinc-500">Load source image to enable end-to-end visual scoring.</p>
             )}
@@ -287,12 +399,55 @@ export default function CompilerPage() {
             </p>
           ) : null}
           <div className="rounded border border-zinc-800 bg-black/30 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2 border-b border-zinc-800 pb-2 text-[11px] text-zinc-400">
+              <span>
+                Canvas: {parsed.value?.inventory?.canvas?.width ?? '-'}x{parsed.value?.inventory?.canvas?.height ?? '-'}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPreviewFit((v) => !v)}
+                  className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                >
+                  {previewFit ? 'Fit: ON' : 'Fit: OFF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))}
+                  className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                  aria-label="Zoom out"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-12 text-center text-zinc-300">{Math.round(previewZoom * 100)}%</span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom((z) => Math.min(4, +(z + 0.1).toFixed(2)))}
+                  className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                  aria-label="Zoom in"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom(1)}
+                  className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                >
+                  100%
+                </button>
+              </div>
+            </div>
             {compiledSvg ? (
-              <div
-                key={lastCompiledInputHash ?? 'compiled-preview'}
-                className="mx-auto aspect-square w-full max-w-[600px] overflow-hidden rounded border border-zinc-700 [&>svg]:h-full [&>svg]:w-full"
-                dangerouslySetInnerHTML={{ __html: compiledSvg }}
-              />
+              <div className="h-[70vh] min-h-[360px] overflow-auto rounded border border-zinc-700 bg-zinc-950/40">
+                <div className={previewFit ? 'flex min-h-full items-center justify-center p-3' : 'p-3'}>
+                  <div
+                    key={lastCompiledInputHash ?? 'compiled-preview'}
+                    style={{ transform: `scale(${previewZoom})`, transformOrigin: previewFit ? 'center center' : 'top left' }}
+                    className={previewFit ? '[&>svg]:block [&>svg]:h-auto [&>svg]:max-h-full [&>svg]:max-w-full [&>svg]:w-auto' : '[&>svg]:block'}
+                    dangerouslySetInnerHTML={{ __html: compiledSvg }}
+                  />
+                </div>
+              </div>
             ) : (
               <p className="text-xs text-zinc-500">
                 Run compile to preview deterministic visual envelope output.
