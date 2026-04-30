@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
+type TemplateModel = {
+  elements: Array<Record<string, unknown>>;
+};
 
 const DEFAULT_COLOR_CONTROL = {
   colorControl: {
@@ -26,6 +29,22 @@ export default function ParametricPage() {
   const [colorMode, setColorMode] = useState<ColorMode>('off');
   const [ringRadius, setRingRadius] = useState(44);
   const [tickWidth, setTickWidth] = useState(0.8);
+  const [workingTemplate, setWorkingTemplate] = useState<TemplateModel | null>(null);
+  const [injectJson, setInjectJson] = useState(
+    JSON.stringify(
+      {
+        type: 'circle',
+        role: 'new_marker',
+        materialRef: 'brushed_steel',
+        params: { r: 2.5, strokeWidth: 1 },
+        placement: { mode: 'anchor', config: { anchor: 'top', offset: [0, 10], rotation: 0 } },
+        symmetry: { mode: 'none', config: {} },
+      },
+      null,
+      2,
+    ),
+  );
+  const [injectError, setInjectError] = useState<string | null>(null);
   const [svgMarkup, setSvgMarkup] = useState('');
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,15 +57,23 @@ export default function ParametricPage() {
       // Runtime module sits outside src and is bundled by Vite; TS lacks direct type metadata here.
       // @ts-expect-error runtime import is validated by integration build and smoke render.
       const engineModule = (await import('../engine/index.js')) as {
+        getTemplateSnapshot: () => TemplateModel;
         runEngine: (args?: {
           activeStyle?: StyleKey;
           paramOverrides?: Record<string, Record<string, number>>;
+          templateInput?: TemplateModel;
           colorControl?: typeof DEFAULT_COLOR_CONTROL;
         }) => string;
       };
 
+      const snapshot = workingTemplate ?? engineModule.getTemplateSnapshot();
+      if (!workingTemplate) {
+        setWorkingTemplate(snapshot);
+      }
+
       const svg = engineModule.runEngine({
         activeStyle,
+        templateInput: snapshot,
         paramOverrides: {
           ring: { radius: ringRadius },
           tick: { width: tickWidth },
@@ -66,6 +93,30 @@ export default function ParametricPage() {
     } finally {
       setIsRendering(false);
     }
+  };
+
+  const handleInjectElement = () => {
+    try {
+      const parsed = JSON.parse(injectJson) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
+        throw new Error('Injected element must be a JSON object with a string type field.');
+      }
+
+      setWorkingTemplate((prev) => {
+        if (!prev) return { elements: [parsed] };
+        return { ...prev, elements: [...prev.elements, parsed] };
+      });
+      setInjectError(null);
+    } catch (e) {
+      setInjectError(e instanceof Error ? e.message : 'Invalid JSON for injected element.');
+    }
+  };
+
+  const removeElementAt = (index: number) => {
+    setWorkingTemplate((prev) => {
+      if (!prev) return prev;
+      return { ...prev, elements: prev.elements.filter((_, i) => i !== index) };
+    });
   };
 
   useEffect(() => {
@@ -185,6 +236,76 @@ export default function ParametricPage() {
                 readOnly
                 className="mt-3 h-52 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] leading-5 text-zinc-300"
               />
+            </section>
+
+            <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-zinc-100">Elements</h2>
+                <span className="text-xs text-zinc-400">
+                  {(workingTemplate?.elements ?? []).length} item(s)
+                </span>
+              </div>
+
+              <div className="mt-3 max-h-56 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/70">
+                {(workingTemplate?.elements ?? []).map((element, index) => {
+                  const role = typeof element.role === 'string' ? element.role : 'no-role';
+                  const type = typeof element.type === 'string' ? element.type : 'unknown';
+                  const placement =
+                    element.placement && typeof element.placement === 'object' && 'mode' in element.placement
+                      ? String((element.placement as { mode?: unknown }).mode ?? 'none')
+                      : 'none';
+                  const symmetry =
+                    element.symmetry && typeof element.symmetry === 'object' && 'mode' in element.symmetry
+                      ? String((element.symmetry as { mode?: unknown }).mode ?? 'none')
+                      : 'none';
+
+                  return (
+                    <div key={`${type}-${role}-${index}`} className="flex items-center justify-between border-b border-zinc-800 px-3 py-2 text-xs">
+                      <div className="space-y-0.5">
+                        <p className="font-medium text-zinc-200">{type} · {role}</p>
+                        <p className="text-zinc-500">placement: {placement} · symmetry: {symmetry}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeElementAt(index)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
+                {(workingTemplate?.elements ?? []).length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-zinc-500">No elements loaded yet.</p>
+                ) : null}
+              </div>
+
+              <h3 className="mt-4 text-xs uppercase tracking-wide text-zinc-400">Inject Element JSON</h3>
+              <textarea
+                value={injectJson}
+                onChange={(e) => setInjectJson(e.target.value)}
+                className="mt-2 h-40 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] leading-5 text-zinc-300"
+              />
+              {injectError ? <p className="mt-2 text-xs text-red-400">{injectError}</p> : null}
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                  onClick={handleInjectElement}
+                >
+                  Add Element
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                  onClick={() => void renderPreview()}
+                >
+                  Apply To Preview
+                </Button>
+              </div>
             </section>
           </div>
         </div>
