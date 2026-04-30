@@ -56,5 +56,13 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 		};
 	});
 
-	return { elements };
+	return {
+		layout: geometryObj.layout && typeof geometryObj.layout === "object" ? { ...geometryObj.layout } : null,
+		scale: geometryObj.scale && typeof geometryObj.scale === "object" ? { ...geometryObj.scale } : null,
+		relationships: geometryObj.relationships && typeof geometryObj.relationships === "object" ? { ...geometryObj.relationships } : null,
+		effects3d: geometryObj.effects3d && typeof geometryObj.effects3d === "object" ? { ...geometryObj.effects3d } : null,
+		styleAdjust: geometryObj.styleAdjust && typeof geometryObj.styleAdjust === "object" ? { ...geometryObj.styleAdjust } : null,
+		texture: geometryObj.texture && typeof geometryObj.texture === "object" ? { ...geometryObj.texture } : null,
+		elements,
+	};
 }

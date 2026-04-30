@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1958,6 +1959,7 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
 
 function StudioApp() {
   const { state, dispatch } = useApp();
+  const navigate = useNavigate();
   const [watchModel, setWatchModel] = useState('Balance 2');
   const [watchFaceName, setWatchFaceName] = useState('');
   const [editorMode, setEditorMode] = useState<EditorMode>('MAIN');
@@ -3786,6 +3788,25 @@ function StudioApp() {
                   placeholder="My Custom Watch Face"
                   className="bg-[#0F0F0F] border-zinc-700 text-white placeholder:text-zinc-600"
                 />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-cyan-800/60 bg-cyan-950/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">New Path</p>
+                  <h3 className="text-sm font-semibold text-cyan-100">Parametric Watchface Engine</h3>
+                  <p className="mt-1 text-xs text-cyan-200/80">
+                    Open deterministic template-based compiler workspace under Studio.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => navigate('/studio/parametric')}
+                  className="h-10 bg-cyan-600 text-white hover:bg-cyan-500"
+                >
+                  Open Parametric Studio
+                </Button>
               </div>
             </div>
 

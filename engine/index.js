@@ -7,6 +7,7 @@ import styles from "./styles/styles.json" with { type: "json" };
 import { buildGeometry } from "./core/geometry.js";
 import { compose } from "./core/composer.js";
 import { renderSvg } from "./core/renderer.js";
+import { applyRelationships } from "./core/relationships.js";
 import { registerElement } from "./elements/elementRegistry.js";
 import { DEFAULT_COLOR_CONTROL_CONFIG } from "./color/colorController.js";
 
@@ -14,11 +15,25 @@ import { circleElement } from "./elements/baseElements/circle.js";
 import { ringElement } from "./elements/baseElements/ring.js";
 import { radialTicksElement } from "./elements/baseElements/radialTicks.js";
 import { rectElement } from "./elements/baseElements/rect.js";
+import { bezelElement } from "./elements/baseElements/bezel.js";
+import { ticksRadialElement } from "./elements/baseElements/ticksRadial.js";
+import { freeCircleElement } from "./elements/baseElements/freeCircle.js";
+import { freeRectElement } from "./elements/baseElements/freeRect.js";
+import { outlineRingElement } from "./elements/baseElements/outlineRing.js";
+import { outlineRectElement } from "./elements/baseElements/outlineRect.js";
+import { textureLayerElement } from "./elements/baseElements/textureLayer.js";
 
 function registerBaseElements() {
 	registerElement("circle", circleElement);
 	registerElement("ring", ringElement);
 	registerElement("radialTicks", radialTicksElement);
+	registerElement("bezel", bezelElement);
+	registerElement("ticks_radial", ticksRadialElement);
+	registerElement("free_circle", freeCircleElement);
+	registerElement("free_rect", freeRectElement);
+	registerElement("outline_ring", outlineRingElement);
+	registerElement("outline_rect", outlineRectElement);
+	registerElement("texture_layer", textureLayerElement);
 	registerElement("rect", rectElement);
 }
 
@@ -56,7 +71,8 @@ export function runEngine({ activeStyle = "gold_dark", paramOverrides = {}, colo
 	const sourceTemplate = templateInput && typeof templateInput === "object" ? templateInput : template;
 	const geometry = buildGeometry(sourceTemplate);
 	const resolved = compose(geometry, activeStyle, styles, materials, paramOverrides);
-	return renderSvg(resolved, {
+	const withRelationships = applyRelationships(resolved);
+	return renderSvg(withRelationships, {
 		activeStyle,
 		colorControlConfig: colorControl,
 	});
@@ -66,7 +82,13 @@ export function getTemplateSnapshot() {
 	return JSON.parse(JSON.stringify(template));
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
+const isDirectNodeRun =
+	typeof process !== "undefined" &&
+	Array.isArray(process.argv) &&
+	typeof process.argv[1] === "string" &&
+	import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`;
+
+if (isDirectNodeRun) {
 	const svg = runEngine();
 	console.log(svg);
 }

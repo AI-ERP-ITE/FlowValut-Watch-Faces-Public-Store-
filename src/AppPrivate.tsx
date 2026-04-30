@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import StudioApp from './StudioApp';
 import LabPage from './LabPage';
+import ParametricPage from './ParametricPage';
 import { AdminOpsPage } from '@/components/storefront/AdminOpsPage';
 import {
   completeRedirectSignIn,
@@ -184,6 +185,14 @@ export default function AppPrivate() {
         element={
           <PrivateRouteGuard>
             <LabPage />
+          </PrivateRouteGuard>
+        }
+      />
+      <Route
+        path="/studio/parametric"
+        element={
+          <PrivateRouteGuard>
+            <ParametricPage />
           </PrivateRouteGuard>
         }
       />

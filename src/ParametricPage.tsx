@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button';
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
 type TemplateModel = {
+  layout?: Record<string, unknown>;
+  scale?: Record<string, unknown>;
+  relationships?: Record<string, unknown>;
+  effects3d?: Record<string, unknown>;
+  styleAdjust?: Record<string, unknown>;
+  texture?: Record<string, unknown>;
   elements: Array<Record<string, unknown>>;
 };
 
@@ -91,6 +97,37 @@ export default function ParametricPage() {
     }
   };
 
+  const parseDraftTemplate = (): TemplateModel | null => {
+    if (!draftJson.trim()) return null;
+
+    try {
+      const parsed = JSON.parse(draftJson) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!Array.isArray(parsed.elements)) return null;
+
+      const normalized: TemplateModel = {
+        elements: parsed.elements.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>,
+      };
+      if (parsed.layout && typeof parsed.layout === 'object') normalized.layout = parsed.layout as Record<string, unknown>;
+      if (parsed.scale && typeof parsed.scale === 'object') normalized.scale = parsed.scale as Record<string, unknown>;
+      if (parsed.relationships && typeof parsed.relationships === 'object') {
+        normalized.relationships = parsed.relationships as Record<string, unknown>;
+      }
+      if (parsed.effects3d && typeof parsed.effects3d === 'object') {
+        normalized.effects3d = parsed.effects3d as Record<string, unknown>;
+      }
+      if (parsed.styleAdjust && typeof parsed.styleAdjust === 'object') {
+        normalized.styleAdjust = parsed.styleAdjust as Record<string, unknown>;
+      }
+      if (parsed.texture && typeof parsed.texture === 'object') {
+        normalized.texture = parsed.texture as Record<string, unknown>;
+      }
+      return normalized;
+    } catch {
+      return null;
+    }
+  };
+
   const renderPreview = async () => {
     setIsRendering(true);
     setError(null);
@@ -112,6 +149,29 @@ export default function ParametricPage() {
       const snapshot = workingTemplate ?? storedTemplate ?? engineModule.getTemplateSnapshot();
       if (!workingTemplate && snapshot) {
         setWorkingTemplate(snapshot);
+      }
+
+      const fullTemplate = parseDraftTemplate();
+      if (fullTemplate) {
+        setPreviewCandidate(null);
+        const svg = engineModule.runEngine({
+          activeStyle,
+          templateInput: fullTemplate,
+          paramOverrides: {
+            ring: { radius: ringRadius },
+            tick: { width: tickWidth },
+          },
+          colorControl: {
+            ...DEFAULT_COLOR_CONTROL,
+            colorControl: {
+              ...DEFAULT_COLOR_CONTROL.colorControl,
+              mode: colorMode,
+            },
+          },
+        });
+        setSvgMarkup(svg);
+        setDraftError(null);
+        return;
       }
 
       const candidate = parseDraftElement();
