@@ -14,6 +14,8 @@ import type {
   VisualEnvelope,
 } from '@/types/visualSpec';
 import { isAppearanceInherit, isGeometryInherit } from '@/types/visualSpec';
+import type { VisualFidelityResult } from '@/pipeline/visualFidelity';
+import { evaluateVisualFidelity } from '@/pipeline/visualFidelity';
 
 // ─── Forbidden semantic vocabulary ────────────────────────────────────────────
 // Any of these words appearing in an id, text content, or string value
@@ -315,7 +317,17 @@ function validateGeometryShape(entry: GeometryEntry): { valid: boolean; reason: 
       if (typeof e.content !== 'string') return { valid: false, reason: 'text needs content string' };
       return numericFields(e, ['x', 'y', 'fontSize']);
     case 'image':
-      return numericFields(e, ['x', 'y', 'w', 'h']);
+      {
+        const base = numericFields(e, ['x', 'y', 'w', 'h']);
+        if (!base.valid) return base;
+        if (e.src !== undefined && typeof e.src !== 'string') {
+          return { valid: false, reason: 'image `src` must be string when provided' };
+        }
+        if (e.href !== undefined && typeof e.href !== 'string') {
+          return { valid: false, reason: 'image `href` must be string when provided' };
+        }
+        return { valid: true, reason: '' };
+      }
     case 'group':
       return { valid: true, reason: '' };
     default:
@@ -518,6 +530,16 @@ export function validateVisualEnvelope(env: VisualEnvelope): ValidationReport {
 
   const isValid = gates.every((g) => g.status === 'PASS');
   return { isValid, gates, failedIds };
+}
+
+export async function validateVisualFidelity(input: {
+  sourceDataUrl: string;
+  renderedSvg: string;
+  width: number;
+  height: number;
+  threshold?: number;
+}): Promise<VisualFidelityResult> {
+  return evaluateVisualFidelity(input);
 }
 
 // Re-export VisualEnvelope and types for convenience

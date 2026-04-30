@@ -106,6 +106,7 @@ interface DefsContext {
   gradientCounter: number;
   fillRefs: Map<string, string>; // appearance id → fill attribute value
   clipRefs: Map<string, string>; // inventory id → clip-path attribute value
+  filterRefs: Map<string, string>; // filter kind → filter attribute value
 }
 
 function defsId(prefix: string, n: number): string {
@@ -162,6 +163,36 @@ function buildClipPathDef(ctx: DefsContext, clipSourceId: string, merged: Merged
   return ref;
 }
 
+function buildFilterDef(
+  ctx: DefsContext,
+  filterKind: AppearanceItem['filter'],
+): string | null {
+  if (!filterKind) return null;
+  const key = String(filterKind);
+  if (ctx.filterRefs.has(key)) return ctx.filterRefs.get(key)!;
+
+  const id = defsId('filter', ctx.gradientCounter++);
+  if (filterKind === 'shadow') {
+    ctx.defs.push(
+      `<filter id="${id}" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#000000" flood-opacity="0.55"/></filter>`,
+    );
+  } else if (filterKind === 'glow') {
+    ctx.defs.push(
+      `<filter id="${id}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur"/><feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.85 0" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`,
+    );
+  } else if (filterKind === 'blur') {
+    ctx.defs.push(
+      `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="1.8"/></filter>`,
+    );
+  } else {
+    return null;
+  }
+
+  const ref = `url(#${id})`;
+  ctx.filterRefs.set(key, ref);
+  return ref;
+}
+
 // ─── Shape rendering ──────────────────────────────────────────────────────────
 
 function renderShapeOnly(g: GeometryEntry): string {
@@ -199,6 +230,10 @@ function renderShapeOnly(g: GeometryEntry): string {
     }
     case 'image': {
       const i = g as GeometryImage;
+      const href = i.href ?? i.src;
+      if (href) {
+        return `<image x="${i.x}" y="${i.y}" width="${i.w}" height="${i.h}" preserveAspectRatio="none" href="${escapeXml(href)}"${tr}/>`;
+      }
       return `<rect x="${i.x}" y="${i.y}" width="${i.w}" height="${i.h}"${tr}/>`;
     }
     case 'group':
@@ -265,6 +300,10 @@ function blendAttr(item: AppearanceItem | undefined): string {
   return ` style="mix-blend-mode:${item.blendMode}"`;
 }
 
+function filterAttr(filterRef: string | null): string {
+  return filterRef ? ` filter="${filterRef}"` : '';
+}
+
 function renderElement(
   ctx: DefsContext,
   merged: MergedSpec,
@@ -281,6 +320,7 @@ function renderElement(
 
   let clipRef: string | null = null;
   if (item?.clipPath) clipRef = buildClipPathDef(ctx, item.clipPath, merged);
+  const filterRef = buildFilterDef(ctx, item?.filter ?? null);
 
   const attrs = [
     `data-id="${escapeXml(inv.id)}"`,
@@ -291,7 +331,7 @@ function renderElement(
   if (!isGeometryInherit(geom) && geom.shape === 'group') {
     const childIds = merged.elements.filter((e) => e.inventory.groupId === inv.id);
     const inner = childIds.map((c) => renderElement(ctx, merged, c)).join('');
-    return `<g ${attrs}${elementOpacityAttr(item)}${clipPathAttr(clipRef)}${blendAttr(item)}>${inner}</g>`;
+    return `<g ${attrs}${elementOpacityAttr(item)}${clipPathAttr(clipRef)}${blendAttr(item)}${filterAttr(filterRef)}>${inner}</g>`;
   }
 
   // Skip elements that are inside a group; they were rendered by parent
@@ -305,7 +345,7 @@ function renderElement(
     /^<(\w+)/,
     `<$1 fill="${fillValue}"${fillOpacityAttr(fill, item?.opacity)}${strokeAttrs(stroke)}`,
   );
-  return `<g ${attrs}${elementOpacityAttr(item)}${clipPathAttr(clipRef)}${blendAttr(item)}>${enriched}</g>`;
+  return `<g ${attrs}${elementOpacityAttr(item)}${clipPathAttr(clipRef)}${blendAttr(item)}${filterAttr(filterRef)}>${enriched}</g>`;
 }
 
 // Children rendered by their group should not be skipped when reached via group recursion
@@ -328,12 +368,13 @@ function renderGroupChild(
   const fillValue = buildFillForElement(ctx, inv.id, fill);
   let clipRef: string | null = null;
   if (item?.clipPath) clipRef = buildClipPathDef(ctx, item.clipPath, merged);
+  const filterRef = buildFilterDef(ctx, item?.filter ?? null);
   const enriched = shapeXml.replace(
     /^<(\w+)/,
     `<$1 fill="${fillValue}"${fillOpacityAttr(fill, item?.opacity)}${strokeAttrs(stroke)}`,
   );
   const attrs = `data-id="${escapeXml(inv.id)}" data-kind="${inv.kind}" data-z="${inv.zOrder}"`;
-  return `<g ${attrs}${elementOpacityAttr(item)}${clipPathAttr(clipRef)}${blendAttr(item)}>${enriched}</g>`;
+  return `<g ${attrs}${elementOpacityAttr(item)}${clipPathAttr(clipRef)}${blendAttr(item)}${filterAttr(filterRef)}>${enriched}</g>`;
 }
 
 // Override renderElement's group branch to use renderGroupChild for children
@@ -377,22 +418,25 @@ export function renderVisualSpec(env: VisualEnvelope): RenderResult {
     gradientCounter: 0,
     fillRefs: new Map(),
     clipRefs: new Map(),
+    filterRefs: new Map(),
   };
 
   const body = merged.elements.map((el) => renderTopLevel(ctx, merged, el)).join('');
-  const canvas = canvasAttrs(merged.canvas);
+  const canvas = canvasAttrs(ctx, merged.canvas);
   const defsXml = ctx.defs.length > 0 ? `<defs>${ctx.defs.join('')}</defs>` : '';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${merged.canvas.width} ${merged.canvas.height}" width="${merged.canvas.width}" height="${merged.canvas.height}"${canvas.clip}>${defsXml}${body}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${merged.canvas.width} ${merged.canvas.height}" width="${merged.canvas.width}" height="${merged.canvas.height}">${defsXml}<g${canvas.clip}>${body}</g></svg>`;
   const html = `<!doctype html><html><body style="margin:0;background:#000">${svg}</body></html>`;
   return { svg, html, merged };
 }
 
-function canvasAttrs(canvas: Canvas): { clip: string } {
+function canvasAttrs(ctx: DefsContext, canvas: Canvas): { clip: string } {
   if (canvas.shape === 'circle') {
-    // Add a circular clip via inline preserveAspectRatio + style? We instead emit
-    // a clipPath def at body level handled by the data attr; simplest: no clipping.
-    // Renderer keeps rect viewport even for circle canvas; consumer can mask externally.
-    return { clip: '' };
+    const id = defsId('canvas_clip', ctx.gradientCounter++);
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const r = Math.min(canvas.width, canvas.height) / 2;
+    ctx.defs.push(`<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>`);
+    return { clip: ` clip-path="url(#${id})"` };
   }
   return { clip: '' };
 }

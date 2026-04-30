@@ -118,6 +118,8 @@ export interface GeometryImage extends GeometryTransform {
   y: number;
   w: number;
   h: number;
+  src?: string;
+  href?: string;
 }
 
 export interface GeometryGroup {
