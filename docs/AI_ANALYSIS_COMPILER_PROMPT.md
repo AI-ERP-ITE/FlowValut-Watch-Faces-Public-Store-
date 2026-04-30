@@ -18,10 +18,12 @@ Use this when generating envelopes to avoid parser errors and reduce overhead.
 2. First non-whitespace char must be `{`.
 3. Last non-whitespace char must be `}`.
 4. No markdown fences, labels, notes, or prefixes/suffixes.
-5. Top-level keys must be exactly: `inventory`, `geometry`, `appearance`.
+5. Top-level keys must be exactly: `inventory`, `decomposition`, `geometry`, `appearance`.
 6. `inventory.canvas.width/height` must equal source image size.
-7. `inventory.elements.length === geometry.length === appearance.length`.
-8. ID sets must match exactly across all three stages.
+7. Do not use implicit square fallback dimensions (such as `768x768`) unless source image is exactly that size.
+8. If source width/height is uncertain, fail generation instead of guessing.
+9. `inventory.elements.length === decomposition.length === geometry.length === appearance.length`.
+10. ID sets must match exactly across all four stages.
 
 Minimal envelope skeleton:
 
@@ -31,12 +33,28 @@ Minimal envelope skeleton:
     "canvas": { "width": 0, "height": 0, "shape": "rect" },
     "elements": []
   },
+  "decomposition": [],
   "geometry": [],
   "appearance": []
 }
 ```
 
 If parser shows `Unexpected token ...`, response is not raw JSON.
+
+---
+
+## Upstream-Only Quality Strategy (Single Shot)
+
+This pipeline keeps compiler behavior deterministic. Quality improvements happen
+upstream in AI analysis output only.
+
+1. No compile-side multi-candidate search.
+2. No compile-side iterative correction loops.
+3. Per-element decisions must use dual basis before emit:
+  - Pixel basis: local region/edge/color evidence.
+  - Structure basis: shape continuity, relative placement, layer coherence.
+4. Group/layer preservation must be explicit in analysis output so renderer stays
+  simple and stable.
 
 ---
 
@@ -94,6 +112,18 @@ Rules:
 2. `visual_envelope_full.json` must be raw JSON only.
 3. Validate with JSON parse before paste.
 
+Canonical rewrite requirement (tool-assisted local runs):
+
+1. On every successful emit, overwrite both files fully:
+  - `app/exports/compiler/temp_env.json`
+  - `app/exports/compiler/visual_envelope_full.json`
+2. Never update only one of the two files.
+3. Never append/merge old JSON fragments.
+4. Post-write parity checks are mandatory:
+  - same top-level keys (`inventory|decomposition|geometry|appearance`)
+  - same stage counts
+  - same effective payload
+
 ---
 
 ## 0. Pipeline overview
@@ -102,6 +132,7 @@ Rules:
 image  ──▶  speckit.compile.master.prompt.md  (chat)
                 │
                 ├─▶ speckit.compile.inventory.agent.md   → InventoryDoc
+                ├─▶ speckit.compile.decomposition.agent.md → DecompositionEntry[]
                 ├─▶ speckit.compile.geometry.agent.md    → GeometryEntry[]
                 ├─▶ speckit.compile.appearance.agent.md  → AppearanceEntry[]
                 ├─▶ speckit.compile.audit.agent.md       → ValidationReport
@@ -121,13 +152,16 @@ image  ──▶  speckit.compile.master.prompt.md  (chat)
                                                     1. Pure visual only: describe what is seen, not what it means.
                                                     2. One envelope shape only:
                                                        - `inventory`
+                                                       - `decomposition`
                                                        - `geometry`
                                                        - `appearance`
                                                     3. IDs are immutable across stages: exact one-to-one parity.
                                                     4. Canvas units are source-image pixel units.
                                                     5. Canvas width and height must match attached source image resolution.
-                                                    6. Transform fields are flat keys only (no nested `transform` object).
-                                                    7. Polygon points are tuple arrays only: `[[x,y], ...]`.
+                                                    6. Never infer fallback square canvas dimensions (for example `768x768`) unless source is exactly that size.
+                                                    7. If source dimensions are uncertain, fail generation and request a valid source image.
+                                                    8. Transform fields are flat keys only (no nested `transform` object).
+                                                    9. Polygon points are tuple arrays only: `[[x,y], ...]`.
 
                                                     ---
 
@@ -136,6 +170,7 @@ image  ──▶  speckit.compile.master.prompt.md  (chat)
                                                     ```ts
                                                     interface VisualEnvelope {
                                                       inventory: InventoryDoc;
+                                                      decomposition: DecompositionEntry[];
                                                       geometry: GeometryEntry[];
                                                       appearance: AppearanceEntry[];
                                                     }
@@ -145,7 +180,7 @@ image  ──▶  speckit.compile.master.prompt.md  (chat)
 
                                                     `^[a-z][a-z0-9_]{0,63}$`
 
-                                                    The same ID set must exist in all three stages.
+                                                    The same ID set must exist in all four stages.
 
                                                     ---
 
@@ -265,16 +300,17 @@ image  ──▶  speckit.compile.master.prompt.md  (chat)
 
                                                     ## 6. Pre-paste checklist
 
-                                                    1. Top-level keys are exactly `inventory`, `geometry`, `appearance`.
+                                                    1. Top-level keys are exactly `inventory`, `decomposition`, `geometry`, `appearance`.
                                                     2. `inventory.canvas.width/height` equals source image width/height.
-                                                    3. All three stages contain the same id set.
-                                                    4. IDs satisfy regex and are purpose-neutral.
-                                                    5. No duplicate `zOrder`.
-                                                    6. All polygon points use tuple format.
-                                                    7. Only flat transform keys are used.
-                                                    8. Colors are lowercase hex.
-                                                    9. No forbidden semantic vocabulary appears.
-                                                    10. JSON starts with `{` and ends with `}` with no extra text.
+                                                    3. No implicit fallback square canvas (for example `768x768`) unless source is exactly that size.
+                                                    4. All four stages contain the same id set.
+                                                    5. IDs satisfy regex and are purpose-neutral.
+                                                    6. No duplicate `zOrder`.
+                                                    7. All polygon points use tuple format.
+                                                    8. Only flat transform keys are used.
+                                                    9. Colors are lowercase hex.
+                                                    10. No forbidden semantic vocabulary appears.
+                                                    11. JSON starts with `{` and ends with `}` with no extra text.
 
                                                     ---
 
