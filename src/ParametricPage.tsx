@@ -257,6 +257,13 @@ function inferCategory(element: TemplateElement): string {
   return 'General';
 }
 
+function isLikelyRawLayoutObject(value: Record<string, unknown>): boolean {
+  const keys = Object.keys(value);
+  if (keys.length === 0) return false;
+  const layoutKeys = new Set(['shape', 'width', 'height', 'baseRadius', 'padding']);
+  return keys.every((key) => layoutKeys.has(key));
+}
+
 export default function ParametricPage() {
   const navigate = useNavigate();
   const [activeStyle, setActiveStyle] = useState<StyleKey>('gold_dark');
@@ -386,21 +393,36 @@ export default function ParametricPage() {
     try {
       const parsed = JSON.parse(draftJson) as Record<string, unknown>;
       if (!parsed || typeof parsed !== 'object') return null;
-      if (!Array.isArray(parsed.elements)) return null;
 
-      const layout = parsed.layout && typeof parsed.layout === 'object'
-        ? (parsed.layout as Record<string, unknown>)
-        : deepClone(DEFAULT_EMPTY_TEMPLATE.layout as Record<string, unknown>);
+      const hasTemplateWrapperField =
+        Object.prototype.hasOwnProperty.call(parsed, 'layout') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'scale') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'elements');
+      const rawLayoutOnly = isLikelyRawLayoutObject(parsed);
+      if (!hasTemplateWrapperField && !rawLayoutOnly) return null;
+
+      const baseTemplate = workingTemplate ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
+
+      const layout = rawLayoutOnly
+        ? parsed
+        : parsed.layout && typeof parsed.layout === 'object'
+          ? (parsed.layout as Record<string, unknown>)
+          : (baseTemplate.layout as Record<string, unknown>);
+
       const scale = parsed.scale && typeof parsed.scale === 'object'
         ? (parsed.scale as Record<string, unknown>)
-        : { global: 1 };
+        : (baseTemplate.scale as Record<string, unknown>);
+
+      const nextElements = Array.isArray(parsed.elements)
+        ? parsed.elements
+            .filter((entry) => entry && typeof entry === 'object')
+            .map((entry, index) => ensureElement(entry as TemplateElement, index))
+        : baseTemplate.elements;
 
       const normalized: TemplateModel = {
         layout,
         scale,
-        elements: parsed.elements
-          .filter((entry) => entry && typeof entry === 'object')
-          .map((entry, index) => ensureElement(entry as TemplateElement, index)),
+        elements: nextElements,
       };
 
       return normalized;
@@ -722,7 +744,7 @@ export default function ParametricPage() {
             <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2">
               <p className="text-[11px] uppercase tracking-wide text-zinc-400">JSON Input (Element or Full Template)</p>
               <p className="mt-1 text-[11px] text-zinc-500">
-                Paste single element JSON, or full template JSON with layout/scale/elements to set base.
+                Paste element JSON, full template JSON, or layout-only JSON to update template space.
               </p>
               <textarea
                 value={draftJson}
