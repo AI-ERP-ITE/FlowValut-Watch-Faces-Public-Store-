@@ -14,6 +14,7 @@ type TemplateElement = Record<string, unknown> & {
   role?: string;
   type?: string;
   visible?: boolean;
+  gradient?: Record<string, unknown>;
   params?: Record<string, unknown>;
   placement?: { mode?: string; config?: Record<string, unknown> };
   symmetry?: { mode?: string; config?: Record<string, unknown> };
@@ -330,6 +331,10 @@ const FREE_OBJECT_SHAPE_BY_TYPE = new Map<string, { label: string; type: string;
   FREE_OBJECT_SHAPE_OPTIONS.map((item) => [item.type, item]),
 );
 
+const EFFECT_PANEL_KEYS = ['styleFx', 'depthFx', 'textureFx', 'gradientFx', 'materialFx'] as const;
+type EffectPanelKey = (typeof EFFECT_PANEL_KEYS)[number];
+const FIXED_RENDER_STYLE: StyleKey = 'gold_dark';
+
 function makeId(prefix = 'el'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -428,9 +433,11 @@ function isLikelyRawLayoutObject(value: Record<string, unknown>): boolean {
 
 export default function ParametricPage() {
   const navigate = useNavigate();
-  const [activeStyle, setActiveStyle] = useState<StyleKey>('gold_dark');
   const [colorMode, setColorMode] = useState<ColorMode>('off');
   const [selectedPanelTarget, setSelectedPanelTarget] = useState<'layout' | 'element'>('layout');
+  const [isGlobalPanelCollapsed, setIsGlobalPanelCollapsed] = useState(false);
+  const [drawerCollapsedByCategory, setDrawerCollapsedByCategory] = useState<Record<string, boolean>>({});
+  const [effectPanelCollapsed, setEffectPanelCollapsed] = useState<Record<string, boolean>>({});
 
   const [workingTemplate, setWorkingTemplate] = useState<TemplateModel | null>(null);
   const [library, setLibrary] = useState<Array<LibraryEntry>>(SAMPLE_LIBRARY);
@@ -516,6 +523,20 @@ export default function ParametricPage() {
       };
     });
   }, [library]);
+
+  const setAllDrawerSectionsCollapsed = (collapsed: boolean) => {
+    setDrawerCollapsedByCategory(
+      Object.fromEntries(groupedLibrary.map(({ category }) => [category, collapsed])) as Record<string, boolean>,
+    );
+  };
+
+  const setAllEffectPanelsCollapsed = (collapsed: boolean) => {
+    setEffectPanelCollapsed(
+      Object.fromEntries(EFFECT_PANEL_KEYS.map((key) => [key, collapsed])) as Record<string, boolean>,
+    );
+  };
+
+  const isEffectPanelCollapsed = (key: EffectPanelKey) => effectPanelCollapsed[key] === true;
 
   const saveTemplate = (template: TemplateModel) => {
     try {
@@ -791,7 +812,7 @@ export default function ParametricPage() {
         : baseTemplate.elements;
 
       const normalized: TemplateModel = {
-        activeStyle: parsed.activeStyle === 'steel_night' ? 'steel_night' : parsed.activeStyle === 'gold_dark' ? 'gold_dark' : baseTemplate.activeStyle,
+        activeStyle: baseTemplate.activeStyle,
         layout,
         scale,
         elements: nextElements,
@@ -819,8 +840,6 @@ export default function ParametricPage() {
       };
 
       const template = templateOverride ?? workingTemplate ?? loadStoredTemplate() ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
-      const styleFromTemplate = template.activeStyle === 'steel_night' || template.activeStyle === 'gold_dark' ? template.activeStyle : null;
-
       const renderInput: TemplateModel = {
         ...template,
         elements: (template.elements ?? [])
@@ -835,7 +854,7 @@ export default function ParametricPage() {
       };
 
       const svg = engineModule.runEngine({
-        activeStyle: styleFromTemplate ?? activeStyle,
+        activeStyle: FIXED_RENDER_STYLE,
         templateInput: renderInput,
         colorControl: {
           ...DEFAULT_COLOR_CONTROL,
@@ -852,7 +871,7 @@ export default function ParametricPage() {
     } finally {
       setIsRendering(false);
     }
-  }, [activeStyle, colorMode, workingTemplate]);
+  }, [colorMode, workingTemplate]);
 
   const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>) => {
     let nextTemplate: TemplateModel | null = null;
@@ -1261,6 +1280,7 @@ export default function ParametricPage() {
         Object.prototype.hasOwnProperty.call(parsed, 'symmetry') ||
         Object.prototype.hasOwnProperty.call(parsed, 'material') ||
         Object.prototype.hasOwnProperty.call(parsed, 'texture') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'gradient') ||
         Object.prototype.hasOwnProperty.call(parsed, 'styleAdjust') ||
         Object.prototype.hasOwnProperty.call(parsed, 'effect3d');
       if (!isElementPatch) return;
@@ -1324,6 +1344,7 @@ export default function ParametricPage() {
         Object.prototype.hasOwnProperty.call(parsed, 'symmetry') ||
         Object.prototype.hasOwnProperty.call(parsed, 'material') ||
         Object.prototype.hasOwnProperty.call(parsed, 'texture') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'gradient') ||
         Object.prototype.hasOwnProperty.call(parsed, 'styleAdjust') ||
         Object.prototype.hasOwnProperty.call(parsed, 'effect3d');
 
@@ -1646,6 +1667,148 @@ export default function ParametricPage() {
     );
   };
 
+  const setSelectedGradientEnabled = (enabled: boolean) => {
+    if (!selectedElement) return;
+    const defaultTarget = getPreviousElementName();
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const currentGradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
+        const currentClip = currentGradient.clip && typeof currentGradient.clip === 'object' ? currentGradient.clip as Record<string, unknown> : {};
+        const clip = enabled
+          ? {
+              ...currentClip,
+              enabled: true,
+              inheritPrevious: true,
+              targetName: typeof currentClip.targetName === 'string' && currentClip.targetName.trim().length > 0
+                ? currentClip.targetName
+                : defaultTarget,
+            }
+          : currentClip;
+        return { ...element, gradient: { ...currentGradient, enabled, clip } };
+      }),
+    );
+  };
+
+  const setSelectedGradientNumber = (path: string, value: number) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = gradient;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, gradient };
+      }),
+    );
+  };
+
+  const setSelectedGradientString = (path: string, value: string) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = gradient;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, gradient };
+      }),
+    );
+  };
+
+  const getSelectedGradientNumber = (path: string, fallback: number) => {
+    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.gradient;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    const n = Number(cursor);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const getSelectedGradientString = (path: string, fallback: string) => {
+    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.gradient;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'string' ? cursor : fallback;
+  };
+
+  const isSelectedGradientEnabled = () => {
+    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return false;
+    return (selectedElement.gradient as Record<string, unknown>).enabled === true;
+  };
+
+  const setSelectedGradientClipEnabled = (enabled: boolean) => {
+    if (!selectedElement) return;
+    const defaultTarget = getPreviousElementName();
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
+        const clip = gradient.clip && typeof gradient.clip === 'object' ? deepClone(gradient.clip) as Record<string, unknown> : {};
+        const nextClip = {
+          ...clip,
+          enabled,
+          inheritPrevious: enabled ? true : clip.inheritPrevious === true,
+          targetName: enabled
+            ? (typeof clip.targetName === 'string' && clip.targetName.trim().length > 0 ? clip.targetName : defaultTarget)
+            : (typeof clip.targetName === 'string' ? clip.targetName : ''),
+        };
+        return { ...element, gradient: { ...gradient, clip: nextClip } };
+      }),
+    );
+  };
+
+  const getSelectedGradientClipEnabled = () => {
+    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return false;
+    const clip = (selectedElement.gradient as Record<string, unknown>).clip;
+    return !!(clip && typeof clip === 'object' && (clip as Record<string, unknown>).enabled === true);
+  };
+
+  const getSelectedGradientClipTargetName = () => {
+    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return '';
+    const clip = (selectedElement.gradient as Record<string, unknown>).clip;
+    if (!clip || typeof clip !== 'object') return '';
+    const value = (clip as Record<string, unknown>).targetName;
+    return typeof value === 'string' ? value : '';
+  };
+
+  const setSelectedGradientClipTargetName = (targetName: string) => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
+        const clip = gradient.clip && typeof gradient.clip === 'object' ? deepClone(gradient.clip) as Record<string, unknown> : {};
+        return { ...element, gradient: { ...gradient, clip: { ...clip, targetName } } };
+      }),
+    );
+  };
+
   const setSelectedMaterialEnabled = (enabled: boolean) => {
     if (!selectedElement) return;
     const defaultTarget = getPreviousElementName();
@@ -1937,9 +2100,6 @@ export default function ParametricPage() {
     const storedThemes = loadStoredThemes();
     if (storedTemplate) {
       setWorkingTemplate(storedTemplate);
-      if (storedTemplate.activeStyle === 'gold_dark' || storedTemplate.activeStyle === 'steel_night') {
-        setActiveStyle(storedTemplate.activeStyle);
-      }
       if (storedTemplate.elements.length > 0) {
         setSelectedElementId(storedTemplate.elements[0].id ?? null);
         setSelectedPanelTarget('element');
@@ -1991,7 +2151,7 @@ export default function ParametricPage() {
   useEffect(() => {
     if (!workingTemplate) return;
     void renderPreview(workingTemplate);
-  }, [activeStyle, colorMode, renderPreview, workingTemplate]);
+  }, [colorMode, renderPreview, workingTemplate]);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_8%_12%,#1e293b_0%,#0b1020_35%,#08090c_100%)] text-white p-4 md:p-6">
@@ -2020,6 +2180,22 @@ export default function ParametricPage() {
             <h2 className="text-sm font-semibold text-zinc-100">Element Drawer</h2>
             <p className="text-xs text-zinc-400">Pick from categories, then Add to Canvas. Saved items persist in this browser local storage.</p>
             {drawerNotice ? <p className="text-xs text-emerald-400">{drawerNotice}</p> : null}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAllDrawerSectionsCollapsed(false)}
+                className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+              >
+                Expand All Drawers
+              </button>
+              <button
+                type="button"
+                onClick={() => setAllDrawerSectionsCollapsed(true)}
+                className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+              >
+                Collapse All Drawers
+              </button>
+            </div>
 
             <button
               type="button"
@@ -2095,9 +2271,23 @@ export default function ParametricPage() {
             </div>
 
             <div className="max-h-80 overflow-auto space-y-3 pr-1">
-              {groupedLibrary.map(({ category, entries, fallbackElement }) => (
+              {groupedLibrary.map(({ category, entries, fallbackElement }) => {
+                const isDrawerCollapsed = drawerCollapsedByCategory[category] === true;
+                return (
                 <div key={category} className="rounded border border-zinc-800 bg-zinc-950/50 p-2">
-                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">{category}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">{category}</p>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerCollapsedByCategory((prev) => ({ ...prev, [category]: !isDrawerCollapsed }))}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      {isDrawerCollapsed ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+
+                  {!isDrawerCollapsed ? (
+                    <>
 
                   <div className="mt-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Type Draft JSON</p>
@@ -2223,8 +2413,11 @@ export default function ParametricPage() {
                     {entries.length === 0 ? <p className="text-[11px] text-zinc-500">No saved elements in this type yet.</p> : null}
                     </div>
                   </div>
+                    </>
+                  ) : null}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2">
@@ -2397,31 +2590,22 @@ export default function ParametricPage() {
             <h2 className="text-sm font-semibold text-zinc-100">Controls</h2>
 
             <div className="space-y-3 rounded border border-zinc-800 bg-zinc-950/60 p-3">
-              <p className="text-xs uppercase tracking-wide text-amber-300">Global Render Controls</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs uppercase tracking-wide text-amber-300">Global Render Controls</p>
+                <button
+                  type="button"
+                  onClick={() => setIsGlobalPanelCollapsed((prev) => !prev)}
+                  className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                >
+                  {isGlobalPanelCollapsed ? 'Expand' : 'Collapse'}
+                </button>
+              </div>
               <p className="text-[11px] text-zinc-500">
-                Style = material preset mapping for generated visuals. It is global, not tied to one selected element.
+                Only global controls here: Color Mode and Universal Lighting.
               </p>
 
-            <label className="block space-y-2">
-              <span className="text-xs uppercase tracking-wide text-zinc-400">Style</span>
-              <select
-                value={activeStyle}
-                onChange={(e) => {
-                  const nextStyle = e.target.value as StyleKey;
-                  setActiveStyle(nextStyle);
-                  setWorkingTemplate((prev) => {
-                    if (!prev) return prev;
-                    const next = { ...prev, activeStyle: nextStyle };
-                    saveTemplate(next);
-                    return next;
-                  });
-                }}
-                className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm"
-              >
-                <option value="gold_dark">gold_dark</option>
-                <option value="steel_night">steel_night</option>
-              </select>
-            </label>
+            {!isGlobalPanelCollapsed ? (
+            <>
 
             <label className="block space-y-2">
               <span className="text-xs uppercase tracking-wide text-zinc-400">Color Mode</span>
@@ -2514,6 +2698,8 @@ export default function ParametricPage() {
                 />
               </label>
             </div>
+            </>
+            ) : null}
             </div>
 
             {selectedPanelTarget === 'layout' ? (
@@ -2625,6 +2811,22 @@ export default function ParametricPage() {
             {selectedPanelTarget === 'element' && selectedElement ? (
               <div className="space-y-3 rounded border border-zinc-800 bg-zinc-950/60 p-3">
                 <p className="text-xs uppercase tracking-wide text-amber-300">Editing: {selectedElement.type}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAllEffectPanelsCollapsed(false)}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Expand All Effects
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAllEffectPanelsCollapsed(true)}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Collapse All Effects
+                  </button>
+                </div>
 
                 <label className="block space-y-1">
                   <span className="text-[11px] text-zinc-400">Name</span>
@@ -2757,7 +2959,18 @@ export default function ParametricPage() {
                 ) : null}
 
                 <div className="space-y-2 rounded border border-zinc-800 p-2">
-                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Style FX (All Types)</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Style FX (All Types)</p>
+                    <button
+                      type="button"
+                      onClick={() => setEffectPanelCollapsed((prev) => ({ ...prev, styleFx: !isEffectPanelCollapsed('styleFx') }))}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      {isEffectPanelCollapsed('styleFx') ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+                  {!isEffectPanelCollapsed('styleFx') ? (
+                    <>
                   <p className="text-[11px] text-zinc-500">Highlight, shadows, sharpness, hue, and tint apply to any selected element.</p>
 
                   <label className="flex items-center gap-2">
@@ -2863,10 +3076,23 @@ export default function ParametricPage() {
                       className="w-full"
                     />
                   </label>
+                    </>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2 rounded border border-zinc-800 p-2">
-                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Depth FX (All Types)</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Depth FX (All Types)</p>
+                    <button
+                      type="button"
+                      onClick={() => setEffectPanelCollapsed((prev) => ({ ...prev, depthFx: !isEffectPanelCollapsed('depthFx') }))}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      {isEffectPanelCollapsed('depthFx') ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+                  {!isEffectPanelCollapsed('depthFx') ? (
+                    <>
                   <p className="text-[11px] text-zinc-500">Optional per-element light direction and depth strength.</p>
 
                   <label className="flex items-center gap-2">
@@ -2916,10 +3142,23 @@ export default function ParametricPage() {
                       className="w-full"
                     />
                   </label>
+                    </>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2 rounded border border-zinc-800 p-2">
-                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Texture (Clipped)</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Texture (Clipped)</p>
+                    <button
+                      type="button"
+                      onClick={() => setEffectPanelCollapsed((prev) => ({ ...prev, textureFx: !isEffectPanelCollapsed('textureFx') }))}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      {isEffectPanelCollapsed('textureFx') ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+                  {!isEffectPanelCollapsed('textureFx') ? (
+                    <>
                   <p className="text-[11px] text-zinc-500">One texture system only. Clip target defaults to previous layer name when enabled.</p>
 
                   <label className="flex items-center gap-2">
@@ -2941,6 +3180,15 @@ export default function ParametricPage() {
                       value={getSelectedTextureNumber('opacity', 0.3)}
                       onChange={(e) => setSelectedTextureNumber('opacity', Number(e.target.value))}
                       className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Texture Blend Mode</span>
+                    <input
+                      value={getSelectedTextureString('blendMode', 'overlay')}
+                      onChange={(e) => setSelectedTextureString('blendMode', e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                     />
                   </label>
 
@@ -3085,10 +3333,188 @@ export default function ParametricPage() {
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                     />
                   </label>
+                    </>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2 rounded border border-zinc-800 p-2">
-                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Material (Clipped)</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Gradient (Separate)</p>
+                    <button
+                      type="button"
+                      onClick={() => setEffectPanelCollapsed((prev) => ({ ...prev, gradientFx: !isEffectPanelCollapsed('gradientFx') }))}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      {isEffectPanelCollapsed('gradientFx') ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+                  {!isEffectPanelCollapsed('gradientFx') ? (
+                    <>
+                  <p className="text-[11px] text-zinc-500">Independent gradient overlay separate from texture and material.</p>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelectedGradientEnabled()}
+                      onChange={(e) => setSelectedGradientEnabled(e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Enable separate gradient on this element</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Opacity {getSelectedGradientNumber('opacity', 0.24).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedGradientNumber('opacity', 0.24)}
+                      onChange={(e) => setSelectedGradientNumber('opacity', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Blend Mode</span>
+                    <input
+                      value={getSelectedGradientString('blendMode', 'overlay')}
+                      onChange={(e) => setSelectedGradientString('blendMode', e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedGradientNumber('from.0', 0))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedGradientNumber('from.0', 0)}
+                      onChange={(e) => setSelectedGradientNumber('from.0', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient Start Y {Math.round(getSelectedGradientNumber('from.1', 0))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedGradientNumber('from.1', 0)}
+                      onChange={(e) => setSelectedGradientNumber('from.1', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient End X {Math.round(getSelectedGradientNumber('to.0', 100))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedGradientNumber('to.0', 100)}
+                      onChange={(e) => setSelectedGradientNumber('to.0', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient End Y {Math.round(getSelectedGradientNumber('to.1', 100))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedGradientNumber('to.1', 100)}
+                      onChange={(e) => setSelectedGradientNumber('to.1', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Gradient Stops</p>
+                    {[0, 1, 2].map((stopIndex) => (
+                      <div key={`overlay-stop-${stopIndex}`} className="space-y-1">
+                        <p className="text-[11px] text-zinc-500">Stop {stopIndex + 1}</p>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Offset {getSelectedGradientNumber(`stops.${stopIndex}.offset`, stopIndex === 0 ? 0 : stopIndex === 1 ? 0.5 : 1).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={getSelectedGradientNumber(`stops.${stopIndex}.offset`, stopIndex === 0 ? 0 : stopIndex === 1 ? 0.5 : 1)}
+                            onChange={(e) => setSelectedGradientNumber(`stops.${stopIndex}.offset`, Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={normalizeColorHex(getSelectedGradientString(`stops.${stopIndex}.color`, stopIndex === 0 ? '#ffffff' : stopIndex === 1 ? '#8899aa' : '#000000'), '#ffffff')}
+                            onChange={(e) => setSelectedGradientString(`stops.${stopIndex}.color`, e.target.value)}
+                            className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                          />
+                          <input
+                            value={getSelectedGradientString(`stops.${stopIndex}.color`, stopIndex === 0 ? '#ffffff' : stopIndex === 1 ? '#8899aa' : '#000000')}
+                            onChange={(e) => setSelectedGradientString(`stops.${stopIndex}.color`, e.target.value)}
+                            className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                          />
+                        </div>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Stop Opacity {getSelectedGradientNumber(`stops.${stopIndex}.opacity`, stopIndex === 0 ? 0.24 : stopIndex === 1 ? 0.2 : 0.18).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={getSelectedGradientNumber(`stops.${stopIndex}.opacity`, stopIndex === 0 ? 0.24 : stopIndex === 1 ? 0.2 : 0.18)}
+                            onChange={(e) => setSelectedGradientNumber(`stops.${stopIndex}.opacity`, Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={getSelectedGradientClipEnabled()}
+                      onChange={(e) => setSelectedGradientClipEnabled(e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Clip gradient to target element</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient Clip Target Name</span>
+                    <input
+                      value={getSelectedGradientClipTargetName()}
+                      onChange={(e) => setSelectedGradientClipTargetName(e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    />
+                  </label>
+                    </>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Material (Clipped)</p>
+                    <button
+                      type="button"
+                      onClick={() => setEffectPanelCollapsed((prev) => ({ ...prev, materialFx: !isEffectPanelCollapsed('materialFx') }))}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      {isEffectPanelCollapsed('materialFx') ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+                  {!isEffectPanelCollapsed('materialFx') ? (
+                    <>
                   <p className="text-[11px] text-zinc-500">Material overlay works like texture and stores inside element JSON.</p>
 
                   <label className="flex items-center gap-2">
@@ -3156,6 +3582,8 @@ export default function ParametricPage() {
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                     />
                   </label>
+                    </>
+                  ) : null}
                 </div>
 
                 <label className="block space-y-1">
