@@ -254,7 +254,7 @@ const SAMPLE_LIBRARY: Array<LibraryEntry> = [
             { offset: 1, color: '#1b150b', opacity: 0.36 },
           ],
         },
-        noise: { density: 0.72, effectRadius: 14 },
+        noise: { amount: 0.72, radius: 14 },
       },
     },
   },
@@ -448,7 +448,7 @@ export default function ParametricPage() {
   const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({});
   const [categoryHeaderLocks, setCategoryHeaderLocks] = useState<Record<string, boolean>>({});
   const [freeObjectShapeType, setFreeObjectShapeType] = useState<string>('free_rect');
-  const [quickNewCategory, setQuickNewCategory] = useState<string>('Base');
+  const [quickNewCategory, setQuickNewCategory] = useState<string>('General');
   const [libraryNameDrafts, setLibraryNameDrafts] = useState<Record<string, string>>({});
 
   const [draftJson, setDraftJson] = useState(
@@ -462,7 +462,7 @@ export default function ParametricPage() {
           radius: 0.44,
           thickness: 0.03,
           opacity: 0.35,
-          noise: { density: 0.72, effectRadius: 14 },
+          noise: { amount: 0.72, radius: 14 },
         },
       },
       null,
@@ -889,6 +889,37 @@ export default function ParametricPage() {
     }
   };
 
+  const updateTemplateEffects3d = (updater: (effects: Record<string, unknown>) => Record<string, unknown>) => {
+    let nextTemplate: TemplateModel | null = null;
+    setWorkingTemplate((prev) => {
+      if (!prev) return prev;
+      const currentEffects = prev.effects3d && typeof prev.effects3d === 'object' ? prev.effects3d : {};
+      const next = {
+        ...prev,
+        effects3d: updater({ ...currentEffects }),
+      };
+      nextTemplate = next;
+      saveTemplate(next);
+      return next;
+    });
+    if (nextTemplate) {
+      void renderPreview(nextTemplate);
+    }
+  };
+
+  const getTemplateEffectNumber = (key: string, fallback: number): number => {
+    const effects = workingTemplate?.effects3d;
+    if (!effects || typeof effects !== 'object') return fallback;
+    const value = Number((effects as Record<string, unknown>)[key]);
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  const getTemplateEffectEnabled = (): boolean => {
+    const effects = workingTemplate?.effects3d;
+    if (!effects || typeof effects !== 'object') return false;
+    return (effects as Record<string, unknown>).enabled === true;
+  };
+
   const syncBaseElementShapeToLayout = (shape: 'circle' | 'rectangle') => {
     let nextTemplate: TemplateModel | null = null;
     setWorkingTemplate((prev) => {
@@ -1055,7 +1086,7 @@ export default function ParametricPage() {
     const existing = categoryDrafts[category];
     if (typeof existing === 'string') return existing;
     if (fallbackElement) return JSON.stringify(fallbackElement, null, 2);
-    return JSON.stringify({ type: 'base', params: { shape: 'circle', radius: 0.5 } }, null, 2);
+    return JSON.stringify({ type: 'element', role: 'element', params: {} }, null, 2);
   };
 
   const resolveFreeObjectHeader = (): { type: string; role: string } => {
@@ -1077,7 +1108,11 @@ export default function ParametricPage() {
     return CATEGORY_HEADER_DEFAULTS[category] ?? CATEGORY_HEADER_DEFAULTS.General;
   };
 
-  const isCategoryHeaderLocked = (category: string): boolean => categoryHeaderLocks[category] !== false;
+  const isCategoryHeaderLocked = (category: string): boolean => {
+    const current = categoryHeaderLocks[category];
+    if (typeof current === 'boolean') return current;
+    return category === 'Free Objects';
+  };
 
   const applyCategoryHeaderLock = (
     category: string,
@@ -1525,6 +1560,40 @@ export default function ParametricPage() {
     return Number.isFinite(n) ? n : fallback;
   };
 
+  const setSelectedTextureString = (path: string, value: string) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+
+        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = texture;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, texture };
+      }),
+    );
+  };
+
+  const getSelectedTextureString = (path: string, fallback: string) => {
+    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.texture;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'string' ? cursor : fallback;
+  };
+
   const isSelectedTextureEnabled = () => {
     if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return false;
     return (selectedElement.texture as Record<string, unknown>).enabled === true;
@@ -1717,6 +1786,149 @@ export default function ParametricPage() {
         return { ...element, material: { ...material, clip: { ...clip, targetName } } };
       }),
     );
+  };
+
+  const setSelectedStyleAdjustEnabled = (enabled: boolean) => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const styleAdjust = element.styleAdjust && typeof element.styleAdjust === 'object'
+          ? deepClone(element.styleAdjust) as Record<string, unknown>
+          : {};
+        return { ...element, styleAdjust: { ...styleAdjust, enabled } };
+      }),
+    );
+  };
+
+  const setSelectedStyleAdjustNumber = (path: string, value: number) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const styleAdjust = element.styleAdjust && typeof element.styleAdjust === 'object'
+          ? deepClone(element.styleAdjust) as Record<string, unknown>
+          : {};
+        let cursor: Record<string, unknown> = styleAdjust;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, styleAdjust };
+      }),
+    );
+  };
+
+  const setSelectedStyleAdjustString = (path: string, value: string) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const styleAdjust = element.styleAdjust && typeof element.styleAdjust === 'object'
+          ? deepClone(element.styleAdjust) as Record<string, unknown>
+          : {};
+        let cursor: Record<string, unknown> = styleAdjust;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, styleAdjust };
+      }),
+    );
+  };
+
+  const getSelectedStyleAdjustNumber = (path: string, fallback: number) => {
+    if (!selectedElement || !selectedElement.styleAdjust || typeof selectedElement.styleAdjust !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.styleAdjust;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    const n = Number(cursor);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const getSelectedStyleAdjustString = (path: string, fallback: string) => {
+    if (!selectedElement || !selectedElement.styleAdjust || typeof selectedElement.styleAdjust !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.styleAdjust;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'string' ? cursor : fallback;
+  };
+
+  const isSelectedStyleAdjustEnabled = () => {
+    if (!selectedElement || !selectedElement.styleAdjust || typeof selectedElement.styleAdjust !== 'object') return true;
+    return (selectedElement.styleAdjust as Record<string, unknown>).enabled !== false;
+  };
+
+  const setSelectedEffect3dEnabled = (enabled: boolean) => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const effect3d = element.effect3d && typeof element.effect3d === 'object'
+          ? deepClone(element.effect3d) as Record<string, unknown>
+          : {};
+        return { ...element, effect3d: { ...effect3d, enabled } };
+      }),
+    );
+  };
+
+  const setSelectedEffect3dNumber = (path: string, value: number) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const effect3d = element.effect3d && typeof element.effect3d === 'object'
+          ? deepClone(element.effect3d) as Record<string, unknown>
+          : {};
+        let cursor: Record<string, unknown> = effect3d;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, effect3d };
+      }),
+    );
+  };
+
+  const getSelectedEffect3dNumber = (path: string, fallback: number) => {
+    if (!selectedElement || !selectedElement.effect3d || typeof selectedElement.effect3d !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.effect3d;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    const n = Number(cursor);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const isSelectedEffect3dEnabled = () => {
+    if (!selectedElement || !selectedElement.effect3d || typeof selectedElement.effect3d !== 'object') return false;
+    return (selectedElement.effect3d as Record<string, unknown>).enabled === true;
   };
 
   useEffect(() => {
@@ -2223,6 +2435,85 @@ export default function ParametricPage() {
                 <option value="enforce">enforce</option>
               </select>
             </label>
+
+            <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2 space-y-2">
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400">Universal Lighting (All Elements)</p>
+              <p className="text-[11px] text-zinc-500">Global light rig applied to all layers unless per-layer depth override disables it.</p>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={getTemplateEffectEnabled()}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, enabled: e.target.checked }))}
+                />
+                <span className="text-[11px] text-zinc-400">Enable global lighting</span>
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Angle {Math.round(getTemplateEffectNumber('angle', -35))}deg</span>
+                <input
+                  type="range"
+                  min={-180}
+                  max={180}
+                  step={1}
+                  value={getTemplateEffectNumber('angle', -35)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, angle: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Intensity {getTemplateEffectNumber('intensity', 0.46).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={getTemplateEffectNumber('intensity', 0.46)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Fall Speed {getTemplateEffectNumber('falloff', 1).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={3}
+                  step={0.01}
+                  value={getTemplateEffectNumber('falloff', 1)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, falloff: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">White Balance {getTemplateEffectNumber('whiteBalance', 0).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  value={getTemplateEffectNumber('whiteBalance', 0)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, whiteBalance: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Spreading {getTemplateEffectNumber('spread', 0).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={getTemplateEffectNumber('spread', 0)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, spread: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </label>
+            </div>
             </div>
 
             {selectedPanelTarget === 'layout' ? (
@@ -2466,6 +2757,168 @@ export default function ParametricPage() {
                 ) : null}
 
                 <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Style FX (All Types)</p>
+                  <p className="text-[11px] text-zinc-500">Highlight, shadows, sharpness, hue, and tint apply to any selected element.</p>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelectedStyleAdjustEnabled()}
+                      onChange={(e) => setSelectedStyleAdjustEnabled(e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Enable style adjustments</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Highlight {getSelectedStyleAdjustNumber('highlight', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedStyleAdjustNumber('highlight', 0)}
+                      onChange={(e) => setSelectedStyleAdjustNumber('highlight', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Shadows {getSelectedStyleAdjustNumber('shadows', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedStyleAdjustNumber('shadows', 0)}
+                      onChange={(e) => setSelectedStyleAdjustNumber('shadows', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Contrast {getSelectedStyleAdjustNumber('contrast', 1).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={3}
+                      step={0.01}
+                      value={getSelectedStyleAdjustNumber('contrast', 1)}
+                      onChange={(e) => setSelectedStyleAdjustNumber('contrast', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Sharpness {getSelectedStyleAdjustNumber('sharpness', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedStyleAdjustNumber('sharpness', 0)}
+                      onChange={(e) => setSelectedStyleAdjustNumber('sharpness', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Hue {Math.round(getSelectedStyleAdjustNumber('hue', 0))}</span>
+                    <input
+                      type="range"
+                      min={-180}
+                      max={180}
+                      step={1}
+                      value={getSelectedStyleAdjustNumber('hue', 0)}
+                      onChange={(e) => setSelectedStyleAdjustNumber('hue', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Tint Color</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={normalizeColorHex(getSelectedStyleAdjustString('color', '#ffffff'), '#ffffff')}
+                        onChange={(e) => setSelectedStyleAdjustString('color', e.target.value)}
+                        className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                      />
+                      <input
+                        value={getSelectedStyleAdjustString('color', '#ffffff')}
+                        onChange={(e) => setSelectedStyleAdjustString('color', e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Tint Opacity {getSelectedStyleAdjustNumber('colorOpacity', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedStyleAdjustNumber('colorOpacity', 0)}
+                      onChange={(e) => setSelectedStyleAdjustNumber('colorOpacity', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Depth FX (All Types)</p>
+                  <p className="text-[11px] text-zinc-500">Optional per-element light direction and depth strength.</p>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelectedEffect3dEnabled()}
+                      onChange={(e) => setSelectedEffect3dEnabled(e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Enable depth effect</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Depth Intensity {getSelectedEffect3dNumber('intensity', 0.46).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedEffect3dNumber('intensity', 0.46)}
+                      onChange={(e) => setSelectedEffect3dNumber('intensity', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Light Angle {Math.round(getSelectedEffect3dNumber('angle', -35))}deg</span>
+                    <input
+                      type="range"
+                      min={-180}
+                      max={180}
+                      step={1}
+                      value={getSelectedEffect3dNumber('angle', -35)}
+                      onChange={(e) => setSelectedEffect3dNumber('angle', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Depth Distance {getSelectedEffect3dNumber('distance', 1.2).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={6}
+                      step={0.05}
+                      value={getSelectedEffect3dNumber('distance', 1.2)}
+                      onChange={(e) => setSelectedEffect3dNumber('distance', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
                   <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Texture (Clipped)</p>
                   <p className="text-[11px] text-zinc-500">One texture system only. Clip target defaults to previous layer name when enabled.</p>
 
@@ -2492,11 +2945,109 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedTextureNumber('gradient.from.0', 0))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedTextureNumber('gradient.from.0', 0)}
+                      onChange={(e) => setSelectedTextureNumber('gradient.from.0', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient Start Y {Math.round(getSelectedTextureNumber('gradient.from.1', 0))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedTextureNumber('gradient.from.1', 0)}
+                      onChange={(e) => setSelectedTextureNumber('gradient.from.1', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient End X {Math.round(getSelectedTextureNumber('gradient.to.0', 100))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedTextureNumber('gradient.to.0', 100)}
+                      onChange={(e) => setSelectedTextureNumber('gradient.to.0', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Gradient End Y {Math.round(getSelectedTextureNumber('gradient.to.1', 100))}%</span>
+                    <input
+                      type="range"
+                      min={-100}
+                      max={200}
+                      step={1}
+                      value={getSelectedTextureNumber('gradient.to.1', 100)}
+                      onChange={(e) => setSelectedTextureNumber('gradient.to.1', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Gradient Stops</p>
+                    {[0, 1, 2].map((stopIndex) => (
+                      <div key={`stop-${stopIndex}`} className="space-y-1">
+                        <p className="text-[11px] text-zinc-500">Stop {stopIndex + 1}</p>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Offset {getSelectedTextureNumber(`gradient.stops.${stopIndex}.offset`, stopIndex === 0 ? 0 : stopIndex === 1 ? 0.5 : 1).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={getSelectedTextureNumber(`gradient.stops.${stopIndex}.offset`, stopIndex === 0 ? 0 : stopIndex === 1 ? 0.5 : 1)}
+                            onChange={(e) => setSelectedTextureNumber(`gradient.stops.${stopIndex}.offset`, Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={normalizeColorHex(getSelectedTextureString(`gradient.stops.${stopIndex}.color`, stopIndex === 0 ? '#ffffff' : stopIndex === 1 ? '#8899aa' : '#000000'), '#ffffff')}
+                            onChange={(e) => setSelectedTextureString(`gradient.stops.${stopIndex}.color`, e.target.value)}
+                            className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                          />
+                          <input
+                            value={getSelectedTextureString(`gradient.stops.${stopIndex}.color`, stopIndex === 0 ? '#ffffff' : stopIndex === 1 ? '#8899aa' : '#000000')}
+                            onChange={(e) => setSelectedTextureString(`gradient.stops.${stopIndex}.color`, e.target.value)}
+                            className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                          />
+                        </div>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Stop Opacity {getSelectedTextureNumber(`gradient.stops.${stopIndex}.opacity`, stopIndex === 0 ? 0.22 : stopIndex === 1 ? 0.2 : 0.18).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={getSelectedTextureNumber(`gradient.stops.${stopIndex}.opacity`, stopIndex === 0 ? 0.22 : stopIndex === 1 ? 0.2 : 0.18)}
+                            onChange={(e) => setSelectedTextureNumber(`gradient.stops.${stopIndex}.opacity`, Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Noise Amount {getSelectedTextureNumber('noise.amount', 0.2).toFixed(2)}</span>
                     <input
                       type="range"
                       min={0}
-                      max={1}
+                      max={3}
                       step={0.01}
                       value={getSelectedTextureNumber('noise.amount', 0.2)}
                       onChange={(e) => setSelectedTextureNumber('noise.amount', Number(e.target.value))}
@@ -2508,9 +3059,9 @@ export default function ParametricPage() {
                     <span className="text-[11px] text-zinc-500">Noise Radius {getSelectedTextureNumber('noise.radius', 24).toFixed(1)}</span>
                     <input
                       type="range"
-                      min={1}
-                      max={120}
-                      step={1}
+                      min={0.1}
+                      max={320}
+                      step={0.1}
                       value={getSelectedTextureNumber('noise.radius', 24)}
                       onChange={(e) => setSelectedTextureNumber('noise.radius', Number(e.target.value))}
                       className="w-full"

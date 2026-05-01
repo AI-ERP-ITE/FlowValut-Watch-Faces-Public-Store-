@@ -43,14 +43,21 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			: {};
 
 		return {
+			id: element.id,
+			name: element.name,
 			type: element.type,
 			role: element.role,
+			visible: element.visible,
 			materialRef: materialKey,
 			params: {
 				...(element.params || {}),
 				...(material || {}),
 				...roleOverrides,
 			},
+			material: element.material && typeof element.material === "object" ? { ...element.material } : null,
+			texture: element.texture && typeof element.texture === "object" ? { ...element.texture } : null,
+			styleAdjust: element.styleAdjust && typeof element.styleAdjust === "object" ? { ...element.styleAdjust } : null,
+			effect3d: element.effect3d && typeof element.effect3d === "object" ? { ...element.effect3d } : null,
 			placement: element.placement ? { ...element.placement, config: { ...(element.placement.config || {}) } } : null,
 			symmetry: element.symmetry ? { ...element.symmetry, config: { ...(element.symmetry.config || {}) } } : { mode: "none", config: {} },
 		};

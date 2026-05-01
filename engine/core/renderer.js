@@ -47,10 +47,13 @@ function buildLayoutMetrics(composition) {
 
 function buildDepthEffect(composition) {
 	const effect = composition.effects3d && typeof composition.effects3d === "object" ? composition.effects3d : {};
-	const enabled = effect.enabled !== false;
+	const enabled = effect.enabled === true;
 	const intensity = clamp(effect.intensity, 0, 1, 0.46);
 	const angleDeg = Number.isFinite(Number(effect.angle)) ? Number(effect.angle) : -35;
 	const distance = clamp(effect.distance, 0, 6, 1.2);
+	const falloff = clamp(effect.falloff, 0.2, 3, 1);
+	const whiteBalance = clamp(effect.whiteBalance, -1, 1, 0);
+	const spread = clamp(effect.spread, 0, 1, 0);
 	const radians = (angleDeg * Math.PI) / 180;
 	const dx = Math.cos(radians) * distance;
 	const dy = Math.sin(radians) * distance;
@@ -60,6 +63,9 @@ function buildDepthEffect(composition) {
 		intensity,
 		dx,
 		dy,
+		falloff,
+		whiteBalance,
+		spread,
 	};
 }
 
@@ -90,6 +96,10 @@ function normalizeTexture(source = {}, fallback = {}) {
 			: [{ offset: 0, color: "#ffffff", opacity: 0.22 }, { offset: 1, color: "#000000", opacity: 0.18 }]);
 	const noise = src.noise && typeof src.noise === "object" ? src.noise : {};
 	const fallbackNoise = fallback.noise && typeof fallback.noise === "object" ? fallback.noise : {};
+	const legacyAmount = Number.isFinite(Number(noise.density)) ? Number(noise.density) : null;
+	const legacyRadius = Number.isFinite(Number(noise.effectRadius)) ? Number(noise.effectRadius) : null;
+	const fallbackLegacyAmount = Number.isFinite(Number(fallbackNoise.density)) ? Number(fallbackNoise.density) : null;
+	const fallbackLegacyRadius = Number.isFinite(Number(fallbackNoise.effectRadius)) ? Number(fallbackNoise.effectRadius) : null;
 	const clip = src.clip && typeof src.clip === "object" ? src.clip : {};
 	const fallbackClip = fallback.clip && typeof fallback.clip === "object" ? fallback.clip : {};
 
@@ -102,8 +112,8 @@ function normalizeTexture(source = {}, fallback = {}) {
 			stops,
 		},
 		noise: {
-			amount: clamp(noise.amount, 0, 1, fallbackNoise.amount ?? 0),
-			radius: clamp(noise.radius, 0.1, 120, fallbackNoise.radius ?? 24),
+			amount: clamp(noise.amount, 0, 3, fallbackNoise.amount ?? fallbackLegacyAmount ?? legacyAmount ?? 0),
+			radius: clamp(noise.radius, 0.1, 320, fallbackNoise.radius ?? fallbackLegacyRadius ?? legacyRadius ?? 24),
 		},
 		clip: {
 			enabled: clip.enabled === true || fallbackClip.enabled === true,
@@ -141,14 +151,17 @@ function normalizeMaterialOverlay(source = {}, fallback = {}) {
 
 function normalizeDepthEffect(source = {}, fallback = null) {
 	const src = source && typeof source === "object" ? source : {};
-	const base = fallback || { enabled: false, intensity: 0, dx: 0, dy: 0 };
+	const base = fallback || { enabled: false, intensity: 0, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 };
 	const enabled = src.enabled !== false && base.enabled;
 	const intensity = clamp(src.intensity, 0, 1, base.intensity);
 	const angleDeg = Number.isFinite(Number(src.angle)) ? Number(src.angle) : null;
 	const distance = clamp(src.distance, 0, 6, Math.sqrt(base.dx * base.dx + base.dy * base.dy));
+	const falloff = clamp(src.falloff, 0.2, 3, base.falloff ?? 1);
+	const whiteBalance = clamp(src.whiteBalance, -1, 1, base.whiteBalance ?? 0);
+	const spread = clamp(src.spread, 0, 1, base.spread ?? 0);
 
 	if (angleDeg === null) {
-		return { enabled, intensity, dx: base.dx, dy: base.dy };
+		return { enabled, intensity, dx: base.dx, dy: base.dy, falloff, whiteBalance, spread };
 	}
 
 	const radians = (angleDeg * Math.PI) / 180;
@@ -157,6 +170,9 @@ function normalizeDepthEffect(source = {}, fallback = null) {
 		intensity,
 		dx: Math.cos(radians) * distance,
 		dy: Math.sin(radians) * distance,
+		falloff,
+		whiteBalance,
+		spread,
 	};
 }
 
@@ -194,11 +210,23 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect) {
 	}
 
 	if (depthEffect.enabled && depthEffect.intensity > 0) {
-		const shadowOpacity = (0.42 * depthEffect.intensity).toFixed(3);
-		const lightOpacity = (0.3 * depthEffect.intensity).toFixed(3);
-		const blur = (0.6 + depthEffect.intensity * 0.9).toFixed(3);
-		parts.push(`<feDropShadow in=\"${chain}\" dx=\"${depthEffect.dx.toFixed(3)}\" dy=\"${depthEffect.dy.toFixed(3)}\" stdDeviation=\"${blur}\" flood-color=\"#000000\" flood-opacity=\"${shadowOpacity}\" result=\"depthA\" />`);
-		parts.push(`<feDropShadow in=\"depthA\" dx=\"${(-depthEffect.dx).toFixed(3)}\" dy=\"${(-depthEffect.dy).toFixed(3)}\" stdDeviation=\"${blur}\" flood-color=\"#ffffff\" flood-opacity=\"${lightOpacity}\" result=\"depthB\" />`);
+		const falloff = clamp(depthEffect.falloff, 0.2, 3, 1);
+		const spread = clamp(depthEffect.spread, 0, 1, 0);
+		const wb = clamp(depthEffect.whiteBalance, -1, 1, 0);
+		const shadowOpacity = clamp(0.42 * depthEffect.intensity * Math.min(2, falloff), 0, 1, 0.42).toFixed(3);
+		const lightOpacity = clamp(0.3 * depthEffect.intensity * Math.min(2, falloff), 0, 1, 0.3).toFixed(3);
+		const blur = Math.max(0.05, (0.6 + depthEffect.intensity * 0.9) / falloff).toFixed(3);
+		const spreadRadius = (spread * 2.25).toFixed(3);
+		const lightColor = wb >= 0 ? `rgb(255,${Math.round(255 - wb * 28)},${Math.round(255 - wb * 72)})` : `rgb(${Math.round(255 + wb * 72)},${Math.round(255 + wb * 18)},255)`;
+		const shadowColor = wb >= 0 ? `rgb(${Math.round(18 + wb * 30)},${Math.round(20 + wb * 24)},${Math.round(28 + wb * 16)})` : `rgb(${Math.round(10 - wb * 12)},${Math.round(14 - wb * 10)},${Math.round(34 - wb * 26)})`;
+
+		if (spread > 0.0001) {
+			parts.push(`<feMorphology in="${chain}" operator="dilate" radius="${spreadRadius}" result="spreadBase" />`);
+			chain = "spreadBase";
+		}
+
+		parts.push(`<feDropShadow in="${chain}" dx="${depthEffect.dx.toFixed(3)}" dy="${depthEffect.dy.toFixed(3)}" stdDeviation="${blur}" flood-color="${shadowColor}" flood-opacity="${shadowOpacity}" result="depthA" />`);
+		parts.push(`<feDropShadow in="depthA" dx="${(-depthEffect.dx).toFixed(3)}" dy="${(-depthEffect.dy).toFixed(3)}" stdDeviation="${blur}" flood-color="${lightColor}" flood-opacity="${lightOpacity}" result="depthB" />`);
 		chain = "depthB";
 	}
 

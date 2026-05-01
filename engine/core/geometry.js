@@ -26,10 +26,17 @@ export function buildGeometry(template) {
 			? { ...safeElement.symmetry, config: { ...(safeElement.symmetry.config || {}) } }
 			: { mode: "none", config: {} };
 		return {
+			id: safeElement.id,
+			name: safeElement.name,
 			type: safeElement.type,
 			role: safeElement.role,
+			visible: safeElement.visible,
 			materialRef: safeElement.materialRef,
 			params: { ...safeElement.params },
+			material: safeElement.material && typeof safeElement.material === "object" ? { ...safeElement.material } : null,
+			texture: safeElement.texture && typeof safeElement.texture === "object" ? { ...safeElement.texture } : null,
+			styleAdjust: safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? { ...safeElement.styleAdjust } : null,
+			effect3d: safeElement.effect3d && typeof safeElement.effect3d === "object" ? { ...safeElement.effect3d } : null,
 			placement,
 			symmetry,
 		};
