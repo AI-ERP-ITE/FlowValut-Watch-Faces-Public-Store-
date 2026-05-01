@@ -246,57 +246,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTexture, de
 }
 
 function renderLayoutBase(composition, context) {
-	const layout = composition.layout && typeof composition.layout === "object" ? composition.layout : {};
-	const base = layout.base && typeof layout.base === "object" ? layout.base : {};
-	if (base.enabled === false) return "";
-
-	const width = context.layoutMetrics.width;
-	const height = context.layoutMetrics.height;
-	const scale = context.layoutMetrics.globalScale;
-	const baseRadius = context.layoutMetrics.baseRadius;
-	const shape = context.layoutMetrics.shape;
-	const fill = typeof base.fill === "string" ? base.fill : "#0f1118";
-	const stroke = typeof base.stroke === "string" ? base.stroke : "none";
-	const thicknessRatio = clamp(base.thickness, 0, 1, 0.01);
-	const strokeWidth = Math.max(0, thicknessRatio * baseRadius * scale);
-
-	let body = "";
-	if (shape === "rectangle") {
-		const rectWidth = width * (1 - context.layoutMetrics.padding * 2) * scale;
-		const rectHeight = height * (1 - context.layoutMetrics.padding * 2) * scale;
-		const cornerRatio = clamp(base.cornerRadius, 0, 1, 0.06);
-		const corner = cornerRatio * Math.min(rectWidth, rectHeight);
-		body = `<rect x=\"${-rectWidth / 2}\" y=\"${-rectHeight / 2}\" width=\"${rectWidth}\" height=\"${rectHeight}\" rx=\"${corner}\" ry=\"${corner}\" fill=\"${fill}\" stroke=\"${stroke}\" stroke-width=\"${strokeWidth}\" />`;
-	} else {
-		body = `<circle cx=\"0\" cy=\"0\" r=\"${baseRadius * scale}\" fill=\"${fill}\" stroke=\"${stroke}\" stroke-width=\"${strokeWidth}\" />`;
-	}
-
-	const styleAdjust = normalizeStyleAdjust(
-		{
-			...(composition.styleAdjust && typeof composition.styleAdjust === "object" ? composition.styleAdjust : {}),
-			...(layout.styleAdjust && typeof layout.styleAdjust === "object" ? layout.styleAdjust : {}),
-			...(base.styleAdjust && typeof base.styleAdjust === "object" ? base.styleAdjust : {}),
-		},
-		{ enabled: true, contrast: 1, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 },
-	);
-	const texture = normalizeTexture(
-		{
-			...(composition.texture && typeof composition.texture === "object" ? composition.texture : {}),
-			...(layout.texture && typeof layout.texture === "object" ? layout.texture : {}),
-			...(base.texture && typeof base.texture === "object" ? base.texture : {}),
-		},
-		{ enabled: false, opacity: 0.22 },
-	);
-	const depth = normalizeDepthEffect(
-		{
-			...(composition.effects3d && typeof composition.effects3d === "object" ? composition.effects3d : {}),
-			...(layout.effect3d && typeof layout.effect3d === "object" ? layout.effect3d : {}),
-			...(base.effect3d && typeof base.effect3d === "object" ? base.effect3d : {}),
-		},
-		context.depthEffect,
-	);
-
-	return renderLayer("layout-base", body, width / 2, height / 2, 0, styleAdjust, texture, depth, context.layoutMetrics);
+	return "";
 }
 
 function processGradientStops(stops, context) {

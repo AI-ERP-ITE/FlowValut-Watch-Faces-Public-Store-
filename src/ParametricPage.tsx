@@ -53,6 +53,19 @@ const DEFAULT_COLOR_CONTROL = {
 
 const SAMPLE_LIBRARY: Array<LibraryEntry> = [
   {
+    id: 'sample-base-layer',
+    name: 'Base Layer',
+    category: 'Base',
+    element: {
+      type: 'base',
+      role: 'base',
+      name: 'Base Layer',
+      params: { shape: 'circle', radius: 0.5, fill: '#0b0b0b' },
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+    },
+  },
+  {
     id: 'sample-base-bezel',
     name: 'Base Bezel',
     category: 'Bezel',
@@ -167,11 +180,6 @@ const DEFAULT_EMPTY_TEMPLATE: TemplateModel = {
     height: 480,
     baseRadius: 0.5,
     padding: 0.04,
-    base: {
-      fill: '#0f1118',
-      stroke: '#2b3344',
-      thickness: 0.01,
-    },
   },
   scale: { global: 1 },
   elements: [],
@@ -240,6 +248,7 @@ function ensureElement(element: TemplateElement, fallbackIndex = 0): TemplateEle
 
 function inferCategory(element: TemplateElement): string {
   const type = typeof element.type === 'string' ? element.type : '';
+  if (type === 'base') return 'Base';
   if (type.includes('texture')) return 'Texture';
   if (type.includes('tick')) return 'Ticks';
   if (type.includes('bezel')) return 'Bezel';
@@ -897,7 +906,8 @@ export default function ParametricPage() {
             </div>
 
             <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-3">
-              <p className="text-xs uppercase tracking-wide text-amber-300">Base Controls</p>
+              <p className="text-xs uppercase tracking-wide text-amber-300">Template Space Controls</p>
+              <p className="text-[11px] text-zinc-500">These define the coordinate space only. Add a Base element from left drawer to draw the first visible layer.</p>
 
               <label className="block space-y-1">
                 <span className="text-[11px] text-zinc-400">Base Shape</span>

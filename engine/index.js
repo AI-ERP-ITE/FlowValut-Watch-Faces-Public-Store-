@@ -22,9 +22,11 @@ import { freeRectElement } from "./elements/baseElements/freeRect.js";
 import { outlineRingElement } from "./elements/baseElements/outlineRing.js";
 import { outlineRectElement } from "./elements/baseElements/outlineRect.js";
 import { textureLayerElement } from "./elements/baseElements/textureLayer.js";
+import { baseElement } from "./elements/baseElements/base.js";
 
 function registerBaseElements() {
 	registerElement("circle", circleElement);
+	registerElement("base", baseElement);
 	registerElement("ring", ringElement);
 	registerElement("radialTicks", radialTicksElement);
 	registerElement("bezel", bezelElement);
