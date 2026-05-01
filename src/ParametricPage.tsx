@@ -954,6 +954,21 @@ export default function ParametricPage() {
     }
   };
 
+  const addNewElementFromDefaults = (preferredCategory = 'Base') => {
+    const fallback = DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY.get(preferredCategory)
+      ?? SAMPLE_LIBRARY[0]?.element
+      ?? {
+        type: 'base',
+        role: 'base',
+        name: 'Base Layer',
+        params: { shape: 'circle', radius: 0.5, fill: '#0b0b0b' },
+        placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+        symmetry: { mode: 'none', config: {} },
+      };
+    addElementToCanvas(fallback);
+    setDrawerNotice(`Added new ${preferredCategory} element. Edit controls are now active.`);
+  };
+
   const toggleElementVisibility = (id: string) => {
     updateTemplateElements((elements) =>
       elements.map((element) => (element.id === id ? { ...element, visible: element.visible === false } : element)),
@@ -2012,7 +2027,16 @@ export default function ParametricPage() {
                   );
                 })}
                 {(workingTemplate?.elements ?? []).length === 0 ? (
-                  <p className="px-3 py-4 text-xs text-zinc-500">No layers yet. Add from left drawer.</p>
+                  <div className="px-3 py-4">
+                    <p className="text-xs text-zinc-500">No layers yet. Add from left drawer or create a new base now.</p>
+                    <button
+                      type="button"
+                      onClick={() => addNewElementFromDefaults('Base')}
+                      className="mt-2 rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                    >
+                      + New Element (Base)
+                    </button>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -2473,6 +2497,13 @@ export default function ParametricPage() {
               <div className="rounded border border-zinc-800 bg-zinc-950/60 p-3">
                 <p className="text-xs uppercase tracking-wide text-zinc-400">Element Controls</p>
                 <p className="mt-2 text-xs text-zinc-500">No element selected yet. Pick a layer in the middle panel to edit element-specific controls.</p>
+                <button
+                  type="button"
+                  onClick={() => addNewElementFromDefaults('Base')}
+                  className="mt-3 rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  + New Element (Base)
+                </button>
               </div>
             ) : null}
           </aside>
