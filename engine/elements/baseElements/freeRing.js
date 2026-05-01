@@ -3,6 +3,7 @@
 const DEFAULTS = {
 	radius: 0.2,
 	thickness: 0.015,
+	strokeWidth: 0.015,
 	stroke: "#d6dde8",
 	fill: "none",
 };
@@ -30,7 +31,8 @@ export function renderFreeRing(params = {}, position = {}, context = {}) {
 	const baseRadius = getBaseRadius(context);
 	const scale = getScale(context);
 	const radius = clamp01(p.radius, DEFAULTS.radius) * baseRadius * scale;
-	const thickness = Math.max(0, clamp01(p.thickness, DEFAULTS.thickness) * baseRadius * scale);
+	const rawStroke = p.strokeWidth ?? p.thickness;
+	const thickness = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
 
 	return `<circle cx="0" cy="0" r="${radius}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${thickness}" />`;
 }

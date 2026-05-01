@@ -7,6 +7,7 @@ const DEFAULTS = {
 	fill: "#8c939f",
 	stroke: "#f2f4f7",
 	thickness: 0.008,
+	strokeWidth: 0.008,
 };
 
 function clamp01(value, fallback) {
@@ -34,7 +35,8 @@ export function renderFreeRect(params = {}, position = {}, context = {}) {
 	const width = clamp01(p.width, DEFAULTS.width) * baseRadius * 2 * scale;
 	const height = clamp01(p.height, DEFAULTS.height) * baseRadius * 2 * scale;
 	const cornerRadius = clamp01(p.cornerRadius, DEFAULTS.cornerRadius) * baseRadius * scale;
-	const strokeWidth = Math.max(0, clamp01(p.thickness, DEFAULTS.thickness) * baseRadius * scale);
+	const rawStroke = p.strokeWidth ?? p.thickness;
+	const strokeWidth = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
 	const x = -width / 2;
 	const y = -height / 2;
 

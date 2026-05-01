@@ -5,6 +5,7 @@ const DEFAULTS = {
 	fill: "#b8bec8",
 	stroke: "#f5f7fa",
 	thickness: 0.008,
+	strokeWidth: 0.008,
 };
 
 function clamp01(value, fallback) {
@@ -30,7 +31,8 @@ export function renderFreeCircle(params = {}, position = {}, context = {}) {
 	const baseRadius = getBaseRadius(context);
 	const scale = getScale(context);
 	const radius = clamp01(p.radius, DEFAULTS.radius) * baseRadius * scale;
-	const strokeWidth = Math.max(0, clamp01(p.thickness, DEFAULTS.thickness) * baseRadius * scale);
+	const rawStroke = p.strokeWidth ?? p.thickness;
+	const strokeWidth = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
 
 	return `<circle cx="0" cy="0" r="${radius}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${strokeWidth}" />`;
 }

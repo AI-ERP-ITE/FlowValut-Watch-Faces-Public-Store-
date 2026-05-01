@@ -90,6 +90,8 @@ function normalizeTexture(source = {}, fallback = {}) {
 			: [{ offset: 0, color: "#ffffff", opacity: 0.22 }, { offset: 1, color: "#000000", opacity: 0.18 }]);
 	const noise = src.noise && typeof src.noise === "object" ? src.noise : {};
 	const fallbackNoise = fallback.noise && typeof fallback.noise === "object" ? fallback.noise : {};
+	const clip = src.clip && typeof src.clip === "object" ? src.clip : {};
+	const fallbackClip = fallback.clip && typeof fallback.clip === "object" ? fallback.clip : {};
 
 	return {
 		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
@@ -102,6 +104,37 @@ function normalizeTexture(source = {}, fallback = {}) {
 		noise: {
 			amount: clamp(noise.amount, 0, 1, fallbackNoise.amount ?? 0),
 			radius: clamp(noise.radius, 0.1, 120, fallbackNoise.radius ?? 24),
+		},
+		clip: {
+			enabled: clip.enabled === true || fallbackClip.enabled === true,
+			inheritPrevious: clip.inheritPrevious === true || fallbackClip.inheritPrevious === true,
+			targetName: typeof clip.targetName === "string"
+				? clip.targetName
+				: (typeof fallbackClip.targetName === "string" ? fallbackClip.targetName : ""),
+		},
+	};
+}
+
+function normalizeMaterialOverlay(source = {}, fallback = {}) {
+	const src = source && typeof source === "object" ? source : {};
+	const clip = src.clip && typeof src.clip === "object" ? src.clip : {};
+	const fallbackClip = fallback.clip && typeof fallback.clip === "object" ? fallback.clip : {};
+
+	return {
+		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
+		color: typeof src.color === "string"
+			? src.color
+			: (typeof fallback.color === "string" ? fallback.color : "#ffffff"),
+		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.18),
+		blendMode: typeof src.blendMode === "string"
+			? src.blendMode
+			: (typeof fallback.blendMode === "string" ? fallback.blendMode : "multiply"),
+		clip: {
+			enabled: clip.enabled === true || fallbackClip.enabled === true,
+			inheritPrevious: clip.inheritPrevious === true || fallbackClip.inheritPrevious === true,
+			targetName: typeof clip.targetName === "string"
+				? clip.targetName
+				: (typeof fallbackClip.targetName === "string" ? fallbackClip.targetName : ""),
 		},
 	};
 }
@@ -224,12 +257,33 @@ function buildTextureDefs(localId, texture) {
 	};
 }
 
-function renderLayer(localId, body, x, y, rotation, layerStyle, layerTexture, depthEffect, layoutMetrics) {
+function resolveClipMaskBody(clipConfig, context, fallbackBody) {
+	if (!clipConfig || clipConfig.enabled !== true) return fallbackBody;
+
+	const explicitTarget = typeof clipConfig.targetName === "string" ? clipConfig.targetName.trim() : "";
+	const inheritedTarget = clipConfig.inheritPrevious === true && typeof context.previousElementName === "string"
+		? context.previousElementName.trim()
+		: "";
+	const resolvedTarget = explicitTarget || inheritedTarget;
+	if (!resolvedTarget) return fallbackBody;
+
+	const registry = context.layerMaskRegistry && typeof context.layerMaskRegistry === "object" ? context.layerMaskRegistry : {};
+	const targetBody = registry[resolvedTarget];
+	if (typeof targetBody === "string" && targetBody.length > 0) {
+		return targetBody;
+	}
+
+	return fallbackBody;
+}
+
+function renderLayer(localId, body, x, y, rotation, layerStyle, layerTexture, layerMaterial, depthEffect, layoutMetrics, context = {}) {
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect);
 	const textureDef = buildTextureDefs(localId, layerTexture);
-	const defs = `<defs>${filterDef}${textureDef.defs}<mask id=\"${maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${body}</mask></defs>`;
+	const textureMaskBody = resolveClipMaskBody(layerTexture.clip, context, body);
+	const materialMaskBody = resolveClipMaskBody(layerMaterial.clip, context, body);
+	const defs = `<defs>${filterDef}${textureDef.defs}<mask id=\"${maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${textureMaskBody}</mask><mask id=\"${maskId}-material\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${materialMaskBody}</mask></defs>`;
 	const filterAttr = filterDef.length > 0 ? ` filter=\"url(#${filterId})\"` : "";
 
 	let textureOverlay = "";
@@ -242,7 +296,16 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTexture, de
 		textureOverlay = `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${textureDef.gradientId})\" opacity=\"${layerTexture.opacity.toFixed(3)}\" mask=\"url(#${maskId})\"${textureFilterAttr} />`;
 	}
 
-	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${body}</g>${textureOverlay}</g>`;
+	let materialOverlay = "";
+	if (layerMaterial.enabled && layerMaterial.opacity > 0) {
+		const tx = -layoutMetrics.width;
+		const ty = -layoutMetrics.height;
+		const tw = layoutMetrics.width * 2;
+		const th = layoutMetrics.height * 2;
+		materialOverlay = `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"${layerMaterial.color}\" opacity=\"${layerMaterial.opacity.toFixed(3)}\" mask=\"url(#${maskId}-material)\" style=\"mix-blend-mode:${layerMaterial.blendMode};\" />`;
+	}
+
+	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${body}</g>${textureOverlay}${materialOverlay}</g>`;
 }
 
 function renderLayoutBase(composition, context) {
@@ -334,6 +397,10 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const y = (Number(position.y) / 100) * height;
 			const rotation = Number.isFinite(Number(position.rotation)) ? Number(position.rotation) : 0;
 			const body = definition.render(renderParams, position, context);
+			const worldBody = `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${body}</g>`;
+			if (typeof safeElement.name === "string" && safeElement.name.trim().length > 0 && context.layerMaskRegistry && typeof context.layerMaskRegistry === "object") {
+				context.layerMaskRegistry[safeElement.name.trim()] = worldBody;
+			}
 
 			const styleAdjust = normalizeStyleAdjust(
 				{
@@ -351,6 +418,13 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				},
 				{ enabled: false, opacity: 0.22 },
 			);
+			const material = normalizeMaterialOverlay(
+				{
+					...(safeElement.material && typeof safeElement.material === "object" ? safeElement.material : {}),
+					...(renderParams.material && typeof renderParams.material === "object" ? renderParams.material : {}),
+				},
+				{ enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" },
+			);
 			const depth = normalizeDepthEffect(
 				{
 					...(context?.composition?.effects3d && typeof context.composition.effects3d === "object" ? context.composition.effects3d : {}),
@@ -360,7 +434,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				context.depthEffect,
 			);
 			const localId = `el-${elementIndex}-${positionIndex}`;
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, texture, depth, context.layoutMetrics);
+			return renderLayer(localId, body, x, y, rotation, styleAdjust, texture, material, depth, context.layoutMetrics, context);
 		})
 		.join("");
 }
@@ -376,12 +450,22 @@ export function renderSvg(resolvedComposition, context = {}) {
 		layoutMetrics,
 		depthEffect,
 		composition,
+		layerMaskRegistry: {},
+		previousElementName: "",
 		allocId(prefix = "id") {
 			uid += 1;
 			return `${prefix}-${uid}`;
 		},
 	};
 	const baseLayer = renderLayoutBase(composition, renderContext);
-	const body = elements.map((element, index) => renderElement(element, renderContext, index)).join("");
+	const body = elements
+		.map((element, index) => {
+			const chunk = renderElement(element, renderContext, index);
+			if (typeof element?.name === "string" && element.name.trim().length > 0) {
+				renderContext.previousElementName = element.name.trim();
+			}
+			return chunk;
+		})
+		.join("");
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layoutMetrics.width} ${layoutMetrics.height}">${baseLayer}${body}</svg>`;
 }
