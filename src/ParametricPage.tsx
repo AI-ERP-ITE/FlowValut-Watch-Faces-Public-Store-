@@ -160,6 +160,23 @@ const SAMPLE_LIBRARY: Array<LibraryEntry> = [
   },
 ];
 
+const DEFAULT_EMPTY_TEMPLATE: TemplateModel = {
+  layout: {
+    shape: 'circle',
+    width: 480,
+    height: 480,
+    baseRadius: 0.5,
+    padding: 0.04,
+    base: {
+      fill: '#0f1118',
+      stroke: '#2b3344',
+      thickness: 0.01,
+    },
+  },
+  scale: { global: 1 },
+  elements: [],
+};
+
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -352,10 +369,7 @@ export default function ParametricPage() {
         }) => string;
       };
 
-      const template = workingTemplate ?? loadStoredTemplate() ?? {
-        ...engineModule.getTemplateSnapshot(),
-        elements: (engineModule.getTemplateSnapshot().elements ?? []).map((entry, index) => ensureElement(entry, index)),
-      };
+      const template = workingTemplate ?? loadStoredTemplate() ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
 
       const renderInput: TemplateModel = {
         ...template,
@@ -404,6 +418,33 @@ export default function ParametricPage() {
       saveTemplate(next);
       return next;
     });
+  };
+
+  const updateTemplateLayout = (updater: (layout: Record<string, unknown>) => Record<string, unknown>) => {
+    setWorkingTemplate((prev) => {
+      if (!prev) return prev;
+      const currentLayout = prev.layout && typeof prev.layout === 'object' ? prev.layout : {};
+      const next = {
+        ...prev,
+        layout: updater({ ...currentLayout }),
+      };
+      saveTemplate(next);
+      return next;
+    });
+  };
+
+  const getLayoutShape = (): 'circle' | 'rectangle' => {
+    const shape = workingTemplate?.layout && typeof workingTemplate.layout === 'object'
+      ? (workingTemplate.layout as Record<string, unknown>).shape
+      : 'circle';
+    return shape === 'rectangle' ? 'rectangle' : 'circle';
+  };
+
+  const getLayoutNumber = (key: string, fallback: number): number => {
+    const layout = workingTemplate?.layout;
+    if (!layout || typeof layout !== 'object') return fallback;
+    const value = Number((layout as Record<string, unknown>)[key]);
+    return Number.isFinite(value) ? value : fallback;
   };
 
   const addElementToCanvas = (source: TemplateElement) => {
@@ -539,6 +580,8 @@ export default function ParametricPage() {
       if (storedTemplate.elements.length > 0) {
         setSelectedElementId(storedTemplate.elements[0].id ?? null);
       }
+    } else {
+      setWorkingTemplate(deepClone(DEFAULT_EMPTY_TEMPLATE));
     }
     if (storedLibrary) {
       setLibrary(storedLibrary);
@@ -780,6 +823,89 @@ export default function ParametricPage() {
                 className="w-full"
               />
             </label>
+
+            <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-3">
+              <p className="text-xs uppercase tracking-wide text-amber-300">Base Controls</p>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-400">Base Shape</span>
+                <select
+                  value={getLayoutShape()}
+                  onChange={(e) => {
+                    const nextShape = e.target.value === 'rectangle' ? 'rectangle' : 'circle';
+                    updateTemplateLayout((layout) => ({ ...layout, shape: nextShape }));
+                  }}
+                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs"
+                >
+                  <option value="circle">circle</option>
+                  <option value="rectangle">rectangle</option>
+                </select>
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Width {Math.round(getLayoutNumber('width', 480))}</span>
+                <input
+                  type="range"
+                  min={200}
+                  max={900}
+                  step={10}
+                  value={getLayoutNumber('width', 480)}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    updateTemplateLayout((layout) => ({ ...layout, width: next }));
+                  }}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Height {Math.round(getLayoutNumber('height', 480))}</span>
+                <input
+                  type="range"
+                  min={200}
+                  max={900}
+                  step={10}
+                  value={getLayoutNumber('height', 480)}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    updateTemplateLayout((layout) => ({ ...layout, height: next }));
+                  }}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Base Radius {getLayoutNumber('baseRadius', 0.5).toFixed(3)}</span>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={0.5}
+                  step={0.005}
+                  value={getLayoutNumber('baseRadius', 0.5)}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    updateTemplateLayout((layout) => ({ ...layout, baseRadius: next }));
+                  }}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[11px] text-zinc-500">Padding {getLayoutNumber('padding', 0.04).toFixed(3)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.2}
+                  step={0.002}
+                  value={getLayoutNumber('padding', 0.04)}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    updateTemplateLayout((layout) => ({ ...layout, padding: next }));
+                  }}
+                  className="w-full"
+                />
+              </label>
+            </div>
 
             {selectedElement ? (
               <div className="space-y-3 rounded border border-zinc-800 bg-zinc-950/60 p-3">
