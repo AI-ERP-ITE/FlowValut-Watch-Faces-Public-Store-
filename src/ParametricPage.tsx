@@ -37,8 +37,15 @@ type LibraryEntry = {
   element: TemplateElement;
 };
 
+type ThemeEntry = {
+  id: string;
+  name: string;
+  template: TemplateModel;
+};
+
 const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
 const PARAMETRIC_LIBRARY_STORAGE_KEY = 'parametric-element-library-v1';
+const PARAMETRIC_THEME_STORAGE_KEY = 'parametric-theme-library-v1';
 
 const DEFAULT_COLOR_CONTROL = {
   colorControl: {
@@ -349,6 +356,27 @@ function normalizeLibraryEntries(parsed: Array<unknown>): Array<LibraryEntry> {
     });
 }
 
+function normalizeThemeEntries(parsed: Array<unknown>): Array<ThemeEntry> {
+  return parsed
+    .filter((entry) => entry && typeof entry === 'object')
+    .map((entry, index) => {
+      const safe = entry as Record<string, unknown>;
+      const rawTemplate = safe.template && typeof safe.template === 'object' ? (safe.template as TemplateModel) : { elements: [] };
+      const elements = Array.isArray(rawTemplate.elements)
+        ? rawTemplate.elements.map((element, elementIndex) => ensureElement(element, elementIndex))
+        : [];
+
+      return {
+        id: typeof safe.id === 'string' ? safe.id : makeId('theme'),
+        name: typeof safe.name === 'string' && safe.name.trim().length > 0 ? safe.name : `Theme-${index + 1}`,
+        template: {
+          ...rawTemplate,
+          elements,
+        },
+      };
+    });
+}
+
 function isLikelyRawLayoutObject(value: Record<string, unknown>): boolean {
   const keys = Object.keys(value);
   if (keys.length === 0) return false;
@@ -364,6 +392,8 @@ export default function ParametricPage() {
 
   const [workingTemplate, setWorkingTemplate] = useState<TemplateModel | null>(null);
   const [library, setLibrary] = useState<Array<LibraryEntry>>(SAMPLE_LIBRARY);
+  const [themes, setThemes] = useState<Array<ThemeEntry>>([]);
+  const [themeNameDraft, setThemeNameDraft] = useState('');
 
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
@@ -373,6 +403,7 @@ export default function ParametricPage() {
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [drawerNotice, setDrawerNotice] = useState<string | null>(null);
   const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({});
+  const [libraryNameDrafts, setLibraryNameDrafts] = useState<Record<string, string>>({});
 
   const [draftJson, setDraftJson] = useState(
     JSON.stringify(
@@ -440,6 +471,14 @@ export default function ParametricPage() {
     }
   };
 
+  const saveThemesLocal = (items: Array<ThemeEntry>) => {
+    try {
+      window.localStorage.setItem(PARAMETRIC_THEME_STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      // Ignore localStorage failures.
+    }
+  };
+
   const saveLibraryToFirebaseOnAction = useCallback(async (items: Array<LibraryEntry>) => {
     if (!authConfigured || !getCurrentAuthUser()) return;
     const payload = items.map((entry) => JSON.parse(JSON.stringify(entry)) as Record<string, unknown>);
@@ -468,6 +507,18 @@ export default function ParametricPage() {
       const parsed = JSON.parse(raw) as Array<LibraryEntry>;
       if (!Array.isArray(parsed)) return null;
       return normalizeLibraryEntries(parsed as Array<unknown>);
+    } catch {
+      return null;
+    }
+  };
+
+  const loadStoredThemes = (): Array<ThemeEntry> | null => {
+    try {
+      const raw = window.localStorage.getItem(PARAMETRIC_THEME_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Array<unknown>;
+      if (!Array.isArray(parsed)) return null;
+      return normalizeThemeEntries(parsed);
     } catch {
       return null;
     }
@@ -520,6 +571,88 @@ export default function ParametricPage() {
     persistLibraryFromAction(
       (prev) => prev.filter((entry) => entry.id !== entryId),
       'Library entry deleted.',
+    );
+  };
+
+  const renameLibraryEntry = (entryId: string) => {
+    const draft = (libraryNameDrafts[entryId] ?? '').trim();
+    if (!draft) {
+      setDrawerNotice('Rename failed: name cannot be empty.');
+      return;
+    }
+
+    persistLibraryFromAction(
+      (prev) => prev.map((entry) => (entry.id === entryId ? { ...entry, name: draft } : entry)),
+      'Library entry renamed.',
+    );
+  };
+
+  const persistThemes = (updater: (prev: Array<ThemeEntry>) => Array<ThemeEntry>, successNotice: string) => {
+    setThemes((prev) => {
+      const next = updater(prev);
+      saveThemesLocal(next);
+      return next;
+    });
+    setDrawerNotice(successNotice);
+  };
+
+  const saveCurrentAsTheme = () => {
+    if (!workingTemplate || !Array.isArray(workingTemplate.elements) || workingTemplate.elements.length === 0) {
+      setDrawerNotice('Save theme failed: no layers in current template.');
+      return;
+    }
+
+    const name = themeNameDraft.trim().length > 0 ? themeNameDraft.trim() : `Theme-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`;
+    const nextTheme: ThemeEntry = {
+      id: makeId('theme'),
+      name,
+      template: deepClone(workingTemplate),
+    };
+
+    persistThemes((prev) => [...prev, nextTheme], 'Theme saved locally.');
+  };
+
+  const applyThemeById = (themeId: string) => {
+    const theme = themes.find((entry) => entry.id === themeId);
+    if (!theme) {
+      setDrawerNotice('Theme not found.');
+      return;
+    }
+
+    const template = {
+      ...deepClone(theme.template),
+      elements: (theme.template.elements ?? []).map((element, index) => ensureElement(element, index)),
+    } as TemplateModel;
+
+    setWorkingTemplate(template);
+    saveTemplate(template);
+    setSelectedElementId(template.elements[0]?.id ?? null);
+    setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
+    setThemeNameDraft(theme.name);
+    setDrawerNotice(`Theme loaded: ${theme.name}`);
+    void renderPreview(template);
+  };
+
+  const deleteThemeById = (themeId: string) => {
+    persistThemes((prev) => prev.filter((entry) => entry.id !== themeId), 'Theme deleted.');
+  };
+
+  const importTemplateElementsToLibrary = (template: TemplateModel) => {
+    const items = (template.elements ?? []).map((element, index) => {
+      const normalized = ensureElement(deepClone(element), index);
+      return {
+        id: makeId('lib'),
+        name: typeof normalized.name === 'string' && normalized.name.trim().length > 0 ? normalized.name : `Saved-${index + 1}`,
+        category: inferCategory(normalized),
+        element: normalized,
+      } as LibraryEntry;
+    });
+
+    if (items.length === 0) return;
+
+    persistLibraryFromAction(
+      (prev) => [...prev, ...items],
+      `Imported ${items.length} element(s) from template JSON to drawer library.`,
     );
   };
 
@@ -875,6 +1008,7 @@ export default function ParametricPage() {
     if (template) {
       setWorkingTemplate(template);
       saveTemplate(template);
+      importTemplateElementsToLibrary(template);
       setSelectedElementId(template.elements[0]?.id ?? null);
       setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
       setDraftError(null);
@@ -1050,6 +1184,52 @@ export default function ParametricPage() {
     const n = Number(cursor);
     return Number.isFinite(n) ? n : fallback;
   };
+
+  const setStringParam = (path: string, value: string) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    const currentParams = selectedElement.params && typeof selectedElement.params === 'object' ? deepClone(selectedElement.params) : {};
+
+    let cursor: Record<string, unknown> = currentParams;
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const key = segments[i];
+      const child = cursor[key];
+      if (!child || typeof child !== 'object') {
+        cursor[key] = {};
+      }
+      cursor = cursor[key] as Record<string, unknown>;
+    }
+    cursor[segments[segments.length - 1]] = value;
+
+    updateTemplateElements((elements) =>
+      elements.map((element) => (element.id === selectedElement.id ? { ...element, params: currentParams } : element)),
+    );
+  };
+
+  const getStringParam = (path: string, fallback: string) => {
+    if (!selectedElement || !selectedElement.params || typeof selectedElement.params !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.params;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'string' ? cursor : fallback;
+  };
+
+  const normalizeColorHex = (value: string, fallback: string) => {
+    const raw = (value ?? '').trim();
+    const fullHex = /^#([0-9a-fA-F]{6})$/;
+    if (fullHex.test(raw)) return raw;
+    const shortHex = /^#([0-9a-fA-F]{3})$/;
+    if (shortHex.test(raw)) {
+      const m = raw.slice(1);
+      return `#${m[0]}${m[0]}${m[1]}${m[1]}${m[2]}${m[2]}`;
+    }
+    return fallback;
+  };
+
+  const getColorParam = (path: string, fallback: string) => normalizeColorHex(getStringParam(path, fallback), fallback);
 
   const isSelectedType = (...types: string[]) => {
     if (!selectedElement || typeof selectedElement.type !== 'string') return false;
@@ -1363,6 +1543,7 @@ export default function ParametricPage() {
   useEffect(() => {
     const storedTemplate = loadStoredTemplate();
     const storedLibrary = loadStoredLibrary();
+    const storedThemes = loadStoredThemes();
     if (storedTemplate) {
       setWorkingTemplate(storedTemplate);
       if (storedTemplate.activeStyle === 'gold_dark' || storedTemplate.activeStyle === 'steel_night') {
@@ -1383,6 +1564,9 @@ export default function ParametricPage() {
       void syncLibraryFromFirebase();
     } else {
       void syncLibraryFromFirebase();
+    }
+    if (storedThemes) {
+      setThemes(storedThemes);
     }
     void renderPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1460,6 +1644,53 @@ export default function ParametricPage() {
               <p className="mt-1 text-[11px] text-zinc-400">Click to edit layout controls on the right panel.</p>
             </button>
 
+            <div className="rounded border border-zinc-800 bg-zinc-900/60 p-2">
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400">Themes Library</p>
+              <p className="mt-1 text-[11px] text-zinc-500">Save all current layers as one theme pack, then load later.</p>
+
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={themeNameDraft}
+                  onChange={(e) => setThemeNameDraft(e.target.value)}
+                  placeholder="Theme name"
+                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                />
+                <button
+                  type="button"
+                  onClick={saveCurrentAsTheme}
+                  className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  Save Theme
+                </button>
+              </div>
+
+              <div className="mt-2 max-h-36 overflow-auto space-y-2">
+                {themes.map((theme) => (
+                  <div key={theme.id} className="rounded border border-zinc-800 bg-zinc-900 p-2">
+                    <p className="text-xs font-medium text-zinc-200">{theme.name}</p>
+                    <p className="text-[11px] text-zinc-500">{(theme.template.elements ?? []).length} layers</p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => applyThemeById(theme.id)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Load
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteThemeById(theme.id)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {themes.length === 0 ? <p className="text-[11px] text-zinc-500">No saved themes yet.</p> : null}
+              </div>
+            </div>
+
             <div className="max-h-80 overflow-auto space-y-3 pr-1">
               {groupedLibrary.map(([category, entries]) => (
                 <div key={category} className="rounded border border-zinc-800 bg-zinc-950/50 p-2">
@@ -1496,13 +1727,31 @@ export default function ParametricPage() {
                     <div className="mt-2 space-y-2">
                     {entries.map((entry) => (
                       <div key={entry.id} className="rounded border border-zinc-800 bg-zinc-900 p-2">
-                        <button
-                          type="button"
-                          onClick={() => addElementToCanvas(entry.element)}
-                          className="w-full text-left"
-                        >
-                          <p className="text-xs font-medium text-zinc-200">{entry.name}</p>
-                        </button>
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => addElementToCanvas(entry.element)}
+                            className="w-full text-left"
+                          >
+                            <p className="text-xs font-medium text-zinc-200">{entry.name}</p>
+                          </button>
+
+                          <div className="flex gap-2">
+                            <input
+                              value={libraryNameDrafts[entry.id] ?? entry.name}
+                              onChange={(e) => setLibraryNameDrafts((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                              className="h-7 w-full rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => renameLibraryEntry(entry.id)}
+                              className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                            >
+                              Rename
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
@@ -1873,7 +2122,41 @@ export default function ParametricPage() {
                 {isSelectedType('free_circle', 'free_rect', 'free_ring', 'free_triangle', 'free_hexagon', 'free_octagon', 'free_polygon') ? (
                   <div className="space-y-2 rounded border border-zinc-800 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-400">Free Shape Paint</p>
-                    <p className="text-[11px] text-zinc-500">Use fill/stroke colors in JSON. Stroke line width controlled here.</p>
+                    <p className="text-[11px] text-zinc-500">Use color wheel or hex picker for fill and stroke.</p>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Fill Color</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={getColorParam('fill', '#58657b')}
+                          onChange={(e) => setStringParam('fill', e.target.value)}
+                          className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                        />
+                        <input
+                          value={getStringParam('fill', '#58657b')}
+                          onChange={(e) => setStringParam('fill', e.target.value)}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Stroke Color</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={getColorParam('stroke', '#e5ecff')}
+                          onChange={(e) => setStringParam('stroke', e.target.value)}
+                          className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                        />
+                        <input
+                          value={getStringParam('stroke', '#e5ecff')}
+                          onChange={(e) => setStringParam('stroke', e.target.value)}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                        />
+                      </div>
+                    </label>
 
                     <label className="block space-y-1">
                       <span className="text-[11px] text-zinc-500">Stroke Width {getNumericParam('strokeWidth', getNumericParam('thickness', 0.008)).toFixed(3)}</span>
@@ -2002,11 +2285,19 @@ export default function ParametricPage() {
 
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Color</span>
-                    <input
-                      value={getSelectedMaterialString('color', '#ffffff')}
-                      onChange={(e) => setSelectedMaterialString('color', e.target.value)}
-                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={normalizeColorHex(getSelectedMaterialString('color', '#ffffff'), '#ffffff')}
+                        onChange={(e) => setSelectedMaterialString('color', e.target.value)}
+                        className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                      />
+                      <input
+                        value={getSelectedMaterialString('color', '#ffffff')}
+                        onChange={(e) => setSelectedMaterialString('color', e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
+                    </div>
                   </label>
 
                   <label className="block space-y-1">
