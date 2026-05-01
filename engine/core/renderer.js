@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 import { getElement } from "../elements/elementRegistry.js";
 import { validateElementModel } from "../elements/elementRegistry.js";
@@ -8,6 +8,7 @@ import { applySymmetry } from "./symmetry.js";
 
 const COLOR_KEYS = new Set(["fill", "stroke", "color", "stopColor", "shadowColor", "highlightColor"]);
 const GRADIENT_KEYS = new Set(["gradientStops", "stops"]);
+const BLUR_TYPES = new Set(["gaussian", "directional", "radial", "zoom", "soften"]);
 
 function requireObject(value, label) {
 	if (!value || typeof value !== "object") {
@@ -20,6 +21,79 @@ function clamp(value, min, max, fallback) {
 	const n = Number(value);
 	if (!Number.isFinite(n)) return fallback;
 	return Math.max(min, Math.min(max, n));
+}
+
+function normalizeBlur(source = {}, fallback = {}) {
+	const src = source && typeof source === "object" ? source : {};
+	const nextType = typeof src.type === "string" && BLUR_TYPES.has(src.type)
+		? src.type
+		: (typeof fallback.type === "string" && BLUR_TYPES.has(fallback.type) ? fallback.type : "gaussian");
+	const amount = clamp(src.amount, 0, 72, fallback.amount ?? 0);
+	const samples = Math.round(clamp(src.samples, 3, 24, fallback.samples ?? 8));
+	const angle = clamp(src.angle, -180, 180, fallback.angle ?? 0);
+	const strength = clamp(src.strength, 0, 1, fallback.strength ?? 0.5);
+
+	return {
+		enabled: src.enabled === true || (fallback.enabled === true && amount > 0),
+		type: nextType,
+		amount,
+		samples,
+		angle,
+		strength,
+	};
+}
+
+function buildBlurPrimitives(inputRef, resultPrefix, blur) {
+	if (!blur.enabled || blur.amount <= 0) {
+		return { parts: [], result: inputRef };
+	}
+
+	const parts = [];
+	if (blur.type === "directional") {
+		const rad = (blur.angle * Math.PI) / 180;
+		const sigmaX = Math.max(0.001, Math.abs(Math.cos(rad)) * blur.amount);
+		const sigmaY = Math.max(0.001, Math.abs(Math.sin(rad)) * blur.amount);
+		const result = `${resultPrefix}-dir`;
+		parts.push(`<feGaussianBlur in="${inputRef}" stdDeviation="${sigmaX.toFixed(3)} ${sigmaY.toFixed(3)}" result="${result}" />`);
+		return { parts, result };
+	}
+
+	if (blur.type === "radial") {
+		const radius = blur.amount * (0.35 + blur.strength * 0.85);
+		const sampleCount = Math.max(3, blur.samples);
+		for (let i = 0; i < sampleCount; i += 1) {
+			const theta = (Math.PI * 2 * i) / sampleCount;
+			const dx = Math.cos(theta) * radius;
+			const dy = Math.sin(theta) * radius;
+			parts.push(`<feOffset in="${inputRef}" dx="${dx.toFixed(3)}" dy="${dy.toFixed(3)}" result="${resultPrefix}-rad-${i}" />`);
+		}
+		const mergeNodes = Array.from({ length: sampleCount }, (_, i) => `<feMergeNode in="${resultPrefix}-rad-${i}" />`).join("");
+		parts.push(`<feMerge result="${resultPrefix}-rad-merge">${mergeNodes}<feMergeNode in="${inputRef}" /></feMerge>`);
+		parts.push(`<feGaussianBlur in="${resultPrefix}-rad-merge" stdDeviation="${Math.max(0.001, blur.amount * 0.22).toFixed(3)}" result="${resultPrefix}-rad-final" />`);
+		return { parts, result: `${resultPrefix}-rad-final` };
+	}
+
+	if (blur.type === "zoom") {
+		const nearSigma = Math.max(0.001, blur.amount * 0.45);
+		const farSigma = Math.max(0.001, blur.amount * (0.9 + blur.strength * 0.8));
+		parts.push(`<feGaussianBlur in="${inputRef}" stdDeviation="${nearSigma.toFixed(3)}" result="${resultPrefix}-zoom-near" />`);
+		parts.push(`<feGaussianBlur in="${inputRef}" stdDeviation="${farSigma.toFixed(3)}" result="${resultPrefix}-zoom-far" />`);
+		parts.push(`<feBlend in="${resultPrefix}-zoom-near" in2="${resultPrefix}-zoom-far" mode="screen" result="${resultPrefix}-zoom-blend" />`);
+		parts.push(`<feBlend in="${resultPrefix}-zoom-blend" in2="${inputRef}" mode="screen" result="${resultPrefix}-zoom-final" />`);
+		return { parts, result: `${resultPrefix}-zoom-final` };
+	}
+
+	if (blur.type === "soften") {
+		const sigma = Math.max(0.001, blur.amount * (0.18 + blur.strength * 0.3));
+		const result = `${resultPrefix}-soft`;
+		parts.push(`<feGaussianBlur in="${inputRef}" stdDeviation="${sigma.toFixed(3)}" result="${result}" />`);
+		return { parts, result };
+	}
+
+	const sigma = Math.max(0.001, blur.amount);
+	const result = `${resultPrefix}-gauss`;
+	parts.push(`<feGaussianBlur in="${inputRef}" stdDeviation="${sigma.toFixed(3)}" result="${result}" />`);
+	return { parts, result };
 }
 
 function buildLayoutMetrics(composition) {
@@ -102,10 +176,15 @@ function normalizeTexture(source = {}, fallback = {}) {
 	const fallbackLegacyRadius = Number.isFinite(Number(fallbackNoise.effectRadius)) ? Number(fallbackNoise.effectRadius) : null;
 	const clip = src.clip && typeof src.clip === "object" ? src.clip : {};
 	const fallbackClip = fallback.clip && typeof fallback.clip === "object" ? fallback.clip : {};
+	const blur = src.blur && typeof src.blur === "object" ? src.blur : {};
+	const fallbackBlur = fallback.blur && typeof fallback.blur === "object" ? fallback.blur : {};
 
 	return {
 		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
 		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.22),
+		blendMode: typeof src.blendMode === "string"
+			? src.blendMode
+			: (typeof fallback.blendMode === "string" ? fallback.blendMode : "overlay"),
 		gradient: {
 			from: [clamp(from[0], -100, 200, 0), clamp(from[1], -100, 200, 0)],
 			to: [clamp(to[0], -100, 200, 100), clamp(to[1], -100, 200, 100)],
@@ -115,6 +194,41 @@ function normalizeTexture(source = {}, fallback = {}) {
 			amount: clamp(noise.amount, 0, 3, fallbackNoise.amount ?? fallbackLegacyAmount ?? legacyAmount ?? 0),
 			radius: clamp(noise.radius, 0.1, 320, fallbackNoise.radius ?? fallbackLegacyRadius ?? legacyRadius ?? 24),
 		},
+		blur: normalizeBlur(blur, fallbackBlur),
+		clip: {
+			enabled: clip.enabled === true || fallbackClip.enabled === true,
+			inheritPrevious: clip.inheritPrevious === true || fallbackClip.inheritPrevious === true,
+			targetName: typeof clip.targetName === "string"
+				? clip.targetName
+				: (typeof fallbackClip.targetName === "string" ? fallbackClip.targetName : ""),
+		},
+	};
+}
+
+function normalizeGradientOverlay(source = {}, fallback = {}) {
+	const src = source && typeof source === "object" ? source : {};
+	const from = Array.isArray(src.from) ? src.from : (Array.isArray(fallback.from) ? fallback.from : [0, 0]);
+	const to = Array.isArray(src.to) ? src.to : (Array.isArray(fallback.to) ? fallback.to : [100, 100]);
+	const stops = Array.isArray(src.stops)
+		? src.stops
+		: (Array.isArray(fallback.stops)
+			? fallback.stops
+			: [{ offset: 0, color: "#ffffff", opacity: 0.24 }, { offset: 1, color: "#000000", opacity: 0.18 }]);
+	const clip = src.clip && typeof src.clip === "object" ? src.clip : {};
+	const fallbackClip = fallback.clip && typeof fallback.clip === "object" ? fallback.clip : {};
+	const blur = src.blur && typeof src.blur === "object" ? src.blur : {};
+	const fallbackBlur = fallback.blur && typeof fallback.blur === "object" ? fallback.blur : {};
+
+	return {
+		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
+		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.24),
+		blendMode: typeof src.blendMode === "string"
+			? src.blendMode
+			: (typeof fallback.blendMode === "string" ? fallback.blendMode : "overlay"),
+		from: [clamp(from[0], -100, 200, 0), clamp(from[1], -100, 200, 0)],
+		to: [clamp(to[0], -100, 200, 100), clamp(to[1], -100, 200, 100)],
+		stops,
+		blur: normalizeBlur(blur, fallbackBlur),
 		clip: {
 			enabled: clip.enabled === true || fallbackClip.enabled === true,
 			inheritPrevious: clip.inheritPrevious === true || fallbackClip.inheritPrevious === true,
@@ -246,11 +360,11 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect) {
 
 function buildTextureDefs(localId, texture) {
 	if (!texture.enabled || texture.opacity <= 0) {
-		return { defs: "", gradientId: null, noiseId: null };
+		return { defs: "", gradientId: null, filterId: null };
 	}
 
 	const gradientId = `grad-${localId}`;
-	const noiseId = texture.noise.amount > 0 ? `noise-${localId}` : null;
+	const textureFilterId = `textureFx-${localId}`;
 	const stops = texture.gradient.stops
 		.map((stop, index) => {
 			const src = stop && typeof stop === "object" ? stop : {};
@@ -263,26 +377,56 @@ function buildTextureDefs(localId, texture) {
 
 	const gradientDef = `<linearGradient id=\"${gradientId}\" x1=\"${texture.gradient.from[0]}%\" y1=\"${texture.gradient.from[1]}%\" x2=\"${texture.gradient.to[0]}%\" y2=\"${texture.gradient.to[1]}%\">${stops}</linearGradient>`;
 
-	if (!noiseId) {
-		return { defs: gradientDef, gradientId, noiseId: null };
+	let chain = "SourceGraphic";
+	const filterParts = [];
+	if (texture.noise.amount > 0) {
+		const frequency = (1 / texture.noise.radius).toFixed(4);
+		const alpha = clamp(texture.noise.amount, 0, 1, 0).toFixed(3);
+		filterParts.push(`<feTurbulence type=\"fractalNoise\" baseFrequency=\"${frequency}\" numOctaves=\"2\" seed=\"7\" result=\"grain\" />`);
+		filterParts.push(`<feColorMatrix in=\"grain\" type=\"matrix\" values=\"1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0\" result=\"grainAlpha\" />`);
+		filterParts.push(`<feBlend in=\"${chain}\" in2=\"grainAlpha\" mode=\"overlay\" result=\"texture-noise\" />`);
+		chain = "texture-noise";
 	}
 
-	const frequency = (1 / texture.noise.radius).toFixed(4);
-	const alpha = clamp(texture.noise.amount, 0, 1, 0).toFixed(3);
-	const noiseDef = [
-		`<filter id=\"${noiseId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
-		`<feTurbulence type=\"fractalNoise\" baseFrequency=\"${frequency}\" numOctaves=\"2\" seed=\"7\" result=\"grain\" />`,
-		`<feColorMatrix in=\"grain\" type=\"matrix\" values=\"1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0\" result=\"grainAlpha\" />`,
-		"<feBlend in=\"SourceGraphic\" in2=\"grainAlpha\" mode=\"overlay\" result=\"textured\" />",
-		"<feMerge><feMergeNode in=\"textured\" /></feMerge>",
-		"</filter>",
-	].join("");
+	const blurPass = buildBlurPrimitives(chain, `texture-${localId}`, texture.blur || {});
+	filterParts.push(...blurPass.parts);
+	chain = blurPass.result;
 
+	if (filterParts.length === 0) {
+		return { defs: gradientDef, gradientId, filterId: null };
+	}
+
+	const filterDef = [`<filter id=\"${textureFilterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`, ...filterParts, `<feMerge><feMergeNode in=\"${chain}\" /></feMerge>`, "</filter>"].join("");
 	return {
-		defs: `${gradientDef}${noiseDef}`,
+		defs: `${gradientDef}${filterDef}`,
 		gradientId,
-		noiseId,
+		filterId: textureFilterId,
 	};
+}
+
+function buildGradientOverlayDefs(localId, gradient) {
+	if (!gradient.enabled || gradient.opacity <= 0) {
+		return { defs: "", gradientId: null, filterId: null };
+	}
+
+	const gradientId = `overlay-grad-${localId}`;
+	const stops = gradient.stops
+		.map((stop, index) => {
+			const src = stop && typeof stop === "object" ? stop : {};
+			const offset = clamp(src.offset, 0, 1, index === 0 ? 0 : 1);
+			const color = typeof src.color === "string" ? src.color : "#ffffff";
+			const opacity = clamp(src.opacity, 0, 1, 1);
+			return `<stop offset="${(offset * 100).toFixed(2)}%" stop-color="${color}" stop-opacity="${opacity.toFixed(3)}" />`;
+		})
+		.join("");
+
+	const blurPass = buildBlurPrimitives("SourceGraphic", `gradient-${localId}`, gradient.blur || {});
+	const filterId = blurPass.parts.length > 0 ? `gradientFx-${localId}` : null;
+	const filterDef = filterId
+		? [`<filter id="${filterId}" x="-25%" y="-25%" width="150%" height="150%">`, ...blurPass.parts, `<feMerge><feMergeNode in="${blurPass.result}" /></feMerge>`, "</filter>"].join("")
+		: "";
+	const defs = `<linearGradient id="${gradientId}" x1="${gradient.from[0]}%" y1="${gradient.from[1]}%" x2="${gradient.to[0]}%" y2="${gradient.to[1]}%">${stops}</linearGradient>${filterDef}`;
+	return { defs, gradientId, filterId };
 }
 
 function resolveClipMaskBody(clipConfig, context, fallbackBody) {
@@ -304,24 +448,36 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody) {
 	return fallbackBody;
 }
 
-function renderLayer(localId, body, x, y, rotation, layerStyle, layerTexture, layerMaterial, depthEffect, layoutMetrics, context = {}) {
+function renderLayer(localId, body, x, y, rotation, layerStyle, layerTexture, layerGradient, layerMaterial, depthEffect, layoutMetrics, context = {}) {
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect);
 	const textureDef = buildTextureDefs(localId, layerTexture);
+	const gradientDef = buildGradientOverlayDefs(localId, layerGradient);
 	const textureMaskBody = resolveClipMaskBody(layerTexture.clip, context, body);
+	const gradientMaskBody = resolveClipMaskBody(layerGradient.clip, context, body);
 	const materialMaskBody = resolveClipMaskBody(layerMaterial.clip, context, body);
-	const defs = `<defs>${filterDef}${textureDef.defs}<mask id=\"${maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${textureMaskBody}</mask><mask id=\"${maskId}-material\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${materialMaskBody}</mask></defs>`;
+	const defs = `<defs>${filterDef}${textureDef.defs}${gradientDef.defs}<mask id=\"${maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${textureMaskBody}</mask><mask id=\"${maskId}-gradient\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${gradientMaskBody}</mask><mask id=\"${maskId}-material\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${materialMaskBody}</mask></defs>`;
 	const filterAttr = filterDef.length > 0 ? ` filter=\"url(#${filterId})\"` : "";
 
 	let textureOverlay = "";
 	if (textureDef.gradientId && layerTexture.enabled && layerTexture.opacity > 0) {
-		const textureFilterAttr = textureDef.noiseId ? ` filter=\"url(#${textureDef.noiseId})\"` : "";
+		const textureFilterAttr = textureDef.filterId ? ` filter=\"url(#${textureDef.filterId})\"` : "";
 		const tx = -layoutMetrics.width;
 		const ty = -layoutMetrics.height;
 		const tw = layoutMetrics.width * 2;
 		const th = layoutMetrics.height * 2;
-		textureOverlay = `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${textureDef.gradientId})\" opacity=\"${layerTexture.opacity.toFixed(3)}\" mask=\"url(#${maskId})\"${textureFilterAttr} />`;
+		textureOverlay = `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${textureDef.gradientId})\" opacity=\"${layerTexture.opacity.toFixed(3)}\" mask=\"url(#${maskId})\" style=\"mix-blend-mode:${layerTexture.blendMode};\"${textureFilterAttr} />`;
+	}
+
+	let gradientOverlay = "";
+	if (gradientDef.gradientId && layerGradient.enabled && layerGradient.opacity > 0) {
+		const gradientFilterAttr = gradientDef.filterId ? ` filter=\"url(#${gradientDef.filterId})\"` : "";
+		const tx = -layoutMetrics.width;
+		const ty = -layoutMetrics.height;
+		const tw = layoutMetrics.width * 2;
+		const th = layoutMetrics.height * 2;
+		gradientOverlay = `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${gradientDef.gradientId})\" opacity=\"${layerGradient.opacity.toFixed(3)}\" mask=\"url(#${maskId}-gradient)\" style=\"mix-blend-mode:${layerGradient.blendMode};\"${gradientFilterAttr} />`;
 	}
 
 	let materialOverlay = "";
@@ -333,7 +489,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTexture, la
 		materialOverlay = `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"${layerMaterial.color}\" opacity=\"${layerMaterial.opacity.toFixed(3)}\" mask=\"url(#${maskId}-material)\" style=\"mix-blend-mode:${layerMaterial.blendMode};\" />`;
 	}
 
-	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${body}</g>${textureOverlay}${materialOverlay}</g>`;
+	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${body}</g>${textureOverlay}${gradientOverlay}${materialOverlay}</g>`;
 }
 
 function renderLayoutBase(composition, context) {
@@ -433,7 +589,6 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 
 			const styleAdjust = normalizeStyleAdjust(
 				{
-					...(context?.composition?.styleAdjust && typeof context.composition.styleAdjust === "object" ? context.composition.styleAdjust : {}),
 					...(safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? safeElement.styleAdjust : {}),
 					...(renderParams.styleAdjust && typeof renderParams.styleAdjust === "object" ? renderParams.styleAdjust : {}),
 				},
@@ -441,11 +596,17 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			);
 			const texture = normalizeTexture(
 				{
-					...(context?.composition?.texture && typeof context.composition.texture === "object" ? context.composition.texture : {}),
 					...(safeElement.texture && typeof safeElement.texture === "object" ? safeElement.texture : {}),
 					...(renderParams.texture && typeof renderParams.texture === "object" ? renderParams.texture : {}),
 				},
-				{ enabled: false, opacity: 0.22 },
+				{ enabled: false, opacity: 0.22, blendMode: "overlay" },
+			);
+			const gradient = normalizeGradientOverlay(
+				{
+					...(safeElement.gradient && typeof safeElement.gradient === "object" ? safeElement.gradient : {}),
+					...(renderParams.gradientOverlay && typeof renderParams.gradientOverlay === "object" ? renderParams.gradientOverlay : {}),
+				},
+				{ enabled: false, opacity: 0.24, blendMode: "overlay" },
 			);
 			const material = normalizeMaterialOverlay(
 				{
@@ -454,16 +615,17 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				},
 				{ enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" },
 			);
-			const depth = normalizeDepthEffect(
-				{
-					...(context?.composition?.effects3d && typeof context.composition.effects3d === "object" ? context.composition.effects3d : {}),
-					...(safeElement.effect3d && typeof safeElement.effect3d === "object" ? safeElement.effect3d : {}),
-					...(renderParams.effect3d && typeof renderParams.effect3d === "object" ? renderParams.effect3d : {}),
-				},
-				context.depthEffect,
-			);
+			const depth = context.globalDepthEnabled
+				? { enabled: false, intensity: 0, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
+				: normalizeDepthEffect(
+					{
+						...(safeElement.effect3d && typeof safeElement.effect3d === "object" ? safeElement.effect3d : {}),
+						...(renderParams.effect3d && typeof renderParams.effect3d === "object" ? renderParams.effect3d : {}),
+					},
+					context.depthEffect,
+				);
 			const localId = `el-${elementIndex}-${positionIndex}`;
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, texture, material, depth, context.layoutMetrics, context);
+			return renderLayer(localId, body, x, y, rotation, styleAdjust, texture, gradient, material, depth, context.layoutMetrics, context);
 		})
 		.join("");
 }
@@ -478,6 +640,7 @@ export function renderSvg(resolvedComposition, context = {}) {
 		...context,
 		layoutMetrics,
 		depthEffect,
+		globalDepthEnabled: depthEffect.enabled && depthEffect.intensity > 0,
 		composition,
 		layerMaskRegistry: {},
 		previousElementName: "",
@@ -496,5 +659,13 @@ export function renderSvg(resolvedComposition, context = {}) {
 			return chunk;
 		})
 		.join("");
-	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layoutMetrics.width} ${layoutMetrics.height}">${baseLayer}${body}</svg>`;
+	const globalDepthId = "globalDepthFx";
+	const globalDepthDef = renderContext.globalDepthEnabled
+		? buildLayerFilterDef(globalDepthId, { enabled: false, contrast: 1, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0, color: null }, depthEffect)
+		: "";
+	const content = `${baseLayer}${body}`;
+	if (globalDepthDef.length > 0) {
+		return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layoutMetrics.width} ${layoutMetrics.height}"><defs>${globalDepthDef}</defs><g filter="url(#${globalDepthId})">${content}</g></svg>`;
+	}
+	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layoutMetrics.width} ${layoutMetrics.height}">${content}</svg>`;
 }

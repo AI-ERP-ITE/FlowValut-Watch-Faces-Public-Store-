@@ -333,6 +333,13 @@ const FREE_OBJECT_SHAPE_BY_TYPE = new Map<string, { label: string; type: string;
 
 const EFFECT_PANEL_KEYS = ['styleFx', 'depthFx', 'textureFx', 'gradientFx', 'materialFx'] as const;
 type EffectPanelKey = (typeof EFFECT_PANEL_KEYS)[number];
+const BLUR_MODE_OPTIONS = [
+  { value: 'gaussian', label: 'Gaussian' },
+  { value: 'directional', label: 'Directional' },
+  { value: 'radial', label: 'Radial' },
+  { value: 'zoom', label: 'Zoom' },
+  { value: 'soften', label: 'Soften' },
+] as const;
 const FIXED_RENDER_STYLE: StyleKey = 'gold_dark';
 
 function makeId(prefix = 'el'): string {
@@ -1604,6 +1611,29 @@ export default function ParametricPage() {
     );
   };
 
+  const setSelectedTextureBoolean = (path: string, value: boolean) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+
+        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = texture;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, texture };
+      }),
+    );
+  };
+
   const getSelectedTextureString = (path: string, fallback: string) => {
     if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return fallback;
     const segments = path.split('.');
@@ -1613,6 +1643,17 @@ export default function ParametricPage() {
       cursor = (cursor as Record<string, unknown>)[key];
     }
     return typeof cursor === 'string' ? cursor : fallback;
+  };
+
+  const getSelectedTextureBoolean = (path: string, fallback: boolean) => {
+    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.texture;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'boolean' ? cursor : fallback;
   };
 
   const isSelectedTextureEnabled = () => {
@@ -1734,6 +1775,28 @@ export default function ParametricPage() {
     );
   };
 
+  const setSelectedGradientBoolean = (path: string, value: boolean) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = gradient;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, gradient };
+      }),
+    );
+  };
+
   const getSelectedGradientNumber = (path: string, fallback: number) => {
     if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return fallback;
     const segments = path.split('.');
@@ -1755,6 +1818,17 @@ export default function ParametricPage() {
       cursor = (cursor as Record<string, unknown>)[key];
     }
     return typeof cursor === 'string' ? cursor : fallback;
+  };
+
+  const getSelectedGradientBoolean = (path: string, fallback: boolean) => {
+    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.gradient;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'boolean' ? cursor : fallback;
   };
 
   const isSelectedGradientEnabled = () => {
@@ -3192,6 +3266,83 @@ export default function ParametricPage() {
                     />
                   </label>
 
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Texture Blur</p>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={getSelectedTextureBoolean('blur.enabled', false)}
+                        onChange={(e) => setSelectedTextureBoolean('blur.enabled', e.target.checked)}
+                      />
+                      <span className="text-[11px] text-zinc-400">Enable texture blur</span>
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Mode</span>
+                      <select
+                        value={getSelectedTextureString('blur.type', 'gaussian')}
+                        onChange={(e) => setSelectedTextureString('blur.type', e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      >
+                        {BLUR_MODE_OPTIONS.map((option) => (
+                          <option key={`texture-blur-${option.value}`} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Amount {getSelectedTextureNumber('blur.amount', 0).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={72}
+                        step={0.1}
+                        value={getSelectedTextureNumber('blur.amount', 0)}
+                        onChange={(e) => setSelectedTextureNumber('blur.amount', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Angle {Math.round(getSelectedTextureNumber('blur.angle', 0))}deg</span>
+                      <input
+                        type="range"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        value={getSelectedTextureNumber('blur.angle', 0)}
+                        onChange={(e) => setSelectedTextureNumber('blur.angle', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Samples {Math.round(getSelectedTextureNumber('blur.samples', 8))}</span>
+                      <input
+                        type="range"
+                        min={3}
+                        max={24}
+                        step={1}
+                        value={getSelectedTextureNumber('blur.samples', 8)}
+                        onChange={(e) => setSelectedTextureNumber('blur.samples', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Strength {getSelectedTextureNumber('blur.strength', 0.5).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={getSelectedTextureNumber('blur.strength', 0.5)}
+                        onChange={(e) => setSelectedTextureNumber('blur.strength', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+                  </div>
+
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedTextureNumber('gradient.from.0', 0))}%</span>
                     <input
@@ -3382,6 +3533,83 @@ export default function ParametricPage() {
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                     />
                   </label>
+
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Gradient Blur</p>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={getSelectedGradientBoolean('blur.enabled', false)}
+                        onChange={(e) => setSelectedGradientBoolean('blur.enabled', e.target.checked)}
+                      />
+                      <span className="text-[11px] text-zinc-400">Enable gradient blur</span>
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Mode</span>
+                      <select
+                        value={getSelectedGradientString('blur.type', 'gaussian')}
+                        onChange={(e) => setSelectedGradientString('blur.type', e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      >
+                        {BLUR_MODE_OPTIONS.map((option) => (
+                          <option key={`gradient-blur-${option.value}`} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Amount {getSelectedGradientNumber('blur.amount', 0).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={72}
+                        step={0.1}
+                        value={getSelectedGradientNumber('blur.amount', 0)}
+                        onChange={(e) => setSelectedGradientNumber('blur.amount', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Angle {Math.round(getSelectedGradientNumber('blur.angle', 0))}deg</span>
+                      <input
+                        type="range"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        value={getSelectedGradientNumber('blur.angle', 0)}
+                        onChange={(e) => setSelectedGradientNumber('blur.angle', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Samples {Math.round(getSelectedGradientNumber('blur.samples', 8))}</span>
+                      <input
+                        type="range"
+                        min={3}
+                        max={24}
+                        step={1}
+                        value={getSelectedGradientNumber('blur.samples', 8)}
+                        onChange={(e) => setSelectedGradientNumber('blur.samples', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Blur Strength {getSelectedGradientNumber('blur.strength', 0.5).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={getSelectedGradientNumber('blur.strength', 0.5)}
+                        onChange={(e) => setSelectedGradientNumber('blur.strength', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+                  </div>
 
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedGradientNumber('from.0', 0))}%</span>
