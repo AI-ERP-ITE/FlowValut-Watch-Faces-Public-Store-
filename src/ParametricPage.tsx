@@ -306,6 +306,30 @@ const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
   return map;
 })();
 
+const CATEGORY_HEADER_DEFAULTS: Record<string, { type: string; role: string }> = {
+  Base: { type: 'base', role: 'base' },
+  Bezel: { type: 'bezel', role: 'bezel' },
+  Ticks: { type: 'ticks_radial', role: 'ticks' },
+  Outline: { type: 'outline_ring', role: 'outline_ring' },
+  'Free Objects': { type: 'free_rect', role: 'free_rect' },
+  Texture: { type: 'texture_layer', role: 'texture_layer' },
+  General: { type: 'element', role: 'element' },
+};
+
+const FREE_OBJECT_SHAPE_OPTIONS = [
+  { label: 'Circle', type: 'free_circle', role: 'free_circle' },
+  { label: 'Ring', type: 'free_ring', role: 'free_ring' },
+  { label: 'Triangle', type: 'free_triangle', role: 'free_triangle' },
+  { label: 'Hexagon', type: 'free_hexagon', role: 'free_hexagon' },
+  { label: 'Octagon', type: 'free_octagon', role: 'free_octagon' },
+  { label: 'Polygon', type: 'free_polygon', role: 'free_polygon' },
+  { label: 'Rectangle', type: 'free_rect', role: 'free_rect' },
+] as const;
+
+const FREE_OBJECT_SHAPE_BY_TYPE = new Map<string, { label: string; type: string; role: string }>(
+  FREE_OBJECT_SHAPE_OPTIONS.map((item) => [item.type, item]),
+);
+
 function makeId(prefix = 'el'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -422,6 +446,9 @@ export default function ParametricPage() {
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [drawerNotice, setDrawerNotice] = useState<string | null>(null);
   const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({});
+  const [categoryHeaderLocks, setCategoryHeaderLocks] = useState<Record<string, boolean>>({});
+  const [freeObjectShapeType, setFreeObjectShapeType] = useState<string>('free_rect');
+  const [quickNewCategory, setQuickNewCategory] = useState<string>('Base');
   const [libraryNameDrafts, setLibraryNameDrafts] = useState<Record<string, string>>({});
 
   const [draftJson, setDraftJson] = useState(
@@ -954,8 +981,16 @@ export default function ParametricPage() {
     }
   };
 
-  const addNewElementFromDefaults = (preferredCategory = 'Base') => {
-    const fallback = DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY.get(preferredCategory)
+  const resolveNewElementTemplate = (preferredCategory: string, fallbackElement?: TemplateElement): TemplateElement => {
+    if (preferredCategory === 'Free Objects') {
+      const fromShape = SAMPLE_LIBRARY.find(
+        (entry) => entry.category === 'Free Objects' && entry.element.type === freeObjectShapeType,
+      )?.element;
+      if (fromShape) return fromShape;
+    }
+
+    return fallbackElement
+      ?? DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY.get(preferredCategory)
       ?? SAMPLE_LIBRARY[0]?.element
       ?? {
         type: 'base',
@@ -965,7 +1000,12 @@ export default function ParametricPage() {
         placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
         symmetry: { mode: 'none', config: {} },
       };
-    addElementToCanvas(fallback);
+  };
+
+  const addNewElementFromDefaults = (preferredCategory = 'Base', fallbackElement?: TemplateElement) => {
+    const fallback = resolveNewElementTemplate(preferredCategory, fallbackElement);
+    const next = applyCategoryHeaderLock(preferredCategory, fallback, fallbackElement);
+    addElementToCanvas(next);
     setDrawerNotice(`Added new ${preferredCategory} element. Edit controls are now active.`);
   };
 
@@ -1018,6 +1058,45 @@ export default function ParametricPage() {
     return JSON.stringify({ type: 'base', params: { shape: 'circle', radius: 0.5 } }, null, 2);
   };
 
+  const resolveFreeObjectHeader = (): { type: string; role: string } => {
+    const picked = FREE_OBJECT_SHAPE_BY_TYPE.get(freeObjectShapeType);
+    if (picked) return { type: picked.type, role: picked.role };
+    return CATEGORY_HEADER_DEFAULTS['Free Objects'];
+  };
+
+  const resolveCategoryHeader = (category: string, fallbackElement?: TemplateElement): { type: string; role: string } => {
+    if (category === 'Free Objects') {
+      return resolveFreeObjectHeader();
+    }
+    if (fallbackElement && typeof fallbackElement.type === 'string' && typeof fallbackElement.role === 'string') {
+      return { type: fallbackElement.type, role: fallbackElement.role };
+    }
+    if (fallbackElement && typeof fallbackElement.type === 'string') {
+      return { type: fallbackElement.type, role: fallbackElement.type };
+    }
+    return CATEGORY_HEADER_DEFAULTS[category] ?? CATEGORY_HEADER_DEFAULTS.General;
+  };
+
+  const isCategoryHeaderLocked = (category: string): boolean => categoryHeaderLocks[category] !== false;
+
+  const applyCategoryHeaderLock = (
+    category: string,
+    element: TemplateElement,
+    fallbackElement?: TemplateElement,
+  ): TemplateElement => {
+    const normalized = ensureElement(element);
+    if (!isCategoryHeaderLocked(category)) {
+      return normalized;
+    }
+
+    const header = resolveCategoryHeader(category, fallbackElement);
+    return {
+      ...normalized,
+      type: header.type,
+      role: header.role,
+    };
+  };
+
   const parseCategoryDraftElement = (category: string, fallbackElement?: TemplateElement): TemplateElement | null => {
     const text = getCategoryDraftText(category, fallbackElement);
     if (!text.trim()) {
@@ -1029,8 +1108,11 @@ export default function ParametricPage() {
       if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
         throw new Error('Element JSON must contain string field: type');
       }
+
+      const finalElement = applyCategoryHeaderLock(category, parsed, fallbackElement);
+
       setDrawerNotice(null);
-      return ensureElement(parsed);
+      return finalElement;
     } catch (e) {
       setDrawerNotice(`${category}: ${e instanceof Error ? e.message : 'Invalid JSON.'}`);
       return null;
@@ -1680,7 +1762,6 @@ export default function ParametricPage() {
       if (!user) return;
       void syncLibraryFromFirebase();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authConfigured, syncLibraryFromFirebase]);
 
   useEffect(() => {
@@ -1809,12 +1890,48 @@ export default function ParametricPage() {
                   <div className="mt-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Type Draft JSON</p>
                     <p className="mt-1 text-[11px] text-zinc-500">Paste/edit JSON for this element type.</p>
+                    {category === 'Free Objects' ? (
+                      <label className="mt-2 block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Free Shape Type</span>
+                        <select
+                          value={freeObjectShapeType}
+                          onChange={(e) => setFreeObjectShapeType(e.target.value)}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                        >
+                          {FREE_OBJECT_SHAPE_OPTIONS.map((item) => (
+                            <option key={item.type} value={item.type}>{item.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    <label className="mt-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isCategoryHeaderLocked(category)}
+                        onChange={(e) => setCategoryHeaderLocks((prev) => ({ ...prev, [category]: e.target.checked }))}
+                      />
+                      <span className="text-[11px] text-zinc-400">
+                        Lock type/role header for this type
+                      </span>
+                    </label>
+                    {isCategoryHeaderLocked(category) ? (
+                      <p className="mt-1 text-[11px] text-amber-300">
+                        Enforced header: {resolveCategoryHeader(category, fallbackElement).type} / {resolveCategoryHeader(category, fallbackElement).role}
+                      </p>
+                    ) : null}
                     <textarea
                       value={getCategoryDraftText(category, fallbackElement)}
                       onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [category]: e.target.value }))}
                       className="mt-2 h-24 w-full resize-y rounded border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300"
                     />
                     <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => addNewElementFromDefaults(category, fallbackElement)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        New
+                      </button>
                       <button
                         type="button"
                         onClick={() => addCategoryDraftToCanvas(category, fallbackElement)}
@@ -2028,14 +2145,36 @@ export default function ParametricPage() {
                 })}
                 {(workingTemplate?.elements ?? []).length === 0 ? (
                   <div className="px-3 py-4">
-                    <p className="text-xs text-zinc-500">No layers yet. Add from left drawer or create a new base now.</p>
-                    <button
-                      type="button"
-                      onClick={() => addNewElementFromDefaults('Base')}
-                      className="mt-2 rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
-                    >
-                      + New Element (Base)
-                    </button>
+                    <p className="text-xs text-zinc-500">No layers yet. Add from left drawer or create a new element now.</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <select
+                        value={quickNewCategory}
+                        onChange={(e) => setQuickNewCategory(e.target.value)}
+                        className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                      >
+                        {DEFAULT_DRAWER_CATEGORY_ORDER.map((item) => (
+                          <option key={item} value={item}>{item}</option>
+                        ))}
+                      </select>
+                      {quickNewCategory === 'Free Objects' ? (
+                        <select
+                          value={freeObjectShapeType}
+                          onChange={(e) => setFreeObjectShapeType(e.target.value)}
+                          className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                        >
+                          {FREE_OBJECT_SHAPE_OPTIONS.map((item) => (
+                            <option key={item.type} value={item.type}>{item.label}</option>
+                          ))}
+                        </select>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => addNewElementFromDefaults(quickNewCategory)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        + New Element
+                      </button>
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -2497,13 +2636,35 @@ export default function ParametricPage() {
               <div className="rounded border border-zinc-800 bg-zinc-950/60 p-3">
                 <p className="text-xs uppercase tracking-wide text-zinc-400">Element Controls</p>
                 <p className="mt-2 text-xs text-zinc-500">No element selected yet. Pick a layer in the middle panel to edit element-specific controls.</p>
-                <button
-                  type="button"
-                  onClick={() => addNewElementFromDefaults('Base')}
-                  className="mt-3 rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
-                >
-                  + New Element (Base)
-                </button>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <select
+                    value={quickNewCategory}
+                    onChange={(e) => setQuickNewCategory(e.target.value)}
+                    className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                  >
+                    {DEFAULT_DRAWER_CATEGORY_ORDER.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                  {quickNewCategory === 'Free Objects' ? (
+                    <select
+                      value={freeObjectShapeType}
+                      onChange={(e) => setFreeObjectShapeType(e.target.value)}
+                      className="h-8 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                    >
+                      {FREE_OBJECT_SHAPE_OPTIONS.map((item) => (
+                        <option key={item.type} value={item.type}>{item.label}</option>
+                      ))}
+                    </select>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => addNewElementFromDefaults(quickNewCategory)}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                  >
+                    + New Element
+                  </button>
+                </div>
               </div>
             ) : null}
           </aside>
