@@ -1,13 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
+
 type TemplateElement = Record<string, unknown> & {
+  id?: string;
   name?: string;
+  role?: string;
+  type?: string;
+  visible?: boolean;
+  params?: Record<string, unknown>;
+  placement?: { mode?: string; config?: Record<string, unknown> };
+  symmetry?: { mode?: string; config?: Record<string, unknown> };
 };
+
 type TemplateModel = {
   layout?: Record<string, unknown>;
   scale?: Record<string, unknown>;
@@ -18,31 +27,87 @@ type TemplateModel = {
   elements: Array<TemplateElement>;
 };
 
-const SAMPLE_ELEMENTS: Array<{ name: string; element: TemplateElement }> = [
+type LibraryEntry = {
+  id: string;
+  name: string;
+  category: string;
+  element: TemplateElement;
+};
+
+const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
+const PARAMETRIC_LIBRARY_STORAGE_KEY = 'parametric-element-library-v1';
+
+const DEFAULT_COLOR_CONTROL = {
+  colorControl: {
+    mode: 'off' as ColorMode,
+    quantization: 'rgb565',
+    palette: [],
+    luminanceClamp: {
+      enabled: false,
+      min: 0.2,
+      max: 0.8,
+    },
+    tolerance: 2,
+  },
+};
+
+const SAMPLE_LIBRARY: Array<LibraryEntry> = [
   {
-    name: 'Base Bezel Ring',
+    id: 'sample-base-bezel',
+    name: 'Base Bezel',
+    category: 'Bezel',
     element: {
       type: 'bezel',
       role: 'bezel',
-      name: 'Base Bezel Ring',
+      name: 'Base Bezel',
       params: { radius: 0.48, thickness: 0.02, stroke: '#d2b879' },
       placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
       symmetry: { mode: 'none', config: {} },
     },
   },
   {
-    name: 'Main Radial Ticks',
+    id: 'sample-main-ticks',
+    name: 'Main Ticks',
+    category: 'Ticks',
     element: {
       type: 'ticks_radial',
       role: 'ticks',
-      name: 'Main Radial Ticks',
+      name: 'Main Ticks',
       params: { count: 60, radius: 0.42, length: 0.02, width: 0.003, majorEvery: 5, majorLength: 0.035 },
       placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
       symmetry: { mode: 'none', config: {} },
     },
   },
   {
+    id: 'sample-outline-ring',
+    name: 'Outline Ring',
+    category: 'Outline',
+    element: {
+      type: 'outline_ring',
+      role: 'outline_ring',
+      name: 'Outline Ring',
+      params: { radius: 0.44, thickness: 0.016, stroke: '#d6bb6a' },
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+    },
+  },
+  {
+    id: 'sample-outline-rect',
+    name: 'Outline Frame',
+    category: 'Outline',
+    element: {
+      type: 'outline_rect',
+      role: 'outline_rect',
+      name: 'Outline Frame',
+      params: { width: 0.75, height: 0.9, cornerRadius: 0.06, thickness: 0.01, stroke: '#8ca0bf' },
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+    },
+  },
+  {
+    id: 'sample-free-circle',
     name: 'Free Circle Marker',
+    category: 'Free Objects',
     element: {
       type: 'free_circle',
       role: 'free_circle',
@@ -53,7 +118,9 @@ const SAMPLE_ELEMENTS: Array<{ name: string; element: TemplateElement }> = [
     },
   },
   {
+    id: 'sample-free-rect',
     name: 'Free Bottom Card',
+    category: 'Free Objects',
     element: {
       type: 'free_rect',
       role: 'free_rect',
@@ -64,32 +131,12 @@ const SAMPLE_ELEMENTS: Array<{ name: string; element: TemplateElement }> = [
     },
   },
   {
-    name: 'Outline Ring',
-    element: {
-      type: 'outline_ring',
-      role: 'outline_ring',
-      name: 'Outline Ring',
-      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
-      symmetry: { mode: 'none', config: {} },
-      params: { radius: 0.44, thickness: 0.016, stroke: '#d6bb6a' },
-    },
-  },
-  {
-    name: 'Outline Frame',
-    element: {
-      type: 'outline_rect',
-      role: 'outline_rect',
-      name: 'Outline Frame',
-      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
-      symmetry: { mode: 'none', config: {} },
-      params: { width: 0.75, height: 0.9, cornerRadius: 0.06, thickness: 0.01, stroke: '#8ca0bf' },
-    },
-  },
-  {
+    id: 'sample-texture-layer',
     name: 'Texture Grain Layer',
+    category: 'Texture',
     element: {
       type: 'texture_layer',
-      role: 'grain_top',
+      role: 'texture_layer',
       name: 'Texture Grain Layer',
       placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
       symmetry: { mode: 'none', config: {} },
@@ -113,21 +160,58 @@ const SAMPLE_ELEMENTS: Array<{ name: string; element: TemplateElement }> = [
   },
 ];
 
-const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
-const DEFAULT_COLOR_CONTROL = {
-  colorControl: {
-    mode: 'off' as ColorMode,
-    quantization: 'rgb565',
-    palette: [],
-    luminanceClamp: {
-      enabled: false,
-      min: 0.2,
-      max: 0.8,
-    },
-    tolerance: 2,
-  },
-};
+function makeId(prefix = 'el'): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function ensureElement(element: TemplateElement, fallbackIndex = 0): TemplateElement {
+  const type = typeof element.type === 'string' ? element.type : 'element';
+  const role = typeof element.role === 'string' ? element.role : type;
+  const name = typeof element.name === 'string' && element.name.trim().length > 0 ? element.name.trim() : `${type}-${fallbackIndex + 1}`;
+  return {
+    ...element,
+    id: typeof element.id === 'string' ? element.id : makeId('el'),
+    type,
+    role,
+    name,
+    visible: element.visible !== false,
+    params: element.params && typeof element.params === 'object' ? { ...element.params } : {},
+    placement:
+      element.placement && typeof element.placement === 'object'
+        ? {
+            mode: typeof element.placement.mode === 'string' ? element.placement.mode : 'center',
+            config:
+              element.placement.config && typeof element.placement.config === 'object'
+                ? { ...element.placement.config }
+                : { offset: [0, 0], rotation: 0 },
+          }
+        : { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+    symmetry:
+      element.symmetry && typeof element.symmetry === 'object'
+        ? {
+            mode: typeof element.symmetry.mode === 'string' ? element.symmetry.mode : 'none',
+            config:
+              element.symmetry.config && typeof element.symmetry.config === 'object'
+                ? { ...element.symmetry.config }
+                : {},
+          }
+        : { mode: 'none', config: {} },
+  };
+}
+
+function inferCategory(element: TemplateElement): string {
+  const type = typeof element.type === 'string' ? element.type : '';
+  if (type.includes('texture')) return 'Texture';
+  if (type.includes('tick')) return 'Ticks';
+  if (type.includes('bezel')) return 'Bezel';
+  if (type.includes('outline')) return 'Outline';
+  if (type.includes('free')) return 'Free Objects';
+  return 'General';
+}
 
 export default function ParametricPage() {
   const navigate = useNavigate();
@@ -135,28 +219,71 @@ export default function ParametricPage() {
   const [colorMode, setColorMode] = useState<ColorMode>('off');
   const [ringRadius, setRingRadius] = useState(44);
   const [tickWidth, setTickWidth] = useState(0.8);
+
   const [workingTemplate, setWorkingTemplate] = useState<TemplateModel | null>(null);
+  const [library, setLibrary] = useState<Array<LibraryEntry>>(SAMPLE_LIBRARY);
+
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState('');
+  const [paramsDraft, setParamsDraft] = useState('{}');
+
   const [draftJson, setDraftJson] = useState(
     JSON.stringify(
       {
-        type: 'circle',
-        role: 'new_marker',
-        materialRef: 'brushed_steel',
-        params: { r: 2.5, strokeWidth: 1 },
-        placement: { mode: 'anchor', config: { anchor: 'top', offset: [0, 10], rotation: 0 } },
-        symmetry: { mode: 'none', config: {} },
+        type: 'texture_layer',
+        role: 'texture_layer',
+        name: 'My Texture',
+        params: {
+          shape: 'ring',
+          radius: 0.44,
+          thickness: 0.03,
+          opacity: 0.35,
+          noise: { density: 0.72, effectRadius: 14 },
+        },
       },
       null,
       2,
     ),
   );
+
   const [draftError, setDraftError] = useState<string | null>(null);
-  const [previewCandidate, setPreviewCandidate] = useState<TemplateElement | null>(null);
-  const [editingNameIndex, setEditingNameIndex] = useState<number | null>(null);
-  const [editingNameValue, setEditingNameValue] = useState('');
   const [svgMarkup, setSvgMarkup] = useState('');
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedIndex = useMemo(() => {
+    if (!workingTemplate || !selectedElementId) return -1;
+    return workingTemplate.elements.findIndex((item) => item.id === selectedElementId);
+  }, [workingTemplate, selectedElementId]);
+
+  const selectedElement = selectedIndex >= 0 && workingTemplate ? workingTemplate.elements[selectedIndex] : null;
+
+  const groupedLibrary = useMemo(() => {
+    const map = new Map<string, Array<LibraryEntry>>();
+    for (const entry of library) {
+      const key = entry.category || 'General';
+      const current = map.get(key) ?? [];
+      current.push(entry);
+      map.set(key, current);
+    }
+    return Array.from(map.entries());
+  }, [library]);
+
+  const saveTemplate = (template: TemplateModel) => {
+    try {
+      window.localStorage.setItem(PARAMETRIC_TEMPLATE_STORAGE_KEY, JSON.stringify(template));
+    } catch {
+      // Ignore localStorage failures.
+    }
+  };
+
+  const saveLibrary = (items: Array<LibraryEntry>) => {
+    try {
+      window.localStorage.setItem(PARAMETRIC_LIBRARY_STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      // Ignore localStorage failures.
+    }
+  };
 
   const loadStoredTemplate = (): TemplateModel | null => {
     try {
@@ -164,80 +291,48 @@ export default function ParametricPage() {
       if (!raw) return null;
       const parsed = JSON.parse(raw) as TemplateModel;
       if (!parsed || !Array.isArray(parsed.elements)) return null;
-      return parsed;
+      return {
+        ...parsed,
+        elements: parsed.elements.map((element, index) => ensureElement(element, index)),
+      };
     } catch {
       return null;
     }
   };
 
-  const saveStoredTemplate = (template: TemplateModel) => {
+  const loadStoredLibrary = (): Array<LibraryEntry> | null => {
     try {
-      window.localStorage.setItem(PARAMETRIC_TEMPLATE_STORAGE_KEY, JSON.stringify(template));
+      const raw = window.localStorage.getItem(PARAMETRIC_LIBRARY_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Array<LibraryEntry>;
+      if (!Array.isArray(parsed)) return null;
+      return parsed
+        .filter((entry) => entry && typeof entry === 'object' && entry.element && typeof entry.element === 'object')
+        .map((entry, index) => ({
+          id: typeof entry.id === 'string' ? entry.id : makeId('lib'),
+          name: typeof entry.name === 'string' && entry.name.trim().length > 0 ? entry.name : `Saved-${index + 1}`,
+          category: typeof entry.category === 'string' && entry.category.trim().length > 0 ? entry.category : inferCategory(entry.element),
+          element: ensureElement(entry.element, index),
+        }));
     } catch {
-      // Ignore storage write failures and keep in-memory state.
+      return null;
     }
-  };
-
-  const ensureElementName = (element: TemplateElement, fallbackIndex = 0): TemplateElement => {
-    const role = typeof element.role === 'string' ? element.role : 'element';
-    const type = typeof element.type === 'string' ? element.type : 'item';
-    const existing = typeof element.name === 'string' ? element.name.trim() : '';
-    return {
-      ...element,
-      name: existing.length > 0 ? existing : `${type}-${role}-${fallbackIndex + 1}`,
-    };
   };
 
   const parseDraftElement = (): TemplateElement | null => {
     if (!draftJson.trim()) {
-      setDraftError('JSON field is empty. Paste an element object first.');
+      setDraftError('JSON field is empty. Paste an element JSON first.');
       return null;
     }
-
     try {
       const parsed = JSON.parse(draftJson) as TemplateElement;
       if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
         throw new Error('Element JSON must be an object with string field: type');
       }
       setDraftError(null);
-      return ensureElementName(parsed);
+      return ensureElement(parsed);
     } catch (e) {
-      setDraftError(e instanceof Error ? e.message : 'Invalid element JSON.');
-      return null;
-    }
-  };
-
-  const parseDraftTemplate = (): TemplateModel | null => {
-    if (!draftJson.trim()) return null;
-
-    try {
-      const parsed = JSON.parse(draftJson) as Record<string, unknown>;
-      if (!parsed || typeof parsed !== 'object') return null;
-      if (!Array.isArray(parsed.elements)) return null;
-
-      const normalizedElements = parsed.elements
-        .filter((entry) => entry && typeof entry === 'object')
-        .map((entry, index) => ensureElementName(entry as TemplateElement, index));
-
-      const normalized: TemplateModel = {
-        elements: normalizedElements,
-      };
-      if (parsed.layout && typeof parsed.layout === 'object') normalized.layout = parsed.layout as Record<string, unknown>;
-      if (parsed.scale && typeof parsed.scale === 'object') normalized.scale = parsed.scale as Record<string, unknown>;
-      if (parsed.relationships && typeof parsed.relationships === 'object') {
-        normalized.relationships = parsed.relationships as Record<string, unknown>;
-      }
-      if (parsed.effects3d && typeof parsed.effects3d === 'object') {
-        normalized.effects3d = parsed.effects3d as Record<string, unknown>;
-      }
-      if (parsed.styleAdjust && typeof parsed.styleAdjust === 'object') {
-        normalized.styleAdjust = parsed.styleAdjust as Record<string, unknown>;
-      }
-      if (parsed.texture && typeof parsed.texture === 'object') {
-        normalized.texture = parsed.texture as Record<string, unknown>;
-      }
-      return normalized;
-    } catch {
+      setDraftError(e instanceof Error ? e.message : 'Invalid JSON.');
       return null;
     }
   };
@@ -245,10 +340,8 @@ export default function ParametricPage() {
   const renderPreview = async () => {
     setIsRendering(true);
     setError(null);
-
     try {
-      // Runtime module sits outside src and is bundled by Vite; TS lacks direct type metadata here.
-      // @ts-expect-error runtime import is validated by integration build and smoke render.
+      // @ts-expect-error runtime import has no TS metadata in this path.
       const engineModule = (await import('../engine/index.js')) as {
         getTemplateSnapshot: () => TemplateModel;
         runEngine: (args?: {
@@ -259,50 +352,27 @@ export default function ParametricPage() {
         }) => string;
       };
 
-      const storedTemplate = loadStoredTemplate();
-      const snapshot = workingTemplate ?? storedTemplate ?? engineModule.getTemplateSnapshot();
-      if (!workingTemplate && snapshot) {
-        setWorkingTemplate(snapshot);
-      }
+      const template = workingTemplate ?? loadStoredTemplate() ?? {
+        ...engineModule.getTemplateSnapshot(),
+        elements: (engineModule.getTemplateSnapshot().elements ?? []).map((entry, index) => ensureElement(entry, index)),
+      };
 
-      const fullTemplate = parseDraftTemplate();
-      if (fullTemplate) {
-        setPreviewCandidate(null);
-        const svg = engineModule.runEngine({
-          activeStyle,
-          templateInput: fullTemplate,
-          paramOverrides: {
-            ring: { radius: ringRadius },
-            tick: { width: tickWidth },
-          },
-          colorControl: {
-            ...DEFAULT_COLOR_CONTROL,
-            colorControl: {
-              ...DEFAULT_COLOR_CONTROL.colorControl,
-              mode: colorMode,
-            },
-          },
-        });
-        setSvgMarkup(svg);
-        setDraftError(null);
-        return;
-      }
-
-      const candidate = parseDraftElement();
-      if (!candidate) {
-        setIsRendering(false);
-        return;
-      }
-      setPreviewCandidate(candidate);
-
-      const previewTemplate: TemplateModel = {
-        ...snapshot,
-        elements: [...(snapshot.elements ?? []), candidate],
+      const renderInput: TemplateModel = {
+        ...template,
+        elements: (template.elements ?? [])
+          .filter((element) => element.visible !== false)
+          .map((element) => {
+            const clone = deepClone(element);
+            delete clone.id;
+            delete clone.name;
+            delete clone.visible;
+            return clone;
+          }),
       };
 
       const svg = engineModule.runEngine({
         activeStyle,
-        templateInput: previewTemplate,
+        templateInput: renderInput,
         paramOverrides: {
           ring: { radius: ringRadius },
           tick: { width: tickWidth },
@@ -318,99 +388,181 @@ export default function ParametricPage() {
 
       setSvgMarkup(svg);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to render parametric preview.');
+      setError(e instanceof Error ? e.message : 'Failed to render preview.');
     } finally {
       setIsRendering(false);
     }
   };
 
-  const handleSaveCandidate = () => {
-    if (!previewCandidate) {
-      setDraftError('Preview an element first, then click Save Element.');
-      return;
-    }
-
-    setWorkingTemplate((prev) => {
-      const base = prev ?? { elements: [] };
-      const next = { ...base, elements: [...base.elements, ensureElementName(previewCandidate, base.elements.length)] };
-      saveStoredTemplate(next);
-      return next;
-    });
-  };
-
-  const injectAllSampleElements = () => {
-    setWorkingTemplate((prev) => {
-      const base = prev ?? { elements: [] };
-      const startIndex = base.elements.length;
-      const injected = SAMPLE_ELEMENTS.map((sample, i) => ensureElementName(sample.element, startIndex + i));
-      const next = { ...base, elements: [...base.elements, ...injected] };
-      saveStoredTemplate(next);
-      return next;
-    });
-  };
-
-  const loadSampleToDraft = (sample: TemplateElement) => {
-    setDraftJson(JSON.stringify(sample, null, 2));
-    setDraftError(null);
-  };
-
-  const beginRenameElement = (index: number) => {
-    const element = workingTemplate?.elements[index];
-    if (!element) return;
-    setEditingNameIndex(index);
-    setEditingNameValue(typeof element.name === 'string' ? element.name : '');
-  };
-
-  const saveRenameElement = (index: number) => {
-    const nextName = editingNameValue.trim();
+  const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>) => {
     setWorkingTemplate((prev) => {
       if (!prev) return prev;
       const next = {
         ...prev,
-        elements: prev.elements.map((element, i) =>
-          i === index
-            ? {
-                ...element,
-                name: nextName.length > 0 ? nextName : ensureElementName(element, index).name,
-              }
-            : element,
-        ),
+        elements: updater(prev.elements),
       };
-      saveStoredTemplate(next);
+      saveTemplate(next);
       return next;
     });
-    setEditingNameIndex(null);
-    setEditingNameValue('');
   };
 
-  const cancelRenameElement = () => {
-    setEditingNameIndex(null);
-    setEditingNameValue('');
-  };
+  const addElementToCanvas = (source: TemplateElement) => {
+    const copy = ensureElement(deepClone(source));
+    copy.id = makeId('layer');
 
-  const removeElementAt = (index: number) => {
     setWorkingTemplate((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, elements: prev.elements.filter((_, i) => i !== index) };
-      saveStoredTemplate(next);
+      const base = prev ?? { elements: [] };
+      const next = {
+        ...base,
+        elements: [...base.elements, copy],
+      };
+      saveTemplate(next);
       return next;
     });
+
+    setSelectedElementId(copy.id ?? null);
+  };
+
+  const toggleElementVisibility = (id: string) => {
+    updateTemplateElements((elements) =>
+      elements.map((element) => (element.id === id ? { ...element, visible: element.visible === false } : element)),
+    );
+  };
+
+  const moveElement = (id: string, direction: 'up' | 'down') => {
+    updateTemplateElements((elements) => {
+      const index = elements.findIndex((element) => element.id === id);
+      if (index < 0) return elements;
+      const target = direction === 'up' ? index - 1 : index + 1;
+      if (target < 0 || target >= elements.length) return elements;
+      const next = [...elements];
+      const [picked] = next.splice(index, 1);
+      next.splice(target, 0, picked);
+      return next;
+    });
+  };
+
+  const removeElement = (id: string) => {
+    updateTemplateElements((elements) => elements.filter((element) => element.id !== id));
+    if (selectedElementId === id) {
+      setSelectedElementId(null);
+      setNameDraft('');
+      setParamsDraft('{}');
+    }
+  };
+
+  const saveDraftToLibrary = () => {
+    const parsed = parseDraftElement();
+    if (!parsed) return;
+
+    const nextEntry: LibraryEntry = {
+      id: makeId('lib'),
+      name: typeof parsed.name === 'string' ? parsed.name : 'Saved Element',
+      category: inferCategory(parsed),
+      element: parsed,
+    };
+
+    setLibrary((prev) => {
+      const next = [...prev, nextEntry];
+      saveLibrary(next);
+      return next;
+    });
+  };
+
+  const addDraftToCanvas = () => {
+    const parsed = parseDraftElement();
+    if (!parsed) return;
+    addElementToCanvas(parsed);
+  };
+
+  const saveSelectedName = () => {
+    if (!selectedElement) return;
+    const nextName = nameDraft.trim();
+    if (!nextName) return;
+    updateTemplateElements((elements) => elements.map((element) => (element.id === selectedElement.id ? { ...element, name: nextName } : element)));
+  };
+
+  const saveSelectedParams = () => {
+    if (!selectedElement) return;
+    try {
+      const parsed = JSON.parse(paramsDraft) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Params must be an object');
+      }
+      setDraftError(null);
+      updateTemplateElements((elements) =>
+        elements.map((element) => (element.id === selectedElement.id ? { ...element, params: parsed } : element)),
+      );
+    } catch (e) {
+      setDraftError(e instanceof Error ? e.message : 'Invalid params JSON.');
+    }
+  };
+
+  const setNumericParam = (path: string, value: number) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    const currentParams = selectedElement.params && typeof selectedElement.params === 'object' ? deepClone(selectedElement.params) : {};
+
+    let cursor: Record<string, unknown> = currentParams;
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const key = segments[i];
+      const child = cursor[key];
+      if (!child || typeof child !== 'object') {
+        cursor[key] = {};
+      }
+      cursor = cursor[key] as Record<string, unknown>;
+    }
+    cursor[segments[segments.length - 1]] = value;
+
+    updateTemplateElements((elements) =>
+      elements.map((element) => (element.id === selectedElement.id ? { ...element, params: currentParams } : element)),
+    );
+  };
+
+  const getNumericParam = (path: string, fallback: number) => {
+    if (!selectedElement || !selectedElement.params || typeof selectedElement.params !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.params;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    const n = Number(cursor);
+    return Number.isFinite(n) ? n : fallback;
   };
 
   useEffect(() => {
+    const storedTemplate = loadStoredTemplate();
+    const storedLibrary = loadStoredLibrary();
+    if (storedTemplate) {
+      setWorkingTemplate(storedTemplate);
+      if (storedTemplate.elements.length > 0) {
+        setSelectedElementId(storedTemplate.elements[0].id ?? null);
+      }
+    }
+    if (storedLibrary) {
+      setLibrary(storedLibrary);
+    }
     void renderPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!selectedElement) return;
+    setNameDraft(typeof selectedElement.name === 'string' ? selectedElement.name : '');
+    const params = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params : {};
+    setParamsDraft(JSON.stringify(params, null, 2));
+  }, [selectedElement]);
+
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_8%_12%,#1e293b_0%,#0b1020_35%,#08090c_100%)] text-white p-6">
-      <section className="mx-auto w-full max-w-6xl rounded-2xl border border-zinc-800/80 bg-zinc-950/90 p-6 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_8%_12%,#1e293b_0%,#0b1020_35%,#08090c_100%)] text-white p-4 md:p-6">
+      <section className="mx-auto w-full max-w-[1500px] rounded-2xl border border-zinc-800/80 bg-zinc-950/90 p-4 md:p-6 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Deterministic Engine</p>
             <h1 className="mt-2 text-2xl font-semibold">Parametric Watchface Designer</h1>
             <p className="mt-2 text-sm text-zinc-300">
-              Build repeatable geometry with placement and symmetry rules, then preview exact SVG output before export.
+              Left: element library and add flow. Middle: preview + layers. Right: selected element controls.
             </p>
           </div>
           <Button
@@ -424,16 +576,166 @@ export default function ParametricPage() {
           </Button>
         </div>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="mt-6 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
           <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4">
-            <h2 className="text-sm font-semibold text-zinc-100">Controls</h2>
+            <h2 className="text-sm font-semibold text-zinc-100">Element Drawer</h2>
+            <p className="text-xs text-zinc-400">Pick from categories, then Add to Canvas.</p>
+
+            <div className="max-h-80 overflow-auto space-y-3 pr-1">
+              {groupedLibrary.map(([category, entries]) => (
+                <div key={category} className="rounded border border-zinc-800 bg-zinc-950/50 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">{category}</p>
+                  <div className="mt-2 space-y-2">
+                    {entries.map((entry) => (
+                      <div key={entry.id} className="rounded border border-zinc-800 bg-zinc-900 p-2">
+                        <p className="text-xs font-medium text-zinc-200">{entry.name}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => addElementToCanvas(entry.element)}
+                            className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDraftJson(JSON.stringify(entry.element, null, 2))}
+                            className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                          >
+                            JSON
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2">
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400">New JSON Element</p>
+              <textarea
+                value={draftJson}
+                onChange={(e) => setDraftJson(e.target.value)}
+                className="mt-2 h-40 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] leading-5 text-zinc-300"
+              />
+              {draftError ? <p className="mt-2 text-xs text-red-400">{draftError}</p> : null}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={addDraftToCanvas}
+                  className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  Add to Canvas
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDraftToLibrary}
+                  className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  Save to Drawer
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <section className="space-y-4">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-zinc-100">Preview</h2>
+                <Button
+                  type="button"
+                  className="h-9 bg-amber-500 text-black hover:bg-amber-400"
+                  onClick={() => void renderPreview()}
+                  disabled={isRendering}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isRendering ? 'animate-spin' : ''}`} />
+                  {isRendering ? 'Rendering...' : 'Apply Preview'}
+                </Button>
+              </div>
+              <div className="mt-3 grid place-items-center rounded-lg border border-zinc-800 bg-black/60 p-4 min-h-[420px]">
+                {svgMarkup ? (
+                  <div className="w-full max-w-[520px]" dangerouslySetInnerHTML={{ __html: svgMarkup }} />
+                ) : (
+                  <p className="text-sm text-zinc-500">No preview yet.</p>
+                )}
+              </div>
+              {error ? <p className="mt-2 text-xs text-red-400">{error}</p> : null}
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold text-zinc-100">Layers (Order = Render Order)</h2>
+                <span className="text-xs text-zinc-400">{(workingTemplate?.elements ?? []).length} layer(s)</span>
+              </div>
+
+              <div className="mt-3 max-h-64 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/70">
+                {(workingTemplate?.elements ?? []).map((element, index) => {
+                  const isSelected = selectedElementId === element.id;
+                  return (
+                    <div
+                      key={element.id ?? `${element.type}-${index}`}
+                      className={`flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2 text-xs ${isSelected ? 'bg-zinc-800/60' : ''}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedElementId(element.id ?? null)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p className="truncate font-medium text-zinc-200">{element.name ?? `layer-${index + 1}`}</p>
+                        <p className="truncate text-zinc-500">{element.type} · {element.role}</p>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => toggleElementVisibility(element.id ?? '')}
+                          className="rounded border border-zinc-700 p-1 text-zinc-300 hover:bg-zinc-800"
+                          title={element.visible === false ? 'Show layer' : 'Hide layer'}
+                        >
+                          {element.visible === false ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveElement(element.id ?? '', 'up')}
+                          className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveElement(element.id ?? '', 'down')}
+                          className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeElement(element.id ?? '')}
+                          className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
+                        >
+                          x
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(workingTemplate?.elements ?? []).length === 0 ? (
+                  <p className="px-3 py-4 text-xs text-zinc-500">No layers yet. Add from left drawer.</p>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4">
+            <h2 className="text-sm font-semibold text-zinc-100">Element Controls</h2>
 
             <label className="block space-y-2">
               <span className="text-xs uppercase tracking-wide text-zinc-400">Style</span>
               <select
                 value={activeStyle}
                 onChange={(e) => setActiveStyle(e.target.value as StyleKey)}
-                className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm"
+                className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm"
               >
                 <option value="gold_dark">gold_dark</option>
                 <option value="steel_night">steel_night</option>
@@ -445,7 +747,7 @@ export default function ParametricPage() {
               <select
                 value={colorMode}
                 onChange={(e) => setColorMode(e.target.value as ColorMode)}
-                className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm"
+                className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm"
               >
                 <option value="off">off</option>
                 <option value="warning">warning</option>
@@ -454,7 +756,7 @@ export default function ParametricPage() {
             </label>
 
             <label className="block space-y-2">
-              <span className="text-xs uppercase tracking-wide text-zinc-400">Bezel Radius: {ringRadius.toFixed(1)}</span>
+              <span className="text-xs uppercase tracking-wide text-zinc-400">Bezel Radius Override: {ringRadius.toFixed(1)}</span>
               <input
                 type="range"
                 min={20}
@@ -467,7 +769,7 @@ export default function ParametricPage() {
             </label>
 
             <label className="block space-y-2">
-              <span className="text-xs uppercase tracking-wide text-zinc-400">Tick Width: {tickWidth.toFixed(2)}</span>
+              <span className="text-xs uppercase tracking-wide text-zinc-400">Tick Width Override: {tickWidth.toFixed(2)}</span>
               <input
                 type="range"
                 min={0.2}
@@ -479,172 +781,98 @@ export default function ParametricPage() {
               />
             </label>
 
-            <Button
-              type="button"
-              className="h-10 w-full bg-amber-500 text-black hover:bg-amber-400"
-              onClick={() => void renderPreview()}
-              disabled={isRendering}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isRendering ? 'animate-spin' : ''}`} />
-              {isRendering ? 'Rendering...' : 'Apply To Preview'}
-            </Button>
+            {selectedElement ? (
+              <div className="space-y-3 rounded border border-zinc-800 bg-zinc-950/60 p-3">
+                <p className="text-xs uppercase tracking-wide text-amber-300">Editing: {selectedElement.type}</p>
 
-            {error ? <p className="text-xs text-red-400">{error}</p> : null}
-          </aside>
+                <label className="block space-y-1">
+                  <span className="text-[11px] text-zinc-400">Name</span>
+                  <div className="flex gap-2">
+                    <input
+                      value={nameDraft}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={saveSelectedName}
+                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </label>
 
-          <div className="space-y-4">
-            <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-              <h2 className="text-sm font-semibold text-zinc-100">Live Preview</h2>
-              <div className="mt-3 grid place-items-center rounded-lg border border-zinc-800 bg-black/60 p-4 min-h-[360px]">
-                {svgMarkup ? (
-                  <div
-                    className="w-full max-w-[420px]"
-                    dangerouslySetInnerHTML={{ __html: svgMarkup }}
-                  />
-                ) : (
-                  <p className="text-sm text-zinc-500">No preview generated yet.</p>
-                )}
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-              <h2 className="text-sm font-semibold text-zinc-100">SVG Output</h2>
-              <textarea
-                value={svgMarkup}
-                readOnly
-                className="mt-3 h-52 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] leading-5 text-zinc-300"
-              />
-            </section>
-
-            <section className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-zinc-100">Elements</h2>
-                <span className="text-xs text-zinc-400">
-                  {(workingTemplate?.elements ?? []).length} item(s)
-                </span>
-              </div>
-
-              <div className="mt-3 max-h-56 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/70">
-                {(workingTemplate?.elements ?? []).map((element, index) => {
-                  const name = typeof element.name === 'string' ? element.name : `element-${index + 1}`;
-                  const role = typeof element.role === 'string' ? element.role : 'no-role';
-                  const type = typeof element.type === 'string' ? element.type : 'unknown';
-                  const placement =
-                    element.placement && typeof element.placement === 'object' && 'mode' in element.placement
-                      ? String((element.placement as { mode?: unknown }).mode ?? 'none')
-                      : 'none';
-                  const symmetry =
-                    element.symmetry && typeof element.symmetry === 'object' && 'mode' in element.symmetry
-                      ? String((element.symmetry as { mode?: unknown }).mode ?? 'none')
-                      : 'none';
-
-                  return (
-                    <div key={`${type}-${role}-${index}`} className="flex items-center justify-between border-b border-zinc-800 px-3 py-2 text-xs gap-2">
-                      <div className="space-y-0.5 min-w-0 flex-1">
-                        {editingNameIndex === index ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              value={editingNameValue}
-                              onChange={(e) => setEditingNameValue(e.target.value)}
-                              className="h-7 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                              placeholder="Element name"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => saveRenameElement(index)}
-                              className="rounded border border-emerald-700 px-2 py-1 text-emerald-300 hover:bg-emerald-900/30"
-                            >
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelRenameElement}
-                              className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <p className="font-medium text-zinc-200 truncate">{name} · {type} · {role}</p>
-                        )}
-                        <p className="text-zinc-500">placement: {placement} · symmetry: {symmetry}</p>
-                      </div>
-                      {editingNameIndex !== index ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => beginRenameElement(index)}
-                            className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeElementAt(index)}
-                            className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:bg-zinc-800"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-                {(workingTemplate?.elements ?? []).length === 0 ? (
-                  <p className="px-3 py-4 text-xs text-zinc-500">No elements loaded yet.</p>
+                {selectedElement.type === 'bezel' || selectedElement.type === 'outline_ring' ? (
+                  <div className="space-y-2 rounded border border-zinc-800 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Ring Controls</p>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Radius {getNumericParam('radius', 0.45).toFixed(3)}</span>
+                      <input type="range" min={0} max={1} step={0.005} value={getNumericParam('radius', 0.45)} onChange={(e) => setNumericParam('radius', Number(e.target.value))} className="w-full" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Thickness {getNumericParam('thickness', 0.02).toFixed(3)}</span>
+                      <input type="range" min={0.001} max={0.2} step={0.001} value={getNumericParam('thickness', 0.02)} onChange={(e) => setNumericParam('thickness', Number(e.target.value))} className="w-full" />
+                    </label>
+                  </div>
                 ) : null}
-              </div>
 
-              <h3 className="mt-4 text-xs uppercase tracking-wide text-zinc-400">Draft Element JSON</h3>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-8 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
-                  onClick={injectAllSampleElements}
-                >
-                  Inject All Samples
-                </Button>
-                {SAMPLE_ELEMENTS.map((sample) => (
-                  <Button
-                    key={sample.name}
+                {selectedElement.type === 'ticks_radial' ? (
+                  <div className="space-y-2 rounded border border-zinc-800 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Ticks Controls</p>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Radius {getNumericParam('radius', 0.42).toFixed(3)}</span>
+                      <input type="range" min={0} max={1} step={0.005} value={getNumericParam('radius', 0.42)} onChange={(e) => setNumericParam('radius', Number(e.target.value))} className="w-full" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Length {getNumericParam('length', 0.02).toFixed(3)}</span>
+                      <input type="range" min={0.001} max={0.2} step={0.001} value={getNumericParam('length', 0.02)} onChange={(e) => setNumericParam('length', Number(e.target.value))} className="w-full" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Width {getNumericParam('width', 0.003).toFixed(3)}</span>
+                      <input type="range" min={0.001} max={0.05} step={0.001} value={getNumericParam('width', 0.003)} onChange={(e) => setNumericParam('width', Number(e.target.value))} className="w-full" />
+                    </label>
+                  </div>
+                ) : null}
+
+                {selectedElement.type === 'texture_layer' ? (
+                  <div className="space-y-2 rounded border border-zinc-800 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Texture Controls</p>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Opacity {getNumericParam('opacity', 0.35).toFixed(3)}</span>
+                      <input type="range" min={0} max={1} step={0.01} value={getNumericParam('opacity', 0.35)} onChange={(e) => setNumericParam('opacity', Number(e.target.value))} className="w-full" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Noise Density {getNumericParam('noise.density', 0.5).toFixed(3)}</span>
+                      <input type="range" min={0} max={1} step={0.01} value={getNumericParam('noise.density', 0.5)} onChange={(e) => setNumericParam('noise.density', Number(e.target.value))} className="w-full" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Effect Radius {getNumericParam('noise.effectRadius', 20).toFixed(1)}</span>
+                      <input type="range" min={1} max={120} step={1} value={getNumericParam('noise.effectRadius', 20)} onChange={(e) => setNumericParam('noise.effectRadius', Number(e.target.value))} className="w-full" />
+                    </label>
+                  </div>
+                ) : null}
+
+                <label className="block space-y-1">
+                  <span className="text-[11px] text-zinc-400">Params JSON</span>
+                  <textarea
+                    value={paramsDraft}
+                    onChange={(e) => setParamsDraft(e.target.value)}
+                    className="h-36 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300"
+                  />
+                  <button
                     type="button"
-                    variant="outline"
-                    className="h-8 border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
-                    onClick={() => loadSampleToDraft(sample.element)}
+                    onClick={saveSelectedParams}
+                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
                   >
-                    {sample.name}
-                  </Button>
-                ))}
+                    Save Params
+                  </button>
+                </label>
               </div>
-              <textarea
-                value={draftJson}
-                onChange={(e) => setDraftJson(e.target.value)}
-                className="mt-2 h-40 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] leading-5 text-zinc-300"
-              />
-              {draftError ? <p className="mt-2 text-xs text-red-400">{draftError}</p> : null}
-              {previewCandidate ? <p className="mt-2 text-xs text-emerald-400">Preview ready. Click Save Element to add it to the Elements list.</p> : null}
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
-                  onClick={() => void renderPreview()}
-                >
-                  Apply To Preview
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
-                  onClick={handleSaveCandidate}
-                >
-                  Save Element
-                </Button>
-              </div>
-            </section>
-          </div>
+            ) : (
+              <p className="text-xs text-zinc-500">Select a layer in the middle panel to edit controls here.</p>
+            )}
+          </aside>
         </div>
       </section>
     </main>
