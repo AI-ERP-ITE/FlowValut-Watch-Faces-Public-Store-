@@ -177,6 +177,24 @@ const DEFAULT_EMPTY_TEMPLATE: TemplateModel = {
   elements: [],
 };
 
+const BASE_TEMPLATE_DRAFT = JSON.stringify(
+  {
+    layout: {
+      shape: 'circle',
+      width: 480,
+      height: 480,
+      baseRadius: 0.5,
+      padding: 0.04,
+    },
+    scale: {
+      global: 1.0,
+    },
+    elements: [],
+  },
+  null,
+  2,
+);
+
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -693,7 +711,10 @@ export default function ParametricPage() {
             </div>
 
             <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2">
-              <p className="text-[11px] uppercase tracking-wide text-zinc-400">New JSON Element</p>
+              <p className="text-[11px] uppercase tracking-wide text-zinc-400">JSON Input (Element or Full Template)</p>
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Paste single element JSON, or full template JSON with layout/scale/elements to set base.
+              </p>
               <textarea
                 value={draftJson}
                 onChange={(e) => setDraftJson(e.target.value)}
@@ -701,6 +722,13 @@ export default function ParametricPage() {
               />
               {draftError ? <p className="mt-2 text-xs text-red-400">{draftError}</p> : null}
               <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraftJson(BASE_TEMPLATE_DRAFT)}
+                  className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  Use Base JSON
+                </button>
                 <button
                   type="button"
                   onClick={addDraftToCanvas}
@@ -808,7 +836,13 @@ export default function ParametricPage() {
           </section>
 
           <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4">
-            <h2 className="text-sm font-semibold text-zinc-100">Element Controls</h2>
+            <h2 className="text-sm font-semibold text-zinc-100">Controls</h2>
+
+            <div className="space-y-3 rounded border border-zinc-800 bg-zinc-950/60 p-3">
+              <p className="text-xs uppercase tracking-wide text-amber-300">Global Render Controls</p>
+              <p className="text-[11px] text-zinc-500">
+                Style = material preset mapping for generated visuals. It is global, not tied to one selected element.
+              </p>
 
             <label className="block space-y-2">
               <span className="text-xs uppercase tracking-wide text-zinc-400">Style</span>
@@ -860,6 +894,7 @@ export default function ParametricPage() {
                 className="w-full"
               />
             </label>
+            </div>
 
             <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-3">
               <p className="text-xs uppercase tracking-wide text-amber-300">Base Controls</p>
@@ -1033,7 +1068,10 @@ export default function ParametricPage() {
                 </label>
               </div>
             ) : (
-              <p className="text-xs text-zinc-500">Select a layer in the middle panel to edit controls here.</p>
+              <div className="rounded border border-zinc-800 bg-zinc-950/60 p-3">
+                <p className="text-xs uppercase tracking-wide text-zinc-400">Element Controls</p>
+                <p className="mt-2 text-xs text-zinc-500">No element selected yet. Pick a layer in the middle panel to edit element-specific controls.</p>
+              </div>
             )}
           </aside>
         </div>
