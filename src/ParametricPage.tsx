@@ -394,6 +394,7 @@ export default function ParametricPage() {
   const [library, setLibrary] = useState<Array<LibraryEntry>>(SAMPLE_LIBRARY);
   const [themes, setThemes] = useState<Array<ThemeEntry>>([]);
   const [themeNameDraft, setThemeNameDraft] = useState('');
+  const [themeNameDrafts, setThemeNameDrafts] = useState<Record<string, string>>({});
 
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
@@ -635,6 +636,19 @@ export default function ParametricPage() {
 
   const deleteThemeById = (themeId: string) => {
     persistThemes((prev) => prev.filter((entry) => entry.id !== themeId), 'Theme deleted.');
+  };
+
+  const renameThemeById = (themeId: string) => {
+    const draft = (themeNameDrafts[themeId] ?? '').trim();
+    if (!draft) {
+      setDrawerNotice('Theme rename failed: name cannot be empty.');
+      return;
+    }
+
+    persistThemes(
+      (prev) => prev.map((entry) => (entry.id === themeId ? { ...entry, name: draft } : entry)),
+      'Theme renamed.',
+    );
   };
 
   const importTemplateElementsToLibrary = (template: TemplateModel) => {
@@ -1669,6 +1683,20 @@ export default function ParametricPage() {
                   <div key={theme.id} className="rounded border border-zinc-800 bg-zinc-900 p-2">
                     <p className="text-xs font-medium text-zinc-200">{theme.name}</p>
                     <p className="text-[11px] text-zinc-500">{(theme.template.elements ?? []).length} layers</p>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={themeNameDrafts[theme.id] ?? theme.name}
+                        onChange={(e) => setThemeNameDrafts((prev) => ({ ...prev, [theme.id]: e.target.value }))}
+                        className="h-7 w-full rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => renameThemeById(theme.id)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Rename
+                      </button>
+                    </div>
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
