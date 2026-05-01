@@ -345,9 +345,9 @@ function processGradientStops(stops, context) {
 	return processed;
 }
 
-function applyColorControlToParams(params, context) {
+function applyColorControlToParams(params, context, path = "") {
 	if (Array.isArray(params)) {
-		return params.map((entry) => applyColorControlToParams(entry, context));
+		return params.map((entry, index) => applyColorControlToParams(entry, context, `${path}[${index}]`));
 	}
 
 	if (!params || typeof params !== "object") {
@@ -356,17 +356,18 @@ function applyColorControlToParams(params, context) {
 
 	const out = {};
 	for (const [key, value] of Object.entries(params)) {
+		const nextPath = path ? `${path}.${key}` : key;
 		if (GRADIENT_KEYS.has(key) && Array.isArray(value)) {
 			out[key] = processGradientStops(value, context);
 			continue;
 		}
 
 		if (COLOR_KEYS.has(key) && typeof value === "string") {
-			out[key] = processColor(value, context.colorControlConfig);
+			out[key] = processColor(value, context.colorControlConfig, { keyPath: nextPath });
 			continue;
 		}
 
-		out[key] = applyColorControlToParams(value, context);
+		out[key] = applyColorControlToParams(value, context, nextPath);
 	}
 
 	return out;
