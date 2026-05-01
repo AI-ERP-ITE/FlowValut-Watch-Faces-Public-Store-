@@ -19,6 +19,7 @@ import { bezelElement } from "./elements/baseElements/bezel.js";
 import { ticksRadialElement } from "./elements/baseElements/ticksRadial.js";
 import { freeCircleElement } from "./elements/baseElements/freeCircle.js";
 import { freeRectElement } from "./elements/baseElements/freeRect.js";
+import { freeRingElement } from "./elements/baseElements/freeRing.js";
 import { outlineRingElement } from "./elements/baseElements/outlineRing.js";
 import { outlineRectElement } from "./elements/baseElements/outlineRect.js";
 import { textureLayerElement } from "./elements/baseElements/textureLayer.js";
@@ -33,6 +34,7 @@ function registerBaseElements() {
 	registerElement("ticks_radial", ticksRadialElement);
 	registerElement("free_circle", freeCircleElement);
 	registerElement("free_rect", freeRectElement);
+	registerElement("free_ring", freeRingElement);
 	registerElement("outline_ring", outlineRingElement);
 	registerElement("outline_rect", outlineRectElement);
 	registerElement("texture_layer", textureLayerElement);

@@ -133,6 +133,19 @@ const SAMPLE_LIBRARY: Array<LibraryEntry> = [
     },
   },
   {
+    id: 'sample-free-ring',
+    name: 'Free Ring Marker',
+    category: 'Free Objects',
+    element: {
+      type: 'free_ring',
+      role: 'free_ring',
+      name: 'Free Ring Marker',
+      placement: { mode: 'anchor', config: { anchor: 'right', offset: [-22, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+      params: { radius: 0.08, thickness: 0.01, stroke: '#d9e4ff', fill: 'none' },
+    },
+  },
+  {
     id: 'sample-free-rect',
     name: 'Free Bottom Card',
     category: 'Free Objects',
@@ -868,6 +881,57 @@ export default function ParametricPage() {
     return Number.isFinite(n) ? n : fallback;
   };
 
+  const setSelectedTextureEnabled = (enabled: boolean) => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const currentTexture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
+        return { ...element, texture: { ...currentTexture, enabled } };
+      }),
+    );
+  };
+
+  const setSelectedTextureNumber = (path: string, value: number) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+
+        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = texture;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, texture };
+      }),
+    );
+  };
+
+  const getSelectedTextureNumber = (path: string, fallback: number) => {
+    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.texture;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    const n = Number(cursor);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const isSelectedTextureEnabled = () => {
+    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return false;
+    return (selectedElement.texture as Record<string, unknown>).enabled === true;
+  };
+
   useEffect(() => {
     const storedTemplate = loadStoredTemplate();
     const storedLibrary = loadStoredLibrary();
@@ -1332,7 +1396,7 @@ export default function ParametricPage() {
                   </div>
                 </label>
 
-                {selectedElement.type === 'bezel' || selectedElement.type === 'outline_ring' ? (
+                {selectedElement.type === 'bezel' || selectedElement.type === 'outline_ring' || selectedElement.type === 'free_ring' ? (
                   <div className="space-y-2 rounded border border-zinc-800 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-400">Ring Controls</p>
                     <label className="block space-y-1">
@@ -1381,6 +1445,59 @@ export default function ParametricPage() {
                     </label>
                   </div>
                 ) : null}
+
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Texture (Clipped)</p>
+                  <p className="text-[11px] text-zinc-500">Texture is clipped to this selected element shape.</p>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelectedTextureEnabled()}
+                      onChange={(e) => setSelectedTextureEnabled(e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Enable texture on this element</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Opacity {getSelectedTextureNumber('opacity', 0.3).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedTextureNumber('opacity', 0.3)}
+                      onChange={(e) => setSelectedTextureNumber('opacity', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Noise Amount {getSelectedTextureNumber('noise.amount', 0.2).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedTextureNumber('noise.amount', 0.2)}
+                      onChange={(e) => setSelectedTextureNumber('noise.amount', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Noise Radius {getSelectedTextureNumber('noise.radius', 24).toFixed(1)}</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={120}
+                      step={1}
+                      value={getSelectedTextureNumber('noise.radius', 24)}
+                      onChange={(e) => setSelectedTextureNumber('noise.radius', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+                </div>
 
                 <label className="block space-y-1">
                   <span className="text-[11px] text-zinc-400">Params JSON</span>

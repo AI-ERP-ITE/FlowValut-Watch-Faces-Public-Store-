@@ -42,20 +42,25 @@ function resolveFill(params) {
 export function renderBase(params = {}, position = {}, context = {}) {
 	const p = { ...DEFAULTS, ...params };
 	const { width, height, baseRadius, scale } = getLayoutMetrics(context);
-	const minSide = Math.min(width, height);
+	const drawableDiameter = Math.max(1, baseRadius * 2);
 	const fill = resolveFill(p);
 	const stroke = typeof p.stroke === "string" ? p.stroke : DEFAULTS.stroke;
 	const strokeWidth = Math.max(0, clamp(p.thickness, 0, 1, DEFAULTS.thickness) * baseRadius * scale);
 	const shape = typeof p.shape === "string" ? p.shape : DEFAULTS.shape;
+	const edgeInsetPx = Math.max(0.5, strokeWidth * 0.5 + 0.25);
 
 	if (shape === "rectangle" || shape === "rect") {
-		const rectWidth = clamp(p.width, 0, 1, DEFAULTS.width) * width * scale;
-		const rectHeight = clamp(p.height, 0, 1, DEFAULTS.height) * height * scale;
+		const rectWidthRaw = clamp(p.width, 0, 1, DEFAULTS.width) * drawableDiameter * scale;
+		const rectHeightRaw = clamp(p.height, 0, 1, DEFAULTS.height) * drawableDiameter * scale;
+		const rectWidth = Math.max(0, rectWidthRaw - edgeInsetPx * 2);
+		const rectHeight = Math.max(0, rectHeightRaw - edgeInsetPx * 2);
 		const cornerRadius = clamp(p.cornerRadius, 0, 1, DEFAULTS.cornerRadius) * Math.min(rectWidth, rectHeight);
 		return `<rect x="${-rectWidth / 2}" y="${-rectHeight / 2}" width="${rectWidth}" height="${rectHeight}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
 	}
 
-	const radius = clamp(p.radius, 0, 1, DEFAULTS.radius) * minSide * scale;
+	const targetRadius = clamp(p.radius, 0, 1, DEFAULTS.radius) * drawableDiameter * scale;
+	const maxRadius = Math.max(0, (drawableDiameter * scale) / 2 - edgeInsetPx);
+	const radius = Math.max(0, Math.min(targetRadius, maxRadius));
 	return `<circle cx="0" cy="0" r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
 }
 
