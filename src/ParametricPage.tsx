@@ -43,6 +43,12 @@ type ThemeEntry = {
   template: TemplateModel;
 };
 
+type GroupedLibrarySection = {
+  category: string;
+  entries: Array<LibraryEntry>;
+  fallbackElement?: TemplateElement;
+};
+
 const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
 const PARAMETRIC_LIBRARY_STORAGE_KEY = 'parametric-element-library-v1';
 const PARAMETRIC_THEME_STORAGE_KEY = 'parametric-theme-library-v1';
@@ -288,6 +294,18 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+const DEFAULT_DRAWER_CATEGORY_ORDER = ['Base', 'Bezel', 'Ticks', 'Outline', 'Free Objects', 'Texture', 'General'] as const;
+
+const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
+  const map = new Map<string, TemplateElement>();
+  for (const entry of SAMPLE_LIBRARY) {
+    if (!map.has(entry.category)) {
+      map.set(entry.category, deepClone(entry.element));
+    }
+  }
+  return map;
+})();
+
 function makeId(prefix = 'el'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -445,15 +463,31 @@ export default function ParametricPage() {
     return name;
   };
 
-  const groupedLibrary = useMemo(() => {
-    const map = new Map<string, Array<LibraryEntry>>();
+  const groupedLibrary = useMemo<Array<GroupedLibrarySection>>(() => {
+    const byCategory = new Map<string, Array<LibraryEntry>>();
     for (const entry of library) {
       const key = entry.category || 'General';
-      const current = map.get(key) ?? [];
+      const current = byCategory.get(key) ?? [];
       current.push(entry);
-      map.set(key, current);
+      byCategory.set(key, current);
     }
-    return Array.from(map.entries());
+
+    const categories = new Set<string>(DEFAULT_DRAWER_CATEGORY_ORDER);
+    for (const key of DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY.keys()) {
+      categories.add(key);
+    }
+    for (const key of byCategory.keys()) {
+      categories.add(key);
+    }
+
+    return Array.from(categories).map((category) => {
+      const entries = byCategory.get(category) ?? [];
+      return {
+        category,
+        entries,
+        fallbackElement: entries[0]?.element ?? DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY.get(category),
+      };
+    });
   }, [library]);
 
   const saveTemplate = (template: TemplateModel) => {
@@ -1753,7 +1787,7 @@ export default function ParametricPage() {
             </div>
 
             <div className="max-h-80 overflow-auto space-y-3 pr-1">
-              {groupedLibrary.map(([category, entries]) => (
+              {groupedLibrary.map(({ category, entries, fallbackElement }) => (
                 <div key={category} className="rounded border border-zinc-800 bg-zinc-950/50 p-2">
                   <p className="text-[11px] uppercase tracking-wide text-zinc-400">{category}</p>
 
@@ -1761,21 +1795,21 @@ export default function ParametricPage() {
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Type Draft JSON</p>
                     <p className="mt-1 text-[11px] text-zinc-500">Paste/edit JSON for this element type.</p>
                     <textarea
-                      value={getCategoryDraftText(category, entries[0]?.element)}
+                      value={getCategoryDraftText(category, fallbackElement)}
                       onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [category]: e.target.value }))}
                       className="mt-2 h-24 w-full resize-y rounded border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300"
                     />
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
-                        onClick={() => addCategoryDraftToCanvas(category, entries[0]?.element)}
+                        onClick={() => addCategoryDraftToCanvas(category, fallbackElement)}
                         className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
                       >
                         Add Draft
                       </button>
                       <button
                         type="button"
-                        onClick={() => saveCategoryDraftToLibrary(category, entries[0]?.element)}
+                        onClick={() => saveCategoryDraftToLibrary(category, fallbackElement)}
                         className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
                       >
                         Save Draft
@@ -1842,6 +1876,7 @@ export default function ParametricPage() {
                         </div>
                       </div>
                     ))}
+                    {entries.length === 0 ? <p className="text-[11px] text-zinc-500">No saved elements in this type yet.</p> : null}
                     </div>
                   </div>
                 </div>
