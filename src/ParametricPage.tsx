@@ -354,6 +354,34 @@ export default function ParametricPage() {
     }
   };
 
+  const parseDraftTemplate = (): TemplateModel | null => {
+    if (!draftJson.trim()) return null;
+    try {
+      const parsed = JSON.parse(draftJson) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!Array.isArray(parsed.elements)) return null;
+
+      const layout = parsed.layout && typeof parsed.layout === 'object'
+        ? (parsed.layout as Record<string, unknown>)
+        : deepClone(DEFAULT_EMPTY_TEMPLATE.layout as Record<string, unknown>);
+      const scale = parsed.scale && typeof parsed.scale === 'object'
+        ? (parsed.scale as Record<string, unknown>)
+        : { global: 1 };
+
+      const normalized: TemplateModel = {
+        layout,
+        scale,
+        elements: parsed.elements
+          .filter((entry) => entry && typeof entry === 'object')
+          .map((entry, index) => ensureElement(entry as TemplateElement, index)),
+      };
+
+      return normalized;
+    } catch {
+      return null;
+    }
+  };
+
   const renderPreview = async () => {
     setIsRendering(true);
     setError(null);
@@ -511,6 +539,15 @@ export default function ParametricPage() {
   };
 
   const addDraftToCanvas = () => {
+    const template = parseDraftTemplate();
+    if (template) {
+      setWorkingTemplate(template);
+      saveTemplate(template);
+      setSelectedElementId(template.elements[0]?.id ?? null);
+      setDraftError(null);
+      return;
+    }
+
     const parsed = parseDraftElement();
     if (!parsed) return;
     addElementToCanvas(parsed);
