@@ -691,8 +691,17 @@ export default function ParametricPage() {
   const parseDraftTemplate = (): TemplateModel | null => {
     if (!draftJson.trim()) return null;
     try {
-      const parsed = JSON.parse(draftJson) as Record<string, unknown>;
-      if (!parsed || typeof parsed !== 'object') return null;
+      const rawParsed = JSON.parse(draftJson) as Record<string, unknown>;
+      if (!rawParsed || typeof rawParsed !== 'object') return null;
+
+      const wrappedTemplateCandidate =
+        rawParsed.template && typeof rawParsed.template === 'object'
+          ? (rawParsed.template as Record<string, unknown>)
+          : rawParsed.composition && typeof rawParsed.composition === 'object'
+            ? (rawParsed.composition as Record<string, unknown>)
+            : null;
+
+      const parsed = wrappedTemplateCandidate ?? rawParsed;
 
       const hasTemplateWrapperField =
         Object.prototype.hasOwnProperty.call(parsed, 'activeStyle') ||
@@ -1048,46 +1057,40 @@ export default function ParametricPage() {
         Object.prototype.hasOwnProperty.call(parsed, 'scale');
       if (isTemplatePayload) return;
 
+      const isElementPatch =
+        Object.prototype.hasOwnProperty.call(parsed, 'type') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'params') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'placement') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'symmetry') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'material') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'texture') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'styleAdjust') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'effect3d');
+      if (!isElementPatch) return;
+
       updateTemplateElements((elements) =>
         elements.map((element, index) => {
           if (element.id !== selectedElement.id) return element;
 
-          const isElementPatch =
-            Object.prototype.hasOwnProperty.call(parsed, 'type') ||
-            Object.prototype.hasOwnProperty.call(parsed, 'params') ||
-            Object.prototype.hasOwnProperty.call(parsed, 'placement') ||
-            Object.prototype.hasOwnProperty.call(parsed, 'symmetry') ||
-            Object.prototype.hasOwnProperty.call(parsed, 'material') ||
-            Object.prototype.hasOwnProperty.call(parsed, 'texture') ||
-            Object.prototype.hasOwnProperty.call(parsed, 'styleAdjust') ||
-            Object.prototype.hasOwnProperty.call(parsed, 'effect3d');
-
-          if (isElementPatch) {
-            const parsedParams = parsed.params && typeof parsed.params === 'object' ? (parsed.params as Record<string, unknown>) : null;
-            const materialPatch = parsed.material && typeof parsed.material === 'object' ? (parsed.material as Record<string, unknown>) : null;
-            const mergedParams = {
-              ...(element.params && typeof element.params === 'object' ? (element.params as Record<string, unknown>) : {}),
-              ...(parsedParams ?? {}),
-            };
-            if (materialPatch && !(parsedParams && typeof parsedParams.material === 'object')) {
-              mergedParams.material = materialPatch;
-            }
-
-            const patched = {
-              ...element,
-              ...parsed,
-              params: mergedParams,
-              id: element.id,
-              visible: element.visible,
-            } as TemplateElement;
-
-            return ensureElement(patched, index);
+          const parsedParams = parsed.params && typeof parsed.params === 'object' ? (parsed.params as Record<string, unknown>) : null;
+          const materialPatch = parsed.material && typeof parsed.material === 'object' ? (parsed.material as Record<string, unknown>) : null;
+          const mergedParams = {
+            ...(element.params && typeof element.params === 'object' ? (element.params as Record<string, unknown>) : {}),
+            ...(parsedParams ?? {}),
+          };
+          if (materialPatch && !(parsedParams && typeof parsedParams.material === 'object')) {
+            mergedParams.material = materialPatch;
           }
 
-          return {
+          const patched = {
             ...element,
-            params: parsed,
-          };
+            ...parsed,
+            params: mergedParams,
+            id: element.id,
+            visible: element.visible,
+          } as TemplateElement;
+
+          return ensureElement(patched, index);
         }),
       );
       setDraftError(null);
@@ -1605,7 +1608,6 @@ export default function ParametricPage() {
     setNameDraft(typeof selectedElement.name === 'string' ? selectedElement.name : '');
     const params = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params : {};
     setParamsDraft(JSON.stringify(params, null, 2));
-    setDraftJson(JSON.stringify(selectedElement, null, 2));
   }, [selectedElement]);
 
   useEffect(() => {
