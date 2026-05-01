@@ -40,9 +40,13 @@ function registerBaseElements() {
 	registerElement("free_rect", freeRectElement);
 	registerElement("free_ring", freeRingElement);
 	registerElement("free_triangle", freeTriangleElement);
+	registerElement("triangle", freeTriangleElement);
 	registerElement("free_hexagon", freeHexagonElement);
+	registerElement("hexagon", freeHexagonElement);
 	registerElement("free_octagon", freeOctagonElement);
+	registerElement("octagon", freeOctagonElement);
 	registerElement("free_polygon", freePolygonElement);
+	registerElement("polygon", freePolygonElement);
 	registerElement("outline_ring", outlineRingElement);
 	registerElement("outline_rect", outlineRectElement);
 	registerElement("texture_layer", textureLayerElement);
