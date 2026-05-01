@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getCurrentAuthUser, isFirebaseAuthConfigured, subscribeAuthState } from '@/lib/firebaseAuthClient';
+import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase } from '@/lib/studioFirebasePublishApi';
 
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
@@ -257,6 +259,24 @@ function inferCategory(element: TemplateElement): string {
   return 'General';
 }
 
+function normalizeLibraryEntries(parsed: Array<unknown>): Array<LibraryEntry> {
+  return parsed
+    .filter((entry) => entry && typeof entry === 'object')
+    .map((entry, index) => {
+      const safe = entry as Record<string, unknown>;
+      const rawElement = safe.element && typeof safe.element === 'object' ? (safe.element as TemplateElement) : {};
+      return {
+        id: typeof safe.id === 'string' ? safe.id : makeId('lib'),
+        name: typeof safe.name === 'string' && safe.name.trim().length > 0 ? safe.name : `Saved-${index + 1}`,
+        category:
+          typeof safe.category === 'string' && safe.category.trim().length > 0
+            ? safe.category
+            : inferCategory(rawElement),
+        element: ensureElement(rawElement, index),
+      };
+    });
+}
+
 function isLikelyRawLayoutObject(value: Record<string, unknown>): boolean {
   const keys = Object.keys(value);
   if (keys.length === 0) return false;
@@ -277,6 +297,11 @@ export default function ParametricPage() {
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [paramsDraft, setParamsDraft] = useState('{}');
+  const [layoutDraft, setLayoutDraft] = useState(JSON.stringify(DEFAULT_EMPTY_TEMPLATE.layout, null, 2));
+  const [layoutDraftError, setLayoutDraftError] = useState<string | null>(null);
+  const [editorNotice, setEditorNotice] = useState<string | null>(null);
+  const [drawerNotice, setDrawerNotice] = useState<string | null>(null);
+  const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({});
 
   const [draftJson, setDraftJson] = useState(
     JSON.stringify(
@@ -301,6 +326,7 @@ export default function ParametricPage() {
   const [svgMarkup, setSvgMarkup] = useState('');
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const authConfigured = isFirebaseAuthConfigured();
 
   const selectedIndex = useMemo(() => {
     if (!workingTemplate || !selectedElementId) return -1;
@@ -334,6 +360,13 @@ export default function ParametricPage() {
     } catch {
       // Ignore localStorage failures.
     }
+
+    if (authConfigured && getCurrentAuthUser()) {
+      const payload = items.map((entry) => JSON.parse(JSON.stringify(entry)) as Record<string, unknown>);
+      void saveParametricLibraryToFirebase({ entries: payload }).catch(() => {
+        // Keep local data even if cloud sync fails.
+      });
+    }
   };
 
   const loadStoredTemplate = (): TemplateModel | null => {
@@ -357,18 +390,40 @@ export default function ParametricPage() {
       if (!raw) return null;
       const parsed = JSON.parse(raw) as Array<LibraryEntry>;
       if (!Array.isArray(parsed)) return null;
-      return parsed
-        .filter((entry) => entry && typeof entry === 'object' && entry.element && typeof entry.element === 'object')
-        .map((entry, index) => ({
-          id: typeof entry.id === 'string' ? entry.id : makeId('lib'),
-          name: typeof entry.name === 'string' && entry.name.trim().length > 0 ? entry.name : `Saved-${index + 1}`,
-          category: typeof entry.category === 'string' && entry.category.trim().length > 0 ? entry.category : inferCategory(entry.element),
-          element: ensureElement(entry.element, index),
-        }));
+      return normalizeLibraryEntries(parsed as Array<unknown>);
     } catch {
       return null;
     }
   };
+
+  const syncLibraryFromFirebase = useCallback(async (localFallback?: Array<LibraryEntry>) => {
+    if (!authConfigured || !getCurrentAuthUser()) return;
+
+    try {
+      const remoteRaw = await fetchParametricLibraryFromFirebase();
+      const remote = normalizeLibraryEntries(remoteRaw as Array<unknown>);
+
+      if (remote.length > 0) {
+        setLibrary(remote);
+        try {
+          window.localStorage.setItem(PARAMETRIC_LIBRARY_STORAGE_KEY, JSON.stringify(remote));
+        } catch {
+          // Ignore localStorage failures.
+        }
+        setDrawerNotice('Library synced from Firebase.');
+        return;
+      }
+
+      const seed = localFallback && localFallback.length > 0 ? localFallback : null;
+      if (seed && seed.length > 0) {
+        const payload = seed.map((entry) => JSON.parse(JSON.stringify(entry)) as Record<string, unknown>);
+        await saveParametricLibraryToFirebase({ entries: payload });
+        setDrawerNotice('Library initialized in Firebase from local data.');
+      }
+    } catch {
+      setDrawerNotice('Firebase sync unavailable. Using local drawer library.');
+    }
+  }, [authConfigured]);
 
   const parseDraftElement = (): TemplateElement | null => {
     if (!draftJson.trim()) {
@@ -431,7 +486,7 @@ export default function ParametricPage() {
     }
   };
 
-  const renderPreview = async () => {
+  const renderPreview = useCallback(async (templateOverride?: TemplateModel) => {
     setIsRendering(true);
     setError(null);
     try {
@@ -446,7 +501,7 @@ export default function ParametricPage() {
         }) => string;
       };
 
-      const template = workingTemplate ?? loadStoredTemplate() ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
+      const template = templateOverride ?? workingTemplate ?? loadStoredTemplate() ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
 
       const renderInput: TemplateModel = {
         ...template,
@@ -483,21 +538,27 @@ export default function ParametricPage() {
     } finally {
       setIsRendering(false);
     }
-  };
+  }, [activeStyle, colorMode, ringRadius, tickWidth, workingTemplate]);
 
   const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>) => {
+    let nextTemplate: TemplateModel | null = null;
     setWorkingTemplate((prev) => {
       if (!prev) return prev;
       const next = {
         ...prev,
         elements: updater(prev.elements),
       };
+      nextTemplate = next;
       saveTemplate(next);
       return next;
     });
+    if (nextTemplate) {
+      void renderPreview(nextTemplate);
+    }
   };
 
   const updateTemplateLayout = (updater: (layout: Record<string, unknown>) => Record<string, unknown>) => {
+    let nextTemplate: TemplateModel | null = null;
     setWorkingTemplate((prev) => {
       if (!prev) return prev;
       const currentLayout = prev.layout && typeof prev.layout === 'object' ? prev.layout : {};
@@ -505,9 +566,13 @@ export default function ParametricPage() {
         ...prev,
         layout: updater({ ...currentLayout }),
       };
+      nextTemplate = next;
       saveTemplate(next);
       return next;
     });
+    if (nextTemplate) {
+      void renderPreview(nextTemplate);
+    }
   };
 
   const getLayoutShape = (): 'circle' | 'rectangle' => {
@@ -524,21 +589,43 @@ export default function ParametricPage() {
     return Number.isFinite(value) ? value : fallback;
   };
 
+  const applyLayoutDraft = () => {
+    if (!layoutDraft.trim()) {
+      setLayoutDraftError('Layout JSON is empty.');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(layoutDraft) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Layout JSON must be an object.');
+      }
+      setLayoutDraftError(null);
+      updateTemplateLayout(() => parsed);
+    } catch (e) {
+      setLayoutDraftError(e instanceof Error ? e.message : 'Invalid layout JSON.');
+    }
+  };
+
   const addElementToCanvas = (source: TemplateElement) => {
     const copy = ensureElement(deepClone(source));
     copy.id = makeId('layer');
 
+    let nextTemplate: TemplateModel | null = null;
     setWorkingTemplate((prev) => {
       const base = prev ?? { elements: [] };
       const next = {
         ...base,
         elements: [...base.elements, copy],
       };
+      nextTemplate = next as TemplateModel;
       saveTemplate(next);
       return next;
     });
 
     setSelectedElementId(copy.id ?? null);
+    if (nextTemplate) {
+      void renderPreview(nextTemplate);
+    }
   };
 
   const toggleElementVisibility = (id: string) => {
@@ -585,6 +672,85 @@ export default function ParametricPage() {
       saveLibrary(next);
       return next;
     });
+
+    setEditorNotice('Saved to drawer library.');
+    setDrawerNotice('Draft JSON saved to drawer library.');
+  };
+
+  const getCategoryDraftText = (category: string, fallbackElement?: TemplateElement): string => {
+    const existing = categoryDrafts[category];
+    if (typeof existing === 'string') return existing;
+    if (fallbackElement) return JSON.stringify(fallbackElement, null, 2);
+    return JSON.stringify({ type: 'base', params: { shape: 'circle', radius: 0.5 } }, null, 2);
+  };
+
+  const parseCategoryDraftElement = (category: string, fallbackElement?: TemplateElement): TemplateElement | null => {
+    const text = getCategoryDraftText(category, fallbackElement);
+    if (!text.trim()) {
+      setDrawerNotice(`${category}: JSON is empty.`);
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(text) as TemplateElement;
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') {
+        throw new Error('Element JSON must contain string field: type');
+      }
+      setDrawerNotice(null);
+      return ensureElement(parsed);
+    } catch (e) {
+      setDrawerNotice(`${category}: ${e instanceof Error ? e.message : 'Invalid JSON.'}`);
+      return null;
+    }
+  };
+
+  const addCategoryDraftToCanvas = (category: string, fallbackElement?: TemplateElement) => {
+    const parsed = parseCategoryDraftElement(category, fallbackElement);
+    if (!parsed) return;
+    addElementToCanvas(parsed);
+    setDrawerNotice(`${category}: draft element added to canvas.`);
+  };
+
+  const saveCategoryDraftToLibrary = (category: string, fallbackElement?: TemplateElement) => {
+    const parsed = parseCategoryDraftElement(category, fallbackElement);
+    if (!parsed) return;
+
+    const nextEntry: LibraryEntry = {
+      id: makeId('lib'),
+      name: typeof parsed.name === 'string' ? parsed.name : `${category} Saved`,
+      category,
+      element: parsed,
+    };
+
+    setLibrary((prev) => {
+      const next = [...prev, nextEntry];
+      saveLibrary(next);
+      return next;
+    });
+
+    setDrawerNotice(`${category}: draft saved to this type library.`);
+  };
+
+  const saveSelectedToLibrary = () => {
+    if (!selectedElement) {
+      setEditorNotice('No selected element to save.');
+      return;
+    }
+
+    const normalized = ensureElement(deepClone(selectedElement));
+    const nextEntry: LibraryEntry = {
+      id: makeId('lib'),
+      name: typeof normalized.name === 'string' && normalized.name.trim().length > 0 ? normalized.name : 'Saved Element',
+      category: inferCategory(normalized),
+      element: normalized,
+    };
+
+    setLibrary((prev) => {
+      const next = [...prev, nextEntry];
+      saveLibrary(next);
+      return next;
+    });
+
+    setEditorNotice('Selected element saved to drawer library.');
   };
 
   const addDraftToCanvas = () => {
@@ -594,6 +760,7 @@ export default function ParametricPage() {
       saveTemplate(template);
       setSelectedElementId(template.elements[0]?.id ?? null);
       setDraftError(null);
+      void renderPreview(template);
       return;
     }
 
@@ -607,6 +774,7 @@ export default function ParametricPage() {
     const nextName = nameDraft.trim();
     if (!nextName) return;
     updateTemplateElements((elements) => elements.map((element) => (element.id === selectedElement.id ? { ...element, name: nextName } : element)));
+    setEditorNotice('Name saved.');
   };
 
   const saveSelectedParams = () => {
@@ -616,12 +784,53 @@ export default function ParametricPage() {
       if (!parsed || typeof parsed !== 'object') {
         throw new Error('Params must be an object');
       }
+
+      const isElementPatch =
+        Object.prototype.hasOwnProperty.call(parsed, 'type') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'params') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'placement') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'symmetry') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'material') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'texture') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'styleAdjust') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'effect3d');
+
       setDraftError(null);
+
+      if (isElementPatch) {
+        updateTemplateElements((elements) =>
+          elements.map((element, index) => {
+            if (element.id !== selectedElement.id) return element;
+            const parsedParams = parsed.params && typeof parsed.params === 'object' ? (parsed.params as Record<string, unknown>) : null;
+            const materialPatch = parsed.material && typeof parsed.material === 'object' ? (parsed.material as Record<string, unknown>) : null;
+            const mergedParams = {
+              ...(element.params && typeof element.params === 'object' ? (element.params as Record<string, unknown>) : {}),
+              ...(parsedParams ?? {}),
+            };
+            if (materialPatch && !(parsedParams && typeof parsedParams.material === 'object')) {
+              mergedParams.material = materialPatch;
+            }
+            const patched = {
+              ...element,
+              ...parsed,
+              params: mergedParams,
+              id: element.id,
+              visible: element.visible,
+            } as TemplateElement;
+            return ensureElement(patched, index);
+          }),
+        );
+        setEditorNotice('Element patch saved.');
+        return;
+      }
+
       updateTemplateElements((elements) =>
         elements.map((element) => (element.id === selectedElement.id ? { ...element, params: parsed } : element)),
       );
+      setEditorNotice('Params saved.');
     } catch (e) {
       setDraftError(e instanceof Error ? e.message : 'Invalid params JSON.');
+      setEditorNotice('Save failed: invalid JSON.');
     }
   };
 
@@ -671,10 +880,27 @@ export default function ParametricPage() {
     }
     if (storedLibrary) {
       setLibrary(storedLibrary);
+      void syncLibraryFromFirebase(storedLibrary);
+    } else {
+      void syncLibraryFromFirebase(SAMPLE_LIBRARY);
     }
     void renderPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!authConfigured) return;
+
+    if (getCurrentAuthUser()) {
+      void syncLibraryFromFirebase(loadStoredLibrary() ?? undefined);
+    }
+
+    return subscribeAuthState((user) => {
+      if (!user) return;
+      void syncLibraryFromFirebase(loadStoredLibrary() ?? undefined);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authConfigured, syncLibraryFromFirebase]);
 
   useEffect(() => {
     if (!selectedElement) return;
@@ -682,6 +908,16 @@ export default function ParametricPage() {
     const params = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params : {};
     setParamsDraft(JSON.stringify(params, null, 2));
   }, [selectedElement]);
+
+  useEffect(() => {
+    if (!workingTemplate || !workingTemplate.layout || typeof workingTemplate.layout !== 'object') return;
+    setLayoutDraft(JSON.stringify(workingTemplate.layout, null, 2));
+  }, [workingTemplate]);
+
+  useEffect(() => {
+    if (!workingTemplate) return;
+    void renderPreview(workingTemplate);
+  }, [activeStyle, colorMode, ringRadius, tickWidth, renderPreview, workingTemplate]);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_8%_12%,#1e293b_0%,#0b1020_35%,#08090c_100%)] text-white p-4 md:p-6">
@@ -708,13 +944,43 @@ export default function ParametricPage() {
         <div className="mt-6 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
           <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4">
             <h2 className="text-sm font-semibold text-zinc-100">Element Drawer</h2>
-            <p className="text-xs text-zinc-400">Pick from categories, then Add to Canvas.</p>
+            <p className="text-xs text-zinc-400">Pick from categories, then Add to Canvas. Saved items persist in this browser local storage.</p>
+            {drawerNotice ? <p className="text-xs text-emerald-400">{drawerNotice}</p> : null}
 
             <div className="max-h-80 overflow-auto space-y-3 pr-1">
               {groupedLibrary.map(([category, entries]) => (
                 <div key={category} className="rounded border border-zinc-800 bg-zinc-950/50 p-2">
                   <p className="text-[11px] uppercase tracking-wide text-zinc-400">{category}</p>
-                  <div className="mt-2 space-y-2">
+
+                  <div className="mt-2 rounded border border-zinc-800 bg-zinc-900/60 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Type Draft JSON</p>
+                    <p className="mt-1 text-[11px] text-zinc-500">Paste/edit JSON for this element type.</p>
+                    <textarea
+                      value={getCategoryDraftText(category, entries[0]?.element)}
+                      onChange={(e) => setCategoryDrafts((prev) => ({ ...prev, [category]: e.target.value }))}
+                      className="mt-2 h-24 w-full resize-y rounded border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => addCategoryDraftToCanvas(category, entries[0]?.element)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Add Draft
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveCategoryDraftToLibrary(category, entries[0]?.element)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Save Draft
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 rounded border border-zinc-800 bg-zinc-900/50 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Saved {category} Elements ({entries.length})</p>
+                    <div className="mt-2 space-y-2">
                     {entries.map((entry) => (
                       <div key={entry.id} className="rounded border border-zinc-800 bg-zinc-900 p-2">
                         <p className="text-xs font-medium text-zinc-200">{entry.name}</p>
@@ -728,7 +994,11 @@ export default function ParametricPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setDraftJson(JSON.stringify(entry.element, null, 2))}
+                            onClick={() => {
+                              setDraftJson(JSON.stringify(entry.element, null, 2));
+                              setCategoryDrafts((prev) => ({ ...prev, [category]: JSON.stringify(entry.element, null, 2) }));
+                              setDrawerNotice(`${category}: copied element JSON to draft box.`);
+                            }}
                             className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
                           >
                             JSON
@@ -736,6 +1006,7 @@ export default function ParametricPage() {
                         </div>
                       </div>
                     ))}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -931,6 +1202,26 @@ export default function ParametricPage() {
               <p className="text-xs uppercase tracking-wide text-amber-300">Template Space Controls</p>
               <p className="text-[11px] text-zinc-500">These define the coordinate space only. Add a Base element from left drawer to draw the first visible layer.</p>
 
+              <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                <p className="text-[11px] uppercase tracking-wide text-zinc-400">Layout JSON</p>
+                <p className="mt-1 text-[11px] text-zinc-500">Paste layout JSON here and apply directly.</p>
+                <textarea
+                  value={layoutDraft}
+                  onChange={(e) => setLayoutDraft(e.target.value)}
+                  className="mt-2 h-28 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] leading-5 text-zinc-300"
+                />
+                {layoutDraftError ? <p className="mt-2 text-xs text-red-400">{layoutDraftError}</p> : null}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyLayoutDraft}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Apply Layout JSON
+                  </button>
+                </div>
+              </div>
+
               <label className="block space-y-1">
                 <span className="text-[11px] text-zinc-400">Base Shape</span>
                 <select
@@ -1090,6 +1381,7 @@ export default function ParametricPage() {
                     onChange={(e) => setParamsDraft(e.target.value)}
                     className="h-36 w-full resize-y rounded-md border border-zinc-800 bg-zinc-950 p-2 font-mono text-[11px] text-zinc-300"
                   />
+                  <p className="text-[11px] text-zinc-500">Accepts params-only JSON or full element patch JSON.</p>
                   <button
                     type="button"
                     onClick={saveSelectedParams}
@@ -1097,6 +1389,14 @@ export default function ParametricPage() {
                   >
                     Save Params
                   </button>
+                  <button
+                    type="button"
+                    onClick={saveSelectedToLibrary}
+                    className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Save Selected to Drawer
+                  </button>
+                  {editorNotice ? <p className="text-xs text-emerald-400">{editorNotice}</p> : null}
                 </label>
               </div>
             ) : (

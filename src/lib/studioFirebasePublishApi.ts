@@ -211,3 +211,18 @@ export async function setCatalogStatusInFirebase(input: {
     body: JSON.stringify(input),
   });
 }
+
+export async function fetchParametricLibraryFromFirebase(): Promise<Array<Record<string, unknown>>> {
+  return adminFetch<{ entries?: Array<Record<string, unknown>> }>('userParametricLibraryGet', {
+    method: 'GET',
+  }).then((payload) => (Array.isArray(payload.entries) ? payload.entries : []));
+}
+
+export async function saveParametricLibraryToFirebase(input: {
+  entries: Array<Record<string, unknown>>;
+}): Promise<{ ok: boolean; count: number }> {
+  return adminFetch<{ ok: boolean; count: number }>('userParametricLibrarySet', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
