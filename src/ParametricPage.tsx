@@ -354,20 +354,19 @@ export default function ParametricPage() {
     }
   };
 
-  const saveLibrary = (items: Array<LibraryEntry>) => {
+  const saveLibraryLocal = (items: Array<LibraryEntry>) => {
     try {
       window.localStorage.setItem(PARAMETRIC_LIBRARY_STORAGE_KEY, JSON.stringify(items));
     } catch {
       // Ignore localStorage failures.
     }
-
-    if (authConfigured && getCurrentAuthUser()) {
-      const payload = items.map((entry) => JSON.parse(JSON.stringify(entry)) as Record<string, unknown>);
-      void saveParametricLibraryToFirebase({ entries: payload }).catch(() => {
-        // Keep local data even if cloud sync fails.
-      });
-    }
   };
+
+  const saveLibraryToFirebaseOnAction = useCallback(async (items: Array<LibraryEntry>) => {
+    if (!authConfigured || !getCurrentAuthUser()) return;
+    const payload = items.map((entry) => JSON.parse(JSON.stringify(entry)) as Record<string, unknown>);
+    await saveParametricLibraryToFirebase({ entries: payload });
+  }, [authConfigured]);
 
   const loadStoredTemplate = (): TemplateModel | null => {
     try {
@@ -396,7 +395,7 @@ export default function ParametricPage() {
     }
   };
 
-  const syncLibraryFromFirebase = useCallback(async (localFallback?: Array<LibraryEntry>) => {
+  const syncLibraryFromFirebase = useCallback(async () => {
     if (!authConfigured || !getCurrentAuthUser()) return;
 
     try {
@@ -414,16 +413,37 @@ export default function ParametricPage() {
         return;
       }
 
-      const seed = localFallback && localFallback.length > 0 ? localFallback : null;
-      if (seed && seed.length > 0) {
-        const payload = seed.map((entry) => JSON.parse(JSON.stringify(entry)) as Record<string, unknown>);
-        await saveParametricLibraryToFirebase({ entries: payload });
-        setDrawerNotice('Library initialized in Firebase from local data.');
-      }
     } catch {
       setDrawerNotice('Firebase sync unavailable. Using local drawer library.');
     }
   }, [authConfigured]);
+
+  const persistLibraryFromAction = (updater: (prev: Array<LibraryEntry>) => Array<LibraryEntry>, successNotice: string) => {
+    let pushed = false;
+    setLibrary((prev) => {
+      const next = updater(prev);
+      saveLibraryLocal(next);
+      void saveLibraryToFirebaseOnAction(next)
+        .then(() => {
+          pushed = true;
+          setDrawerNotice(authConfigured && getCurrentAuthUser() ? `${successNotice} Saved to Firebase.` : `${successNotice} Saved locally.`);
+        })
+        .catch(() => {
+          setDrawerNotice(`${successNotice} Saved locally. Firebase unavailable.`);
+        });
+      return next;
+    });
+    if (!pushed) {
+      setEditorNotice(successNotice);
+    }
+  };
+
+  const deleteLibraryEntry = (entryId: string) => {
+    persistLibraryFromAction(
+      (prev) => prev.filter((entry) => entry.id !== entryId),
+      'Library entry deleted.',
+    );
+  };
 
   const parseDraftElement = (): TemplateElement | null => {
     if (!draftJson.trim()) {
@@ -667,14 +687,7 @@ export default function ParametricPage() {
       element: parsed,
     };
 
-    setLibrary((prev) => {
-      const next = [...prev, nextEntry];
-      saveLibrary(next);
-      return next;
-    });
-
-    setEditorNotice('Saved to drawer library.');
-    setDrawerNotice('Draft JSON saved to drawer library.');
+    persistLibraryFromAction((prev) => [...prev, nextEntry], 'Draft JSON saved to drawer library.');
   };
 
   const getCategoryDraftText = (category: string, fallbackElement?: TemplateElement): string => {
@@ -721,13 +734,7 @@ export default function ParametricPage() {
       element: parsed,
     };
 
-    setLibrary((prev) => {
-      const next = [...prev, nextEntry];
-      saveLibrary(next);
-      return next;
-    });
-
-    setDrawerNotice(`${category}: draft saved to this type library.`);
+    persistLibraryFromAction((prev) => [...prev, nextEntry], `${category}: draft saved to this type library.`);
   };
 
   const saveSelectedToLibrary = () => {
@@ -744,13 +751,7 @@ export default function ParametricPage() {
       element: normalized,
     };
 
-    setLibrary((prev) => {
-      const next = [...prev, nextEntry];
-      saveLibrary(next);
-      return next;
-    });
-
-    setEditorNotice('Selected element saved to drawer library.');
+    persistLibraryFromAction((prev) => [...prev, nextEntry], 'Selected element saved to drawer library.');
   };
 
   const addDraftToCanvas = () => {
@@ -880,9 +881,9 @@ export default function ParametricPage() {
     }
     if (storedLibrary) {
       setLibrary(storedLibrary);
-      void syncLibraryFromFirebase(storedLibrary);
+      void syncLibraryFromFirebase();
     } else {
-      void syncLibraryFromFirebase(SAMPLE_LIBRARY);
+      void syncLibraryFromFirebase();
     }
     void renderPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -892,12 +893,12 @@ export default function ParametricPage() {
     if (!authConfigured) return;
 
     if (getCurrentAuthUser()) {
-      void syncLibraryFromFirebase(loadStoredLibrary() ?? undefined);
+      void syncLibraryFromFirebase();
     }
 
     return subscribeAuthState((user) => {
       if (!user) return;
-      void syncLibraryFromFirebase(loadStoredLibrary() ?? undefined);
+      void syncLibraryFromFirebase();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authConfigured, syncLibraryFromFirebase]);
@@ -1002,6 +1003,13 @@ export default function ParametricPage() {
                             className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
                           >
                             JSON
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteLibraryEntry(entry.id)}
+                            className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                          >
+                            Delete
                           </button>
                         </div>
                       </div>
