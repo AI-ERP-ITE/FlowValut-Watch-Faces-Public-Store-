@@ -1031,9 +1031,9 @@ export default function ParametricPage() {
     if (template) {
       setWorkingTemplate(template);
       saveTemplate(template);
-      importTemplateElementsToLibrary(template);
       setSelectedElementId(template.elements[0]?.id ?? null);
       setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
+      setDrawerNotice('Template applied to canvas only. Use Save Full JSON to persist elements/theme.');
       setDraftError(null);
       void renderPreview(template);
       return;
@@ -1042,6 +1042,37 @@ export default function ParametricPage() {
     const parsed = parseDraftElement();
     if (!parsed) return;
     addElementToCanvas(parsed);
+  };
+
+  const saveDraftTemplateToLibraryAndTheme = () => {
+    const template = parseDraftTemplate();
+    if (!template) {
+      setDraftError('Save failed: paste a full template JSON first.');
+      return;
+    }
+
+    const normalizedTemplate: TemplateModel = {
+      ...template,
+      elements: (template.elements ?? []).map((element, index) => ensureElement(element, index)),
+    };
+
+    importTemplateElementsToLibrary(normalizedTemplate);
+
+    if (!Array.isArray(normalizedTemplate.elements) || normalizedTemplate.elements.length === 0) {
+      setDrawerNotice('Template saved to drawer skipped: no elements found for theme save.');
+      return;
+    }
+
+    const name = themeNameDraft.trim().length > 0
+      ? themeNameDraft.trim()
+      : `Theme-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`;
+    const nextTheme: ThemeEntry = {
+      id: makeId('theme'),
+      name,
+      template: deepClone(normalizedTemplate),
+    };
+
+    persistThemes((prev) => [...prev, nextTheme], 'Full JSON saved: elements imported + theme saved.');
   };
 
   const applyDraftJsonToSelectedElementLive = (nextDraft: string) => {
@@ -1842,6 +1873,13 @@ export default function ParametricPage() {
                   className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
                 >
                   Add to Canvas
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDraftTemplateToLibraryAndTheme}
+                  className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  Save Full JSON
                 </button>
                 <button
                   type="button"
