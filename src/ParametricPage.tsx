@@ -622,6 +622,12 @@ export default function ParametricPage() {
     return name;
   };
 
+  const getDefaultClipTargetName = () => {
+    const selfName = typeof selectedElement?.name === 'string' ? selectedElement.name.trim() : '';
+    if (selfName.length > 0) return selfName;
+    return getPreviousElementName();
+  };
+
   const groupedLibrary = useMemo<Array<GroupedLibrarySection>>(() => {
     const byCategory = new Map<string, Array<LibraryEntry>>();
     for (const entry of library) {
@@ -1727,7 +1733,7 @@ export default function ParametricPage() {
 
   const setSelectedTextureEnabled = (enabled: boolean) => {
     if (!selectedElement) return;
-    const defaultTarget = getPreviousElementName();
+    const defaultTarget = getDefaultClipTargetName();
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -1858,7 +1864,7 @@ export default function ParametricPage() {
 
   const setSelectedTextureClipEnabled = (enabled: boolean) => {
     if (!selectedElement) return;
-    const defaultTarget = getPreviousElementName();
+    const defaultTarget = getDefaultClipTargetName();
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -1948,7 +1954,7 @@ export default function ParametricPage() {
   };
 
   const addSelectedGradientLayer = () => {
-    const defaultTarget = getPreviousElementName();
+    const defaultTarget = getDefaultClipTargetName();
     updateSelectedGradientLayer((_current, layers) => {
       const nextLayer: Record<string, unknown> = {
         enabled: true,
@@ -1987,7 +1993,7 @@ export default function ParametricPage() {
   };
 
   const setSelectedGradientEnabled = (enabled: boolean) => {
-    const defaultTarget = getPreviousElementName();
+    const defaultTarget = getDefaultClipTargetName();
     updateSelectedGradientLayer((current, layers) => {
       const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
       const nextLayer = { ...current };
@@ -2117,7 +2123,7 @@ export default function ParametricPage() {
   };
 
   const setSelectedGradientClipEnabled = (enabled: boolean) => {
-    const defaultTarget = getPreviousElementName();
+    const defaultTarget = getDefaultClipTargetName();
     updateSelectedGradientLayer((current, layers) => {
       const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
       const layer = { ...current };
@@ -2326,7 +2332,7 @@ export default function ParametricPage() {
 
   const setSelectedMaterialEnabled = (enabled: boolean) => {
     if (!selectedElement) return;
-    const defaultTarget = getPreviousElementName();
+    const defaultTarget = getDefaultClipTargetName();
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -2421,7 +2427,7 @@ export default function ParametricPage() {
 
   const setSelectedMaterialClipEnabled = (enabled: boolean) => {
     if (!selectedElement) return;
-    const defaultTarget = getPreviousElementName();
+    const defaultTarget = getDefaultClipTargetName();
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -2656,8 +2662,11 @@ export default function ParametricPage() {
     setNameDraft(typeof selectedElement.name === 'string' ? selectedElement.name : '');
     const params = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params : {};
     setParamsDraft(JSON.stringify(params, null, 2));
-    setActiveGradientLayerIndex(0);
   }, [selectedElement]);
+
+  useEffect(() => {
+    setActiveGradientLayerIndex(0);
+  }, [selectedElementId]);
 
   useEffect(() => {
     if (!workingTemplate || !workingTemplate.layout || typeof workingTemplate.layout !== 'object') return;
