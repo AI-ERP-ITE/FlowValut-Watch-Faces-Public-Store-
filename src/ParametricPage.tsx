@@ -537,7 +537,9 @@ export default function ParametricPage() {
   const [isSoloMode, setIsSoloMode] = useState(false);
   const [isDimMode, setIsDimMode] = useState(false);
   const [gradientHandleTarget, setGradientHandleTarget] = useState<'texture' | 'gradient'>('gradient');
+  const [activeTextureLayerIndex, setActiveTextureLayerIndex] = useState(0);
   const [activeGradientLayerIndex, setActiveGradientLayerIndex] = useState(0);
+  const [activeMaterialLayerIndex, setActiveMaterialLayerIndex] = useState(0);
   const [draggingGradientHandle, setDraggingGradientHandle] = useState<null | 'from' | 'to'>(null);
   const [draggingOffsetHandle, setDraggingOffsetHandle] = useState(false);
   const [draggingRadiusHandle, setDraggingRadiusHandle] = useState(false);
@@ -1731,56 +1733,142 @@ export default function ParametricPage() {
     }
   };
 
-  const setSelectedTextureEnabled = (enabled: boolean) => {
+  const getSelectedTextureLayers = () => {
+    if (!selectedElement) return [] as Array<Record<string, unknown>>;
+    const layersRaw = (selectedElement as Record<string, unknown>).textureLayers;
+    if (Array.isArray(layersRaw)) {
+      return layersRaw
+        .filter((entry) => !!entry && typeof entry === 'object')
+        .map((entry) => deepClone(entry as Record<string, unknown>));
+    }
+    if (selectedElement.texture && typeof selectedElement.texture === 'object') {
+      return [deepClone(selectedElement.texture as Record<string, unknown>)];
+    }
+    return [] as Array<Record<string, unknown>>;
+  };
+
+  const getSelectedTextureLayer = () => {
+    const layers = getSelectedTextureLayers();
+    if (layers.length === 0) return null;
+    const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, layers.length - 1));
+    return layers[safeIndex] ?? null;
+  };
+
+  const updateSelectedTextureLayer = (updater: (layer: Record<string, unknown>, allLayers: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
     if (!selectedElement) return;
-    const defaultTarget = getDefaultClipTargetName();
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
-        const currentTexture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
-        const currentClip = currentTexture.clip && typeof currentTexture.clip === 'object' ? currentTexture.clip as Record<string, unknown> : {};
-        const clip = enabled
-          ? {
-              ...currentClip,
-              enabled: true,
-              inheritPrevious: true,
-              targetName: typeof currentClip.targetName === 'string' && currentClip.targetName.trim().length > 0
-                ? currentClip.targetName
-                : defaultTarget,
-            }
-          : currentClip;
-        return { ...element, texture: { ...currentTexture, enabled, clip } };
+        const layersRaw = (element as Record<string, unknown>).textureLayers;
+        const layers = Array.isArray(layersRaw)
+          ? layersRaw.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry as Record<string, unknown>))
+          : (element.texture && typeof element.texture === 'object' ? [deepClone(element.texture as Record<string, unknown>)] : []);
+        const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
+        const current = layers[safeIndex] && typeof layers[safeIndex] === 'object' ? deepClone(layers[safeIndex]) as Record<string, unknown> : {};
+        const nextLayers = updater(current, layers);
+        const sanitizedLayers = nextLayers.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry));
+        const firstLayer = sanitizedLayers[0] ?? null;
+        return {
+          ...element,
+          texture: firstLayer,
+          textureLayers: sanitizedLayers,
+        };
       }),
     );
+  };
+
+  const addSelectedTextureLayer = () => {
+    const defaultTarget = getDefaultClipTargetName();
+    updateSelectedTextureLayer((_current, layers) => {
+      const nextLayer: Record<string, unknown> = {
+        enabled: true,
+        opacity: 0.22,
+        blendMode: 'overlay',
+        gradient: {
+          from: [0, 0],
+          to: [100, 100],
+          stops: [
+            { offset: 0, color: '#ffffff', opacity: 0.22 },
+            { offset: 0.5, color: '#8899aa', opacity: 0.2 },
+            { offset: 1, color: '#000000', opacity: 0.18 },
+          ],
+        },
+        noise: { amount: 0.2, radius: 24 },
+        clip: {
+          enabled: true,
+          inheritPrevious: true,
+          targetName: defaultTarget,
+        },
+      };
+      const next = [...layers, nextLayer];
+      setActiveTextureLayerIndex(Math.max(0, next.length - 1));
+      return next;
+    });
+  };
+
+  const removeSelectedTextureLayer = () => {
+    updateSelectedTextureLayer((_current, layers) => {
+      if (layers.length <= 1) {
+        setActiveTextureLayerIndex(0);
+        return [];
+      }
+      const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, layers.length - 1));
+      const next = layers.filter((_, index) => index !== safeIndex);
+      setActiveTextureLayerIndex(Math.max(0, Math.min(safeIndex, next.length - 1)));
+      return next;
+    });
+  };
+
+  const setSelectedTextureEnabled = (enabled: boolean) => {
+    const defaultTarget = getDefaultClipTargetName();
+    updateSelectedTextureLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
+      const nextLayer = { ...current };
+      const currentClip = nextLayer.clip && typeof nextLayer.clip === 'object' ? nextLayer.clip as Record<string, unknown> : {};
+      const clip = enabled
+        ? {
+            ...currentClip,
+            enabled: true,
+            inheritPrevious: true,
+            targetName: typeof currentClip.targetName === 'string' && currentClip.targetName.trim().length > 0
+              ? currentClip.targetName
+              : defaultTarget,
+          }
+        : currentClip;
+      nextLayer.enabled = enabled;
+      nextLayer.clip = clip;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = nextLayer;
+      return next;
+    });
   };
 
   const setSelectedTextureNumber = (path: string, value: number) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-
-        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = texture;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedTextureLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, texture };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedTextureNumber = (path: string, fallback: number) => {
-    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return fallback;
+    const layer = getSelectedTextureLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.texture;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -1790,55 +1878,52 @@ export default function ParametricPage() {
   };
 
   const setSelectedTextureString = (path: string, value: string) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-
-        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = texture;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedTextureLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, texture };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const setSelectedTextureBoolean = (path: string, value: boolean) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-
-        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = texture;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedTextureLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, texture };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedTextureString = (path: string, fallback: string) => {
-    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return fallback;
+    const layer = getSelectedTextureLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.texture;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -1847,9 +1932,10 @@ export default function ParametricPage() {
   };
 
   const getSelectedTextureBoolean = (path: string, fallback: boolean) => {
-    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return fallback;
+    const layer = getSelectedTextureLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.texture;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -1858,55 +1944,58 @@ export default function ParametricPage() {
   };
 
   const isSelectedTextureEnabled = () => {
-    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return false;
-    return (selectedElement.texture as Record<string, unknown>).enabled === true;
+    const layer = getSelectedTextureLayer();
+    if (!layer) return false;
+    return layer.enabled === true;
   };
 
   const setSelectedTextureClipEnabled = (enabled: boolean) => {
-    if (!selectedElement) return;
     const defaultTarget = getDefaultClipTargetName();
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
-        const clip = texture.clip && typeof texture.clip === 'object' ? deepClone(texture.clip) as Record<string, unknown> : {};
-        const nextClip = {
-          ...clip,
-          enabled,
-          inheritPrevious: enabled ? true : clip.inheritPrevious === true,
-          targetName: enabled
-            ? (typeof clip.targetName === 'string' && clip.targetName.trim().length > 0 ? clip.targetName : defaultTarget)
-            : (typeof clip.targetName === 'string' ? clip.targetName : ''),
-        };
-        return { ...element, texture: { ...texture, clip: nextClip } };
-      }),
-    );
+    updateSelectedTextureLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      const clip = layer.clip && typeof layer.clip === 'object' ? deepClone(layer.clip as Record<string, unknown>) : {};
+      const nextClip = {
+        ...clip,
+        enabled,
+        inheritPrevious: enabled ? true : clip.inheritPrevious === true,
+        targetName: enabled
+          ? (typeof clip.targetName === 'string' && clip.targetName.trim().length > 0 ? clip.targetName : defaultTarget)
+          : (typeof clip.targetName === 'string' ? clip.targetName : ''),
+      };
+      layer.clip = nextClip;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedTextureClipEnabled = () => {
-    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return false;
-    const clip = (selectedElement.texture as Record<string, unknown>).clip;
+    const layer = getSelectedTextureLayer();
+    if (!layer) return false;
+    const clip = layer.clip;
     return !!(clip && typeof clip === 'object' && (clip as Record<string, unknown>).enabled === true);
   };
 
   const getSelectedTextureClipTargetName = () => {
-    if (!selectedElement || !selectedElement.texture || typeof selectedElement.texture !== 'object') return '';
-    const clip = (selectedElement.texture as Record<string, unknown>).clip;
+    const layer = getSelectedTextureLayer();
+    if (!layer) return '';
+    const clip = layer.clip;
     if (!clip || typeof clip !== 'object') return '';
     const value = (clip as Record<string, unknown>).targetName;
     return typeof value === 'string' ? value : '';
   };
 
   const setSelectedTextureClipTargetName = (targetName: string) => {
-    if (!selectedElement) return;
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const texture = element.texture && typeof element.texture === 'object' ? deepClone(element.texture) as Record<string, unknown> : {};
-        const clip = texture.clip && typeof texture.clip === 'object' ? deepClone(texture.clip) as Record<string, unknown> : {};
-        return { ...element, texture: { ...texture, clip: { ...clip, targetName } } };
-      }),
-    );
+    updateSelectedTextureLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      const clip = layer.clip && typeof layer.clip === 'object' ? deepClone(layer.clip as Record<string, unknown>) : {};
+      layer.clip = { ...clip, targetName };
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedGradientLayers = () => {
@@ -2330,77 +2419,154 @@ export default function ParametricPage() {
     );
   };
 
-  const setSelectedMaterialEnabled = (enabled: boolean) => {
+  const getSelectedMaterialLayers = () => {
+    if (!selectedElement) return [] as Array<Record<string, unknown>>;
+    const layersRaw = (selectedElement as Record<string, unknown>).materialLayers;
+    if (Array.isArray(layersRaw)) {
+      return layersRaw
+        .filter((entry) => !!entry && typeof entry === 'object')
+        .map((entry) => deepClone(entry as Record<string, unknown>));
+    }
+    if (selectedElement.material && typeof selectedElement.material === 'object') {
+      return [deepClone(selectedElement.material as Record<string, unknown>)];
+    }
+    return [] as Array<Record<string, unknown>>;
+  };
+
+  const getSelectedMaterialLayer = () => {
+    const layers = getSelectedMaterialLayers();
+    if (layers.length === 0) return null;
+    const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, layers.length - 1));
+    return layers[safeIndex] ?? null;
+  };
+
+  const updateSelectedMaterialLayer = (updater: (layer: Record<string, unknown>, allLayers: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
     if (!selectedElement) return;
-    const defaultTarget = getDefaultClipTargetName();
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
-        const currentMaterial = element.material && typeof element.material === 'object' ? deepClone(element.material) as Record<string, unknown> : {};
-        const currentClip = currentMaterial.clip && typeof currentMaterial.clip === 'object' ? currentMaterial.clip as Record<string, unknown> : {};
-        const clip = enabled
-          ? {
-              ...currentClip,
-              enabled: true,
-              inheritPrevious: true,
-              targetName: typeof currentClip.targetName === 'string' && currentClip.targetName.trim().length > 0
-                ? currentClip.targetName
-                : defaultTarget,
-            }
-          : currentClip;
-        return { ...element, material: { ...currentMaterial, enabled, clip } };
+        const layersRaw = (element as Record<string, unknown>).materialLayers;
+        const layers = Array.isArray(layersRaw)
+          ? layersRaw.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry as Record<string, unknown>))
+          : (element.material && typeof element.material === 'object' ? [deepClone(element.material as Record<string, unknown>)] : []);
+        const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, layers.length - 1)));
+        const current = layers[safeIndex] && typeof layers[safeIndex] === 'object' ? deepClone(layers[safeIndex]) as Record<string, unknown> : {};
+        const nextLayers = updater(current, layers);
+        const sanitizedLayers = nextLayers.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry));
+        const firstLayer = sanitizedLayers[0] ?? null;
+        return {
+          ...element,
+          material: firstLayer,
+          materialLayers: sanitizedLayers,
+        };
       }),
     );
+  };
+
+  const addSelectedMaterialLayer = () => {
+    const defaultTarget = getDefaultClipTargetName();
+    updateSelectedMaterialLayer((_current, layers) => {
+      const nextLayer: Record<string, unknown> = {
+        enabled: true,
+        color: '#ffffff',
+        opacity: 0.18,
+        blendMode: 'multiply',
+        clip: {
+          enabled: true,
+          inheritPrevious: true,
+          targetName: defaultTarget,
+        },
+      };
+      const next = [...layers, nextLayer];
+      setActiveMaterialLayerIndex(Math.max(0, next.length - 1));
+      return next;
+    });
+  };
+
+  const removeSelectedMaterialLayer = () => {
+    updateSelectedMaterialLayer((_current, layers) => {
+      if (layers.length <= 1) {
+        setActiveMaterialLayerIndex(0);
+        return [];
+      }
+      const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, layers.length - 1));
+      const next = layers.filter((_, index) => index !== safeIndex);
+      setActiveMaterialLayerIndex(Math.max(0, Math.min(safeIndex, next.length - 1)));
+      return next;
+    });
+  };
+
+  const setSelectedMaterialEnabled = (enabled: boolean) => {
+    const defaultTarget = getDefaultClipTargetName();
+    updateSelectedMaterialLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, layers.length - 1)));
+      const nextLayer = { ...current };
+      const currentClip = nextLayer.clip && typeof nextLayer.clip === 'object' ? nextLayer.clip as Record<string, unknown> : {};
+      const clip = enabled
+        ? {
+            ...currentClip,
+            enabled: true,
+            inheritPrevious: true,
+            targetName: typeof currentClip.targetName === 'string' && currentClip.targetName.trim().length > 0
+              ? currentClip.targetName
+              : defaultTarget,
+          }
+        : currentClip;
+      nextLayer.enabled = enabled;
+      nextLayer.clip = clip;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = nextLayer;
+      return next;
+    });
   };
 
   const setSelectedMaterialNumber = (path: string, value: number) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const material = element.material && typeof element.material === 'object' ? deepClone(element.material) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = material;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedMaterialLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, material };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const setSelectedMaterialString = (path: string, value: string) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const material = element.material && typeof element.material === 'object' ? deepClone(element.material) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = material;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedMaterialLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, material };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedMaterialNumber = (path: string, fallback: number) => {
-    if (!selectedElement || !selectedElement.material || typeof selectedElement.material !== 'object') return fallback;
+    const layer = getSelectedMaterialLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.material;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -2410,9 +2576,10 @@ export default function ParametricPage() {
   };
 
   const getSelectedMaterialString = (path: string, fallback: string) => {
-    if (!selectedElement || !selectedElement.material || typeof selectedElement.material !== 'object') return fallback;
+    const layer = getSelectedMaterialLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.material;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -2421,55 +2588,58 @@ export default function ParametricPage() {
   };
 
   const isSelectedMaterialEnabled = () => {
-    if (!selectedElement || !selectedElement.material || typeof selectedElement.material !== 'object') return false;
-    return (selectedElement.material as Record<string, unknown>).enabled === true;
+    const layer = getSelectedMaterialLayer();
+    if (!layer) return false;
+    return layer.enabled === true;
   };
 
   const setSelectedMaterialClipEnabled = (enabled: boolean) => {
-    if (!selectedElement) return;
     const defaultTarget = getDefaultClipTargetName();
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const material = element.material && typeof element.material === 'object' ? deepClone(element.material) as Record<string, unknown> : {};
-        const clip = material.clip && typeof material.clip === 'object' ? deepClone(material.clip) as Record<string, unknown> : {};
-        const nextClip = {
-          ...clip,
-          enabled,
-          inheritPrevious: enabled ? true : clip.inheritPrevious === true,
-          targetName: enabled
-            ? (typeof clip.targetName === 'string' && clip.targetName.trim().length > 0 ? clip.targetName : defaultTarget)
-            : (typeof clip.targetName === 'string' ? clip.targetName : ''),
-        };
-        return { ...element, material: { ...material, clip: nextClip } };
-      }),
-    );
+    updateSelectedMaterialLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      const clip = layer.clip && typeof layer.clip === 'object' ? deepClone(layer.clip as Record<string, unknown>) : {};
+      const nextClip = {
+        ...clip,
+        enabled,
+        inheritPrevious: enabled ? true : clip.inheritPrevious === true,
+        targetName: enabled
+          ? (typeof clip.targetName === 'string' && clip.targetName.trim().length > 0 ? clip.targetName : defaultTarget)
+          : (typeof clip.targetName === 'string' ? clip.targetName : ''),
+      };
+      layer.clip = nextClip;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedMaterialClipEnabled = () => {
-    if (!selectedElement || !selectedElement.material || typeof selectedElement.material !== 'object') return false;
-    const clip = (selectedElement.material as Record<string, unknown>).clip;
+    const layer = getSelectedMaterialLayer();
+    if (!layer) return false;
+    const clip = layer.clip;
     return !!(clip && typeof clip === 'object' && (clip as Record<string, unknown>).enabled === true);
   };
 
   const getSelectedMaterialClipTargetName = () => {
-    if (!selectedElement || !selectedElement.material || typeof selectedElement.material !== 'object') return '';
-    const clip = (selectedElement.material as Record<string, unknown>).clip;
+    const layer = getSelectedMaterialLayer();
+    if (!layer) return '';
+    const clip = layer.clip;
     if (!clip || typeof clip !== 'object') return '';
     const value = (clip as Record<string, unknown>).targetName;
     return typeof value === 'string' ? value : '';
   };
 
   const setSelectedMaterialClipTargetName = (targetName: string) => {
-    if (!selectedElement) return;
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const material = element.material && typeof element.material === 'object' ? deepClone(element.material) as Record<string, unknown> : {};
-        const clip = material.clip && typeof material.clip === 'object' ? deepClone(material.clip) as Record<string, unknown> : {};
-        return { ...element, material: { ...material, clip: { ...clip, targetName } } };
-      }),
-    );
+    updateSelectedMaterialLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      const clip = layer.clip && typeof layer.clip === 'object' ? deepClone(layer.clip as Record<string, unknown>) : {};
+      layer.clip = { ...clip, targetName };
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const setSelectedStyleAdjustEnabled = (enabled: boolean) => {
@@ -2665,7 +2835,9 @@ export default function ParametricPage() {
   }, [selectedElement]);
 
   useEffect(() => {
+    setActiveTextureLayerIndex(0);
     setActiveGradientLayerIndex(0);
+    setActiveMaterialLayerIndex(0);
   }, [selectedElementId]);
 
   useEffect(() => {
@@ -4318,7 +4490,40 @@ export default function ParametricPage() {
                   </div>
                   {!isEffectPanelCollapsed('textureFx') ? (
                     <>
-                  <p className="text-[11px] text-zinc-500">One texture system only. Clip target defaults to previous layer name when enabled.</p>
+                  <p className="text-[11px] text-zinc-500">Layered texture system. Each texture layer has independent blend mode, blur, and clip target.</p>
+
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Texture Layers</p>
+                      <span className="text-[11px] text-zinc-500">{getSelectedTextureLayers().length} layer(s)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, getSelectedTextureLayers().length - 1)))}
+                        onChange={(e) => setActiveTextureLayerIndex(Number(e.target.value))}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      >
+                        {getSelectedTextureLayers().length === 0 ? <option value={0}>No layer</option> : null}
+                        {getSelectedTextureLayers().map((_layer, index) => (
+                          <option key={`texture-layer-${index}`} value={index}>Layer {index + 1}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={addSelectedTextureLayer}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removeSelectedTextureLayer}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
 
                   <label className="flex items-center gap-2">
                     <input
@@ -4662,71 +4867,74 @@ export default function ParametricPage() {
                       />
                       <span className="text-[11px] text-zinc-400">Enable gradient blur</span>
                     </label>
+                    {getSelectedGradientBoolean('blur.enabled', false) ? (
+                      <>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Blur Mode</span>
+                          <select
+                            value={getSelectedGradientString('blur.type', 'gaussian')}
+                            onChange={(e) => setSelectedGradientString('blur.type', e.target.value)}
+                            className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                          >
+                            {BLUR_MODE_OPTIONS.map((option) => (
+                              <option key={`gradient-blur-${option.value}`} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
 
-                    <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Blur Mode</span>
-                      <select
-                        value={getSelectedGradientString('blur.type', 'gaussian')}
-                        onChange={(e) => setSelectedGradientString('blur.type', e.target.value)}
-                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                      >
-                        {BLUR_MODE_OPTIONS.map((option) => (
-                          <option key={`gradient-blur-${option.value}`} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </label>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Blur Amount {getSelectedGradientNumber('blur.amount', 0).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={72}
+                            step={0.1}
+                            value={getSelectedGradientNumber('blur.amount', 0)}
+                            onChange={(e) => setSelectedGradientNumber('blur.amount', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
 
-                    <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Blur Amount {getSelectedGradientNumber('blur.amount', 0).toFixed(2)}</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={72}
-                        step={0.1}
-                        value={getSelectedGradientNumber('blur.amount', 0)}
-                        onChange={(e) => setSelectedGradientNumber('blur.amount', Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </label>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Blur Angle {Math.round(getSelectedGradientNumber('blur.angle', 0))}deg</span>
+                          <input
+                            type="range"
+                            min={-180}
+                            max={180}
+                            step={1}
+                            value={getSelectedGradientNumber('blur.angle', 0)}
+                            onChange={(e) => setSelectedGradientNumber('blur.angle', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
 
-                    <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Blur Angle {Math.round(getSelectedGradientNumber('blur.angle', 0))}deg</span>
-                      <input
-                        type="range"
-                        min={-180}
-                        max={180}
-                        step={1}
-                        value={getSelectedGradientNumber('blur.angle', 0)}
-                        onChange={(e) => setSelectedGradientNumber('blur.angle', Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </label>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Blur Samples {Math.round(getSelectedGradientNumber('blur.samples', 8))}</span>
+                          <input
+                            type="range"
+                            min={3}
+                            max={24}
+                            step={1}
+                            value={getSelectedGradientNumber('blur.samples', 8)}
+                            onChange={(e) => setSelectedGradientNumber('blur.samples', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
 
-                    <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Blur Samples {Math.round(getSelectedGradientNumber('blur.samples', 8))}</span>
-                      <input
-                        type="range"
-                        min={3}
-                        max={24}
-                        step={1}
-                        value={getSelectedGradientNumber('blur.samples', 8)}
-                        onChange={(e) => setSelectedGradientNumber('blur.samples', Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </label>
-
-                    <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Blur Strength {getSelectedGradientNumber('blur.strength', 0.5).toFixed(2)}</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={getSelectedGradientNumber('blur.strength', 0.5)}
-                        onChange={(e) => setSelectedGradientNumber('blur.strength', Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </label>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Blur Strength {getSelectedGradientNumber('blur.strength', 0.5).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={getSelectedGradientNumber('blur.strength', 0.5)}
+                            onChange={(e) => setSelectedGradientNumber('blur.strength', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+                      </>
+                    ) : null}
                   </div>
 
                   <label className="block space-y-1">
@@ -4861,7 +5069,40 @@ export default function ParametricPage() {
                   </div>
                   {!isEffectPanelCollapsed('materialFx') ? (
                     <>
-                  <p className="text-[11px] text-zinc-500">Material overlay works like texture and stores inside element JSON.</p>
+                  <p className="text-[11px] text-zinc-500">Layered material overlay. Each material layer has independent color, blend mode, and clip target.</p>
+
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Material Layers</p>
+                      <span className="text-[11px] text-zinc-500">{getSelectedMaterialLayers().length} layer(s)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, getSelectedMaterialLayers().length - 1)))}
+                        onChange={(e) => setActiveMaterialLayerIndex(Number(e.target.value))}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      >
+                        {getSelectedMaterialLayers().length === 0 ? <option value={0}>No layer</option> : null}
+                        {getSelectedMaterialLayers().map((_layer, index) => (
+                          <option key={`material-layer-${index}`} value={index}>Layer {index + 1}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={addSelectedMaterialLayer}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removeSelectedMaterialLayer}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
 
                   <label className="flex items-center gap-2">
                     <input
