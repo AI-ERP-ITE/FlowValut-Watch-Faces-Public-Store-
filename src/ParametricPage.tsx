@@ -4,9 +4,11 @@ import { ArrowLeft, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getCurrentAuthUser, isFirebaseAuthConfigured, subscribeAuthState } from '@/lib/firebaseAuthClient';
 import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase } from '@/lib/studioFirebasePublishApi';
+import { FONT_STYLES } from '@/lib/fontLibrary';
 
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
+type MaskBrushAction = 'hide' | 'reveal';
 
 type TemplateElement = Record<string, unknown> & {
   id?: string;
@@ -14,6 +16,7 @@ type TemplateElement = Record<string, unknown> & {
   role?: string;
   type?: string;
   visible?: boolean;
+  mask?: Record<string, unknown>;
   gradient?: Record<string, unknown>;
   params?: Record<string, unknown>;
   placement?: { mode?: string; config?: Record<string, unknown> };
@@ -103,7 +106,25 @@ const SAMPLE_LIBRARY: Array<LibraryEntry> = [
       type: 'ticks_radial',
       role: 'ticks',
       name: 'Main Ticks',
-      params: { count: 60, radius: 0.42, length: 0.02, width: 0.003, majorEvery: 5, majorLength: 0.035 },
+      params: {
+        count: 60,
+        radius: 0.42,
+        length: 0.02,
+        width: 0.003,
+        majorEvery: 5,
+        majorLength: 0.035,
+        token: {
+          mode: 'line',
+          every: 5,
+          locale: 'en',
+          numberingSystem: '',
+          offset: 0.012,
+          number: { start: 1, step: 1, pad: 0 },
+          text: { value: '', values: '' },
+          icon: { key: 'dot', glyph: '' },
+          font: { styleKey: 'arial', family: 'Segoe UI Symbol, Arial', weight: 'bold', size: 0.06, fill: '#ffffff' },
+        },
+      },
       placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
       symmetry: { mode: 'none', config: {} },
     },
@@ -295,6 +316,53 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function buildMaskPrimitives(mask: Record<string, unknown>): string {
+  const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
+  return strokes
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return '';
+      const stroke = entry as Record<string, unknown>;
+      const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
+      const tone = action === 'hide' ? 'black' : 'white';
+      const opacity = Math.max(0.04, Math.min(1, Number(stroke.opacity) || 1));
+      const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
+      if (points.length > 0) {
+        const size = Math.max(0.2, (Number(stroke.size) || 16) / 5.2);
+        const pointsString = points
+          .map((point) => `${Math.max(0, Math.min(100, Number(point.x) || 0))},${Math.max(0, Math.min(100, Number(point.y) || 0))}`)
+          .join(' ');
+        return `<polyline points="${pointsString}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
+      }
+
+      if (stroke.tool === 'selection' && stroke.shape === 'rect') {
+        const x = Math.max(0, Math.min(100, Number(stroke.x) || 0));
+        const y = Math.max(0, Math.min(100, Number(stroke.y) || 0));
+        const width = Math.max(0, Math.min(100, Number(stroke.width) || 0));
+        const height = Math.max(0, Math.min(100, Number(stroke.height) || 0));
+        return `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${tone}" fill-opacity="${opacity}" />`;
+      }
+
+      return '';
+    })
+    .join('');
+}
+
+function applyMaskToSvgMarkup(svgMarkup: string, mask: Record<string, unknown>, seed: string): string {
+  const openTagMatch = svgMarkup.match(/^<svg[^>]*>/i);
+  if (!openTagMatch) return svgMarkup;
+  const closeIndex = svgMarkup.lastIndexOf('</svg>');
+  if (closeIndex <= openTagMatch[0].length) return svgMarkup;
+
+  const openTag = openTagMatch[0];
+  const inner = svgMarkup.slice(openTag.length, closeIndex);
+  const maskId = `uiMask-${seed.replace(/[^a-zA-Z0-9_-]/g, '') || 'selected'}`;
+  const baseFill = mask.invert === true ? 'black' : 'white';
+  const primitives = buildMaskPrimitives(mask);
+  const defs = `<defs><mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect x="0" y="0" width="100" height="100" fill="${baseFill}" />${primitives}</mask></defs>`;
+
+  return `${openTag}${defs}<g mask="url(#${maskId})">${inner}</g></svg>`;
+}
+
 const DEFAULT_DRAWER_CATEGORY_ORDER = ['Base', 'Bezel', 'Ticks', 'Outline', 'Free Objects', 'Texture', 'General'] as const;
 
 const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
@@ -339,6 +407,27 @@ const BLUR_MODE_OPTIONS = [
   { value: 'radial', label: 'Radial' },
   { value: 'zoom', label: 'Zoom' },
   { value: 'soften', label: 'Soften' },
+] as const;
+const TICK_TOKEN_MODE_OPTIONS = [
+  { value: 'line', label: 'Line' },
+  { value: 'number', label: 'Number' },
+  { value: 'text', label: 'Text' },
+  { value: 'icon', label: 'Icon' },
+] as const;
+const TICK_ICON_OPTIONS = [
+  { value: 'dot', label: 'Dot (•)' },
+  { value: 'circle', label: 'Circle (○)' },
+  { value: 'bullet', label: 'Bullet (●)' },
+  { value: 'square', label: 'Square (■)' },
+  { value: 'diamond', label: 'Diamond (◆)' },
+  { value: 'triangle', label: 'Triangle (▲)' },
+  { value: 'star', label: 'Star (★)' },
+  { value: 'heart', label: 'Heart (❤)' },
+  { value: 'plus', label: 'Plus (+)' },
+  { value: 'cross', label: 'Cross (✕)' },
+  { value: 'bolt', label: 'Bolt (⚡)' },
+  { value: 'sun', label: 'Sun (☀)' },
+  { value: 'moon', label: 'Moon (☾)' },
 ] as const;
 const FIXED_RENDER_STYLE: StyleKey = 'gold_dark';
 
@@ -442,6 +531,34 @@ export default function ParametricPage() {
   const navigate = useNavigate();
   const [colorMode, setColorMode] = useState<ColorMode>('off');
   const [selectedPanelTarget, setSelectedPanelTarget] = useState<'layout' | 'element'>('layout');
+  const [contextTab, setContextTab] = useState<'element' | 'fx' | 'texture' | 'gradient' | 'material' | 'json'>('element');
+  const [layersPanelHeight, setLayersPanelHeight] = useState<number>(220);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isSoloMode, setIsSoloMode] = useState(false);
+  const [isDimMode, setIsDimMode] = useState(false);
+  const [gradientHandleTarget, setGradientHandleTarget] = useState<'texture' | 'gradient'>('gradient');
+  const [activeGradientLayerIndex, setActiveGradientLayerIndex] = useState(0);
+  const [draggingGradientHandle, setDraggingGradientHandle] = useState<null | 'from' | 'to'>(null);
+  const [draggingOffsetHandle, setDraggingOffsetHandle] = useState(false);
+  const [draggingRadiusHandle, setDraggingRadiusHandle] = useState(false);
+  const [isMaskBrushEditEnabled, setIsMaskBrushEditEnabled] = useState(false);
+  const [maskBrushAction, setMaskBrushAction] = useState<MaskBrushAction>('hide');
+  const [isMaskPainting, setIsMaskPainting] = useState(false);
+  const [activeMaskSelectionRect, setActiveMaskSelectionRect] = useState<null | {
+    action: MaskBrushAction;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    opacity: number;
+  }>(null);
+  const [activeMaskStroke, setActiveMaskStroke] = useState<null | {
+    action: MaskBrushAction;
+    size: number;
+    hardness: number;
+    opacity: number;
+    points: Array<{ x: number; y: number }>;
+  }>(null);
   const [isGlobalPanelCollapsed, setIsGlobalPanelCollapsed] = useState(false);
   const [drawerCollapsedByCategory, setDrawerCollapsedByCategory] = useState<Record<string, boolean>>({});
   const [effectPanelCollapsed, setEffectPanelCollapsed] = useState<Record<string, boolean>>({});
@@ -486,6 +603,7 @@ export default function ParametricPage() {
 
   const [draftError, setDraftError] = useState<string | null>(null);
   const [svgMarkup, setSvgMarkup] = useState('');
+  const [svgOverlayMarkup, setSvgOverlayMarkup] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const authConfigured = isFirebaseAuthConfigured();
@@ -847,10 +965,24 @@ export default function ParametricPage() {
       };
 
       const template = templateOverride ?? workingTemplate ?? loadStoredTemplate() ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
+      const visibleElements = (template.elements ?? []).filter((element) => element.visible !== false);
+      const selectedVisibleElement = selectedElementId
+        ? visibleElements.find((element) => element.id === selectedElementId)
+        : null;
+      const selectedMask = selectedVisibleElement && selectedVisibleElement.mask && typeof selectedVisibleElement.mask === 'object'
+        ? selectedVisibleElement.mask as Record<string, unknown>
+        : null;
+      const isSelectedMaskEnabled = selectedMask?.enabled === true;
+
+      const baseElements = isSoloMode && selectedVisibleElement
+        ? [selectedVisibleElement]
+        : isSelectedMaskEnabled && selectedVisibleElement
+          ? visibleElements.filter((element) => element.id !== selectedVisibleElement.id)
+          : visibleElements;
+
       const renderInput: TemplateModel = {
         ...template,
-        elements: (template.elements ?? [])
-          .filter((element) => element.visible !== false)
+        elements: baseElements
           .map((element) => {
             const clone = deepClone(element);
             delete clone.id;
@@ -873,12 +1005,45 @@ export default function ParametricPage() {
       });
 
       setSvgMarkup(svg);
+
+      if (!isSoloMode && selectedVisibleElement && (isDimMode || isSelectedMaskEnabled)) {
+        const overlayInput: TemplateModel = {
+          ...template,
+          elements: [selectedVisibleElement].map((element) => {
+            const clone = deepClone(element);
+            delete clone.id;
+            delete clone.name;
+            delete clone.visible;
+            return clone;
+          }),
+        };
+
+        const overlaySvg = engineModule.runEngine({
+          activeStyle: FIXED_RENDER_STYLE,
+          templateInput: overlayInput,
+          colorControl: {
+            ...DEFAULT_COLOR_CONTROL,
+            colorControl: {
+              ...DEFAULT_COLOR_CONTROL.colorControl,
+              mode: colorMode,
+            },
+          },
+        });
+
+        const maskedOverlay = isSelectedMaskEnabled && selectedMask
+          ? applyMaskToSvgMarkup(overlaySvg, selectedMask, String(selectedVisibleElement.id ?? 'selected'))
+          : overlaySvg;
+        setSvgOverlayMarkup(maskedOverlay);
+      } else {
+        setSvgOverlayMarkup(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to render preview.');
+      setSvgOverlayMarkup(null);
     } finally {
       setIsRendering(false);
     }
-  }, [colorMode, workingTemplate]);
+  }, [colorMode, isDimMode, isSoloMode, selectedElementId, workingTemplate]);
 
   const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>) => {
     let nextTemplate: TemplateModel | null = null;
@@ -1285,6 +1450,7 @@ export default function ParametricPage() {
         Object.prototype.hasOwnProperty.call(parsed, 'params') ||
         Object.prototype.hasOwnProperty.call(parsed, 'placement') ||
         Object.prototype.hasOwnProperty.call(parsed, 'symmetry') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'mask') ||
         Object.prototype.hasOwnProperty.call(parsed, 'material') ||
         Object.prototype.hasOwnProperty.call(parsed, 'texture') ||
         Object.prototype.hasOwnProperty.call(parsed, 'gradient') ||
@@ -1349,6 +1515,7 @@ export default function ParametricPage() {
         Object.prototype.hasOwnProperty.call(parsed, 'params') ||
         Object.prototype.hasOwnProperty.call(parsed, 'placement') ||
         Object.prototype.hasOwnProperty.call(parsed, 'symmetry') ||
+        Object.prototype.hasOwnProperty.call(parsed, 'mask') ||
         Object.prototype.hasOwnProperty.call(parsed, 'material') ||
         Object.prototype.hasOwnProperty.call(parsed, 'texture') ||
         Object.prototype.hasOwnProperty.call(parsed, 'gradient') ||
@@ -1457,6 +1624,34 @@ export default function ParametricPage() {
       cursor = (cursor as Record<string, unknown>)[key];
     }
     return typeof cursor === 'string' ? cursor : fallback;
+  };
+
+  const getSelectedPlacementOffset = (axis: 0 | 1) => {
+    if (!selectedElement || !selectedElement.placement || typeof selectedElement.placement !== 'object') return 0;
+    const config = selectedElement.placement.config && typeof selectedElement.placement.config === 'object'
+      ? selectedElement.placement.config
+      : {};
+    const offsetRaw = (config as Record<string, unknown>).offset;
+    const offset = Array.isArray(offsetRaw) ? offsetRaw : [0, 0];
+    const value = Number(offset[axis]);
+    return Number.isFinite(value) ? value : 0;
+  };
+
+  const setSelectedPlacementOffset = (x: number, y: number) => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const placement = element.placement && typeof element.placement === 'object'
+          ? deepClone(element.placement) as { mode?: string; config?: Record<string, unknown> }
+          : { mode: 'center', config: {} };
+        const config = placement.config && typeof placement.config === 'object'
+          ? deepClone(placement.config) as Record<string, unknown>
+          : {};
+        config.offset = [x, y];
+        return { ...element, placement: { ...placement, config } };
+      }),
+    );
   };
 
   const normalizeColorHex = (value: string, fallback: string) => {
@@ -1708,99 +1903,181 @@ export default function ParametricPage() {
     );
   };
 
-  const setSelectedGradientEnabled = (enabled: boolean) => {
+  const getSelectedGradientLayers = () => {
+    if (!selectedElement) return [] as Array<Record<string, unknown>>;
+    const layersRaw = (selectedElement as Record<string, unknown>).gradientLayers;
+    if (Array.isArray(layersRaw)) {
+      return layersRaw
+        .filter((entry) => !!entry && typeof entry === 'object')
+        .map((entry) => deepClone(entry as Record<string, unknown>));
+    }
+    if (selectedElement.gradient && typeof selectedElement.gradient === 'object') {
+      return [deepClone(selectedElement.gradient as Record<string, unknown>)];
+    }
+    return [] as Array<Record<string, unknown>>;
+  };
+
+  const getSelectedGradientLayer = () => {
+    const layers = getSelectedGradientLayers();
+    if (layers.length === 0) return null;
+    const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, layers.length - 1));
+    return layers[safeIndex] ?? null;
+  };
+
+  const updateSelectedGradientLayer = (updater: (layer: Record<string, unknown>, allLayers: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
     if (!selectedElement) return;
-    const defaultTarget = getPreviousElementName();
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
-        const currentGradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
-        const currentClip = currentGradient.clip && typeof currentGradient.clip === 'object' ? currentGradient.clip as Record<string, unknown> : {};
-        const clip = enabled
-          ? {
-              ...currentClip,
-              enabled: true,
-              inheritPrevious: true,
-              targetName: typeof currentClip.targetName === 'string' && currentClip.targetName.trim().length > 0
-                ? currentClip.targetName
-                : defaultTarget,
-            }
-          : currentClip;
-        return { ...element, gradient: { ...currentGradient, enabled, clip } };
+        const layersRaw = (element as Record<string, unknown>).gradientLayers;
+        const layers = Array.isArray(layersRaw)
+          ? layersRaw.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry as Record<string, unknown>))
+          : (element.gradient && typeof element.gradient === 'object' ? [deepClone(element.gradient as Record<string, unknown>)] : []);
+        const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
+        const current = layers[safeIndex] && typeof layers[safeIndex] === 'object' ? deepClone(layers[safeIndex]) as Record<string, unknown> : {};
+        const nextLayers = updater(current, layers);
+        const sanitizedLayers = nextLayers.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry));
+        const firstLayer = sanitizedLayers[0] ?? null;
+        return {
+          ...element,
+          gradient: firstLayer,
+          gradientLayers: sanitizedLayers,
+        };
       }),
     );
+  };
+
+  const addSelectedGradientLayer = () => {
+    const defaultTarget = getPreviousElementName();
+    updateSelectedGradientLayer((_current, layers) => {
+      const nextLayer: Record<string, unknown> = {
+        enabled: true,
+        opacity: 0.24,
+        blendMode: 'overlay',
+        from: [0, 0],
+        to: [100, 100],
+        stops: [
+          { offset: 0, color: '#ffffff', opacity: 0.24 },
+          { offset: 0.5, color: '#8899aa', opacity: 0.2 },
+          { offset: 1, color: '#000000', opacity: 0.18 },
+        ],
+        clip: {
+          enabled: true,
+          inheritPrevious: true,
+          targetName: defaultTarget,
+        },
+      };
+      const next = [...layers, nextLayer];
+      setActiveGradientLayerIndex(Math.max(0, next.length - 1));
+      return next;
+    });
+  };
+
+  const removeSelectedGradientLayer = () => {
+    updateSelectedGradientLayer((_current, layers) => {
+      if (layers.length <= 1) {
+        setActiveGradientLayerIndex(0);
+        return [];
+      }
+      const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, layers.length - 1));
+      const next = layers.filter((_, index) => index !== safeIndex);
+      setActiveGradientLayerIndex(Math.max(0, Math.min(safeIndex, next.length - 1)));
+      return next;
+    });
+  };
+
+  const setSelectedGradientEnabled = (enabled: boolean) => {
+    const defaultTarget = getPreviousElementName();
+    updateSelectedGradientLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
+      const nextLayer = { ...current };
+      const currentClip = nextLayer.clip && typeof nextLayer.clip === 'object' ? nextLayer.clip as Record<string, unknown> : {};
+      const clip = enabled
+        ? {
+            ...currentClip,
+            enabled: true,
+            inheritPrevious: true,
+            targetName: typeof currentClip.targetName === 'string' && currentClip.targetName.trim().length > 0
+              ? currentClip.targetName
+              : defaultTarget,
+          }
+        : currentClip;
+      nextLayer.enabled = enabled;
+      nextLayer.clip = clip;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = nextLayer;
+      return next;
+    });
   };
 
   const setSelectedGradientNumber = (path: string, value: number) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = gradient;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedGradientLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, gradient };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const setSelectedGradientString = (path: string, value: string) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = gradient;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedGradientLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, gradient };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const setSelectedGradientBoolean = (path: string, value: boolean) => {
-    if (!selectedElement) return;
     const segments = path.split('.');
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
-        let cursor: Record<string, unknown> = gradient;
-        for (let i = 0; i < segments.length - 1; i += 1) {
-          const key = segments[i];
-          const child = cursor[key];
-          if (!child || typeof child !== 'object') {
-            cursor[key] = {};
-          }
-          cursor = cursor[key] as Record<string, unknown>;
+    updateSelectedGradientLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      let cursor: Record<string, unknown> = layer;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        const key = segments[i];
+        const child = cursor[key];
+        if (!child || typeof child !== 'object') {
+          cursor[key] = {};
         }
-        cursor[segments[segments.length - 1]] = value;
-        return { ...element, gradient };
-      }),
-    );
+        cursor = cursor[key] as Record<string, unknown>;
+      }
+      cursor[segments[segments.length - 1]] = value;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedGradientNumber = (path: string, fallback: number) => {
-    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return fallback;
+    const layer = getSelectedGradientLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.gradient;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -1810,9 +2087,10 @@ export default function ParametricPage() {
   };
 
   const getSelectedGradientString = (path: string, fallback: string) => {
-    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return fallback;
+    const layer = getSelectedGradientLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.gradient;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -1821,9 +2099,10 @@ export default function ParametricPage() {
   };
 
   const getSelectedGradientBoolean = (path: string, fallback: boolean) => {
-    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return fallback;
+    const layer = getSelectedGradientLayer();
+    if (!layer) return fallback;
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.gradient;
+    let cursor: unknown = layer;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -1832,53 +2111,215 @@ export default function ParametricPage() {
   };
 
   const isSelectedGradientEnabled = () => {
-    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return false;
-    return (selectedElement.gradient as Record<string, unknown>).enabled === true;
+    const layer = getSelectedGradientLayer();
+    if (!layer) return false;
+    return layer.enabled === true;
   };
 
   const setSelectedGradientClipEnabled = (enabled: boolean) => {
-    if (!selectedElement) return;
     const defaultTarget = getPreviousElementName();
-    updateTemplateElements((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedElement.id) return element;
-        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
-        const clip = gradient.clip && typeof gradient.clip === 'object' ? deepClone(gradient.clip) as Record<string, unknown> : {};
-        const nextClip = {
-          ...clip,
-          enabled,
-          inheritPrevious: enabled ? true : clip.inheritPrevious === true,
-          targetName: enabled
-            ? (typeof clip.targetName === 'string' && clip.targetName.trim().length > 0 ? clip.targetName : defaultTarget)
-            : (typeof clip.targetName === 'string' ? clip.targetName : ''),
-        };
-        return { ...element, gradient: { ...gradient, clip: nextClip } };
-      }),
-    );
+    updateSelectedGradientLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      const clip = layer.clip && typeof layer.clip === 'object' ? deepClone(layer.clip as Record<string, unknown>) : {};
+      const nextClip = {
+        ...clip,
+        enabled,
+        inheritPrevious: enabled ? true : clip.inheritPrevious === true,
+        targetName: enabled
+          ? (typeof clip.targetName === 'string' && clip.targetName.trim().length > 0 ? clip.targetName : defaultTarget)
+          : (typeof clip.targetName === 'string' ? clip.targetName : ''),
+      };
+      layer.clip = nextClip;
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
   };
 
   const getSelectedGradientClipEnabled = () => {
-    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return false;
-    const clip = (selectedElement.gradient as Record<string, unknown>).clip;
+    const layer = getSelectedGradientLayer();
+    if (!layer) return false;
+    const clip = layer.clip;
     return !!(clip && typeof clip === 'object' && (clip as Record<string, unknown>).enabled === true);
   };
 
   const getSelectedGradientClipTargetName = () => {
-    if (!selectedElement || !selectedElement.gradient || typeof selectedElement.gradient !== 'object') return '';
-    const clip = (selectedElement.gradient as Record<string, unknown>).clip;
+    const layer = getSelectedGradientLayer();
+    if (!layer) return '';
+    const clip = layer.clip;
     if (!clip || typeof clip !== 'object') return '';
     const value = (clip as Record<string, unknown>).targetName;
     return typeof value === 'string' ? value : '';
   };
 
   const setSelectedGradientClipTargetName = (targetName: string) => {
+    updateSelectedGradientLayer((current, layers) => {
+      const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
+      const layer = { ...current };
+      const clip = layer.clip && typeof layer.clip === 'object' ? deepClone(layer.clip as Record<string, unknown>) : {};
+      layer.clip = { ...clip, targetName };
+      const next = layers.length > 0 ? [...layers] : [{}];
+      next[safeIndex] = layer;
+      return next;
+    });
+  };
+
+  const setSelectedMaskEnabled = (enabled: boolean) => {
     if (!selectedElement) return;
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
-        const gradient = element.gradient && typeof element.gradient === 'object' ? deepClone(element.gradient) as Record<string, unknown> : {};
-        const clip = gradient.clip && typeof gradient.clip === 'object' ? deepClone(gradient.clip) as Record<string, unknown> : {};
-        return { ...element, gradient: { ...gradient, clip: { ...clip, targetName } } };
+        const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
+        const brush = mask.brush && typeof mask.brush === 'object' ? mask.brush as Record<string, unknown> : {};
+        return {
+          ...element,
+          mask: {
+            ...mask,
+            enabled,
+            mode: typeof mask.mode === 'string' ? mask.mode : 'brush',
+            invert: mask.invert === true,
+            brush: {
+              size: Number(brush.size) || 16,
+              hardness: Number(brush.hardness) || 0.8,
+              opacity: Number(brush.opacity) || 1,
+              ...brush,
+            },
+            strokes: Array.isArray(mask.strokes) ? mask.strokes : [],
+          },
+        };
+      }),
+    );
+  };
+
+  const setSelectedMaskNumber = (path: string, value: number) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+
+        const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = mask;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, mask };
+      }),
+    );
+  };
+
+  const setSelectedMaskString = (path: string, value: string) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+
+        const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = mask;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, mask };
+      }),
+    );
+  };
+
+  const setSelectedMaskBoolean = (path: string, value: boolean) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+
+        const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
+        let cursor: Record<string, unknown> = mask;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, mask };
+      }),
+    );
+  };
+
+  const getSelectedMaskNumber = (path: string, fallback: number) => {
+    if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.mask;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    const n = Number(cursor);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const getSelectedMaskString = (path: string, fallback: string) => {
+    if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.mask;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'string' ? cursor : fallback;
+  };
+
+  const getSelectedMaskBoolean = (path: string, fallback: boolean) => {
+    if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return fallback;
+    const segments = path.split('.');
+    let cursor: unknown = selectedElement.mask;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'boolean' ? cursor : fallback;
+  };
+
+  const isSelectedMaskEnabled = () => {
+    if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return false;
+    return (selectedElement.mask as Record<string, unknown>).enabled === true;
+  };
+
+  const clearSelectedMaskStrokes = () => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
+        return { ...element, mask: { ...mask, strokes: [] } };
+      }),
+    );
+  };
+
+  const appendSelectedMaskStroke = (stroke: Record<string, unknown>) => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
+        const strokes = Array.isArray(mask.strokes) ? [...mask.strokes] : [];
+        strokes.push(stroke);
+        return { ...element, mask: { ...mask, strokes } };
       }),
     );
   };
@@ -2215,6 +2656,7 @@ export default function ParametricPage() {
     setNameDraft(typeof selectedElement.name === 'string' ? selectedElement.name : '');
     const params = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params : {};
     setParamsDraft(JSON.stringify(params, null, 2));
+    setActiveGradientLayerIndex(0);
   }, [selectedElement]);
 
   useEffect(() => {
@@ -2227,15 +2669,93 @@ export default function ParametricPage() {
     void renderPreview(workingTemplate);
   }, [colorMode, renderPreview, workingTemplate]);
 
+  const getCanvasGradientNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to', axis: 0 | 1) => {
+    const fallback = anchor === 'from' ? 0 : 100;
+    if (target === 'texture') {
+      return getSelectedTextureNumber(`gradient.${anchor}.${axis}`, fallback);
+    }
+    return getSelectedGradientNumber(`${anchor}.${axis}`, fallback);
+  };
+
+  const setCanvasGradientNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to', axis: 0 | 1, value: number) => {
+    const next = Math.max(0, Math.min(100, value));
+    if (target === 'texture') {
+      setSelectedTextureNumber(`gradient.${anchor}.${axis}`, next);
+      return;
+    }
+    setSelectedGradientNumber(`${anchor}.${axis}`, next);
+  };
+
+  const gradientFromX = getCanvasGradientNumber(gradientHandleTarget, 'from', 0);
+  const gradientFromY = getCanvasGradientNumber(gradientHandleTarget, 'from', 1);
+  const gradientToX = getCanvasGradientNumber(gradientHandleTarget, 'to', 0);
+  const gradientToY = getCanvasGradientNumber(gradientHandleTarget, 'to', 1);
+  const gradientLineDx = gradientToX - gradientFromX;
+  const gradientLineDy = gradientToY - gradientFromY;
+  const gradientLineLen = Math.max(0.1, Math.sqrt(gradientLineDx * gradientLineDx + gradientLineDy * gradientLineDy));
+  const gradientLineAngle = (Math.atan2(gradientLineDy, gradientLineDx) * 180) / Math.PI;
+  const showGradientCanvasHandles = selectedPanelTarget === 'element' && !!selectedElement && contextTab === 'gradient';
+  const showElementCanvasHandles = selectedPanelTarget === 'element' && !!selectedElement && contextTab === 'element';
+  const showMaskCanvasEditor = showElementCanvasHandles && isSelectedMaskEnabled();
+  const showGlobalLightingCanvasOverlay = contextTab === 'fx';
+  const globalLightAngle = getTemplateEffectNumber('angle', -35);
+  const globalLightIntensity = getTemplateEffectNumber('intensity', 0.46);
+  const globalLightRadius = 22 + globalLightIntensity * 20;
+  const globalLightTipX = 50 + Math.cos((globalLightAngle * Math.PI) / 180) * globalLightRadius;
+  const globalLightTipY = 50 + Math.sin((globalLightAngle * Math.PI) / 180) * globalLightRadius;
+  const selectedOffsetX = getSelectedPlacementOffset(0);
+  const selectedOffsetY = getSelectedPlacementOffset(1);
+  const offsetHandleX = Math.max(0, Math.min(100, 50 + selectedOffsetX / 2));
+  const offsetHandleY = Math.max(0, Math.min(100, 50 + selectedOffsetY / 2));
+  const selectedRadius = getNumericParam('radius', Number.NaN);
+  const hasRadiusHandle = Number.isFinite(selectedRadius);
+  const radiusHandleX = hasRadiusHandle ? Math.max(0, Math.min(100, 50 + selectedRadius * 50)) : 50;
+  const selectedMaskStrokes = (() => {
+    if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return [] as Array<Record<string, unknown>>;
+    const strokes = (selectedElement.mask as Record<string, unknown>).strokes;
+    return Array.isArray(strokes) ? strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>> : [];
+  })();
+
+  const finishMaskStroke = () => {
+    if (activeMaskStroke && activeMaskStroke.points.length > 0) {
+      appendSelectedMaskStroke(activeMaskStroke as unknown as Record<string, unknown>);
+    }
+    setActiveMaskStroke(null);
+    setIsMaskPainting(false);
+  };
+
+  const finishMaskSelectionRect = () => {
+    if (activeMaskSelectionRect) {
+      const x1 = Math.max(0, Math.min(100, activeMaskSelectionRect.startX));
+      const y1 = Math.max(0, Math.min(100, activeMaskSelectionRect.startY));
+      const x2 = Math.max(0, Math.min(100, activeMaskSelectionRect.endX));
+      const y2 = Math.max(0, Math.min(100, activeMaskSelectionRect.endY));
+      const rect = {
+        tool: 'selection',
+        shape: 'rect',
+        action: activeMaskSelectionRect.action,
+        opacity: activeMaskSelectionRect.opacity,
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        width: Math.abs(x2 - x1),
+        height: Math.abs(y2 - y1),
+      } as Record<string, unknown>;
+      if (Number(rect.width) > 0.2 && Number(rect.height) > 0.2) {
+        appendSelectedMaskStroke(rect);
+      }
+    }
+    setActiveMaskSelectionRect(null);
+  };
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_8%_12%,#1e293b_0%,#0b1020_35%,#08090c_100%)] text-white p-4 md:p-6">
-      <section className="mx-auto w-full max-w-[1500px] rounded-2xl border border-zinc-800/80 bg-zinc-950/90 p-4 md:p-6 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+      <section className="mx-auto w-full max-w-[1700px] rounded-2xl border border-zinc-800/80 bg-zinc-950/90 p-4 md:p-6 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Deterministic Engine</p>
             <h1 className="mt-2 text-2xl font-semibold">Parametric Watchface Designer</h1>
             <p className="mt-2 text-sm text-zinc-300">
-              Left: element library and add flow. Middle: preview + layers. Right: selected element controls.
+              Left: element library. Center: preview + layers. Right: tabbed control inspector.
             </p>
           </div>
           <Button
@@ -2249,8 +2769,161 @@ export default function ParametricPage() {
           </Button>
         </div>
 
-        <div className="mt-6 grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-          <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4">
+        <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+              <span className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1">Global Controls</span>
+              <span className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1">Top Bar Dock</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsFocusMode((prev) => !prev)}
+                className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+              >
+                {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSoloMode((prev) => !prev)}
+                className={`rounded border px-2 py-1 text-[11px] hover:bg-zinc-800 ${isSoloMode ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-zinc-700 bg-zinc-950/70 text-zinc-300'}`}
+              >
+                {isSoloMode ? 'Solo On' : 'Solo Off'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDimMode((prev) => !prev)}
+                className={`rounded border px-2 py-1 text-[11px] hover:bg-zinc-800 ${isDimMode ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-zinc-700 bg-zinc-950/70 text-zinc-300'}`}
+              >
+                {isDimMode ? 'Dim On' : 'Dim Off'}
+              </button>
+
+              <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1">
+                <span className="text-[11px] text-zinc-400">Handle Target</span>
+                <select
+                  value={gradientHandleTarget}
+                  onChange={(e) => setGradientHandleTarget(e.target.value === 'texture' ? 'texture' : 'gradient')}
+                  className="h-7 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                >
+                  <option value="gradient">gradient</option>
+                  <option value="texture">texture</option>
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1">
+                <span className="text-[11px] text-zinc-400">Color</span>
+                <select
+                  value={colorMode}
+                  onChange={(e) => setColorMode(e.target.value as ColorMode)}
+                  className="h-7 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                >
+                  <option value="off">off</option>
+                  <option value="warning">warning</option>
+                  <option value="enforce">enforce</option>
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={getTemplateEffectEnabled()}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, enabled: e.target.checked }))}
+                />
+                Global light
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsGlobalPanelCollapsed((prev) => !prev)}
+                className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+              >
+                {isGlobalPanelCollapsed ? 'Expand Lighting' : 'Collapse Lighting'}
+              </button>
+
+              <span className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300">
+                Active target: {selectedPanelTarget}
+              </span>
+              <span className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300">
+                Layers: {(workingTemplate?.elements ?? []).length}
+              </span>
+            </div>
+          </div>
+
+          {!isGlobalPanelCollapsed ? (
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">Angle {Math.round(getTemplateEffectNumber('angle', -35))}deg</span>
+                <input
+                  type="range"
+                  min={-180}
+                  max={180}
+                  step={1}
+                  value={getTemplateEffectNumber('angle', -35)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, angle: Number(e.target.value) }))}
+                  className="mt-1 w-full"
+                />
+              </label>
+
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">Intensity {getTemplateEffectNumber('intensity', 0.46).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={getTemplateEffectNumber('intensity', 0.46)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
+                  className="mt-1 w-full"
+                />
+              </label>
+
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">Falloff {getTemplateEffectNumber('falloff', 1).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={0.2}
+                  max={3}
+                  step={0.01}
+                  value={getTemplateEffectNumber('falloff', 1)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, falloff: Number(e.target.value) }))}
+                  className="mt-1 w-full"
+                />
+              </label>
+
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">White Balance {getTemplateEffectNumber('whiteBalance', 0).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  value={getTemplateEffectNumber('whiteBalance', 0)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, whiteBalance: Number(e.target.value) }))}
+                  className="mt-1 w-full"
+                />
+              </label>
+
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">Spreading {getTemplateEffectNumber('spread', 0).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={getTemplateEffectNumber('spread', 0)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, spread: Number(e.target.value) }))}
+                  className="mt-1 w-full"
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
+
+        <div className={`mt-4 grid gap-4 ${isFocusMode ? 'grid-cols-1' : 'xl:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
+          {!isFocusMode ? (
+          <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 space-y-4 xl:max-h-[calc(100vh-300px)] xl:overflow-auto">
             <h2 className="text-sm font-semibold text-zinc-100">Element Drawer</h2>
             <p className="text-xs text-zinc-400">Pick from categories, then Add to Canvas. Saved items persist in this browser local storage.</p>
             {drawerNotice ? <p className="text-xs text-emerald-400">{drawerNotice}</p> : null}
@@ -2537,8 +3210,9 @@ export default function ParametricPage() {
               </div>
             </div>
           </aside>
+          ) : null}
 
-          <section className="space-y-4">
+          <section className={`space-y-4 min-w-0 ${isFocusMode ? 'mx-auto w-full max-w-[980px]' : 'xl:self-start'}`}>
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold text-zinc-100">Preview</h2>
@@ -2552,23 +3226,308 @@ export default function ParametricPage() {
                   {isRendering ? 'Rendering...' : 'Apply Preview'}
                 </Button>
               </div>
-              <div className="mt-3 grid place-items-center rounded-lg border border-zinc-800 bg-black/60 p-4 min-h-[420px]">
+              <div className="mt-3 grid place-items-center rounded-lg border border-zinc-800 bg-black/60 p-4 min-h-[360px]">
                 {svgMarkup ? (
-                  <div className="w-full max-w-[520px]" dangerouslySetInnerHTML={{ __html: svgMarkup }} />
+                  <div className="relative w-full max-w-[520px]">
+                    <div
+                      className={isDimMode && !isSoloMode && selectedElement ? 'opacity-45' : ''}
+                      dangerouslySetInnerHTML={{ __html: svgMarkup }}
+                    />
+                    {isDimMode && !isSoloMode && svgOverlayMarkup ? (
+                      <div className="pointer-events-none absolute inset-0" dangerouslySetInnerHTML={{ __html: svgOverlayMarkup }} />
+                    ) : null}
+
+                    {showGlobalLightingCanvasOverlay ? (
+                      <>
+                        <div
+                          className="pointer-events-none absolute h-[2px] bg-cyan-300/80"
+                          style={{
+                            left: '50%',
+                            top: '50%',
+                            width: `${globalLightRadius}%`,
+                            transform: `translateY(-50%) rotate(${globalLightAngle}deg)`,
+                            transformOrigin: '0 50%',
+                          }}
+                        />
+                        <div
+                          className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-cyan-200"
+                          style={{ left: `${globalLightTipX}%`, top: `${globalLightTipY}%` }}
+                        />
+                      </>
+                    ) : null}
+
+                    {selectedPanelTarget === 'element' && selectedElement ? (
+                      <div
+                        className={`absolute inset-0 ${showMaskCanvasEditor && isMaskBrushEditEnabled && getSelectedMaskString('mode', 'brush') === 'brush' ? 'cursor-crosshair' : ''}`}
+                        onMouseDown={(event) => {
+                          if (!showMaskCanvasEditor || !isMaskBrushEditEnabled) return;
+                          const target = event.target as HTMLElement;
+                          if (target.closest('button')) return;
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          if (rect.width <= 0 || rect.height <= 0) return;
+                          const x = ((event.clientX - rect.left) / rect.width) * 100;
+                          const y = ((event.clientY - rect.top) / rect.height) * 100;
+                          const maskMode = getSelectedMaskString('mode', 'brush');
+                          if (maskMode === 'selection') {
+                            setActiveMaskSelectionRect({
+                              action: maskBrushAction,
+                              startX: x,
+                              startY: y,
+                              endX: x,
+                              endY: y,
+                              opacity: getSelectedMaskNumber('brush.opacity', 1),
+                            });
+                            return;
+                          }
+                          setIsMaskPainting(true);
+                          setActiveMaskStroke({
+                            action: maskBrushAction,
+                            size: getSelectedMaskNumber('brush.size', 16),
+                            hardness: getSelectedMaskNumber('brush.hardness', 0.8),
+                            opacity: getSelectedMaskNumber('brush.opacity', 1),
+                            points: [{ x, y }],
+                          });
+                        }}
+                        onMouseMove={(event) => {
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          if (rect.width <= 0 || rect.height <= 0) return;
+                          const x = ((event.clientX - rect.left) / rect.width) * 100;
+                          const y = ((event.clientY - rect.top) / rect.height) * 100;
+                          if (showGradientCanvasHandles && draggingGradientHandle) {
+                            setCanvasGradientNumber(gradientHandleTarget, draggingGradientHandle, 0, x);
+                            setCanvasGradientNumber(gradientHandleTarget, draggingGradientHandle, 1, y);
+                          }
+                          if (showElementCanvasHandles && draggingOffsetHandle) {
+                            const ox = Math.max(-100, Math.min(100, (x - 50) * 2));
+                            const oy = Math.max(-100, Math.min(100, (y - 50) * 2));
+                            setSelectedPlacementOffset(ox, oy);
+                          }
+                          if (showElementCanvasHandles && draggingRadiusHandle && hasRadiusHandle) {
+                            const dx = x - 50;
+                            const dy = y - 50;
+                            const r = Math.max(0, Math.min(1, Math.sqrt(dx * dx + dy * dy) / 50));
+                            setNumericParam('radius', r);
+                          }
+                          if (showMaskCanvasEditor && isMaskPainting) {
+                            setActiveMaskStroke((prev) => {
+                              if (!prev) return prev;
+                              const last = prev.points[prev.points.length - 1];
+                              if (last) {
+                                const dx = x - last.x;
+                                const dy = y - last.y;
+                                if (Math.sqrt(dx * dx + dy * dy) < 0.6) return prev;
+                              }
+                              return { ...prev, points: [...prev.points, { x, y }] };
+                            });
+                          }
+                          if (showMaskCanvasEditor && activeMaskSelectionRect) {
+                            setActiveMaskSelectionRect((prev) => {
+                              if (!prev) return prev;
+                              return { ...prev, endX: x, endY: y };
+                            });
+                          }
+                        }}
+                        onMouseUp={() => {
+                          setDraggingGradientHandle(null);
+                          setDraggingOffsetHandle(false);
+                          setDraggingRadiusHandle(false);
+                          finishMaskStroke();
+                          finishMaskSelectionRect();
+                        }}
+                        onMouseLeave={() => {
+                          setDraggingGradientHandle(null);
+                          setDraggingOffsetHandle(false);
+                          setDraggingRadiusHandle(false);
+                          finishMaskStroke();
+                          finishMaskSelectionRect();
+                        }}
+                      >
+                        {showGradientCanvasHandles ? (
+                          <>
+                            <div
+                              className="pointer-events-none absolute h-[2px] bg-amber-300/80"
+                              style={{
+                                left: `${gradientFromX}%`,
+                                top: `${gradientFromY}%`,
+                                width: `${gradientLineLen}%`,
+                                transform: `translateY(-50%) rotate(${gradientLineAngle}deg)`,
+                                transformOrigin: '0 50%',
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingGradientHandle('from')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-emerald-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${gradientFromX}%`, top: `${gradientFromY}%` }}
+                              title="Drag gradient start handle"
+                            >
+                              S
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingGradientHandle('to')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-sky-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${gradientToX}%`, top: `${gradientToY}%` }}
+                              title="Drag gradient end handle"
+                            >
+                              E
+                            </button>
+                          </>
+                        ) : null}
+
+                        {showElementCanvasHandles ? (
+                          <>
+                            <div className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-200/90" />
+                            <div
+                              className="pointer-events-none absolute h-[1px] bg-emerald-200/80"
+                              style={{
+                                left: '50%',
+                                top: '50%',
+                                width: `${Math.max(0.1, Math.sqrt((offsetHandleX - 50) ** 2 + (offsetHandleY - 50) ** 2))}%`,
+                                transform: `translateY(-50%) rotate(${(Math.atan2(offsetHandleY - 50, offsetHandleX - 50) * 180) / Math.PI}deg)`,
+                                transformOrigin: '0 50%',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingOffsetHandle(true)}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-emerald-400 text-[10px] font-semibold text-black"
+                              style={{ left: `${offsetHandleX}%`, top: `${offsetHandleY}%` }}
+                              title="Drag offset handle"
+                            >
+                              O
+                            </button>
+
+                            {hasRadiusHandle ? (
+                              <>
+                                <div
+                                  className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-200/60 border-dashed"
+                                  style={{ width: `${selectedRadius * 100}%`, height: `${selectedRadius * 100}%` }}
+                                />
+                                <button
+                                  type="button"
+                                  onMouseDown={() => setDraggingRadiusHandle(true)}
+                                  className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-sky-400 text-[10px] font-semibold text-black"
+                                  style={{ left: `${radiusHandleX}%`, top: '50%' }}
+                                  title="Drag radius handle"
+                                >
+                                  R
+                                </button>
+                              </>
+                            ) : null}
+                          </>
+                        ) : null}
+
+                        {showMaskCanvasEditor ? (
+                          <svg className="pointer-events-none absolute inset-0 h-full w-full">
+                            {selectedMaskStrokes.map((stroke, index) => {
+                              const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
+                              const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
+                              const strokeColor = action === 'reveal' ? '#22c55e' : '#ef4444';
+                              const opacity = Math.max(0.08, Math.min(1, Number(stroke.opacity) || 1)) * 0.9;
+                              if (stroke.tool === 'selection' && stroke.shape === 'rect') {
+                                const x = Math.max(0, Math.min(100, Number(stroke.x) || 0));
+                                const y = Math.max(0, Math.min(100, Number(stroke.y) || 0));
+                                const width = Math.max(0, Math.min(100, Number(stroke.width) || 0));
+                                const height = Math.max(0, Math.min(100, Number(stroke.height) || 0));
+                                return (
+                                  <rect
+                                    key={`mask-rect-${index}`}
+                                    x={x}
+                                    y={y}
+                                    width={width}
+                                    height={height}
+                                    fill={strokeColor}
+                                    fillOpacity={opacity * 0.25}
+                                    stroke={strokeColor}
+                                    strokeOpacity={opacity}
+                                    strokeWidth={0.6}
+                                  />
+                                );
+                              }
+                              if (points.length === 0) return null;
+                              const pointsString = points.map((point) => `${point.x},${point.y}`).join(' ');
+                              const strokeWidth = Math.max(0.2, Number(stroke.size) / 5.2);
+                              return (
+                                <polyline
+                                  key={`mask-stroke-${index}`}
+                                  points={pointsString}
+                                  fill="none"
+                                  stroke={strokeColor}
+                                  strokeOpacity={opacity}
+                                  strokeWidth={strokeWidth}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              );
+                            })}
+                            {activeMaskStroke && activeMaskStroke.points.length > 0 ? (
+                              <polyline
+                                points={activeMaskStroke.points.map((point) => `${point.x},${point.y}`).join(' ')}
+                                fill="none"
+                                stroke={activeMaskStroke.action === 'reveal' ? '#4ade80' : '#f87171'}
+                                strokeOpacity={0.95}
+                                strokeWidth={Math.max(0.2, activeMaskStroke.size / 5.2)}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            ) : null}
+                            {activeMaskSelectionRect ? (
+                              <rect
+                                x={Math.min(activeMaskSelectionRect.startX, activeMaskSelectionRect.endX)}
+                                y={Math.min(activeMaskSelectionRect.startY, activeMaskSelectionRect.endY)}
+                                width={Math.abs(activeMaskSelectionRect.endX - activeMaskSelectionRect.startX)}
+                                height={Math.abs(activeMaskSelectionRect.endY - activeMaskSelectionRect.startY)}
+                                fill={activeMaskSelectionRect.action === 'reveal' ? '#22c55e' : '#ef4444'}
+                                fillOpacity={0.15}
+                                stroke={activeMaskSelectionRect.action === 'reveal' ? '#4ade80' : '#f87171'}
+                                strokeOpacity={0.95}
+                                strokeWidth={0.7}
+                              />
+                            ) : null}
+                          </svg>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <p className="text-sm text-zinc-500">No preview yet.</p>
                 )}
               </div>
+              <p className="mt-2 text-[11px] text-zinc-500">
+                Canvas overlays follow active tab: Gradient tab shows S/E, Element tab shows O/R and mask brush, FX tab shows global lighting direction.
+              </p>
               {error ? <p className="mt-2 text-xs text-red-400">{error}</p> : null}
             </div>
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold text-zinc-100">Layers (Order = Render Order)</h2>
-                <span className="text-xs text-zinc-400">{(workingTemplate?.elements ?? []).length} layer(s)</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-400">{(workingTemplate?.elements ?? []).length} layer(s)</span>
+                  <span className="text-[11px] text-zinc-500">Height {Math.round(layersPanelHeight)}px</span>
+                </div>
               </div>
 
-              <div className="mt-3 max-h-64 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/70">
+              <label className="mt-2 block space-y-1">
+                <span className="text-[11px] text-zinc-500">Layers Panel Height (Capped)</span>
+                <input
+                  type="range"
+                  min={160}
+                  max={360}
+                  step={4}
+                  value={layersPanelHeight}
+                  onChange={(e) => setLayersPanelHeight(Number(e.target.value))}
+                  className="w-full"
+                />
+              </label>
+
+              <div
+                className="mt-3 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/70"
+                style={{ height: `${layersPanelHeight}px`, minHeight: '160px', maxHeight: '360px' }}
+              >
                 {(workingTemplate?.elements ?? []).map((element, index) => {
                   const isSelected = selectedPanelTarget === 'element' && selectedElementId === element.id;
                   return (
@@ -2660,120 +3619,35 @@ export default function ParametricPage() {
             </div>
           </section>
 
-          <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4">
-            <h2 className="text-sm font-semibold text-zinc-100">Controls</h2>
-
-            <div className="space-y-3 rounded border border-zinc-800 bg-zinc-950/60 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs uppercase tracking-wide text-amber-300">Global Render Controls</p>
-                <button
-                  type="button"
-                  onClick={() => setIsGlobalPanelCollapsed((prev) => !prev)}
-                  className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
-                >
-                  {isGlobalPanelCollapsed ? 'Expand' : 'Collapse'}
-                </button>
-              </div>
-              <p className="text-[11px] text-zinc-500">
-                Only global controls here: Color Mode and Universal Lighting.
-              </p>
-
-            {!isGlobalPanelCollapsed ? (
-            <>
-
-            <label className="block space-y-2">
-              <span className="text-xs uppercase tracking-wide text-zinc-400">Color Mode</span>
-              <select
-                value={colorMode}
-                onChange={(e) => setColorMode(e.target.value as ColorMode)}
-                className="h-9 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm"
-              >
-                <option value="off">off</option>
-                <option value="warning">warning</option>
-                <option value="enforce">enforce</option>
-              </select>
-            </label>
-
-            <div className="rounded border border-zinc-800 bg-zinc-950/60 p-2 space-y-2">
-              <p className="text-[11px] uppercase tracking-wide text-zinc-400">Universal Lighting (All Elements)</p>
-              <p className="text-[11px] text-zinc-500">Global light rig applied to all layers unless per-layer depth override disables it.</p>
-
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={getTemplateEffectEnabled()}
-                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, enabled: e.target.checked }))}
-                />
-                <span className="text-[11px] text-zinc-400">Enable global lighting</span>
-              </label>
-
-              <label className="block space-y-1">
-                <span className="text-[11px] text-zinc-500">Angle {Math.round(getTemplateEffectNumber('angle', -35))}deg</span>
-                <input
-                  type="range"
-                  min={-180}
-                  max={180}
-                  step={1}
-                  value={getTemplateEffectNumber('angle', -35)}
-                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, angle: Number(e.target.value) }))}
-                  className="w-full"
-                />
-              </label>
-
-              <label className="block space-y-1">
-                <span className="text-[11px] text-zinc-500">Intensity {getTemplateEffectNumber('intensity', 0.46).toFixed(2)}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={getTemplateEffectNumber('intensity', 0.46)}
-                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
-                  className="w-full"
-                />
-              </label>
-
-              <label className="block space-y-1">
-                <span className="text-[11px] text-zinc-500">Fall Speed {getTemplateEffectNumber('falloff', 1).toFixed(2)}</span>
-                <input
-                  type="range"
-                  min={0.2}
-                  max={3}
-                  step={0.01}
-                  value={getTemplateEffectNumber('falloff', 1)}
-                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, falloff: Number(e.target.value) }))}
-                  className="w-full"
-                />
-              </label>
-
-              <label className="block space-y-1">
-                <span className="text-[11px] text-zinc-500">White Balance {getTemplateEffectNumber('whiteBalance', 0).toFixed(2)}</span>
-                <input
-                  type="range"
-                  min={-1}
-                  max={1}
-                  step={0.01}
-                  value={getTemplateEffectNumber('whiteBalance', 0)}
-                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, whiteBalance: Number(e.target.value) }))}
-                  className="w-full"
-                />
-              </label>
-
-              <label className="block space-y-1">
-                <span className="text-[11px] text-zinc-500">Spreading {getTemplateEffectNumber('spread', 0).toFixed(2)}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={getTemplateEffectNumber('spread', 0)}
-                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, spread: Number(e.target.value) }))}
-                  className="w-full"
-                />
-              </label>
+          {!isFocusMode ? (
+          <aside className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-zinc-100">Right Context Inspector</h2>
+              <span className="text-[11px] text-zinc-500">Docked right for non-overlap editing.</span>
             </div>
-            </>
-            ) : null}
+
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'element', label: 'Element' },
+                { key: 'fx', label: 'FX' },
+                { key: 'texture', label: 'Texture' },
+                { key: 'gradient', label: 'Gradient' },
+                { key: 'material', label: 'Material' },
+                { key: 'json', label: 'JSON' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setContextTab(tab.key as 'element' | 'fx' | 'texture' | 'gradient' | 'material' | 'json')}
+                  className={`rounded border px-3 py-1 text-[11px] ${contextTab === tab.key ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-zinc-700 bg-zinc-950/70 text-zinc-300 hover:bg-zinc-800'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="rounded border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-[11px] text-zinc-400">
+              Active tab: {contextTab}. Full control migration preserved in this panel.
             </div>
 
             {selectedPanelTarget === 'layout' ? (
@@ -2949,6 +3823,208 @@ export default function ParametricPage() {
                       <span className="text-[11px] text-zinc-500">Width {getNumericParam('width', 0.003).toFixed(3)}</span>
                       <input type="range" min={0.001} max={0.05} step={0.001} value={getNumericParam('width', 0.003)} onChange={(e) => setNumericParam('width', Number(e.target.value))} className="w-full" />
                     </label>
+
+                    <div className="rounded border border-zinc-800 bg-zinc-900/35 p-2 space-y-2">
+                      <p className="text-[11px] uppercase tracking-wide text-zinc-400">Tick Token Mode</p>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Mode</span>
+                        <select
+                          value={getStringParam('token.mode', 'line')}
+                          onChange={(e) => setStringParam('token.mode', e.target.value)}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                        >
+                          {TICK_TOKEN_MODE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </label>
+
+                      {getStringParam('token.mode', 'line') !== 'line' ? (
+                        <>
+                          <label className="block space-y-1">
+                            <span className="text-[11px] text-zinc-500">Font Style (Library)</span>
+                            <select
+                              value={getStringParam('token.font.styleKey', 'arial')}
+                              onChange={(e) => {
+                                const nextStyle = FONT_STYLES.find((style) => style.key === e.target.value);
+                                setStringParam('token.font.styleKey', e.target.value);
+                                if (nextStyle) {
+                                  setStringParam('token.font.family', nextStyle.fontFamily);
+                                  setStringParam('token.font.weight', nextStyle.fontWeight);
+                                }
+                              }}
+                              className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                            >
+                              {FONT_STYLES.map((style) => (
+                                <option key={style.key} value={style.key}>{style.label}</option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="block space-y-1">
+                            <span className="text-[11px] text-zinc-500">Token Every N Ticks</span>
+                            <input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={getNumericParam('token.every', Math.max(1, getNumericParam('majorEvery', 5)))}
+                              onChange={(e) => setNumericParam('token.every', Math.max(1, Number(e.target.value)))}
+                              className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                            />
+                          </label>
+
+                          <label className="block space-y-1">
+                            <span className="text-[11px] text-zinc-500">Locale (IETF tag)</span>
+                            <input
+                              value={getStringParam('token.locale', 'en')}
+                              onChange={(e) => setStringParam('token.locale', e.target.value)}
+                              className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                              placeholder="en, ar, hi, ja, zh-CN"
+                            />
+                          </label>
+
+                          <label className="block space-y-1">
+                            <span className="text-[11px] text-zinc-500">Numbering System (optional)</span>
+                            <input
+                              value={getStringParam('token.numberingSystem', '')}
+                              onChange={(e) => setStringParam('token.numberingSystem', e.target.value)}
+                              className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                              placeholder="latn, arab, deva"
+                            />
+                          </label>
+
+                          <label className="block space-y-1">
+                            <span className="text-[11px] text-zinc-500">Text Radius Offset {getNumericParam('token.offset', 0.012).toFixed(3)}</span>
+                            <input
+                              type="range"
+                              min={0}
+                              max={0.08}
+                              step={0.001}
+                              value={getNumericParam('token.offset', 0.012)}
+                              onChange={(e) => setNumericParam('token.offset', Number(e.target.value))}
+                              className="w-full"
+                            />
+                          </label>
+
+                          <label className="block space-y-1">
+                            <span className="text-[11px] text-zinc-500">Text Size {getNumericParam('token.font.size', 0.06).toFixed(3)}</span>
+                            <input
+                              type="range"
+                              min={0.02}
+                              max={0.14}
+                              step={0.001}
+                              value={getNumericParam('token.font.size', 0.06)}
+                              onChange={(e) => setNumericParam('token.font.size', Number(e.target.value))}
+                              className="w-full"
+                            />
+                          </label>
+
+                          <label className="block space-y-1">
+                            <span className="text-[11px] text-zinc-500">Text Color</span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={getColorParam('token.font.fill', '#ffffff')}
+                                onChange={(e) => setStringParam('token.font.fill', e.target.value)}
+                                className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                              />
+                              <input
+                                value={getStringParam('token.font.fill', '#ffffff')}
+                                onChange={(e) => setStringParam('token.font.fill', e.target.value)}
+                                className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                              />
+                            </div>
+                          </label>
+
+                          {getStringParam('token.mode', 'line') === 'number' ? (
+                            <div className="grid grid-cols-3 gap-2">
+                              <label className="block space-y-1">
+                                <span className="text-[11px] text-zinc-500">Start</span>
+                                <input
+                                  type="number"
+                                  value={getNumericParam('token.number.start', 1)}
+                                  onChange={(e) => setNumericParam('token.number.start', Number(e.target.value))}
+                                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                                />
+                              </label>
+                              <label className="block space-y-1">
+                                <span className="text-[11px] text-zinc-500">Step</span>
+                                <input
+                                  type="number"
+                                  value={getNumericParam('token.number.step', 1)}
+                                  onChange={(e) => setNumericParam('token.number.step', Number(e.target.value))}
+                                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                                />
+                              </label>
+                              <label className="block space-y-1">
+                                <span className="text-[11px] text-zinc-500">Pad</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  value={getNumericParam('token.number.pad', 0)}
+                                  onChange={(e) => setNumericParam('token.number.pad', Number(e.target.value))}
+                                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                                />
+                              </label>
+                            </div>
+                          ) : null}
+
+                          {getStringParam('token.mode', 'line') === 'text' ? (
+                            <div className="space-y-2">
+                              <label className="block space-y-1">
+                                <span className="text-[11px] text-zinc-500">Single Text Value</span>
+                                <input
+                                  value={getStringParam('token.text.value', '')}
+                                  onChange={(e) => setStringParam('token.text.value', e.target.value)}
+                                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                                  placeholder="مثال"
+                                />
+                              </label>
+                              <label className="block space-y-1">
+                                <span className="text-[11px] text-zinc-500">Multilingual Token List (| separated)</span>
+                                <input
+                                  value={getStringParam('token.text.values', '')}
+                                  onChange={(e) => setStringParam('token.text.values', e.target.value)}
+                                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                                  placeholder="一|二|三|四 or الاثنين|الثلاثاء"
+                                />
+                              </label>
+                            </div>
+                          ) : null}
+
+                          {getStringParam('token.mode', 'line') === 'icon' ? (
+                            <div className="space-y-2">
+                              <label className="block space-y-1">
+                                <span className="text-[11px] text-zinc-500">Icon Preset</span>
+                                <select
+                                  value={getStringParam('token.icon.key', 'dot')}
+                                  onChange={(e) => setStringParam('token.icon.key', e.target.value)}
+                                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                                >
+                                  {TICK_ICON_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="block space-y-1">
+                                <span className="text-[11px] text-zinc-500">Custom Icon Glyph (optional)</span>
+                                <input
+                                  value={getStringParam('token.icon.glyph', '')}
+                                  onChange={(e) => setStringParam('token.icon.glyph', e.target.value)}
+                                  className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                                  placeholder="★"
+                                />
+                              </label>
+                            </div>
+                          ) : null}
+
+                          <p className="text-[11px] text-zinc-500">
+                            Token rendering active for number, text, and icon modes. Default line mode remains backward-compatible.
+                          </p>
+                        </>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
 
@@ -3503,6 +4579,39 @@ export default function ParametricPage() {
                     <>
                   <p className="text-[11px] text-zinc-500">Independent gradient overlay separate from texture and material.</p>
 
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Gradient Layers</p>
+                      <span className="text-[11px] text-zinc-500">{getSelectedGradientLayers().length} layer(s)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, getSelectedGradientLayers().length - 1)))}
+                        onChange={(e) => setActiveGradientLayerIndex(Number(e.target.value))}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      >
+                        {getSelectedGradientLayers().length === 0 ? <option value={0}>No layer</option> : null}
+                        {getSelectedGradientLayers().map((_layer, index) => (
+                          <option key={`gradient-layer-${index}`} value={index}>Layer {index + 1}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={addSelectedGradientLayer}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removeSelectedGradientLayer}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -3814,6 +4923,109 @@ export default function ParametricPage() {
                   ) : null}
                 </div>
 
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Mask (Data Model)</p>
+                  <p className="text-[11px] text-zinc-500">Optional mask payload. Backward compatible when disabled.</p>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isSelectedMaskEnabled()}
+                      onChange={(e) => setSelectedMaskEnabled(e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Enable mask model on this element</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Mask Mode</span>
+                    <select
+                      value={getSelectedMaskString('mode', 'brush')}
+                      onChange={(e) => setSelectedMaskString('mode', e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    >
+                      <option value="brush">brush</option>
+                      <option value="selection">selection</option>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isMaskBrushEditEnabled}
+                      onChange={(e) => setIsMaskBrushEditEnabled(e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Enable brush painting on preview</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Brush Action</span>
+                    <select
+                      value={maskBrushAction}
+                      onChange={(e) => setMaskBrushAction(e.target.value === 'reveal' ? 'reveal' : 'hide')}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    >
+                      <option value="hide">hide</option>
+                      <option value="reveal">reveal</option>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={getSelectedMaskBoolean('invert', false)}
+                      onChange={(e) => setSelectedMaskBoolean('invert', e.target.checked)}
+                    />
+                    <span className="text-[11px] text-zinc-400">Invert mask</span>
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Brush Size {Math.round(getSelectedMaskNumber('brush.size', 16))}</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={128}
+                      step={1}
+                      value={getSelectedMaskNumber('brush.size', 16)}
+                      onChange={(e) => setSelectedMaskNumber('brush.size', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Brush Hardness {getSelectedMaskNumber('brush.hardness', 0.8).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedMaskNumber('brush.hardness', 0.8)}
+                      onChange={(e) => setSelectedMaskNumber('brush.hardness', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Brush Opacity {getSelectedMaskNumber('brush.opacity', 1).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={getSelectedMaskNumber('brush.opacity', 1)}
+                      onChange={(e) => setSelectedMaskNumber('brush.opacity', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={clearSelectedMaskStrokes}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Clear Mask Strokes Payload
+                  </button>
+                </div>
+
                 <label className="block space-y-1">
                   <span className="text-[11px] text-zinc-400">Params JSON</span>
                   <textarea
@@ -3875,7 +5087,10 @@ export default function ParametricPage() {
               </div>
             ) : null}
           </aside>
+          ) : null}
         </div>
+
+
       </section>
     </main>
   );
