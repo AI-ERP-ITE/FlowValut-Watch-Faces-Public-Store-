@@ -408,6 +408,35 @@ const BLUR_MODE_OPTIONS = [
   { value: 'zoom', label: 'Zoom' },
   { value: 'soften', label: 'Soften' },
 ] as const;
+const BLEND_MODE_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'dissolve', label: 'Dissolve' },
+  { value: 'darken', label: 'Darken' },
+  { value: 'multiply', label: 'Multiply' },
+  { value: 'color-burn', label: 'Color Burn' },
+  { value: 'linear-burn', label: 'Linear Burn' },
+  { value: 'darker-color', label: 'Darker Color' },
+  { value: 'lighten', label: 'Lighten' },
+  { value: 'screen', label: 'Screen' },
+  { value: 'color-dodge', label: 'Color Dodge' },
+  { value: 'linear-dodge', label: 'Linear Dodge (Add)' },
+  { value: 'lighter-color', label: 'Lighter Color' },
+  { value: 'overlay', label: 'Overlay' },
+  { value: 'soft-light', label: 'Soft Light' },
+  { value: 'hard-light', label: 'Hard Light' },
+  { value: 'vivid-light', label: 'Vivid Light' },
+  { value: 'linear-light', label: 'Linear Light' },
+  { value: 'pin-light', label: 'Pin Light' },
+  { value: 'hard-mix', label: 'Hard Mix' },
+  { value: 'difference', label: 'Difference' },
+  { value: 'exclusion', label: 'Exclusion' },
+  { value: 'subtract', label: 'Subtract' },
+  { value: 'divide', label: 'Divide' },
+  { value: 'hue', label: 'Hue' },
+  { value: 'saturation', label: 'Saturation' },
+  { value: 'color', label: 'Color' },
+  { value: 'luminosity', label: 'Luminosity' },
+] as const;
 const TICK_TOKEN_MODE_OPTIONS = [
   { value: 'line', label: 'Line' },
   { value: 'number', label: 'Number' },
@@ -4549,11 +4578,15 @@ export default function ParametricPage() {
 
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Texture Blend Mode</span>
-                    <input
+                    <select
                       value={getSelectedTextureString('blendMode', 'overlay')}
                       onChange={(e) => setSelectedTextureString('blendMode', e.target.value)}
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                    />
+                    >
+                      {BLEND_MODE_OPTIONS.map((option) => (
+                        <option key={`texture-blend-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                   </label>
 
                   <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
@@ -4850,11 +4883,15 @@ export default function ParametricPage() {
 
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Blend Mode</span>
-                    <input
+                    <select
                       value={getSelectedGradientString('blendMode', 'overlay')}
                       onChange={(e) => setSelectedGradientString('blendMode', e.target.value)}
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                    />
+                    >
+                      {BLEND_MODE_OPTIONS.map((option) => (
+                        <option key={`gradient-blend-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                   </label>
 
                   <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
@@ -5145,11 +5182,15 @@ export default function ParametricPage() {
 
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Blend Mode</span>
-                    <input
+                    <select
                       value={getSelectedMaterialString('blendMode', 'multiply')}
                       onChange={(e) => setSelectedMaterialString('blendMode', e.target.value)}
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                    />
+                    >
+                      {BLEND_MODE_OPTIONS.map((option) => (
+                        <option key={`material-blend-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                   </label>
 
                   <label className="flex items-center gap-2">

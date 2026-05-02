@@ -9,6 +9,44 @@ import { applySymmetry } from "./symmetry.js";
 const COLOR_KEYS = new Set(["fill", "stroke", "color", "stopColor", "shadowColor", "highlightColor"]);
 const GRADIENT_KEYS = new Set(["gradientStops", "stops"]);
 const BLUR_TYPES = new Set(["gaussian", "directional", "radial", "zoom", "soften"]);
+const SUPPORTED_BLEND_MODES = new Set([
+	"normal",
+	"multiply",
+	"screen",
+	"overlay",
+	"darken",
+	"lighten",
+	"color-dodge",
+	"color-burn",
+	"hard-light",
+	"soft-light",
+	"difference",
+	"exclusion",
+	"hue",
+	"saturation",
+	"color",
+	"luminosity",
+	"plus-darker",
+	"plus-lighter",
+]);
+
+const BLEND_MODE_ALIASES = {
+	"colour-dodge": "color-dodge",
+	"colour-burn": "color-burn",
+	"darker-color": "darken",
+	"lighter-color": "lighten",
+	"linear-dodge": "plus-lighter",
+	"add": "plus-lighter",
+	"linear-burn": "plus-darker",
+	"subtract": "plus-darker",
+	"divide": "screen",
+	"dissolve": "normal",
+	"vivid-light": "hard-light",
+	"linear-light": "overlay",
+	"pin-light": "hard-light",
+	"hard-mix": "difference",
+	"pass-through": "normal",
+};
 
 function requireObject(value, label) {
 	if (!value || typeof value !== "object") {
@@ -21,6 +59,16 @@ function clamp(value, min, max, fallback) {
 	const n = Number(value);
 	if (!Number.isFinite(n)) return fallback;
 	return Math.max(min, Math.min(max, n));
+}
+
+function normalizeBlendMode(value, fallback = "normal") {
+	const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
+	if (!raw) return fallback;
+	const canonical = raw.replace(/[\s_]+/g, "-");
+	const resolved = BLEND_MODE_ALIASES[canonical] || canonical;
+	if (SUPPORTED_BLEND_MODES.has(resolved)) return resolved;
+	const normalizedFallback = typeof fallback === "string" ? fallback : "normal";
+	return SUPPORTED_BLEND_MODES.has(normalizedFallback) ? normalizedFallback : "normal";
 }
 
 function normalizeBlur(source = {}, fallback = {}) {
@@ -182,9 +230,7 @@ function normalizeTexture(source = {}, fallback = {}) {
 	return {
 		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
 		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.22),
-		blendMode: typeof src.blendMode === "string"
-			? src.blendMode
-			: (typeof fallback.blendMode === "string" ? fallback.blendMode : "overlay"),
+		blendMode: normalizeBlendMode(src.blendMode, normalizeBlendMode(fallback.blendMode, "overlay")),
 		gradient: {
 			from: [clamp(from[0], -100, 200, 0), clamp(from[1], -100, 200, 0)],
 			to: [clamp(to[0], -100, 200, 100), clamp(to[1], -100, 200, 100)],
@@ -222,9 +268,7 @@ function normalizeGradientOverlay(source = {}, fallback = {}) {
 	return {
 		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
 		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.24),
-		blendMode: typeof src.blendMode === "string"
-			? src.blendMode
-			: (typeof fallback.blendMode === "string" ? fallback.blendMode : "overlay"),
+		blendMode: normalizeBlendMode(src.blendMode, normalizeBlendMode(fallback.blendMode, "overlay")),
 		from: [clamp(from[0], -100, 200, 0), clamp(from[1], -100, 200, 0)],
 		to: [clamp(to[0], -100, 200, 100), clamp(to[1], -100, 200, 100)],
 		stops,
@@ -250,9 +294,7 @@ function normalizeMaterialOverlay(source = {}, fallback = {}) {
 			? src.color
 			: (typeof fallback.color === "string" ? fallback.color : "#ffffff"),
 		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.18),
-		blendMode: typeof src.blendMode === "string"
-			? src.blendMode
-			: (typeof fallback.blendMode === "string" ? fallback.blendMode : "multiply"),
+		blendMode: normalizeBlendMode(src.blendMode, normalizeBlendMode(fallback.blendMode, "multiply")),
 		clip: {
 			enabled: clip.enabled === true || fallbackClip.enabled === true,
 			inheritPrevious: clip.inheritPrevious === true || fallbackClip.inheritPrevious === true,
