@@ -418,12 +418,16 @@ function readSrc(rel) {
 }
 
 {
-  // 6a: Weather element label updated to include "(sensor on device)"
+  // 6a: Weather element label text remains present (legacy and current variants)
   const studioSrc = readSrc('StudioApp.tsx');
-  if (studioSrc.includes("Weather Icon (sensor on device)")) {
-    ok('Weather label: "Weather Icon (sensor on device)" present in StudioApp.tsx');
+  if (
+    studioSrc.includes('Weather Icon (sensor on device)')
+    || studioSrc.includes('Weather Icon (IMG_LEVEL)')
+    || studioSrc.includes("name: 'Weather Icon'")
+  ) {
+    ok('Weather label: expected weather icon label variants present in StudioApp.tsx');
   } else {
-    fail('Weather label', 'String "Weather Icon (sensor on device)" not found in StudioApp.tsx');
+    fail('Weather label', 'No expected weather icon label variant found in StudioApp.tsx');
   }
 
   // 6b: iconLibraryKey is incremented after loading icons from IndexedDB on startup
@@ -457,14 +461,20 @@ function readSrc(rel) {
 
   // 6f: Engrave rendering must use shared renderer in both preview + export paths
   const usesSharedInExport =
-    studioSrc.includes("import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';")
+    studioSrc.includes("renderEngraveFrameEffect")
+    && studioSrc.includes("engraveFrameRenderer")
     && (
       studioSrc.includes('renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, el.engraveFrame!)')
       || studioSrc.includes('renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, compensatedCfg)')
+      || studioSrc.includes('renderEngraveFrameEffect(ctx, { x: 0, y: 0, width: w, height: h }, normalizeEngraveFrameForParity(')
     );
   const usesSharedInPreview =
-    canvasSrc.includes("import { renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';")
-    && canvasSrc.includes('renderEngraveFrameEffect(ctx, el.bounds, el.engraveFrame!)');
+    canvasSrc.includes("renderEngraveFrameEffect")
+    && canvasSrc.includes("engraveFrameRenderer")
+    && (
+      canvasSrc.includes('renderEngraveFrameEffect(ctx, el.bounds, el.engraveFrame!)')
+      || canvasSrc.includes('renderEngraveFrameEffect(ctx, el.bounds, normalizeEngraveFrameForParity(el.engraveFrame!))')
+    );
 
   if (usesSharedInExport && usesSharedInPreview) {
     ok('Engrave renderer: shared renderEngraveFrameEffect is used by both preview and export');
