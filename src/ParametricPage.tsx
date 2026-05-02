@@ -2057,6 +2057,61 @@ export default function ParametricPage() {
 
   const getColorParam = (path: string, fallback: string) => normalizeColorHex(getStringParam(path, fallback), fallback);
 
+  const resolveElementColorTarget = (elementType: string, params: Record<string, unknown>) => {
+    const fillRaw = typeof params.fill === 'string' ? params.fill.trim() : '';
+    const strokeRaw = typeof params.stroke === 'string' ? params.stroke.trim() : '';
+    const hasFill = fillRaw.length > 0;
+    const hasStroke = strokeRaw.length > 0;
+    const fillVisible = hasFill && fillRaw.toLowerCase() !== 'none';
+
+    if (elementType === 'base') return 'fill';
+    if (elementType === 'ring' || elementType === 'bezel' || elementType === 'outline_ring' || elementType === 'ticks_radial' || elementType === 'radialTicks') {
+      if (hasStroke) return 'stroke';
+      if (hasFill) return 'fill';
+      return 'stroke';
+    }
+
+    if (fillVisible) return 'fill';
+    if (hasStroke) return 'stroke';
+    if (hasFill) return 'fill';
+    return 'fill';
+  };
+
+  const getSelectedElementColor = () => {
+    if (!selectedElement) return '#ffffff';
+    const params = selectedElement.params && typeof selectedElement.params === 'object'
+      ? selectedElement.params as Record<string, unknown>
+      : {};
+    const semanticRaw = typeof params.color === 'string' ? params.color : '';
+    const semanticColor = normalizeColorHex(semanticRaw, '');
+    if (semanticColor) return semanticColor;
+
+    const selectedType = typeof selectedElement.type === 'string' ? selectedElement.type : '';
+    const target = resolveElementColorTarget(selectedType, params);
+    const fallbackRaw = target === 'stroke'
+      ? (typeof params.stroke === 'string' ? params.stroke : '#ffffff')
+      : (typeof params.fill === 'string' ? params.fill : '#ffffff');
+    return normalizeColorHex(fallbackRaw, '#ffffff');
+  };
+
+  const setSelectedElementColor = (value: string) => {
+    if (!selectedElement) return;
+    const normalized = normalizeColorHex(value, '#ffffff');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const params = element.params && typeof element.params === 'object'
+          ? deepClone(element.params) as Record<string, unknown>
+          : {};
+        params.color = normalized;
+        const elementType = typeof element.type === 'string' ? element.type : '';
+        const target = resolveElementColorTarget(elementType, params);
+        params[target] = normalized;
+        return { ...element, params };
+      }),
+    );
+  };
+
   const isSelectedType = (...types: string[]) => {
     if (!selectedElement || typeof selectedElement.type !== 'string') return false;
     return types.includes(selectedElement.type);
@@ -5296,6 +5351,23 @@ export default function ParametricPage() {
                       onChange={(e) => setSelectedStyleAdjustNumber('hue', Number(e.target.value))}
                       className="w-full"
                     />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Color</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={getSelectedElementColor()}
+                        onChange={(e) => setSelectedElementColor(e.target.value)}
+                        className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
+                      />
+                      <input
+                        value={getSelectedElementColor()}
+                        onChange={(e) => setSelectedElementColor(e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
+                    </div>
                   </label>
 
                   <label className="block space-y-1">
