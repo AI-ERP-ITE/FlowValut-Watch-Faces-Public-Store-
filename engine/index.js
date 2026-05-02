@@ -9,7 +9,7 @@ import { compose } from "./core/composer.js";
 import { renderSvg } from "./core/renderer.js";
 import { applyRelationships } from "./core/relationships.js";
 import { registerElement } from "./elements/elementRegistry.js";
-import { DEFAULT_COLOR_CONTROL_CONFIG } from "./color/colorController.js";
+import { clearColorCaches, DEFAULT_COLOR_CONTROL_CONFIG } from "./color/colorController.js";
 
 import { circleElement } from "./elements/baseElements/circle.js";
 import { ringElement } from "./elements/baseElements/ring.js";
@@ -97,6 +97,8 @@ export function runEngine({ activeStyle = "gold_dark", paramOverrides = {}, colo
 export function getTemplateSnapshot() {
 	return JSON.parse(JSON.stringify(template));
 }
+
+export { clearColorCaches };
 
 const isDirectNodeRun =
 	typeof process !== "undefined" &&

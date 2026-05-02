@@ -61,6 +61,56 @@ function clamp(value, min, max, fallback) {
 	return Math.max(min, Math.min(max, n));
 }
 
+const RECT_LAYOUT_ADAPTIVE_TYPES = new Set([
+	"ring",
+	"bezel",
+	"ticks_radial",
+	"radialTicks",
+	"circle",
+	"outline_ring",
+	"outline_rect",
+	"free_rect",
+	"rect",
+]);
+
+function resolveRectLayoutReshape(element, context = {}) {
+	const layout = context?.layoutMetrics || {};
+	const shape = typeof layout.shape === "string" ? layout.shape : "circle";
+	if (shape !== "rectangle" && shape !== "rect") {
+		return { enabled: false, sx: 1, sy: 1 };
+	}
+
+	const width = Number(layout.width);
+	const height = Number(layout.height);
+	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+		return { enabled: false, sx: 1, sy: 1 };
+	}
+
+	const safeElement = element && typeof element === "object" ? element : {};
+	const elementType = typeof safeElement.type === "string" ? safeElement.type : "";
+	const params = safeElement.params && typeof safeElement.params === "object" ? safeElement.params : {};
+	const userShapeLink = params.layoutShapeLink;
+	const shouldAutoLink = typeof userShapeLink === "boolean" ? userShapeLink : RECT_LAYOUT_ADAPTIVE_TYPES.has(elementType);
+	if (!shouldAutoLink) {
+		return { enabled: false, sx: 1, sy: 1 };
+	}
+
+	const minAxis = Math.max(1, Math.min(width, height));
+	const targetSx = width / minAxis;
+	const targetSy = height / minAxis;
+	const reshapeStrength = clamp(params.layoutShapeStrength, 0, 1, 1);
+	const manualSx = clamp(params.layoutShapeScaleX, 0.25, 4, 1);
+	const manualSy = clamp(params.layoutShapeScaleY, 0.25, 4, 1);
+	const sx = (1 + ((targetSx - 1) * reshapeStrength)) * manualSx;
+	const sy = (1 + ((targetSy - 1) * reshapeStrength)) * manualSy;
+
+	if (Math.abs(sx - 1) < 0.0001 && Math.abs(sy - 1) < 0.0001) {
+		return { enabled: false, sx: 1, sy: 1 };
+	}
+
+	return { enabled: true, sx, sy };
+}
+
 function normalizeBlendMode(value, fallback = "normal") {
 	const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
 	if (!raw) return fallback;
@@ -69,6 +119,23 @@ function normalizeBlendMode(value, fallback = "normal") {
 	if (SUPPORTED_BLEND_MODES.has(resolved)) return resolved;
 	const normalizedFallback = typeof fallback === "string" ? fallback : "normal";
 	return SUPPORTED_BLEND_MODES.has(normalizedFallback) ? normalizedFallback : "normal";
+}
+
+function normalizeGradientKind(value, fallback = "linear") {
+	const next = typeof value === "string" ? value.trim().toLowerCase() : "";
+	if (next === "radial" || next === "conic" || next === "linear") return next;
+	return fallback === "radial" || fallback === "conic" ? fallback : "linear";
+}
+
+function normalizeTextureKind(value, fallback = "grain") {
+	const next = typeof value === "string" ? value.trim() : "";
+	if (next === "noise" || next === "grain" || next === "brushed" || next === "fabric" || next === "paper" || next === "image" || next === "proceduralMap") {
+		return next;
+	}
+	if (fallback === "noise" || fallback === "brushed" || fallback === "fabric" || fallback === "paper" || fallback === "image" || fallback === "proceduralMap") {
+		return fallback;
+	}
+	return "grain";
 }
 
 function normalizeBlur(source = {}, fallback = {}) {
@@ -226,19 +293,44 @@ function normalizeTexture(source = {}, fallback = {}) {
 	const fallbackClip = fallback.clip && typeof fallback.clip === "object" ? fallback.clip : {};
 	const blur = src.blur && typeof src.blur === "object" ? src.blur : {};
 	const fallbackBlur = fallback.blur && typeof fallback.blur === "object" ? fallback.blur : {};
+	const kind = normalizeTextureKind(src.kind, normalizeTextureKind(fallback.kind, "grain"));
+	const image = src.image && typeof src.image === "object" ? src.image : {};
+	const fallbackImage = fallback.image && typeof fallback.image === "object" ? fallback.image : {};
+	const direction = clamp(src.direction, -180, 180, clamp(fallback.direction, -180, 180, 0));
+	const density = clamp(src.density, 0, 1, clamp(fallback.density, 0, 1, 0.5));
+	const fiber = clamp(src.fiber, 0, 1, clamp(fallback.fiber, 0, 1, 0.5));
+	const seedRaw = Number.isFinite(Number(src.seed)) ? Number(src.seed) : (Number.isFinite(Number(fallback.seed)) ? Number(fallback.seed) : 1);
+	const seed = Math.round(seedRaw);
 
 	return {
+		kind,
 		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
 		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.22),
 		blendMode: normalizeBlendMode(src.blendMode, normalizeBlendMode(fallback.blendMode, "overlay")),
 		gradient: {
+			kind: normalizeGradientKind(grad.kind, normalizeGradientKind(fallbackGrad.kind, "linear")),
 			from: [clamp(from[0], -100, 200, 0), clamp(from[1], -100, 200, 0)],
 			to: [clamp(to[0], -100, 200, 100), clamp(to[1], -100, 200, 100)],
+			center: [clamp(grad.center?.[0], -100, 200, clamp(fallbackGrad.center?.[0], -100, 200, 50)), clamp(grad.center?.[1], -100, 200, clamp(fallbackGrad.center?.[1], -100, 200, 50))],
+			focal: [clamp(grad.focal?.[0], -100, 200, clamp(fallbackGrad.focal?.[0], -100, 200, 50)), clamp(grad.focal?.[1], -100, 200, clamp(fallbackGrad.focal?.[1], -100, 200, 50))],
+			radius: clamp(grad.radius, 0, 200, clamp(fallbackGrad.radius, 0, 200, 50)),
+			angleStart: clamp(grad.angleStart, -360, 360, clamp(fallbackGrad.angleStart, -360, 360, 0)),
+			angleSpan: clamp(grad.angleSpan, 0, 360, clamp(fallbackGrad.angleSpan, 0, 360, 360)),
 			stops,
 		},
 		noise: {
 			amount: clamp(noise.amount, 0, 3, fallbackNoise.amount ?? fallbackLegacyAmount ?? legacyAmount ?? 0),
 			radius: clamp(noise.radius, 0.1, 320, fallbackNoise.radius ?? fallbackLegacyRadius ?? legacyRadius ?? 24),
+		},
+		direction,
+		density,
+		fiber,
+		seed,
+		image: {
+			offsetX: clamp(image.offsetX, -100, 100, clamp(fallbackImage.offsetX, -100, 100, 0)),
+			offsetY: clamp(image.offsetY, -100, 100, clamp(fallbackImage.offsetY, -100, 100, 0)),
+			scale: clamp(image.scale, 0.1, 5, clamp(fallbackImage.scale, 0.1, 5, 1)),
+			rotation: clamp(image.rotation, -180, 180, clamp(fallbackImage.rotation, -180, 180, 0)),
 		},
 		blur: normalizeBlur(blur, fallbackBlur),
 		clip: {
@@ -269,8 +361,14 @@ function normalizeGradientOverlay(source = {}, fallback = {}) {
 		enabled: src.enabled !== false && (src.enabled === true || fallback.enabled === true),
 		opacity: clamp(src.opacity, 0, 1, fallback.opacity ?? 0.24),
 		blendMode: normalizeBlendMode(src.blendMode, normalizeBlendMode(fallback.blendMode, "overlay")),
+		kind: normalizeGradientKind(src.kind, normalizeGradientKind(fallback.kind, "linear")),
 		from: [clamp(from[0], -100, 200, 0), clamp(from[1], -100, 200, 0)],
 		to: [clamp(to[0], -100, 200, 100), clamp(to[1], -100, 200, 100)],
+		center: [clamp(src.center?.[0], -100, 200, clamp(fallback.center?.[0], -100, 200, 50)), clamp(src.center?.[1], -100, 200, clamp(fallback.center?.[1], -100, 200, 50))],
+		focal: [clamp(src.focal?.[0], -100, 200, clamp(fallback.focal?.[0], -100, 200, 50)), clamp(src.focal?.[1], -100, 200, clamp(fallback.focal?.[1], -100, 200, 50))],
+		radius: clamp(src.radius, 0, 200, clamp(fallback.radius, 0, 200, 50)),
+		angleStart: clamp(src.angleStart, -360, 360, clamp(fallback.angleStart, -360, 360, 0)),
+		angleSpan: clamp(src.angleSpan, 0, 360, clamp(fallback.angleSpan, 0, 360, 360)),
 		stops,
 		blur: normalizeBlur(blur, fallbackBlur),
 		clip: {
@@ -307,8 +405,21 @@ function normalizeMaterialOverlay(source = {}, fallback = {}) {
 
 function normalizeDepthEffect(source = {}, fallback = null) {
 	const src = source && typeof source === "object" ? source : {};
-	const base = fallback || { enabled: false, intensity: 0, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 };
-	const enabled = src.enabled !== false && base.enabled;
+	const defaultAngleDeg = -35;
+	const defaultDistance = 1.2;
+	const defaultRadians = (defaultAngleDeg * Math.PI) / 180;
+	const defaultBase = {
+		enabled: false,
+		intensity: 0.46,
+		dx: Math.cos(defaultRadians) * defaultDistance,
+		dy: Math.sin(defaultRadians) * defaultDistance,
+		falloff: 1,
+		whiteBalance: 0,
+		spread: 0,
+	};
+	const base = fallback && typeof fallback === "object" ? { ...defaultBase, ...fallback } : defaultBase;
+	const hasExplicitEnabled = Object.prototype.hasOwnProperty.call(src, "enabled");
+	const enabled = hasExplicitEnabled ? src.enabled === true : base.enabled;
 	const intensity = clamp(src.intensity, 0, 1, base.intensity);
 	const angleDeg = Number.isFinite(Number(src.angle)) ? Number(src.angle) : null;
 	const distance = clamp(src.distance, 0, 6, Math.sqrt(base.dx * base.dx + base.dy * base.dy));
@@ -400,6 +511,148 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect) {
 	return parts.join("");
 }
 
+function asGradientPoint(value, fallbackX, fallbackY) {
+	if (!Array.isArray(value)) return [fallbackX, fallbackY];
+	return [
+		clamp(value[0], -100, 200, fallbackX),
+		clamp(value[1], -100, 200, fallbackY),
+	];
+}
+
+function buildGradientDefinition(gradientId, gradientModel, stopsMarkup) {
+	const model = gradientModel && typeof gradientModel === "object" ? gradientModel : {};
+	const kind = normalizeGradientKind(model.kind, "linear");
+	const from = asGradientPoint(model.from, 0, 0);
+	const to = asGradientPoint(model.to, 100, 100);
+	const center = asGradientPoint(model.center, 50, 50);
+	const focal = asGradientPoint(model.focal, center[0], center[1]);
+	const radius = clamp(model.radius, 0, 200, 50);
+	const angleStart = clamp(model.angleStart, -360, 360, 0);
+	const angleSpan = clamp(model.angleSpan, 0, 360, 360);
+
+	if (kind === "radial") {
+		return `<radialGradient id="${gradientId}" cx="${center[0]}%" cy="${center[1]}%" r="${radius}%" fx="${focal[0]}%" fy="${focal[1]}%">${stopsMarkup}</radialGradient>`;
+	}
+
+	if (kind === "conic") {
+		// SVG has no native conic gradient; map conic controls onto a deterministic linear adapter.
+		const spanFactor = Math.max(0.05, angleSpan / 360);
+		const radians = (angleStart * Math.PI) / 180;
+		const dx = Math.cos(radians) * 50 * spanFactor;
+		const dy = Math.sin(radians) * 50 * spanFactor;
+		const x1 = clamp(center[0] - dx, -100, 200, 0);
+		const y1 = clamp(center[1] - dy, -100, 200, 0);
+		const x2 = clamp(center[0] + dx, -100, 200, 100);
+		const y2 = clamp(center[1] + dy, -100, 200, 100);
+		return `<linearGradient id="${gradientId}" x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%">${stopsMarkup}</linearGradient>`;
+	}
+
+	return `<linearGradient id="${gradientId}" x1="${from[0]}%" y1="${from[1]}%" x2="${to[0]}%" y2="${to[1]}%">${stopsMarkup}</linearGradient>`;
+}
+
+function applyGradientTransform(definition, transform) {
+	if (typeof definition !== "string" || definition.length === 0) return definition;
+	return definition.replace(/<(linearGradient|radialGradient)\s+id="([^"]+)"/, `<$1 id="$2" gradientTransform="${transform}"`);
+}
+
+function buildTextureGradientDefinition(gradientId, texture, stopsMarkup) {
+	const model = texture && typeof texture === "object" ? texture : {};
+	const gradient = model.gradient && typeof model.gradient === "object" ? model.gradient : {};
+	const kind = normalizeTextureKind(model.kind, "grain");
+
+	if (kind === "brushed") {
+		const direction = clamp(model.direction, -180, 180, 0);
+		const radians = (direction * Math.PI) / 180;
+		const dx = Math.cos(radians) * 50;
+		const dy = Math.sin(radians) * 50;
+		const brushedGradient = {
+			...gradient,
+			kind: "linear",
+			from: [50 - dx, 50 - dy],
+			to: [50 + dx, 50 + dy],
+		};
+		return buildGradientDefinition(gradientId, brushedGradient, stopsMarkup);
+	}
+
+	const baseDefinition = buildGradientDefinition(gradientId, gradient, stopsMarkup);
+	if (kind !== "image") return baseDefinition;
+
+	const image = model.image && typeof model.image === "object" ? model.image : {};
+	const offsetX = clamp(image.offsetX, -100, 100, 0);
+	const offsetY = clamp(image.offsetY, -100, 100, 0);
+	const scale = clamp(image.scale, 0.1, 5, 1);
+	const rotation = clamp(image.rotation, -180, 180, 0);
+	const transform = `translate(${offsetX} ${offsetY}) rotate(${rotation} 50 50) scale(${scale})`;
+	return applyGradientTransform(baseDefinition, transform);
+}
+
+function buildTextureKindPrimitives(texture, inputRef) {
+	const kind = normalizeTextureKind(texture.kind, "grain");
+	const noiseAmount = clamp(texture.noise?.amount, 0, 3, 0);
+	const noiseRadius = clamp(texture.noise?.radius, 0.1, 320, 24);
+	const parts = [];
+	let chain = inputRef;
+
+	if (kind === "noise" || kind === "grain") {
+		if (noiseAmount > 0) {
+			const frequency = (1 / noiseRadius).toFixed(4);
+			const alpha = clamp(noiseAmount, 0, 1, 0).toFixed(3);
+			parts.push(`<feTurbulence type="fractalNoise" baseFrequency="${frequency}" numOctaves="2" seed="7" result="grain" />`);
+			parts.push(`<feColorMatrix in="grain" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0" result="grainAlpha" />`);
+			parts.push(`<feBlend in="${chain}" in2="grainAlpha" mode="overlay" result="texture-grain" />`);
+			chain = "texture-grain";
+		}
+		return { parts, result: chain };
+	}
+
+	if (kind === "brushed") {
+		const frequency = (1 / Math.max(8, noiseRadius * 1.8)).toFixed(4);
+		const alpha = clamp(noiseAmount, 0, 1, 0.24).toFixed(3);
+		parts.push(`<feTurbulence type="fractalNoise" baseFrequency="${frequency}" numOctaves="3" seed="11" result="brushedNoise" />`);
+		parts.push(`<feColorMatrix in="brushedNoise" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0" result="brushedAlpha" />`);
+		parts.push(`<feBlend in="${chain}" in2="brushedAlpha" mode="overlay" result="texture-brushed" />`);
+		chain = "texture-brushed";
+		return { parts, result: chain };
+	}
+
+	if (kind === "fabric") {
+		const frequencyA = (1 / Math.max(10, noiseRadius * 2.1)).toFixed(4);
+		const frequencyB = (1 / Math.max(14, noiseRadius * 2.8)).toFixed(4);
+		const alpha = clamp(noiseAmount, 0, 1, 0.22).toFixed(3);
+		parts.push(`<feTurbulence type="fractalNoise" baseFrequency="${frequencyA}" numOctaves="2" seed="17" result="fabricA" />`);
+		parts.push(`<feTurbulence type="fractalNoise" baseFrequency="${frequencyB}" numOctaves="2" seed="23" result="fabricB" />`);
+		parts.push(`<feBlend in="fabricA" in2="fabricB" mode="multiply" result="fabricMix" />`);
+		parts.push(`<feColorMatrix in="fabricMix" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0" result="fabricAlpha" />`);
+		parts.push(`<feBlend in="${chain}" in2="fabricAlpha" mode="soft-light" result="texture-fabric" />`);
+		chain = "texture-fabric";
+		return { parts, result: chain };
+	}
+
+	if (kind === "paper") {
+		const frequency = (1 / Math.max(20, noiseRadius * 3.6)).toFixed(4);
+		const alpha = clamp(noiseAmount, 0, 0.8, 0.16).toFixed(3);
+		parts.push(`<feTurbulence type="fractalNoise" baseFrequency="${frequency}" numOctaves="1" seed="31" result="paperNoise" />`);
+		parts.push(`<feGaussianBlur in="paperNoise" stdDeviation="0.6" result="paperSoft" />`);
+		parts.push(`<feColorMatrix in="paperSoft" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0" result="paperAlpha" />`);
+		parts.push(`<feBlend in="${chain}" in2="paperAlpha" mode="multiply" result="texture-paper" />`);
+		chain = "texture-paper";
+		return { parts, result: chain };
+	}
+
+	if (kind === "proceduralMap") {
+		const seed = Math.round(Number.isFinite(Number(texture.seed)) ? Number(texture.seed) : 1);
+		const frequency = (1 / Math.max(6, noiseRadius * 1.5)).toFixed(4);
+		const alpha = clamp(noiseAmount, 0, 1, 0.28).toFixed(3);
+		parts.push(`<feTurbulence type="fractalNoise" baseFrequency="${frequency}" numOctaves="4" seed="${seed}" result="procNoise" />`);
+		parts.push(`<feColorMatrix in="procNoise" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0" result="procAlpha" />`);
+		parts.push(`<feBlend in="${chain}" in2="procAlpha" mode="hard-light" result="texture-proc" />`);
+		chain = "texture-proc";
+		return { parts, result: chain };
+	}
+
+	return { parts, result: chain };
+}
+
 function buildTextureDefs(localId, texture) {
 	if (!texture.enabled || texture.opacity <= 0) {
 		return { defs: "", gradientId: null, filterId: null };
@@ -417,18 +670,13 @@ function buildTextureDefs(localId, texture) {
 		})
 		.join("");
 
-	const gradientDef = `<linearGradient id=\"${gradientId}\" x1=\"${texture.gradient.from[0]}%\" y1=\"${texture.gradient.from[1]}%\" x2=\"${texture.gradient.to[0]}%\" y2=\"${texture.gradient.to[1]}%\">${stops}</linearGradient>`;
+	const gradientDef = buildTextureGradientDefinition(gradientId, texture, stops);
 
 	let chain = "SourceGraphic";
 	const filterParts = [];
-	if (texture.noise.amount > 0) {
-		const frequency = (1 / texture.noise.radius).toFixed(4);
-		const alpha = clamp(texture.noise.amount, 0, 1, 0).toFixed(3);
-		filterParts.push(`<feTurbulence type=\"fractalNoise\" baseFrequency=\"${frequency}\" numOctaves=\"2\" seed=\"7\" result=\"grain\" />`);
-		filterParts.push(`<feColorMatrix in=\"grain\" type=\"matrix\" values=\"1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0\" result=\"grainAlpha\" />`);
-		filterParts.push(`<feBlend in=\"${chain}\" in2=\"grainAlpha\" mode=\"overlay\" result=\"texture-noise\" />`);
-		chain = "texture-noise";
-	}
+	const kindPass = buildTextureKindPrimitives(texture, chain);
+	filterParts.push(...kindPass.parts);
+	chain = kindPass.result;
 
 	const blurPass = buildBlurPrimitives(chain, `texture-${localId}`, texture.blur || {});
 	filterParts.push(...blurPass.parts);
@@ -467,11 +715,11 @@ function buildGradientOverlayDefs(localId, gradient) {
 	const filterDef = filterId
 		? [`<filter id="${filterId}" x="-25%" y="-25%" width="150%" height="150%">`, ...blurPass.parts, `<feMerge><feMergeNode in="${blurPass.result}" /></feMerge>`, "</filter>"].join("")
 		: "";
-	const defs = `<linearGradient id="${gradientId}" x1="${gradient.from[0]}%" y1="${gradient.from[1]}%" x2="${gradient.to[0]}%" y2="${gradient.to[1]}%">${stops}</linearGradient>${filterDef}`;
+	const defs = `${buildGradientDefinition(gradientId, gradient, stops)}${filterDef}`;
 	return { defs, gradientId, filterId };
 }
 
-function resolveClipMaskBody(clipConfig, context, fallbackBody) {
+function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementName = "") {
 	if (!clipConfig || clipConfig.enabled !== true) return fallbackBody;
 
 	const explicitTarget = typeof clipConfig.targetName === "string" ? clipConfig.targetName.trim() : "";
@@ -480,6 +728,9 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody) {
 		: "";
 	const resolvedTarget = explicitTarget || inheritedTarget;
 	if (!resolvedTarget) return fallbackBody;
+	if (typeof currentElementName === "string" && currentElementName.trim().length > 0 && resolvedTarget === currentElementName.trim()) {
+		return fallbackBody;
+	}
 
 	const registry = context.layerMaskRegistry && typeof context.layerMaskRegistry === "object" ? context.layerMaskRegistry : {};
 	const targetBody = registry[resolvedTarget];
@@ -490,7 +741,7 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody) {
 	return fallbackBody;
 }
 
-function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, layoutMetrics, context = {}) {
+function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, layoutMetrics, context = {}, currentElementName = "") {
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect);
@@ -499,7 +750,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			layerTexture,
 			def: buildTextureDefs(`${localId}-texture-${index}`, layerTexture),
 			maskId: `${maskId}-texture-${index}`,
-			maskBody: resolveClipMaskBody(layerTexture.clip, context, body),
+			maskBody: resolveClipMaskBody(layerTexture.clip, context, body, currentElementName),
 		}))
 		: [];
 	const gradientDefs = Array.isArray(layerGradients)
@@ -507,14 +758,14 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			layerGradient,
 			def: buildGradientOverlayDefs(`${localId}-gradient-${index}`, layerGradient),
 			maskId: `${maskId}-gradient-${index}`,
-			maskBody: resolveClipMaskBody(layerGradient.clip, context, body),
+			maskBody: resolveClipMaskBody(layerGradient.clip, context, body, currentElementName),
 		}))
 		: [];
 	const materialDefs = Array.isArray(layerMaterials)
 		? layerMaterials.map((layerMaterial, index) => ({
 			layerMaterial,
 			maskId: `${maskId}-material-${index}`,
-			maskBody: resolveClipMaskBody(layerMaterial.clip, context, body),
+			maskBody: resolveClipMaskBody(layerMaterial.clip, context, body, currentElementName),
 		}))
 		: [];
 	const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
@@ -655,7 +906,11 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const x = (Number(position.x) / 100) * width;
 			const y = (Number(position.y) / 100) * height;
 			const rotation = Number.isFinite(Number(position.rotation)) ? Number(position.rotation) : 0;
-			const body = definition.render(renderParams, position, context);
+			const bodyRaw = definition.render(renderParams, position, context);
+			const reshape = resolveRectLayoutReshape(safeElement, context);
+			const body = reshape.enabled
+				? `<g transform=\"scale(${reshape.sx.toFixed(6)} ${reshape.sy.toFixed(6)})\">${bodyRaw}</g>`
+				: bodyRaw;
 			const worldBody = `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${body}</g>`;
 			if (typeof safeElement.name === "string" && safeElement.name.trim().length > 0 && context.layerMaskRegistry && typeof context.layerMaskRegistry === "object") {
 				context.layerMaskRegistry[safeElement.name.trim()] = worldBody;
@@ -723,7 +978,8 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					context.depthEffect,
 				);
 			const localId = `el-${elementIndex}-${positionIndex}`;
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, context.layoutMetrics, context);
+			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
+			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, context.layoutMetrics, context, currentElementName);
 		})
 		.join("");
 }

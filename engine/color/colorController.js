@@ -179,6 +179,18 @@ function normalizedKeyPath(metadata = {}) {
   return typeof metadata.keyPath === "string" ? metadata.keyPath.toLowerCase() : "";
 }
 
+function isShadowLikeKeyPath(metadata = {}) {
+  const key = normalizedKeyPath(metadata);
+  if (!key) return false;
+  return (
+    key.includes("shadow") ||
+    key.includes("shadows") ||
+    key.includes("ambient") ||
+    key.includes("occlusion") ||
+    key.includes("depth")
+  );
+}
+
 function applyAmazfitState(color, config) {
   const state = config.amazfit.state;
   if (state === "tapped_zepp3") return applyBrightness(color, config.amazfit.stateBrightness.tappedZepp3);
@@ -217,6 +229,7 @@ function contrastRatio(colorA, colorB) {
 
 function ensureContrast(color, config, metadata = {}) {
   if (!config.amazfit.contrast.enabled) return color;
+  if (isShadowLikeKeyPath(metadata)) return color;
   const key = normalizedKeyPath(metadata);
   const isBackground = config.amazfit.backgroundKeys.some((hint) => key === hint || key.endsWith(`.${hint}`));
   if (isBackground) return color;
@@ -337,11 +350,21 @@ function simulate(color, config, metadata = {}) {
 }
 
 function emitWarnings(lines = []) {
+  const emitted = [];
   for (const line of lines) {
     const message = `[WARNING] ${line}`;
     if (warningCache.has(message)) continue;
     warningCache.add(message);
     console.warn(message);
+    emitted.push(message);
+  }
+
+  if (emitted.length > 0 && typeof globalThis !== "undefined" && globalThis?.dispatchEvent) {
+    try {
+      globalThis.dispatchEvent(new CustomEvent("engine-color-warning", { detail: emitted }));
+    } catch {
+      // Ignore environments without CustomEvent support.
+    }
   }
 }
 

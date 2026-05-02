@@ -1,10 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getCurrentAuthUser, isFirebaseAuthConfigured, subscribeAuthState } from '@/lib/firebaseAuthClient';
 import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase } from '@/lib/studioFirebasePublishApi';
 import { FONT_STYLES } from '@/lib/fontLibrary';
+import {
+  normalizeLegacyGradientLayers,
+  normalizeLegacyMaterialLayers,
+  normalizeLegacyTextureLayers,
+  writeNormalizedGradientLayers,
+  writeNormalizedMaterialLayers,
+  writeNormalizedTextureLayers,
+} from '@/lib/effects/legacyEffectNormalization';
+import {
+  pushHistoryCommand,
+  redoHistory,
+  undoHistory,
+  type HistoryCommand,
+} from '@/lib/history/commandHistory';
 
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
@@ -53,9 +67,12 @@ type GroupedLibrarySection = {
   fallbackElement?: TemplateElement;
 };
 
+type TemplateCommand = HistoryCommand<TemplateModel>;
+
 const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
 const PARAMETRIC_LIBRARY_STORAGE_KEY = 'parametric-element-library-v1';
 const PARAMETRIC_THEME_STORAGE_KEY = 'parametric-theme-library-v1';
+const PARAMETRIC_HISTORY_STORAGE_KEY = 'parametric-template-history-v1';
 
 const DEFAULT_COLOR_CONTROL = {
   colorControl: {
@@ -119,7 +136,7 @@ const SAMPLE_LIBRARY: Array<LibraryEntry> = [
           locale: 'en',
           numberingSystem: '',
           offset: 0.012,
-          number: { start: 1, step: 1, pad: 0 },
+          number: { start: 12, step: 1, pad: 0 },
           text: { value: '', values: '' },
           icon: { key: 'dot', glyph: '' },
           font: { styleKey: 'arial', family: 'Segoe UI Symbol, Arial', weight: 'bold', size: 0.06, fill: '#ffffff' },
@@ -408,6 +425,20 @@ const BLUR_MODE_OPTIONS = [
   { value: 'zoom', label: 'Zoom' },
   { value: 'soften', label: 'Soften' },
 ] as const;
+const GRADIENT_KIND_OPTIONS = [
+  { value: 'linear', label: 'Linear' },
+  { value: 'radial', label: 'Radial' },
+  { value: 'conic', label: 'Conic' },
+] as const;
+const TEXTURE_KIND_OPTIONS = [
+  { value: 'grain', label: 'Grain' },
+  { value: 'noise', label: 'Noise' },
+  { value: 'brushed', label: 'Brushed' },
+  { value: 'fabric', label: 'Fabric' },
+  { value: 'paper', label: 'Paper' },
+  { value: 'image', label: 'Image' },
+  { value: 'proceduralMap', label: 'Procedural Map' },
+] as const;
 const BLEND_MODE_OPTIONS = [
   { value: 'normal', label: 'Normal' },
   { value: 'dissolve', label: 'Dissolve' },
@@ -569,7 +600,8 @@ export default function ParametricPage() {
   const [activeTextureLayerIndex, setActiveTextureLayerIndex] = useState(0);
   const [activeGradientLayerIndex, setActiveGradientLayerIndex] = useState(0);
   const [activeMaterialLayerIndex, setActiveMaterialLayerIndex] = useState(0);
-  const [draggingGradientHandle, setDraggingGradientHandle] = useState<null | 'from' | 'to'>(null);
+  const [draggingGradientHandle, setDraggingGradientHandle] = useState<null | 'from' | 'to' | 'center' | 'focal' | 'radius' | 'angle'>(null);
+  const [draggingTextureHandle, setDraggingTextureHandle] = useState<null | 'direction' | 'imageOffset' | 'imageScale' | 'imageRotation'>(null);
   const [draggingOffsetHandle, setDraggingOffsetHandle] = useState(false);
   const [draggingRadiusHandle, setDraggingRadiusHandle] = useState(false);
   const [isMaskBrushEditEnabled, setIsMaskBrushEditEnabled] = useState(false);
@@ -637,7 +669,69 @@ export default function ParametricPage() {
   const [svgOverlayMarkup, setSvgOverlayMarkup] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyTick, setHistoryTick] = useState(0);
+  const historyPastRef = useRef<Array<TemplateCommand>>([]);
+  const historyFutureRef = useRef<Array<TemplateCommand>>([]);
+  const isHistoryApplyingRef = useRef(false);
+  const isDragHistoryBatchRef = useRef(false);
+  const dragBatchBeforeRef = useRef<TemplateModel | null>(null);
+  const dragBatchLabelRef = useRef('Canvas drag');
   const authConfigured = isFirebaseAuthConfigured();
+
+  const getTemplateFingerprint = useCallback((template: TemplateModel | null): string => {
+    if (!template) return 'null';
+    return JSON.stringify(template);
+  }, []);
+
+  const clearCommandHistory = useCallback(() => {
+    historyPastRef.current = [];
+    historyFutureRef.current = [];
+    isDragHistoryBatchRef.current = false;
+    dragBatchBeforeRef.current = null;
+    dragBatchLabelRef.current = 'Canvas drag';
+    setHistoryTick((value) => value + 1);
+  }, []);
+
+  const restoreCommandHistoryForTemplate = useCallback((template: TemplateModel | null) => {
+    try {
+      const raw = window.sessionStorage.getItem(PARAMETRIC_HISTORY_STORAGE_KEY);
+      if (!raw) {
+        clearCommandHistory();
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as {
+        fingerprint?: string;
+        past?: Array<TemplateCommand>;
+        future?: Array<TemplateCommand>;
+      };
+
+      if (!parsed || typeof parsed !== 'object') {
+        clearCommandHistory();
+        return;
+      }
+
+      if (typeof parsed.fingerprint !== 'string' || parsed.fingerprint !== getTemplateFingerprint(template)) {
+        clearCommandHistory();
+        return;
+      }
+
+      const past = Array.isArray(parsed.past) ? parsed.past.filter((item) => item && typeof item === 'object') : [];
+      const future = Array.isArray(parsed.future) ? parsed.future.filter((item) => item && typeof item === 'object') : [];
+
+      historyPastRef.current = past;
+      historyFutureRef.current = future;
+      isDragHistoryBatchRef.current = false;
+      dragBatchBeforeRef.current = null;
+      dragBatchLabelRef.current = 'Canvas drag';
+      setHistoryTick((value) => value + 1);
+    } catch {
+      clearCommandHistory();
+    }
+  }, [clearCommandHistory, getTemplateFingerprint]);
+
+  const canUndo = historyTick >= 0 && historyPastRef.current.length > 0;
+  const canRedo = historyTick >= 0 && historyFutureRef.current.length > 0;
 
   const selectedIndex = useMemo(() => {
     if (!workingTemplate || !selectedElementId) return -1;
@@ -870,6 +964,7 @@ export default function ParametricPage() {
     } as TemplateModel;
 
     setWorkingTemplate(template);
+    clearCommandHistory();
     saveTemplate(template);
     setSelectedElementId(template.elements[0]?.id ?? null);
     setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
@@ -993,6 +1088,7 @@ export default function ParametricPage() {
       // @ts-expect-error runtime import has no TS metadata in this path.
       const engineModule = (await import('../engine/index.js')) as {
         getTemplateSnapshot: () => TemplateModel;
+        clearColorCaches?: () => void;
         runEngine: (args?: {
           activeStyle?: StyleKey;
           paramOverrides?: Record<string, Record<string, number>>;
@@ -1000,6 +1096,22 @@ export default function ParametricPage() {
           colorControl?: typeof DEFAULT_COLOR_CONTROL;
         }) => string;
       };
+
+      const colorWarnings: string[] = [];
+      const warningHandler = (event: Event) => {
+        const custom = event as CustomEvent<string[]>;
+        const payload = Array.isArray(custom.detail) ? custom.detail : [];
+        for (const line of payload) {
+          if (typeof line === 'string' && line.trim().length > 0) {
+            colorWarnings.push(line);
+          }
+        }
+      };
+
+      window.addEventListener('engine-color-warning', warningHandler as EventListener);
+      engineModule.clearColorCaches?.();
+
+      try {
 
       const template = templateOverride ?? workingTemplate ?? loadStoredTemplate() ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
       const visibleElements = (template.elements ?? []).filter((element) => element.visible !== false);
@@ -1074,6 +1186,15 @@ export default function ParametricPage() {
       } else {
         setSvgOverlayMarkup(null);
       }
+      } finally {
+        window.removeEventListener('engine-color-warning', warningHandler as EventListener);
+      }
+
+      if (colorMode === 'warning' && colorWarnings.length > 0) {
+        const first = colorWarnings[0].replace(/^\[WARNING\]\s*/i, '');
+        const more = colorWarnings.length > 1 ? ` (+${colorWarnings.length - 1} more)` : '';
+        setEditorNotice(`Color warning: ${first}${more}`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to render preview.');
       setSvgOverlayMarkup(null);
@@ -1082,57 +1203,176 @@ export default function ParametricPage() {
     }
   }, [colorMode, isDimMode, isSoloMode, selectedElementId, workingTemplate]);
 
-  const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>) => {
+  const applyTemplateCommand = useCallback((label: string, updater: (prev: TemplateModel) => TemplateModel) => {
     let nextTemplate: TemplateModel | null = null;
+    let didChange = false;
     setWorkingTemplate((prev) => {
       if (!prev) return prev;
-      const next = {
-        ...prev,
-        elements: updater(prev.elements),
-      };
+      const before = deepClone(prev);
+      const next = updater(prev);
+      const beforeSerialized = JSON.stringify(before);
+      const afterSerialized = JSON.stringify(next);
+      if (beforeSerialized === afterSerialized) {
+        return prev;
+      }
+      didChange = true;
       nextTemplate = next;
       saveTemplate(next);
+
+      if (!isHistoryApplyingRef.current && !isDragHistoryBatchRef.current) {
+        const nextStacks = pushHistoryCommand(historyPastRef.current, {
+          id: makeId('cmd'),
+          label,
+          before,
+          after: deepClone(next),
+          createdAt: Date.now(),
+        });
+        historyPastRef.current = nextStacks.past;
+        historyFutureRef.current = nextStacks.future;
+      }
       return next;
     });
     if (nextTemplate) {
       void renderPreview(nextTemplate);
     }
+    if (didChange && !isDragHistoryBatchRef.current) {
+      setHistoryTick((value) => value + 1);
+    }
+  }, [renderPreview]);
+
+  const runUndoCommand = useCallback(() => {
+    const result = undoHistory(historyPastRef.current, historyFutureRef.current);
+    if (!result.template) return;
+    historyPastRef.current = result.stacks.past;
+    historyFutureRef.current = result.stacks.future;
+    isHistoryApplyingRef.current = true;
+    setWorkingTemplate(result.template);
+    saveTemplate(result.template);
+    void renderPreview(result.template);
+    isHistoryApplyingRef.current = false;
+    setHistoryTick((value) => value + 1);
+  }, [renderPreview]);
+
+  const runRedoCommand = useCallback(() => {
+    const result = redoHistory(historyPastRef.current, historyFutureRef.current);
+    if (!result.template) return;
+    historyPastRef.current = result.stacks.past;
+    historyFutureRef.current = result.stacks.future;
+    isHistoryApplyingRef.current = true;
+    setWorkingTemplate(result.template);
+    saveTemplate(result.template);
+    void renderPreview(result.template);
+    isHistoryApplyingRef.current = false;
+    setHistoryTick((value) => value + 1);
+  }, [renderPreview]);
+
+  useEffect(() => {
+    const isAnyHandleDragActive = draggingGradientHandle !== null
+      || draggingTextureHandle !== null
+      || draggingOffsetHandle
+      || draggingRadiusHandle;
+
+    if (isAnyHandleDragActive) {
+      if (!isDragHistoryBatchRef.current && workingTemplate) {
+        isDragHistoryBatchRef.current = true;
+        dragBatchBeforeRef.current = deepClone(workingTemplate);
+        if (draggingGradientHandle) {
+          dragBatchLabelRef.current = `Drag gradient ${draggingGradientHandle}`;
+        } else if (draggingTextureHandle) {
+          dragBatchLabelRef.current = `Drag texture ${draggingTextureHandle}`;
+        } else if (draggingOffsetHandle) {
+          dragBatchLabelRef.current = 'Drag element offset';
+        } else if (draggingRadiusHandle) {
+          dragBatchLabelRef.current = 'Drag element radius';
+        } else {
+          dragBatchLabelRef.current = 'Canvas drag';
+        }
+      }
+      return;
+    }
+
+    if (!isDragHistoryBatchRef.current) return;
+
+    const before = dragBatchBeforeRef.current;
+    const after = workingTemplate;
+    isDragHistoryBatchRef.current = false;
+    dragBatchBeforeRef.current = null;
+
+    if (!before || !after) return;
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+
+    const nextStacks = pushHistoryCommand(historyPastRef.current, {
+      id: makeId('cmd'),
+      label: dragBatchLabelRef.current,
+      before,
+      after: deepClone(after),
+      createdAt: Date.now(),
+    });
+    historyPastRef.current = nextStacks.past;
+    historyFutureRef.current = nextStacks.future;
+    setHistoryTick((value) => value + 1);
+  }, [draggingGradientHandle, draggingOffsetHandle, draggingRadiusHandle, draggingTextureHandle, workingTemplate]);
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      return target.isContentEditable;
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
+      if (isEditableTarget(event.target)) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          runRedoCommand();
+          return;
+        }
+        runUndoCommand();
+        return;
+      }
+
+      if (key === 'y') {
+        event.preventDefault();
+        runRedoCommand();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [runRedoCommand, runUndoCommand]);
+
+  const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>, label = 'Update elements') => {
+    applyTemplateCommand(label, (prev) => ({
+      ...prev,
+      elements: updater(prev.elements),
+    }));
   };
 
-  const updateTemplateLayout = (updater: (layout: Record<string, unknown>) => Record<string, unknown>) => {
-    let nextTemplate: TemplateModel | null = null;
-    setWorkingTemplate((prev) => {
-      if (!prev) return prev;
+  const updateTemplateLayout = (updater: (layout: Record<string, unknown>) => Record<string, unknown>, label = 'Update layout') => {
+    applyTemplateCommand(label, (prev) => {
       const currentLayout = prev.layout && typeof prev.layout === 'object' ? prev.layout : {};
-      const next = {
+      return {
         ...prev,
         layout: updater({ ...currentLayout }),
       };
-      nextTemplate = next;
-      saveTemplate(next);
-      return next;
     });
-    if (nextTemplate) {
-      void renderPreview(nextTemplate);
-    }
   };
 
-  const updateTemplateEffects3d = (updater: (effects: Record<string, unknown>) => Record<string, unknown>) => {
-    let nextTemplate: TemplateModel | null = null;
-    setWorkingTemplate((prev) => {
-      if (!prev) return prev;
+  const updateTemplateEffects3d = (updater: (effects: Record<string, unknown>) => Record<string, unknown>, label = 'Update global effects') => {
+    applyTemplateCommand(label, (prev) => {
       const currentEffects = prev.effects3d && typeof prev.effects3d === 'object' ? prev.effects3d : {};
-      const next = {
+      return {
         ...prev,
         effects3d: updater({ ...currentEffects }),
       };
-      nextTemplate = next;
-      saveTemplate(next);
-      return next;
     });
-    if (nextTemplate) {
-      void renderPreview(nextTemplate);
-    }
   };
 
   const getTemplateEffectNumber = (key: string, fallback: number): number => {
@@ -1149,9 +1389,7 @@ export default function ParametricPage() {
   };
 
   const syncBaseElementShapeToLayout = (shape: 'circle' | 'rectangle') => {
-    let nextTemplate: TemplateModel | null = null;
-    setWorkingTemplate((prev) => {
-      if (!prev) return prev;
+    applyTemplateCommand('Sync base shape to layout', (prev) => {
       const currentLayout = prev.layout && typeof prev.layout === 'object' ? prev.layout : {};
       const nextElements = (prev.elements ?? []).map((element) => {
         if (element.type !== 'base') return element;
@@ -1162,20 +1400,12 @@ export default function ParametricPage() {
         return { ...element, params: nextParams };
       });
 
-      const next = {
+      return {
         ...prev,
         layout: { ...currentLayout, shape },
         elements: nextElements,
       };
-
-      nextTemplate = next;
-      saveTemplate(next);
-      return next;
     });
-
-    if (nextTemplate) {
-      void renderPreview(nextTemplate);
-    }
   };
 
   const getLayoutShape = (): 'circle' | 'rectangle' => {
@@ -1221,23 +1451,10 @@ export default function ParametricPage() {
     const copy = ensureElement(deepClone(source));
     copy.id = makeId('layer');
 
-    let nextTemplate: TemplateModel | null = null;
-    setWorkingTemplate((prev) => {
-      const base = prev ?? { elements: [] };
-      const next = {
-        ...base,
-        elements: [...base.elements, copy],
-      };
-      nextTemplate = next as TemplateModel;
-      saveTemplate(next);
-      return next;
-    });
+    updateTemplateElements((elements) => [...elements, copy], 'Add element to canvas');
 
     setSelectedElementId(copy.id ?? null);
     setSelectedPanelTarget('element');
-    if (nextTemplate) {
-      void renderPreview(nextTemplate);
-    }
   };
 
   const resolveNewElementTemplate = (preferredCategory: string, fallbackElement?: TemplateElement): TemplateElement => {
@@ -1294,6 +1511,78 @@ export default function ParametricPage() {
       setNameDraft('');
       setParamsDraft('{}');
     }
+  };
+
+  const mirrorPlacementConfig = (
+    placement: { mode?: string; config?: Record<string, unknown> } | undefined,
+    axis: 'x' | 'y',
+  ): { mode: string; config: Record<string, unknown> } => {
+    const mode = typeof placement?.mode === 'string' ? placement.mode : 'center';
+    const config = placement?.config && typeof placement.config === 'object'
+      ? deepClone(placement.config) as Record<string, unknown>
+      : {};
+
+    const mirrorRotation = (rotationRaw: unknown) => {
+      const rotation = Number(rotationRaw);
+      if (!Number.isFinite(rotation)) return 0;
+      return axis === 'x' ? -rotation : 180 - rotation;
+    };
+
+    if (mode === 'center' || mode === 'anchor') {
+      const offsetRaw = Array.isArray(config.offset) ? config.offset : [0, 0];
+      const ox = Number(offsetRaw[0]);
+      const oy = Number(offsetRaw[1]);
+      const nextX = axis === 'x' ? -ox : ox;
+      const nextY = axis === 'y' ? -oy : oy;
+      config.offset = [
+        Number.isFinite(nextX) ? nextX : 0,
+        Number.isFinite(nextY) ? nextY : 0,
+      ];
+      config.rotation = mirrorRotation(config.rotation);
+      return { mode, config };
+    }
+
+    if (mode === 'polar') {
+      const angle = Number(config.angle);
+      const safeAngle = Number.isFinite(angle) ? angle : 0;
+      config.angle = axis === 'x' ? 180 - safeAngle : -safeAngle;
+      config.rotation = mirrorRotation(config.rotation ?? config.angle);
+      return { mode, config };
+    }
+
+    return { mode, config };
+  };
+
+  const createQuadrantDuplicates = () => {
+    if (!selectedElement) return;
+
+    const base = ensureElement(deepClone(selectedElement));
+    const baseName = typeof base.name === 'string' && base.name.trim().length > 0 ? base.name.trim() : base.type;
+    const basePlacement = base.placement && typeof base.placement === 'object'
+      ? deepClone(base.placement) as { mode?: string; config?: Record<string, unknown> }
+      : { mode: 'center', config: { offset: [0, 0], rotation: 0 } };
+
+    const makeVariant = (suffix: string, axes: Array<'x' | 'y'>) => {
+      const clone = ensureElement(deepClone(base));
+      clone.id = makeId('layer');
+      clone.name = `${baseName} ${suffix}`;
+      let placement = deepClone(basePlacement);
+      for (const axis of axes) {
+        placement = mirrorPlacementConfig(placement, axis);
+      }
+      clone.placement = placement;
+      clone.symmetry = { mode: 'none', config: {} };
+      return clone;
+    };
+
+    const mirrorX = makeVariant('[MX]', ['x']);
+    const mirrorY = makeVariant('[MY]', ['y']);
+    const mirrorXY = makeVariant('[MXY]', ['x', 'y']);
+
+    updateTemplateElements((elements) => [...elements, mirrorX, mirrorY, mirrorXY], 'Create quadrant mirror duplicates');
+    setSelectedElementId(mirrorXY.id ?? null);
+    setSelectedPanelTarget('element');
+    setEditorNotice('Quadrant duplicates created: MX, MY, MXY.');
   };
 
   const saveDraftToLibrary = () => {
@@ -1424,6 +1713,7 @@ export default function ParametricPage() {
     const template = parseDraftTemplate();
     if (template) {
       setWorkingTemplate(template);
+      clearCommandHistory();
       saveTemplate(template);
       setSelectedElementId(template.elements[0]?.id ?? null);
       setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
@@ -1671,11 +1961,14 @@ export default function ParametricPage() {
     const offsetRaw = (config as Record<string, unknown>).offset;
     const offset = Array.isArray(offsetRaw) ? offsetRaw : [0, 0];
     const value = Number(offset[axis]);
-    return Number.isFinite(value) ? value : 0;
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(-50, Math.min(50, value));
   };
 
   const setSelectedPlacementOffset = (x: number, y: number) => {
     if (!selectedElement) return;
+    const clampedX = Math.max(-50, Math.min(50, x));
+    const clampedY = Math.max(-50, Math.min(50, y));
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -1685,8 +1978,63 @@ export default function ParametricPage() {
         const config = placement.config && typeof placement.config === 'object'
           ? deepClone(placement.config) as Record<string, unknown>
           : {};
-        config.offset = [x, y];
+        config.offset = [clampedX, clampedY];
         return { ...element, placement: { ...placement, config } };
+      }),
+    );
+  };
+
+  const getSelectedPlacementRotation = () => {
+    if (!selectedElement || !selectedElement.placement || typeof selectedElement.placement !== 'object') return 0;
+    const config = selectedElement.placement.config && typeof selectedElement.placement.config === 'object'
+      ? selectedElement.placement.config
+      : {};
+    const value = Number((config as Record<string, unknown>).rotation);
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(-360, Math.min(360, value));
+  };
+
+  const setSelectedPlacementRotation = (rotation: number) => {
+    if (!selectedElement) return;
+    const clampedRotation = Math.max(-360, Math.min(360, rotation));
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const placement = element.placement && typeof element.placement === 'object'
+          ? deepClone(element.placement) as { mode?: string; config?: Record<string, unknown> }
+          : { mode: 'center', config: {} };
+        const config = placement.config && typeof placement.config === 'object'
+          ? deepClone(placement.config) as Record<string, unknown>
+          : {};
+        config.rotation = clampedRotation;
+        return { ...element, placement: { ...placement, config } };
+      }),
+    );
+  };
+
+  const getSelectedSymmetryMode = () => {
+    if (!selectedElement || !selectedElement.symmetry || typeof selectedElement.symmetry !== 'object') return 'none';
+    const rawMode = (selectedElement.symmetry as Record<string, unknown>).mode;
+    if (rawMode === 'mirrorX' || rawMode === 'mirrorY') return rawMode;
+    return 'none';
+  };
+
+  const setSelectedSymmetryMode = (mode: 'none' | 'mirrorX' | 'mirrorY') => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const symmetry = element.symmetry && typeof element.symmetry === 'object'
+          ? deepClone(element.symmetry) as { mode?: string; config?: Record<string, unknown> }
+          : { mode: 'none', config: {} };
+        return {
+          ...element,
+          symmetry: {
+            ...symmetry,
+            mode,
+            config: mode === 'none' ? (symmetry.config && typeof symmetry.config === 'object' ? symmetry.config : {}) : {},
+          },
+        };
       }),
     );
   };
@@ -1764,16 +2112,7 @@ export default function ParametricPage() {
 
   const getSelectedTextureLayers = () => {
     if (!selectedElement) return [] as Array<Record<string, unknown>>;
-    const layersRaw = (selectedElement as Record<string, unknown>).textureLayers;
-    if (Array.isArray(layersRaw)) {
-      return layersRaw
-        .filter((entry) => !!entry && typeof entry === 'object')
-        .map((entry) => deepClone(entry as Record<string, unknown>));
-    }
-    if (selectedElement.texture && typeof selectedElement.texture === 'object') {
-      return [deepClone(selectedElement.texture as Record<string, unknown>)];
-    }
-    return [] as Array<Record<string, unknown>>;
+    return normalizeLegacyTextureLayers(selectedElement as Record<string, unknown>);
   };
 
   const getSelectedTextureLayer = () => {
@@ -1788,20 +2127,11 @@ export default function ParametricPage() {
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
-        const layersRaw = (element as Record<string, unknown>).textureLayers;
-        const layers = Array.isArray(layersRaw)
-          ? layersRaw.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry as Record<string, unknown>))
-          : (element.texture && typeof element.texture === 'object' ? [deepClone(element.texture as Record<string, unknown>)] : []);
+        const layers = normalizeLegacyTextureLayers(element as Record<string, unknown>);
         const safeIndex = Math.max(0, Math.min(activeTextureLayerIndex, Math.max(0, layers.length - 1)));
         const current = layers[safeIndex] && typeof layers[safeIndex] === 'object' ? deepClone(layers[safeIndex]) as Record<string, unknown> : {};
         const nextLayers = updater(current, layers);
-        const sanitizedLayers = nextLayers.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry));
-        const firstLayer = sanitizedLayers[0] ?? null;
-        return {
-          ...element,
-          texture: firstLayer,
-          textureLayers: sanitizedLayers,
-        };
+        return writeNormalizedTextureLayers(element as Record<string, unknown>, nextLayers) as TemplateElement;
       }),
     );
   };
@@ -1810,10 +2140,12 @@ export default function ParametricPage() {
     const defaultTarget = getDefaultClipTargetName();
     updateSelectedTextureLayer((_current, layers) => {
       const nextLayer: Record<string, unknown> = {
+        kind: 'grain',
         enabled: true,
         opacity: 0.22,
         blendMode: 'overlay',
         gradient: {
+          kind: 'linear',
           from: [0, 0],
           to: [100, 100],
           stops: [
@@ -2029,16 +2361,7 @@ export default function ParametricPage() {
 
   const getSelectedGradientLayers = () => {
     if (!selectedElement) return [] as Array<Record<string, unknown>>;
-    const layersRaw = (selectedElement as Record<string, unknown>).gradientLayers;
-    if (Array.isArray(layersRaw)) {
-      return layersRaw
-        .filter((entry) => !!entry && typeof entry === 'object')
-        .map((entry) => deepClone(entry as Record<string, unknown>));
-    }
-    if (selectedElement.gradient && typeof selectedElement.gradient === 'object') {
-      return [deepClone(selectedElement.gradient as Record<string, unknown>)];
-    }
-    return [] as Array<Record<string, unknown>>;
+    return normalizeLegacyGradientLayers(selectedElement as Record<string, unknown>);
   };
 
   const getSelectedGradientLayer = () => {
@@ -2053,20 +2376,11 @@ export default function ParametricPage() {
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
-        const layersRaw = (element as Record<string, unknown>).gradientLayers;
-        const layers = Array.isArray(layersRaw)
-          ? layersRaw.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry as Record<string, unknown>))
-          : (element.gradient && typeof element.gradient === 'object' ? [deepClone(element.gradient as Record<string, unknown>)] : []);
+        const layers = normalizeLegacyGradientLayers(element as Record<string, unknown>);
         const safeIndex = Math.max(0, Math.min(activeGradientLayerIndex, Math.max(0, layers.length - 1)));
         const current = layers[safeIndex] && typeof layers[safeIndex] === 'object' ? deepClone(layers[safeIndex]) as Record<string, unknown> : {};
         const nextLayers = updater(current, layers);
-        const sanitizedLayers = nextLayers.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry));
-        const firstLayer = sanitizedLayers[0] ?? null;
-        return {
-          ...element,
-          gradient: firstLayer,
-          gradientLayers: sanitizedLayers,
-        };
+        return writeNormalizedGradientLayers(element as Record<string, unknown>, nextLayers) as TemplateElement;
       }),
     );
   };
@@ -2078,6 +2392,7 @@ export default function ParametricPage() {
         enabled: true,
         opacity: 0.24,
         blendMode: 'overlay',
+        kind: 'linear',
         from: [0, 0],
         to: [100, 100],
         stops: [
@@ -2450,16 +2765,7 @@ export default function ParametricPage() {
 
   const getSelectedMaterialLayers = () => {
     if (!selectedElement) return [] as Array<Record<string, unknown>>;
-    const layersRaw = (selectedElement as Record<string, unknown>).materialLayers;
-    if (Array.isArray(layersRaw)) {
-      return layersRaw
-        .filter((entry) => !!entry && typeof entry === 'object')
-        .map((entry) => deepClone(entry as Record<string, unknown>));
-    }
-    if (selectedElement.material && typeof selectedElement.material === 'object') {
-      return [deepClone(selectedElement.material as Record<string, unknown>)];
-    }
-    return [] as Array<Record<string, unknown>>;
+    return normalizeLegacyMaterialLayers(selectedElement as Record<string, unknown>);
   };
 
   const getSelectedMaterialLayer = () => {
@@ -2474,20 +2780,11 @@ export default function ParametricPage() {
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
-        const layersRaw = (element as Record<string, unknown>).materialLayers;
-        const layers = Array.isArray(layersRaw)
-          ? layersRaw.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry as Record<string, unknown>))
-          : (element.material && typeof element.material === 'object' ? [deepClone(element.material as Record<string, unknown>)] : []);
+        const layers = normalizeLegacyMaterialLayers(element as Record<string, unknown>);
         const safeIndex = Math.max(0, Math.min(activeMaterialLayerIndex, Math.max(0, layers.length - 1)));
         const current = layers[safeIndex] && typeof layers[safeIndex] === 'object' ? deepClone(layers[safeIndex]) as Record<string, unknown> : {};
         const nextLayers = updater(current, layers);
-        const sanitizedLayers = nextLayers.filter((entry) => !!entry && typeof entry === 'object').map((entry) => deepClone(entry));
-        const firstLayer = sanitizedLayers[0] ?? null;
-        return {
-          ...element,
-          material: firstLayer,
-          materialLayers: sanitizedLayers,
-        };
+        return writeNormalizedMaterialLayers(element as Record<string, unknown>, nextLayers) as TemplateElement;
       }),
     );
   };
@@ -2815,11 +3112,35 @@ export default function ParametricPage() {
   };
 
   useEffect(() => {
+    if (!workingTemplate) return;
+    try {
+      if (historyPastRef.current.length === 0 && historyFutureRef.current.length === 0) {
+        window.sessionStorage.removeItem(PARAMETRIC_HISTORY_STORAGE_KEY);
+        return;
+      }
+      window.sessionStorage.setItem(
+        PARAMETRIC_HISTORY_STORAGE_KEY,
+        JSON.stringify({
+          fingerprint: getTemplateFingerprint(workingTemplate),
+          past: historyPastRef.current,
+          future: historyFutureRef.current,
+        }),
+      );
+    } catch {
+      // Ignore sessionStorage failures.
+    }
+  }, [getTemplateFingerprint, historyTick, workingTemplate]);
+
+  useEffect(() => {
     const storedTemplate = loadStoredTemplate();
     const storedLibrary = loadStoredLibrary();
     const storedThemes = loadStoredThemes();
+    const initialTemplate = storedTemplate ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
+
+    setWorkingTemplate(initialTemplate);
+    restoreCommandHistoryForTemplate(initialTemplate);
+
     if (storedTemplate) {
-      setWorkingTemplate(storedTemplate);
       if (storedTemplate.elements.length > 0) {
         setSelectedElementId(storedTemplate.elements[0].id ?? null);
         setSelectedPanelTarget('element');
@@ -2827,7 +3148,6 @@ export default function ParametricPage() {
         setSelectedPanelTarget('layout');
       }
     } else {
-      setWorkingTemplate(deepClone(DEFAULT_EMPTY_TEMPLATE));
       setSelectedPanelTarget('layout');
     }
     if (storedLibrary) {
@@ -2841,7 +3161,7 @@ export default function ParametricPage() {
     }
     void renderPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [restoreCommandHistoryForTemplate]);
 
   useEffect(() => {
     if (!authConfigured) return;
@@ -2879,16 +3199,20 @@ export default function ParametricPage() {
     void renderPreview(workingTemplate);
   }, [colorMode, renderPreview, workingTemplate]);
 
-  const getCanvasGradientNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to', axis: 0 | 1) => {
-    const fallback = anchor === 'from' ? 0 : 100;
+  const getCanvasGradientPointNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to' | 'center' | 'focal', axis: 0 | 1) => {
+    const fallback = anchor === 'from'
+      ? 0
+      : anchor === 'to'
+        ? 100
+        : 50;
     if (target === 'texture') {
       return getSelectedTextureNumber(`gradient.${anchor}.${axis}`, fallback);
     }
     return getSelectedGradientNumber(`${anchor}.${axis}`, fallback);
   };
 
-  const setCanvasGradientNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to', axis: 0 | 1, value: number) => {
-    const next = Math.max(0, Math.min(100, value));
+  const setCanvasGradientPointNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to' | 'center' | 'focal', axis: 0 | 1, value: number) => {
+    const next = Math.max(-100, Math.min(200, value));
     if (target === 'texture') {
       setSelectedTextureNumber(`gradient.${anchor}.${axis}`, next);
       return;
@@ -2896,18 +3220,150 @@ export default function ParametricPage() {
     setSelectedGradientNumber(`${anchor}.${axis}`, next);
   };
 
-  const gradientFromX = getCanvasGradientNumber(gradientHandleTarget, 'from', 0);
-  const gradientFromY = getCanvasGradientNumber(gradientHandleTarget, 'from', 1);
-  const gradientToX = getCanvasGradientNumber(gradientHandleTarget, 'to', 0);
-  const gradientToY = getCanvasGradientNumber(gradientHandleTarget, 'to', 1);
+  const getCanvasGradientRadius = (target: 'texture' | 'gradient') => {
+    if (target === 'texture') {
+      return getSelectedTextureNumber('gradient.radius', 50);
+    }
+    return getSelectedGradientNumber('radius', 50);
+  };
+
+  const setCanvasGradientRadius = (target: 'texture' | 'gradient', value: number) => {
+    const next = Math.max(0, Math.min(200, value));
+    if (target === 'texture') {
+      setSelectedTextureNumber('gradient.radius', next);
+      return;
+    }
+    setSelectedGradientNumber('radius', next);
+  };
+
+  const getCanvasGradientAngleStart = (target: 'texture' | 'gradient') => {
+    if (target === 'texture') {
+      return getSelectedTextureNumber('gradient.angleStart', 0);
+    }
+    return getSelectedGradientNumber('angleStart', 0);
+  };
+
+  const setCanvasGradientAngleStart = (target: 'texture' | 'gradient', value: number) => {
+    const next = Math.max(-360, Math.min(360, value));
+    if (target === 'texture') {
+      setSelectedTextureNumber('gradient.angleStart', next);
+      return;
+    }
+    setSelectedGradientNumber('angleStart', next);
+  };
+
+  const getCanvasGradientKind = (target: 'texture' | 'gradient') => {
+    const kind = target === 'texture'
+      ? getSelectedTextureString('gradient.kind', 'linear')
+      : getSelectedGradientString('kind', 'linear');
+    if (kind === 'radial' || kind === 'conic') return kind;
+    return 'linear';
+  };
+
+  const setCanvasGradientKind = (target: 'texture' | 'gradient', value: string) => {
+    const next = value === 'radial' || value === 'conic' ? value : 'linear';
+    if (target === 'texture') {
+      setSelectedTextureString('gradient.kind', next);
+      return;
+    }
+    setSelectedGradientString('kind', next);
+  };
+
+  const textureGradientKind = getCanvasGradientKind('texture');
+  const elementGradientKind = getCanvasGradientKind('gradient');
+  const activeHandleGradientKind = getCanvasGradientKind(gradientHandleTarget);
+  const showLinearGradientHandles = activeHandleGradientKind === 'linear';
+  const showRadialGradientHandles = activeHandleGradientKind === 'radial';
+  const showConicGradientHandles = activeHandleGradientKind === 'conic';
+
+  const gradientFromX = getCanvasGradientPointNumber(gradientHandleTarget, 'from', 0);
+  const gradientFromY = getCanvasGradientPointNumber(gradientHandleTarget, 'from', 1);
+  const gradientToX = getCanvasGradientPointNumber(gradientHandleTarget, 'to', 0);
+  const gradientToY = getCanvasGradientPointNumber(gradientHandleTarget, 'to', 1);
+  const gradientCenterX = getCanvasGradientPointNumber(gradientHandleTarget, 'center', 0);
+  const gradientCenterY = getCanvasGradientPointNumber(gradientHandleTarget, 'center', 1);
+  const gradientFocalX = getCanvasGradientPointNumber(gradientHandleTarget, 'focal', 0);
+  const gradientFocalY = getCanvasGradientPointNumber(gradientHandleTarget, 'focal', 1);
+  const gradientRadius = getCanvasGradientRadius(gradientHandleTarget);
+  const gradientRadiusHandleX = Math.max(-100, Math.min(200, gradientCenterX + gradientRadius));
+  const gradientRadiusHandleY = gradientCenterY;
+  const gradientAngleStart = getCanvasGradientAngleStart(gradientHandleTarget);
+  const gradientConicHandleRadius = Math.max(12, Math.min(80, gradientRadius > 0 ? gradientRadius : 24));
+  const gradientAngleHandleX = gradientCenterX + Math.cos((gradientAngleStart * Math.PI) / 180) * gradientConicHandleRadius;
+  const gradientAngleHandleY = gradientCenterY + Math.sin((gradientAngleStart * Math.PI) / 180) * gradientConicHandleRadius;
   const gradientLineDx = gradientToX - gradientFromX;
   const gradientLineDy = gradientToY - gradientFromY;
   const gradientLineLen = Math.max(0.1, Math.sqrt(gradientLineDx * gradientLineDx + gradientLineDy * gradientLineDy));
   const gradientLineAngle = (Math.atan2(gradientLineDy, gradientLineDx) * 180) / Math.PI;
   const showGradientCanvasHandles = selectedPanelTarget === 'element' && !!selectedElement && contextTab === 'gradient';
+  const showLinearGradientCanvasHandles = showGradientCanvasHandles && showLinearGradientHandles;
+  const showRadialGradientCanvasHandles = showGradientCanvasHandles && showRadialGradientHandles;
+  const showConicGradientCanvasHandles = showGradientCanvasHandles && showConicGradientHandles;
+  const selectedTextureKind = getSelectedTextureString('kind', 'grain');
+  const showTextureCanvasHandles = selectedPanelTarget === 'element' && !!selectedElement && contextTab === 'texture';
+  const showBrushedTextureHandles = showTextureCanvasHandles && selectedTextureKind === 'brushed';
+  const showImageTextureHandles = showTextureCanvasHandles && selectedTextureKind === 'image';
+  const brushedDirection = getSelectedTextureNumber('direction', 0);
+  const brushedDirectionHandleRadius = 24;
+  const brushedDirectionHandleX = 50 + Math.cos((brushedDirection * Math.PI) / 180) * brushedDirectionHandleRadius;
+  const brushedDirectionHandleY = 50 + Math.sin((brushedDirection * Math.PI) / 180) * brushedDirectionHandleRadius;
+  const textureImageOffsetX = getSelectedTextureNumber('image.offsetX', 0);
+  const textureImageOffsetY = getSelectedTextureNumber('image.offsetY', 0);
+  const textureImageScale = getSelectedTextureNumber('image.scale', 1);
+  const textureImageRotation = getSelectedTextureNumber('image.rotation', 0);
+  const textureImageOffsetHandleX = Math.max(0, Math.min(100, 50 + textureImageOffsetX / 2));
+  const textureImageOffsetHandleY = Math.max(0, Math.min(100, 50 + textureImageOffsetY / 2));
+  const textureImageScaleRadius = Math.max(2, Math.min(40, textureImageScale * 8));
+  const textureImageScaleHandleX = Math.max(0, Math.min(100, textureImageOffsetHandleX + textureImageScaleRadius));
+  const textureImageScaleHandleY = textureImageOffsetHandleY;
+  const textureImageRotationHandleRadius = textureImageScaleRadius + 8;
+  const textureImageRotationHandleX = Math.max(0, Math.min(100, textureImageOffsetHandleX + Math.cos((textureImageRotation * Math.PI) / 180) * textureImageRotationHandleRadius));
+  const textureImageRotationHandleY = Math.max(0, Math.min(100, textureImageOffsetHandleY + Math.sin((textureImageRotation * Math.PI) / 180) * textureImageRotationHandleRadius));
   const showElementCanvasHandles = selectedPanelTarget === 'element' && !!selectedElement && contextTab === 'element';
   const showMaskCanvasEditor = showElementCanvasHandles && isSelectedMaskEnabled();
+  const selectedTextureClipEnabled = getSelectedTextureClipEnabled();
+  const selectedGradientClipEnabled = getSelectedGradientClipEnabled();
+  const selectedMaterialClipEnabled = getSelectedMaterialClipEnabled();
+  const selectedMaskMode = getSelectedMaskString('mode', 'brush');
+  const isBrushMaskMode = selectedMaskMode === 'brush';
   const showGlobalLightingCanvasOverlay = contextTab === 'fx';
+  const canvasMarkerLegendEntries = (() => {
+    const entries: Array<{ key: string; meaning: string }> = [];
+    if (showLinearGradientCanvasHandles) {
+      entries.push({ key: 'S', meaning: 'Gradient Start' });
+      entries.push({ key: 'E', meaning: 'Gradient End' });
+    }
+    if (showRadialGradientCanvasHandles) {
+      entries.push({ key: 'C', meaning: 'Radial Center' });
+      entries.push({ key: 'R', meaning: 'Radial Radius' });
+      entries.push({ key: 'F', meaning: 'Radial Focal' });
+    }
+    if (showConicGradientCanvasHandles) {
+      entries.push({ key: 'C', meaning: 'Conic Center' });
+      entries.push({ key: 'A', meaning: 'Conic Angle' });
+    }
+    if (showBrushedTextureHandles) {
+      entries.push({ key: 'A', meaning: 'Texture Direction Angle' });
+    }
+    if (showImageTextureHandles) {
+      entries.push({ key: 'O', meaning: 'Image Offset' });
+      entries.push({ key: 'R', meaning: 'Image Scale Radius' });
+      entries.push({ key: 'A', meaning: 'Image Rotation Angle' });
+    }
+    if (showElementCanvasHandles) {
+      entries.push({ key: 'O', meaning: 'Element Offset' });
+      if (Number.isFinite(getNumericParam('radius', Number.NaN))) entries.push({ key: 'R', meaning: 'Element Radius' });
+      if (showMaskCanvasEditor) {
+        entries.push({ key: 'Mask', meaning: selectedMaskMode === 'selection' ? 'Selection Rect Mask Edit' : 'Brush Mask Edit' });
+      }
+    }
+    if (showGlobalLightingCanvasOverlay) {
+      entries.push({ key: 'L', meaning: 'Global Light Direction' });
+    }
+
+    // Keep order while removing duplicate key+meaning entries.
+    return entries.filter((entry, index) => entries.findIndex((candidate) => candidate.key === entry.key && candidate.meaning === entry.meaning) === index);
+  })();
   const globalLightAngle = getTemplateEffectNumber('angle', -35);
   const globalLightIntensity = getTemplateEffectNumber('intensity', 0.46);
   const globalLightRadius = 22 + globalLightIntensity * 20;
@@ -2915,8 +3371,8 @@ export default function ParametricPage() {
   const globalLightTipY = 50 + Math.sin((globalLightAngle * Math.PI) / 180) * globalLightRadius;
   const selectedOffsetX = getSelectedPlacementOffset(0);
   const selectedOffsetY = getSelectedPlacementOffset(1);
-  const offsetHandleX = Math.max(0, Math.min(100, 50 + selectedOffsetX / 2));
-  const offsetHandleY = Math.max(0, Math.min(100, 50 + selectedOffsetY / 2));
+  const offsetHandleX = Math.max(0, Math.min(100, 50 + selectedOffsetX));
+  const offsetHandleY = Math.max(0, Math.min(100, 50 + selectedOffsetY));
   const selectedRadius = getNumericParam('radius', Number.NaN);
   const hasRadiusHandle = Number.isFinite(selectedRadius);
   const radiusHandleX = hasRadiusHandle ? Math.max(0, Math.min(100, 50 + selectedRadius * 50)) : 50;
@@ -3010,17 +3466,39 @@ export default function ParametricPage() {
                 {isDimMode ? 'Dim On' : 'Dim Off'}
               </button>
 
-              <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1">
-                <span className="text-[11px] text-zinc-400">Handle Target</span>
-                <select
-                  value={gradientHandleTarget}
-                  onChange={(e) => setGradientHandleTarget(e.target.value === 'texture' ? 'texture' : 'gradient')}
-                  className="h-7 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
-                >
-                  <option value="gradient">gradient</option>
-                  <option value="texture">texture</option>
-                </select>
-              </label>
+              <button
+                type="button"
+                onClick={runUndoCommand}
+                disabled={!canUndo}
+                className={`rounded border px-2 py-1 text-[11px] ${canUndo ? 'border-zinc-700 bg-zinc-950/70 text-zinc-300 hover:bg-zinc-800' : 'border-zinc-800 bg-zinc-950/30 text-zinc-600'}`}
+                title="Undo last template command"
+              >
+                Undo
+              </button>
+
+              <button
+                type="button"
+                onClick={runRedoCommand}
+                disabled={!canRedo}
+                className={`rounded border px-2 py-1 text-[11px] ${canRedo ? 'border-zinc-700 bg-zinc-950/70 text-zinc-300 hover:bg-zinc-800' : 'border-zinc-800 bg-zinc-950/30 text-zinc-600'}`}
+                title="Redo last template command"
+              >
+                Redo
+              </button>
+
+              {contextTab === 'gradient' ? (
+                <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1">
+                  <span className="text-[11px] text-zinc-400">Handle Target</span>
+                  <select
+                    value={gradientHandleTarget}
+                    onChange={(e) => setGradientHandleTarget(e.target.value === 'texture' ? 'texture' : 'gradient')}
+                    className="h-7 rounded border border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100"
+                  >
+                    <option value="gradient">gradient</option>
+                    <option value="texture">texture</option>
+                  </select>
+                </label>
+              ) : null}
 
               <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1">
                 <span className="text-[11px] text-zinc-400">Color</span>
@@ -3468,7 +3946,7 @@ export default function ParametricPage() {
 
                     {selectedPanelTarget === 'element' && selectedElement ? (
                       <div
-                        className={`absolute inset-0 ${showMaskCanvasEditor && isMaskBrushEditEnabled && getSelectedMaskString('mode', 'brush') === 'brush' ? 'cursor-crosshair' : ''}`}
+                        className={`absolute inset-0 ${showMaskCanvasEditor && isMaskBrushEditEnabled ? 'cursor-crosshair' : ''}`}
                         onMouseDown={(event) => {
                           if (!showMaskCanvasEditor || !isMaskBrushEditEnabled) return;
                           const target = event.target as HTMLElement;
@@ -3504,12 +3982,44 @@ export default function ParametricPage() {
                           const x = ((event.clientX - rect.left) / rect.width) * 100;
                           const y = ((event.clientY - rect.top) / rect.height) * 100;
                           if (showGradientCanvasHandles && draggingGradientHandle) {
-                            setCanvasGradientNumber(gradientHandleTarget, draggingGradientHandle, 0, x);
-                            setCanvasGradientNumber(gradientHandleTarget, draggingGradientHandle, 1, y);
+                            if (draggingGradientHandle === 'radius') {
+                              const dx = x - gradientCenterX;
+                              const dy = y - gradientCenterY;
+                              setCanvasGradientRadius(gradientHandleTarget, Math.sqrt(dx * dx + dy * dy));
+                            } else if (draggingGradientHandle === 'angle') {
+                              const dx = x - gradientCenterX;
+                              const dy = y - gradientCenterY;
+                              const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                              setCanvasGradientAngleStart(gradientHandleTarget, angle);
+                            } else {
+                              setCanvasGradientPointNumber(gradientHandleTarget, draggingGradientHandle, 0, x);
+                              setCanvasGradientPointNumber(gradientHandleTarget, draggingGradientHandle, 1, y);
+                            }
+                          }
+                          if (showTextureCanvasHandles && draggingTextureHandle) {
+                            if (draggingTextureHandle === 'direction') {
+                              const dx = x - 50;
+                              const dy = y - 50;
+                              const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                              setSelectedTextureNumber('direction', angle);
+                            } else if (draggingTextureHandle === 'imageOffset') {
+                              setSelectedTextureNumber('image.offsetX', Math.max(-100, Math.min(100, (x - 50) * 2)));
+                              setSelectedTextureNumber('image.offsetY', Math.max(-100, Math.min(100, (y - 50) * 2)));
+                            } else if (draggingTextureHandle === 'imageScale') {
+                              const dx = x - textureImageOffsetHandleX;
+                              const dy = y - textureImageOffsetHandleY;
+                              const radius = Math.sqrt(dx * dx + dy * dy);
+                              setSelectedTextureNumber('image.scale', Math.max(0.1, Math.min(5, radius / 8)));
+                            } else if (draggingTextureHandle === 'imageRotation') {
+                              const dx = x - textureImageOffsetHandleX;
+                              const dy = y - textureImageOffsetHandleY;
+                              const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                              setSelectedTextureNumber('image.rotation', angle);
+                            }
                           }
                           if (showElementCanvasHandles && draggingOffsetHandle) {
-                            const ox = Math.max(-100, Math.min(100, (x - 50) * 2));
-                            const oy = Math.max(-100, Math.min(100, (y - 50) * 2));
+                            const ox = Math.max(-50, Math.min(50, x - 50));
+                            const oy = Math.max(-50, Math.min(50, y - 50));
                             setSelectedPlacementOffset(ox, oy);
                           }
                           if (showElementCanvasHandles && draggingRadiusHandle && hasRadiusHandle) {
@@ -3539,6 +4049,7 @@ export default function ParametricPage() {
                         }}
                         onMouseUp={() => {
                           setDraggingGradientHandle(null);
+                          setDraggingTextureHandle(null);
                           setDraggingOffsetHandle(false);
                           setDraggingRadiusHandle(false);
                           finishMaskStroke();
@@ -3546,13 +4057,14 @@ export default function ParametricPage() {
                         }}
                         onMouseLeave={() => {
                           setDraggingGradientHandle(null);
+                          setDraggingTextureHandle(null);
                           setDraggingOffsetHandle(false);
                           setDraggingRadiusHandle(false);
                           finishMaskStroke();
                           finishMaskSelectionRect();
                         }}
                       >
-                        {showGradientCanvasHandles ? (
+                        {showLinearGradientCanvasHandles ? (
                           <>
                             <div
                               className="pointer-events-none absolute h-[2px] bg-amber-300/80"
@@ -3583,6 +4095,174 @@ export default function ParametricPage() {
                               title="Drag gradient end handle"
                             >
                               E
+                            </button>
+                          </>
+                        ) : null}
+
+                        {showRadialGradientCanvasHandles ? (
+                          <>
+                            <div
+                              className="pointer-events-none absolute h-[2px] bg-fuchsia-300/70"
+                              style={{
+                                left: `${gradientCenterX}%`,
+                                top: `${gradientCenterY}%`,
+                                width: `${Math.max(0.1, gradientRadius)}%`,
+                                transform: 'translateY(-50%)',
+                                transformOrigin: '0 50%',
+                              }}
+                            />
+                            <div
+                              className="pointer-events-none absolute h-[1px] bg-fuchsia-200/60"
+                              style={{
+                                left: `${gradientCenterX}%`,
+                                top: `${gradientCenterY}%`,
+                                width: `${Math.max(0.1, Math.sqrt((gradientFocalX - gradientCenterX) ** 2 + (gradientFocalY - gradientCenterY) ** 2))}%`,
+                                transform: `translateY(-50%) rotate(${(Math.atan2(gradientFocalY - gradientCenterY, gradientFocalX - gradientCenterX) * 180) / Math.PI}deg)`,
+                                transformOrigin: '0 50%',
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingGradientHandle('center')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-fuchsia-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${gradientCenterX}%`, top: `${gradientCenterY}%` }}
+                              title="Drag radial center handle"
+                            >
+                              C
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingGradientHandle('radius')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-violet-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${gradientRadiusHandleX}%`, top: `${gradientRadiusHandleY}%` }}
+                              title="Drag radial radius handle"
+                            >
+                              R
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingGradientHandle('focal')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-pink-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${gradientFocalX}%`, top: `${gradientFocalY}%` }}
+                              title="Drag radial focal handle"
+                            >
+                              F
+                            </button>
+                          </>
+                        ) : null}
+
+                        {showConicGradientCanvasHandles ? (
+                          <>
+                            <div
+                              className="pointer-events-none absolute h-[1px] bg-orange-200/70"
+                              style={{
+                                left: `${gradientCenterX}%`,
+                                top: `${gradientCenterY}%`,
+                                width: `${Math.max(0.1, Math.sqrt((gradientAngleHandleX - gradientCenterX) ** 2 + (gradientAngleHandleY - gradientCenterY) ** 2))}%`,
+                                transform: `translateY(-50%) rotate(${(Math.atan2(gradientAngleHandleY - gradientCenterY, gradientAngleHandleX - gradientCenterX) * 180) / Math.PI}deg)`,
+                                transformOrigin: '0 50%',
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingGradientHandle('center')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-orange-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${gradientCenterX}%`, top: `${gradientCenterY}%` }}
+                              title="Drag conic center handle"
+                            >
+                              C
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingGradientHandle('angle')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-amber-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${gradientAngleHandleX}%`, top: `${gradientAngleHandleY}%` }}
+                              title="Drag conic angle handle"
+                            >
+                              A
+                            </button>
+                          </>
+                        ) : null}
+
+                        {showBrushedTextureHandles ? (
+                          <>
+                            <div
+                              className="pointer-events-none absolute h-[1px] bg-cyan-200/70"
+                              style={{
+                                left: '50%',
+                                top: '50%',
+                                width: `${Math.max(0.1, Math.sqrt((brushedDirectionHandleX - 50) ** 2 + (brushedDirectionHandleY - 50) ** 2))}%`,
+                                transform: `translateY(-50%) rotate(${(Math.atan2(brushedDirectionHandleY - 50, brushedDirectionHandleX - 50) * 180) / Math.PI}deg)`,
+                                transformOrigin: '0 50%',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingTextureHandle('direction')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-cyan-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${brushedDirectionHandleX}%`, top: `${brushedDirectionHandleY}%` }}
+                              title="Drag texture direction handle"
+                            >
+                              A
+                            </button>
+                          </>
+                        ) : null}
+
+                        {showImageTextureHandles ? (
+                          <>
+                            <div
+                              className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-200/60 border-dashed"
+                              style={{
+                                left: `${textureImageOffsetHandleX}%`,
+                                top: `${textureImageOffsetHandleY}%`,
+                                width: `${textureImageScaleRadius * 2}%`,
+                                height: `${textureImageScaleRadius * 2}%`,
+                              }}
+                            />
+                            <div
+                              className="pointer-events-none absolute h-[1px] bg-amber-200/80"
+                              style={{
+                                left: `${textureImageOffsetHandleX}%`,
+                                top: `${textureImageOffsetHandleY}%`,
+                                width: `${Math.max(0.1, Math.sqrt((textureImageRotationHandleX - textureImageOffsetHandleX) ** 2 + (textureImageRotationHandleY - textureImageOffsetHandleY) ** 2))}%`,
+                                transform: `translateY(-50%) rotate(${(Math.atan2(textureImageRotationHandleY - textureImageOffsetHandleY, textureImageRotationHandleX - textureImageOffsetHandleX) * 180) / Math.PI}deg)`,
+                                transformOrigin: '0 50%',
+                              }}
+                            />
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingTextureHandle('imageOffset')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-emerald-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${textureImageOffsetHandleX}%`, top: `${textureImageOffsetHandleY}%` }}
+                              title="Drag image texture offset handle"
+                            >
+                              O
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingTextureHandle('imageScale')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-sky-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${textureImageScaleHandleX}%`, top: `${textureImageScaleHandleY}%` }}
+                              title="Drag image texture scale handle"
+                            >
+                              R
+                            </button>
+
+                            <button
+                              type="button"
+                              onMouseDown={() => setDraggingTextureHandle('imageRotation')}
+                              className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-amber-300 text-[10px] font-semibold text-black"
+                              style={{ left: `${textureImageRotationHandleX}%`, top: `${textureImageRotationHandleY}%` }}
+                              title="Drag image texture rotation handle"
+                            >
+                              A
                             </button>
                           </>
                         ) : null}
@@ -3707,8 +4387,22 @@ export default function ParametricPage() {
                 )}
               </div>
               <p className="mt-2 text-[11px] text-zinc-500">
-                Canvas overlays follow active tab: Gradient tab shows S/E, Element tab shows O/R and mask brush, FX tab shows global lighting direction.
+                Canvas overlays follow active tab: Gradient tab shows kind handles, Texture tab shows direction or image O/R/A handles, Element tab shows O/R and mask brush, FX tab shows global lighting direction.
               </p>
+              {canvasMarkerLegendEntries.length > 0 ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="text-zinc-500">Marker Legend</span>
+                  {canvasMarkerLegendEntries.map((entry, index) => (
+                    <span
+                      key={`marker-legend-${entry.key}-${entry.meaning}-${index}`}
+                      title={entry.meaning}
+                      className="rounded border border-zinc-700 bg-zinc-950/80 px-2 py-0.5 text-zinc-300"
+                    >
+                      {entry.key}: {entry.meaning}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               {error ? <p className="mt-2 text-xs text-red-400">{error}</p> : null}
             </div>
 
@@ -4004,6 +4698,182 @@ export default function ParametricPage() {
                   </div>
                 </label>
 
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Transform (All Types)</p>
+                  <p className="text-[11px] text-zinc-500">Use sliders for exact position and rotation. Canvas O handle still works for interactive placement.</p>
+
+                  <button
+                    type="button"
+                    onClick={createQuadrantDuplicates}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                  >
+                    One-Click Quadrant Duplicate (MX + MY + MXY)
+                  </button>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Offset X {getSelectedPlacementOffset(0).toFixed(1)}</span>
+                    <input
+                      type="range"
+                      min={-50}
+                      max={50}
+                      step={0.1}
+                      value={getSelectedPlacementOffset(0)}
+                      onChange={(e) => setSelectedPlacementOffset(Number(e.target.value), getSelectedPlacementOffset(1))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Offset Y {getSelectedPlacementOffset(1).toFixed(1)}</span>
+                    <input
+                      type="range"
+                      min={-50}
+                      max={50}
+                      step={0.1}
+                      value={getSelectedPlacementOffset(1)}
+                      onChange={(e) => setSelectedPlacementOffset(getSelectedPlacementOffset(0), Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Placement Rotation {Math.round(getSelectedPlacementRotation())}deg</span>
+                    <input
+                      type="range"
+                      min={-360}
+                      max={360}
+                      step={1}
+                      value={getSelectedPlacementRotation()}
+                      onChange={(e) => setSelectedPlacementRotation(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Mirror Mode</span>
+                    <select
+                      value={getSelectedSymmetryMode()}
+                      onChange={(e) => setSelectedSymmetryMode((e.target.value === 'mirrorX' || e.target.value === 'mirrorY') ? e.target.value : 'none')}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    >
+                      <option value="none">None</option>
+                      <option value="mirrorX">Horizontal Mirror</option>
+                      <option value="mirrorY">Vertical Mirror</option>
+                    </select>
+                  </label>
+                </div>
+
+                {isSelectedType('ring', 'bezel', 'ticks_radial', 'radialTicks', 'circle', 'outline_ring', 'outline_rect', 'free_rect', 'rect') ? (
+                  <div className="space-y-2 rounded border border-zinc-800 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Rect Layout Reshape</p>
+                    <p className="text-[11px] text-zinc-500">When layout is rectangle, this element can auto-stretch to follow width/height. Set strength to 0 to disable.</p>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Auto Reshape Strength {getNumericParam('layoutShapeStrength', 1).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={getNumericParam('layoutShapeStrength', 1)}
+                        onChange={(e) => setNumericParam('layoutShapeStrength', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Manual Scale X {getNumericParam('layoutShapeScaleX', 1).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0.25}
+                        max={2.5}
+                        step={0.01}
+                        value={getNumericParam('layoutShapeScaleX', 1)}
+                        onChange={(e) => setNumericParam('layoutShapeScaleX', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Manual Scale Y {getNumericParam('layoutShapeScaleY', 1).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0.25}
+                        max={2.5}
+                        step={0.01}
+                        value={getNumericParam('layoutShapeScaleY', 1)}
+                        onChange={(e) => setNumericParam('layoutShapeScaleY', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+                  </div>
+                ) : null}
+
+                {isSelectedType('free_circle', 'free_ring', 'free_rect') ? (
+                  <div className="space-y-2 rounded border border-zinc-800 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Free Shape Resize</p>
+                    <p className="text-[11px] text-zinc-500">Manual resize controls for free objects. Canvas handles remain active where available.</p>
+
+                    {isSelectedType('free_circle', 'free_ring') ? (
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Radius {getNumericParam('radius', 0.08).toFixed(3)}</span>
+                        <input
+                          type="range"
+                          min={0.01}
+                          max={0.5}
+                          step={0.001}
+                          value={getNumericParam('radius', 0.08)}
+                          onChange={(e) => setNumericParam('radius', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    ) : null}
+
+                    {isSelectedType('free_rect') ? (
+                      <>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Width {getNumericParam('width', 0.24).toFixed(3)}</span>
+                          <input
+                            type="range"
+                            min={0.02}
+                            max={1}
+                            step={0.001}
+                            value={getNumericParam('width', 0.24)}
+                            onChange={(e) => setNumericParam('width', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Height {getNumericParam('height', 0.14).toFixed(3)}</span>
+                          <input
+                            type="range"
+                            min={0.02}
+                            max={1}
+                            step={0.001}
+                            value={getNumericParam('height', 0.14)}
+                            onChange={(e) => setNumericParam('height', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Corner Radius {getNumericParam('cornerRadius', 0.02).toFixed(3)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={0.5}
+                            step={0.001}
+                            value={getNumericParam('cornerRadius', 0.02)}
+                            onChange={(e) => setNumericParam('cornerRadius', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {selectedElement.type === 'bezel' || selectedElement.type === 'outline_ring' || selectedElement.type === 'free_ring' ? (
                   <div className="space-y-2 rounded border border-zinc-800 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-400">Ring Controls</p>
@@ -4152,7 +5022,7 @@ export default function ParametricPage() {
                                 <span className="text-[11px] text-zinc-500">Start</span>
                                 <input
                                   type="number"
-                                  value={getNumericParam('token.number.start', 1)}
+                                  value={getNumericParam('token.number.start', 12)}
                                   onChange={(e) => setNumericParam('token.number.start', Number(e.target.value))}
                                   className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                                 />
@@ -4564,6 +5434,191 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Texture Kind</span>
+                    <select
+                      value={getSelectedTextureString('kind', 'grain')}
+                      onChange={(e) => setSelectedTextureString('kind', e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    >
+                      {TEXTURE_KIND_OPTIONS.map((option) => (
+                        <option key={`texture-kind-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {getSelectedTextureString('kind', 'grain') === 'grain' || getSelectedTextureString('kind', 'grain') === 'noise' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Noise Amount {getSelectedTextureNumber('noise.amount', 0.2).toFixed(2)}</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={3}
+                          step={0.01}
+                          value={getSelectedTextureNumber('noise.amount', 0.2)}
+                          onChange={(e) => setSelectedTextureNumber('noise.amount', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Noise Radius {getSelectedTextureNumber('noise.radius', 24).toFixed(1)}</span>
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={320}
+                          step={0.1}
+                          value={getSelectedTextureNumber('noise.radius', 24)}
+                          onChange={(e) => setSelectedTextureNumber('noise.radius', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+
+                  {getSelectedTextureString('kind', 'grain') === 'brushed' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Brushed Amount {getSelectedTextureNumber('noise.amount', 0.24).toFixed(2)}</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={3}
+                          step={0.01}
+                          value={getSelectedTextureNumber('noise.amount', 0.24)}
+                          onChange={(e) => setSelectedTextureNumber('noise.amount', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Brushed Radius {getSelectedTextureNumber('noise.radius', 24).toFixed(1)}</span>
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={320}
+                          step={0.1}
+                          value={getSelectedTextureNumber('noise.radius', 24)}
+                          onChange={(e) => setSelectedTextureNumber('noise.radius', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Direction {Math.round(getSelectedTextureNumber('direction', 0))}deg</span>
+                        <input
+                          type="range"
+                          min={-180}
+                          max={180}
+                          step={1}
+                          value={getSelectedTextureNumber('direction', 0)}
+                          onChange={(e) => setSelectedTextureNumber('direction', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+
+                  {getSelectedTextureString('kind', 'grain') === 'fabric' ? (
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Density {getSelectedTextureNumber('density', 0.5).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={getSelectedTextureNumber('density', 0.5)}
+                        onChange={(e) => setSelectedTextureNumber('density', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+                  ) : null}
+
+                  {getSelectedTextureString('kind', 'grain') === 'paper' ? (
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Fiber {getSelectedTextureNumber('fiber', 0.5).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={getSelectedTextureNumber('fiber', 0.5)}
+                        onChange={(e) => setSelectedTextureNumber('fiber', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+                  ) : null}
+
+                  {getSelectedTextureString('kind', 'grain') === 'image' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Offset X {Math.round(getSelectedTextureNumber('image.offsetX', 0))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={100}
+                          step={1}
+                          value={getSelectedTextureNumber('image.offsetX', 0)}
+                          onChange={(e) => setSelectedTextureNumber('image.offsetX', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Offset Y {Math.round(getSelectedTextureNumber('image.offsetY', 0))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={100}
+                          step={1}
+                          value={getSelectedTextureNumber('image.offsetY', 0)}
+                          onChange={(e) => setSelectedTextureNumber('image.offsetY', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Scale {getSelectedTextureNumber('image.scale', 1).toFixed(2)}</span>
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={5}
+                          step={0.01}
+                          value={getSelectedTextureNumber('image.scale', 1)}
+                          onChange={(e) => setSelectedTextureNumber('image.scale', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Rotation {Math.round(getSelectedTextureNumber('image.rotation', 0))}deg</span>
+                        <input
+                          type="range"
+                          min={-180}
+                          max={180}
+                          step={1}
+                          value={getSelectedTextureNumber('image.rotation', 0)}
+                          onChange={(e) => setSelectedTextureNumber('image.rotation', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+
+                  {getSelectedTextureString('kind', 'grain') === 'proceduralMap' ? (
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Seed</span>
+                      <input
+                        type="number"
+                        step={1}
+                        value={Math.round(getSelectedTextureNumber('seed', 1))}
+                        onChange={(e) => setSelectedTextureNumber('seed', Number(e.target.value))}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
+                    </label>
+                  ) : null}
+
+                  <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Opacity {getSelectedTextureNumber('opacity', 0.3).toFixed(2)}</span>
                     <input
                       type="range"
@@ -4667,56 +5722,196 @@ export default function ParametricPage() {
                   </div>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedTextureNumber('gradient.from.0', 0))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedTextureNumber('gradient.from.0', 0)}
-                      onChange={(e) => setSelectedTextureNumber('gradient.from.0', Number(e.target.value))}
-                      className="w-full"
-                    />
+                    <span className="text-[11px] text-zinc-500">Gradient Type</span>
+                    <select
+                      value={textureGradientKind}
+                      onChange={(e) => setCanvasGradientKind('texture', e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    >
+                      {GRADIENT_KIND_OPTIONS.map((option) => (
+                        <option key={`texture-gradient-kind-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                   </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient Start Y {Math.round(getSelectedTextureNumber('gradient.from.1', 0))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedTextureNumber('gradient.from.1', 0)}
-                      onChange={(e) => setSelectedTextureNumber('gradient.from.1', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                  {textureGradientKind === 'linear' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedTextureNumber('gradient.from.0', 0))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.from.0', 0)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.from.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient End X {Math.round(getSelectedTextureNumber('gradient.to.0', 100))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedTextureNumber('gradient.to.0', 100)}
-                      onChange={(e) => setSelectedTextureNumber('gradient.to.0', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Start Y {Math.round(getSelectedTextureNumber('gradient.from.1', 0))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.from.1', 0)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.from.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient End Y {Math.round(getSelectedTextureNumber('gradient.to.1', 100))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedTextureNumber('gradient.to.1', 100)}
-                      onChange={(e) => setSelectedTextureNumber('gradient.to.1', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient End X {Math.round(getSelectedTextureNumber('gradient.to.0', 100))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.to.0', 100)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.to.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient End Y {Math.round(getSelectedTextureNumber('gradient.to.1', 100))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.to.1', 100)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.to.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : textureGradientKind === 'radial' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center X {Math.round(getSelectedTextureNumber('gradient.center.0', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.center.0', 50)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.center.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center Y {Math.round(getSelectedTextureNumber('gradient.center.1', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.center.1', 50)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.center.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Radius {getSelectedTextureNumber('gradient.radius', 50).toFixed(1)}%</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={200}
+                          step={0.5}
+                          value={getSelectedTextureNumber('gradient.radius', 50)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.radius', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Focal X {Math.round(getSelectedTextureNumber('gradient.focal.0', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.focal.0', 50)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.focal.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Focal Y {Math.round(getSelectedTextureNumber('gradient.focal.1', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.focal.1', 50)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.focal.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : textureGradientKind === 'conic' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center X {Math.round(getSelectedTextureNumber('gradient.center.0', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.center.0', 50)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.center.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center Y {Math.round(getSelectedTextureNumber('gradient.center.1', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.center.1', 50)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.center.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Start Angle {Math.round(getSelectedTextureNumber('gradient.angleStart', 0))}deg</span>
+                        <input
+                          type="range"
+                          min={-360}
+                          max={360}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.angleStart', 0)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.angleStart', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Angle Span {Math.round(getSelectedTextureNumber('gradient.angleSpan', 360))}deg</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={360}
+                          step={1}
+                          value={getSelectedTextureNumber('gradient.angleSpan', 360)}
+                          onChange={(e) => setSelectedTextureNumber('gradient.angleSpan', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-zinc-500">Choose gradient type to edit controls.</p>
+                  )}
 
                   <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Gradient Stops</p>
@@ -4764,49 +5959,25 @@ export default function ParametricPage() {
                     ))}
                   </div>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Noise Amount {getSelectedTextureNumber('noise.amount', 0.2).toFixed(2)}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={3}
-                      step={0.01}
-                      value={getSelectedTextureNumber('noise.amount', 0.2)}
-                      onChange={(e) => setSelectedTextureNumber('noise.amount', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
-
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Noise Radius {getSelectedTextureNumber('noise.radius', 24).toFixed(1)}</span>
-                    <input
-                      type="range"
-                      min={0.1}
-                      max={320}
-                      step={0.1}
-                      value={getSelectedTextureNumber('noise.radius', 24)}
-                      onChange={(e) => setSelectedTextureNumber('noise.radius', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
-
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={getSelectedTextureClipEnabled()}
+                      checked={selectedTextureClipEnabled}
                       onChange={(e) => setSelectedTextureClipEnabled(e.target.checked)}
                     />
                     <span className="text-[11px] text-zinc-400">Clip texture to target element</span>
                   </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Texture Clip Target Name</span>
-                    <input
-                      value={getSelectedTextureClipTargetName()}
-                      onChange={(e) => setSelectedTextureClipTargetName(e.target.value)}
-                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                    />
-                  </label>
+                  {selectedTextureClipEnabled ? (
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Texture Clip Target Name</span>
+                      <input
+                        value={getSelectedTextureClipTargetName()}
+                        onChange={(e) => setSelectedTextureClipTargetName(e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
+                    </label>
+                  ) : null}
                     </>
                   ) : null}
                 </div>
@@ -4975,56 +6146,196 @@ export default function ParametricPage() {
                   </div>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedGradientNumber('from.0', 0))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedGradientNumber('from.0', 0)}
-                      onChange={(e) => setSelectedGradientNumber('from.0', Number(e.target.value))}
-                      className="w-full"
-                    />
+                    <span className="text-[11px] text-zinc-500">Gradient Type</span>
+                    <select
+                      value={elementGradientKind}
+                      onChange={(e) => setCanvasGradientKind('gradient', e.target.value)}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    >
+                      {GRADIENT_KIND_OPTIONS.map((option) => (
+                        <option key={`element-gradient-kind-${option.value}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                   </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient Start Y {Math.round(getSelectedGradientNumber('from.1', 0))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedGradientNumber('from.1', 0)}
-                      onChange={(e) => setSelectedGradientNumber('from.1', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                  {elementGradientKind === 'linear' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Start X {Math.round(getSelectedGradientNumber('from.0', 0))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('from.0', 0)}
+                          onChange={(e) => setSelectedGradientNumber('from.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient End X {Math.round(getSelectedGradientNumber('to.0', 100))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedGradientNumber('to.0', 100)}
-                      onChange={(e) => setSelectedGradientNumber('to.0', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Start Y {Math.round(getSelectedGradientNumber('from.1', 0))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('from.1', 0)}
+                          onChange={(e) => setSelectedGradientNumber('from.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient End Y {Math.round(getSelectedGradientNumber('to.1', 100))}%</span>
-                    <input
-                      type="range"
-                      min={-100}
-                      max={200}
-                      step={1}
-                      value={getSelectedGradientNumber('to.1', 100)}
-                      onChange={(e) => setSelectedGradientNumber('to.1', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient End X {Math.round(getSelectedGradientNumber('to.0', 100))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('to.0', 100)}
+                          onChange={(e) => setSelectedGradientNumber('to.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient End Y {Math.round(getSelectedGradientNumber('to.1', 100))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('to.1', 100)}
+                          onChange={(e) => setSelectedGradientNumber('to.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : elementGradientKind === 'radial' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center X {Math.round(getSelectedGradientNumber('center.0', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('center.0', 50)}
+                          onChange={(e) => setSelectedGradientNumber('center.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center Y {Math.round(getSelectedGradientNumber('center.1', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('center.1', 50)}
+                          onChange={(e) => setSelectedGradientNumber('center.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Radius {getSelectedGradientNumber('radius', 50).toFixed(1)}%</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={200}
+                          step={0.5}
+                          value={getSelectedGradientNumber('radius', 50)}
+                          onChange={(e) => setSelectedGradientNumber('radius', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Focal X {Math.round(getSelectedGradientNumber('focal.0', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('focal.0', 50)}
+                          onChange={(e) => setSelectedGradientNumber('focal.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Focal Y {Math.round(getSelectedGradientNumber('focal.1', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('focal.1', 50)}
+                          onChange={(e) => setSelectedGradientNumber('focal.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : elementGradientKind === 'conic' ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center X {Math.round(getSelectedGradientNumber('center.0', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('center.0', 50)}
+                          onChange={(e) => setSelectedGradientNumber('center.0', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Gradient Center Y {Math.round(getSelectedGradientNumber('center.1', 50))}%</span>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={200}
+                          step={1}
+                          value={getSelectedGradientNumber('center.1', 50)}
+                          onChange={(e) => setSelectedGradientNumber('center.1', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Start Angle {Math.round(getSelectedGradientNumber('angleStart', 0))}deg</span>
+                        <input
+                          type="range"
+                          min={-360}
+                          max={360}
+                          step={1}
+                          value={getSelectedGradientNumber('angleStart', 0)}
+                          onChange={(e) => setSelectedGradientNumber('angleStart', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Angle Span {Math.round(getSelectedGradientNumber('angleSpan', 360))}deg</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={360}
+                          step={1}
+                          value={getSelectedGradientNumber('angleSpan', 360)}
+                          onChange={(e) => setSelectedGradientNumber('angleSpan', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-zinc-500">Choose gradient type to edit controls.</p>
+                  )}
 
                   <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Gradient Stops</p>
@@ -5075,20 +6386,22 @@ export default function ParametricPage() {
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={getSelectedGradientClipEnabled()}
+                      checked={selectedGradientClipEnabled}
                       onChange={(e) => setSelectedGradientClipEnabled(e.target.checked)}
                     />
                     <span className="text-[11px] text-zinc-400">Clip gradient to target element</span>
                   </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Gradient Clip Target Name</span>
-                    <input
-                      value={getSelectedGradientClipTargetName()}
-                      onChange={(e) => setSelectedGradientClipTargetName(e.target.value)}
-                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                    />
-                  </label>
+                  {selectedGradientClipEnabled ? (
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Gradient Clip Target Name</span>
+                      <input
+                        value={getSelectedGradientClipTargetName()}
+                        onChange={(e) => setSelectedGradientClipTargetName(e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
+                    </label>
+                  ) : null}
                     </>
                   ) : null}
                 </div>
@@ -5196,20 +6509,22 @@ export default function ParametricPage() {
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={getSelectedMaterialClipEnabled()}
+                      checked={selectedMaterialClipEnabled}
                       onChange={(e) => setSelectedMaterialClipEnabled(e.target.checked)}
                     />
                     <span className="text-[11px] text-zinc-400">Clip material to target element</span>
                   </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Material Clip Target Name</span>
-                    <input
-                      value={getSelectedMaterialClipTargetName()}
-                      onChange={(e) => setSelectedMaterialClipTargetName(e.target.value)}
-                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                    />
-                  </label>
+                  {selectedMaterialClipEnabled ? (
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Material Clip Target Name</span>
+                      <input
+                        value={getSelectedMaterialClipTargetName()}
+                        onChange={(e) => setSelectedMaterialClipTargetName(e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
+                    </label>
+                  ) : null}
                     </>
                   ) : null}
                 </div>
@@ -5230,7 +6545,7 @@ export default function ParametricPage() {
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Mask Mode</span>
                     <select
-                      value={getSelectedMaskString('mode', 'brush')}
+                      value={selectedMaskMode}
                       onChange={(e) => setSelectedMaskString('mode', e.target.value)}
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                     >
@@ -5245,7 +6560,7 @@ export default function ParametricPage() {
                       checked={isMaskBrushEditEnabled}
                       onChange={(e) => setIsMaskBrushEditEnabled(e.target.checked)}
                     />
-                    <span className="text-[11px] text-zinc-400">Enable brush painting on preview</span>
+                    <span className="text-[11px] text-zinc-400">Enable mask editing on preview</span>
                   </label>
 
                   <label className="block space-y-1">
@@ -5269,34 +6584,38 @@ export default function ParametricPage() {
                     <span className="text-[11px] text-zinc-400">Invert mask</span>
                   </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Brush Size {Math.round(getSelectedMaskNumber('brush.size', 16))}</span>
-                    <input
-                      type="range"
-                      min={1}
-                      max={128}
-                      step={1}
-                      value={getSelectedMaskNumber('brush.size', 16)}
-                      onChange={(e) => setSelectedMaskNumber('brush.size', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                  {isBrushMaskMode ? (
+                    <>
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Brush Size {Math.round(getSelectedMaskNumber('brush.size', 16))}</span>
+                        <input
+                          type="range"
+                          min={1}
+                          max={128}
+                          step={1}
+                          value={getSelectedMaskNumber('brush.size', 16)}
+                          onChange={(e) => setSelectedMaskNumber('brush.size', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Brush Hardness {getSelectedMaskNumber('brush.hardness', 0.8).toFixed(2)}</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={getSelectedMaskNumber('brush.hardness', 0.8)}
+                          onChange={(e) => setSelectedMaskNumber('brush.hardness', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : null}
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Brush Hardness {getSelectedMaskNumber('brush.hardness', 0.8).toFixed(2)}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={getSelectedMaskNumber('brush.hardness', 0.8)}
-                      onChange={(e) => setSelectedMaskNumber('brush.hardness', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
-
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Brush Opacity {getSelectedMaskNumber('brush.opacity', 1).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Mask Opacity {getSelectedMaskNumber('brush.opacity', 1).toFixed(2)}</span>
                     <input
                       type="range"
                       min={0}

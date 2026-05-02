@@ -56,6 +56,7 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			},
 			material: element.material && typeof element.material === "object" ? { ...element.material } : null,
 			texture: element.texture && typeof element.texture === "object" ? { ...element.texture } : null,
+			gradient: element.gradient && typeof element.gradient === "object" ? { ...element.gradient } : null,
 			styleAdjust: element.styleAdjust && typeof element.styleAdjust === "object" ? { ...element.styleAdjust } : null,
 			effect3d: element.effect3d && typeof element.effect3d === "object" ? { ...element.effect3d } : null,
 			placement: element.placement ? { ...element.placement, config: { ...(element.placement.config || {}) } } : null,
@@ -70,6 +71,7 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 		effects3d: geometryObj.effects3d && typeof geometryObj.effects3d === "object" ? { ...geometryObj.effects3d } : null,
 		styleAdjust: geometryObj.styleAdjust && typeof geometryObj.styleAdjust === "object" ? { ...geometryObj.styleAdjust } : null,
 		texture: geometryObj.texture && typeof geometryObj.texture === "object" ? { ...geometryObj.texture } : null,
+		gradient: geometryObj.gradient && typeof geometryObj.gradient === "object" ? { ...geometryObj.gradient } : null,
 		elements,
 	};
 }

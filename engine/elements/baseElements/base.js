@@ -22,11 +22,13 @@ function getLayoutMetrics(context) {
 	const height = Number(context?.layoutMetrics?.height);
 	const baseRadius = Number(context?.layoutMetrics?.baseRadius);
 	const scale = Number(context?.layoutMetrics?.globalScale);
+	const padding = Number(context?.layoutMetrics?.padding);
 	return {
 		width: Number.isFinite(width) && width > 0 ? width : 100,
 		height: Number.isFinite(height) && height > 0 ? height : 100,
 		baseRadius: Number.isFinite(baseRadius) && baseRadius > 0 ? baseRadius : 50,
 		scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+		padding: Number.isFinite(padding) ? Math.max(0, Math.min(0.49, padding)) : 0,
 	};
 }
 
@@ -41,8 +43,10 @@ function resolveFill(params) {
 
 export function renderBase(params = {}, position = {}, context = {}) {
 	const p = { ...DEFAULTS, ...params };
-	const { width, height, baseRadius, scale } = getLayoutMetrics(context);
+	const { width, height, baseRadius, scale, padding } = getLayoutMetrics(context);
 	const drawableDiameter = Math.max(1, baseRadius * 2);
+	const drawableWidth = Math.max(1, width * (1 - padding * 2) * scale);
+	const drawableHeight = Math.max(1, height * (1 - padding * 2) * scale);
 	const fill = resolveFill(p);
 	const stroke = typeof p.stroke === "string" ? p.stroke : DEFAULTS.stroke;
 	const strokeWidth = Math.max(0, clamp(p.thickness, 0, 1, DEFAULTS.thickness) * baseRadius * scale);
@@ -50,8 +54,8 @@ export function renderBase(params = {}, position = {}, context = {}) {
 	const edgeInsetPx = Math.max(0.5, strokeWidth * 0.5 + 0.25);
 
 	if (shape === "rectangle" || shape === "rect") {
-		const rectWidthRaw = clamp(p.width, 0, 1, DEFAULTS.width) * drawableDiameter * scale;
-		const rectHeightRaw = clamp(p.height, 0, 1, DEFAULTS.height) * drawableDiameter * scale;
+		const rectWidthRaw = clamp(p.width, 0, 1, DEFAULTS.width) * drawableWidth;
+		const rectHeightRaw = clamp(p.height, 0, 1, DEFAULTS.height) * drawableHeight;
 		const rectWidth = Math.max(0, rectWidthRaw - edgeInsetPx * 2);
 		const rectHeight = Math.max(0, rectHeightRaw - edgeInsetPx * 2);
 		const cornerRadius = clamp(p.cornerRadius, 0, 1, DEFAULTS.cornerRadius) * Math.min(rectWidth, rectHeight);

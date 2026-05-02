@@ -16,6 +16,7 @@ export function buildGeometry(template) {
 	const effects3d = templateObj.effects3d && typeof templateObj.effects3d === "object" ? { ...templateObj.effects3d } : null;
 	const styleAdjust = templateObj.styleAdjust && typeof templateObj.styleAdjust === "object" ? { ...templateObj.styleAdjust } : null;
 	const texture = templateObj.texture && typeof templateObj.texture === "object" ? { ...templateObj.texture } : null;
+	const gradient = templateObj.gradient && typeof templateObj.gradient === "object" ? { ...templateObj.gradient } : null;
 
 	const elements = sourceElements.map((element, index) => {
 		const safeElement = asObject(element, `template.elements[${index}]`);
@@ -35,6 +36,7 @@ export function buildGeometry(template) {
 			params: { ...safeElement.params },
 			material: safeElement.material && typeof safeElement.material === "object" ? { ...safeElement.material } : null,
 			texture: safeElement.texture && typeof safeElement.texture === "object" ? { ...safeElement.texture } : null,
+			gradient: safeElement.gradient && typeof safeElement.gradient === "object" ? { ...safeElement.gradient } : null,
 			styleAdjust: safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? { ...safeElement.styleAdjust } : null,
 			effect3d: safeElement.effect3d && typeof safeElement.effect3d === "object" ? { ...safeElement.effect3d } : null,
 			placement,
@@ -49,6 +51,7 @@ export function buildGeometry(template) {
 		effects3d,
 		styleAdjust,
 		texture,
+		gradient,
 		elements,
 	};
 }
