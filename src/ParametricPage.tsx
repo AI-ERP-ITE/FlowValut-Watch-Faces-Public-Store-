@@ -1254,6 +1254,10 @@ export default function ParametricPage() {
     saveTemplate(result.template);
     void renderPreview(result.template);
     isHistoryApplyingRef.current = false;
+    const label = typeof result.command?.label === 'string' && result.command.label.trim().length > 0
+      ? result.command.label.trim()
+      : 'last command';
+    setEditorNotice(`Undid: ${label}`);
     setHistoryTick((value) => value + 1);
   }, [renderPreview]);
 
@@ -1267,6 +1271,10 @@ export default function ParametricPage() {
     saveTemplate(result.template);
     void renderPreview(result.template);
     isHistoryApplyingRef.current = false;
+    const label = typeof result.command?.label === 'string' && result.command.label.trim().length > 0
+      ? result.command.label.trim()
+      : 'last command';
+    setEditorNotice(`Redid: ${label}`);
     setHistoryTick((value) => value + 1);
   }, [renderPreview]);
 
@@ -1321,7 +1329,19 @@ export default function ParametricPage() {
     const isEditableTarget = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) return false;
       const tag = target.tagName.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if (tag === 'textarea' || tag === 'select') return true;
+      if (tag === 'input') {
+        const input = target as HTMLInputElement;
+        const type = (input.type || '').toLowerCase();
+        // Keep native text-edit undo behavior for textual fields.
+        return type === ''
+          || type === 'text'
+          || type === 'search'
+          || type === 'url'
+          || type === 'tel'
+          || type === 'email'
+          || type === 'password';
+      }
       return target.isContentEditable;
     };
 

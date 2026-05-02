@@ -50,8 +50,8 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			visible: element.visible,
 			materialRef: materialKey,
 			params: {
-				...(element.params || {}),
 				...(material || {}),
+				...(element.params || {}),
 				...roleOverrides,
 			},
 			material: element.material && typeof element.material === "object" ? { ...element.material } : null,
