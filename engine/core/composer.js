@@ -7,6 +7,13 @@ function requireObject(value, label) {
 	return value;
 }
 
+function cloneEffectLayers(value) {
+	if (!Array.isArray(value)) return [];
+	return value
+		.filter((entry) => entry && typeof entry === "object")
+		.map((entry) => ({ ...entry }));
+}
+
 function resolveMaterialKey(element, styleMap) {
 	if (typeof element.materialRef === "string" && element.materialRef.trim().length > 0) {
 		return element.materialRef;
@@ -57,6 +64,10 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			material: element.material && typeof element.material === "object" ? { ...element.material } : null,
 			texture: element.texture && typeof element.texture === "object" ? { ...element.texture } : null,
 			gradient: element.gradient && typeof element.gradient === "object" ? { ...element.gradient } : null,
+			materialLayers: cloneEffectLayers(element.materialLayers),
+			textureLayers: cloneEffectLayers(element.textureLayers),
+			gradientLayers: cloneEffectLayers(element.gradientLayers),
+			dropShadow: element.dropShadow && typeof element.dropShadow === "object" ? { ...element.dropShadow } : null,
 			styleAdjust: element.styleAdjust && typeof element.styleAdjust === "object" ? { ...element.styleAdjust } : null,
 			effect3d: element.effect3d && typeof element.effect3d === "object" ? { ...element.effect3d } : null,
 			placement: element.placement ? { ...element.placement, config: { ...(element.placement.config || {}) } } : null,

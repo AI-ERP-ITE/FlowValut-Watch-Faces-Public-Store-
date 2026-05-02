@@ -13,6 +13,7 @@ import {
   writeNormalizedMaterialLayers,
   writeNormalizedTextureLayers,
 } from '@/lib/effects/legacyEffectNormalization';
+import { normalizeDepthEffectRecord, normalizeDropShadowForBake } from '@/lib/effectNormalization';
 import {
   pushHistoryCommand,
   redoHistory,
@@ -416,7 +417,7 @@ const FREE_OBJECT_SHAPE_BY_TYPE = new Map<string, { label: string; type: string;
   FREE_OBJECT_SHAPE_OPTIONS.map((item) => [item.type, item]),
 );
 
-const EFFECT_PANEL_KEYS = ['styleFx', 'depthFx', 'textureFx', 'gradientFx', 'materialFx'] as const;
+const EFFECT_PANEL_KEYS = ['styleFx', 'depthFx', 'shadowFx', 'textureFx', 'gradientFx', 'materialFx'] as const;
 type EffectPanelKey = (typeof EFFECT_PANEL_KEYS)[number];
 const BLUR_MODE_OPTIONS = [
   { value: 'gaussian', label: 'Gaussian' },
@@ -494,6 +495,19 @@ const RECT_LAYOUT_SHAPE_MODE_OPTIONS = [
   { value: 'circle', label: 'Circle (Keep Circular)' },
 ] as const;
 const FIXED_RENDER_STYLE: StyleKey = 'gold_dark';
+const DEPTH_CONTROL_LIMITS = {
+  intensity: { min: 0, max: 1, step: 0.02 },
+  angle: { min: -180, max: 180, step: 1 },
+  distance: { min: 0, max: 6, step: 0.1 },
+  falloff: { min: 0.2, max: 3, step: 0.02 },
+  whiteBalance: { min: -1, max: 1, step: 0.02 },
+  spread: { min: 0, max: 1, step: 0.02 },
+} as const;
+const DROP_SHADOW_CONTROL_LIMITS = {
+  opacity: { min: 0, max: 1, step: 0.02 },
+  blur: { min: 0, max: 40, step: 0.5 },
+  offset: { min: -30, max: 30, step: 0.5 },
+} as const;
 
 function makeId(prefix = 'el'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1135,9 +1149,21 @@ export default function ParametricPage() {
 
       const renderInput: TemplateModel = {
         ...template,
+        effects3d: normalizeDepthEffectRecord(template.effects3d as Record<string, unknown> | undefined),
         elements: baseElements
           .map((element) => {
             const clone = deepClone(element);
+            clone.effect3d = normalizeDepthEffectRecord(clone.effect3d as Record<string, unknown> | undefined);
+            if (clone.dropShadow && typeof clone.dropShadow === 'object') {
+              const source = clone.dropShadow as Record<string, unknown>;
+              clone.dropShadow = normalizeDropShadowForBake({
+                color: typeof source.color === 'string' ? source.color : '#000000',
+                opacity: Number.isFinite(Number(source.opacity)) ? Number(source.opacity) : 0.45,
+                blur: Number.isFinite(Number(source.blur)) ? Number(source.blur) : 8,
+                offsetX: Number.isFinite(Number(source.offsetX)) ? Number(source.offsetX) : 2,
+                offsetY: Number.isFinite(Number(source.offsetY)) ? Number(source.offsetY) : 2,
+              }) as unknown as TemplateElement['dropShadow'];
+            }
             delete clone.id;
             delete clone.name;
             delete clone.visible;
@@ -1162,8 +1188,20 @@ export default function ParametricPage() {
       if (!isSoloMode && selectedVisibleElement && (isDimMode || isSelectedMaskEnabled)) {
         const overlayInput: TemplateModel = {
           ...template,
+          effects3d: normalizeDepthEffectRecord(template.effects3d as Record<string, unknown> | undefined),
           elements: [selectedVisibleElement].map((element) => {
             const clone = deepClone(element);
+            clone.effect3d = normalizeDepthEffectRecord(clone.effect3d as Record<string, unknown> | undefined);
+            if (clone.dropShadow && typeof clone.dropShadow === 'object') {
+              const source = clone.dropShadow as Record<string, unknown>;
+              clone.dropShadow = normalizeDropShadowForBake({
+                color: typeof source.color === 'string' ? source.color : '#000000',
+                opacity: Number.isFinite(Number(source.opacity)) ? Number(source.opacity) : 0.45,
+                blur: Number.isFinite(Number(source.blur)) ? Number(source.blur) : 8,
+                offsetX: Number.isFinite(Number(source.offsetX)) ? Number(source.offsetX) : 2,
+                offsetY: Number.isFinite(Number(source.offsetY)) ? Number(source.offsetY) : 2,
+              }) as unknown as TemplateElement['dropShadow'];
+            }
             delete clone.id;
             delete clone.name;
             delete clone.visible;
@@ -1392,24 +1430,23 @@ export default function ParametricPage() {
   const updateTemplateEffects3d = (updater: (effects: Record<string, unknown>) => Record<string, unknown>, label = 'Update global effects') => {
     applyTemplateCommand(label, (prev) => {
       const currentEffects = prev.effects3d && typeof prev.effects3d === 'object' ? prev.effects3d : {};
+      const nextEffects = updater({ ...currentEffects });
       return {
         ...prev,
-        effects3d: updater({ ...currentEffects }),
+        effects3d: normalizeDepthEffectRecord(nextEffects),
       };
     });
   };
 
   const getTemplateEffectNumber = (key: string, fallback: number): number => {
-    const effects = workingTemplate?.effects3d;
-    if (!effects || typeof effects !== 'object') return fallback;
-    const value = Number((effects as Record<string, unknown>)[key]);
+    const effects = normalizeDepthEffectRecord(workingTemplate?.effects3d as Record<string, unknown> | undefined);
+    const value = Number(effects[key]);
     return Number.isFinite(value) ? value : fallback;
   };
 
   const getTemplateEffectEnabled = (): boolean => {
-    const effects = workingTemplate?.effects3d;
-    if (!effects || typeof effects !== 'object') return false;
-    return (effects as Record<string, unknown>).enabled === true;
+    const effects = normalizeDepthEffectRecord(workingTemplate?.effects3d as Record<string, unknown> | undefined);
+    return effects.enabled === true;
   };
 
   const syncBaseElementShapeToLayout = (shape: 'circle' | 'rectangle') => {
@@ -3144,7 +3181,7 @@ export default function ParametricPage() {
         const effect3d = element.effect3d && typeof element.effect3d === 'object'
           ? deepClone(element.effect3d) as Record<string, unknown>
           : {};
-        return { ...element, effect3d: { ...effect3d, enabled } };
+        return { ...element, effect3d: normalizeDepthEffectRecord({ ...effect3d, enabled }) };
       }),
     );
   };
@@ -3168,15 +3205,16 @@ export default function ParametricPage() {
           cursor = cursor[key] as Record<string, unknown>;
         }
         cursor[segments[segments.length - 1]] = value;
-        return { ...element, effect3d };
+        return { ...element, effect3d: normalizeDepthEffectRecord(effect3d) };
       }),
     );
   };
 
   const getSelectedEffect3dNumber = (path: string, fallback: number) => {
-    if (!selectedElement || !selectedElement.effect3d || typeof selectedElement.effect3d !== 'object') return fallback;
+    if (!selectedElement) return fallback;
+    const normalized = normalizeDepthEffectRecord(selectedElement.effect3d as Record<string, unknown> | undefined);
     const segments = path.split('.');
-    let cursor: unknown = selectedElement.effect3d;
+    let cursor: unknown = normalized;
     for (const key of segments) {
       if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
       cursor = (cursor as Record<string, unknown>)[key];
@@ -3186,8 +3224,111 @@ export default function ParametricPage() {
   };
 
   const isSelectedEffect3dEnabled = () => {
-    if (!selectedElement || !selectedElement.effect3d || typeof selectedElement.effect3d !== 'object') return false;
-    return (selectedElement.effect3d as Record<string, unknown>).enabled === true;
+    if (!selectedElement) return false;
+    const normalized = normalizeDepthEffectRecord(selectedElement.effect3d as Record<string, unknown> | undefined);
+    return normalized.enabled === true;
+  };
+
+  const normalizeDropShadowRecord = (source?: Record<string, unknown>) => {
+    const safeColor = typeof source?.color === 'string' ? source.color : '#000000';
+    const safeOpacity = Number(source?.opacity);
+    const safeBlur = Number(source?.blur);
+    const safeOffsetX = Number(source?.offsetX);
+    const safeOffsetY = Number(source?.offsetY);
+
+    return normalizeDropShadowForBake({
+      color: safeColor,
+      opacity: Number.isFinite(safeOpacity) ? safeOpacity : 0.45,
+      blur: Number.isFinite(safeBlur) ? safeBlur : 8,
+      offsetX: Number.isFinite(safeOffsetX) ? safeOffsetX : 2,
+      offsetY: Number.isFinite(safeOffsetY) ? safeOffsetY : 2,
+    }) as Record<string, unknown>;
+  };
+
+  const getSelectedDropShadowRecord = () => {
+    if (!selectedElement || !selectedElement.dropShadow || typeof selectedElement.dropShadow !== 'object') {
+      return normalizeDropShadowRecord();
+    }
+    return normalizeDropShadowRecord(selectedElement.dropShadow as Record<string, unknown>);
+  };
+
+  const isSelectedDropShadowEnabled = () => {
+    if (!selectedElement || !selectedElement.dropShadow || typeof selectedElement.dropShadow !== 'object') return false;
+    return true;
+  };
+
+  const setSelectedDropShadowEnabled = (enabled: boolean) => {
+    if (!selectedElement) return;
+    updateTemplateElements(
+      (elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedElement.id) return element;
+          if (!enabled) {
+            const nextElement = { ...element };
+            delete nextElement.dropShadow;
+            return nextElement;
+          }
+          const current = element.dropShadow && typeof element.dropShadow === 'object'
+            ? (element.dropShadow as Record<string, unknown>)
+            : undefined;
+          return {
+            ...element,
+            dropShadow: normalizeDropShadowRecord(current),
+          };
+        }),
+      'Toggle element drop shadow',
+    );
+  };
+
+  const setSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'offsetX' | 'offsetY', value: number) => {
+    if (!selectedElement) return;
+    updateTemplateElements(
+      (elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedElement.id) return element;
+          const current = element.dropShadow && typeof element.dropShadow === 'object'
+            ? (element.dropShadow as Record<string, unknown>)
+            : undefined;
+          const next = normalizeDropShadowRecord(current);
+          next[key] = value;
+          return {
+            ...element,
+            dropShadow: normalizeDropShadowRecord(next),
+          };
+        }),
+      'Adjust element drop shadow',
+    );
+  };
+
+  const setSelectedDropShadowColor = (color: string) => {
+    if (!selectedElement) return;
+    updateTemplateElements(
+      (elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedElement.id) return element;
+          const current = element.dropShadow && typeof element.dropShadow === 'object'
+            ? (element.dropShadow as Record<string, unknown>)
+            : undefined;
+          const next = normalizeDropShadowRecord(current);
+          next.color = color;
+          return {
+            ...element,
+            dropShadow: normalizeDropShadowRecord(next),
+          };
+        }),
+      'Set element drop shadow color',
+    );
+  };
+
+  const getSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'offsetX' | 'offsetY', fallback: number) => {
+    const shadow = getSelectedDropShadowRecord();
+    const raw = Number(shadow[key]);
+    return Number.isFinite(raw) ? raw : fallback;
+  };
+
+  const getSelectedDropShadowColor = (fallback: string) => {
+    const shadow = getSelectedDropShadowRecord();
+    return typeof shadow.color === 'string' ? shadow.color : fallback;
   };
 
   useEffect(() => {
@@ -3624,9 +3765,9 @@ export default function ParametricPage() {
                 <span className="text-[11px] text-zinc-500">Angle {Math.round(getTemplateEffectNumber('angle', -35))}deg</span>
                 <input
                   type="range"
-                  min={-180}
-                  max={180}
-                  step={1}
+                  min={DEPTH_CONTROL_LIMITS.angle.min}
+                  max={DEPTH_CONTROL_LIMITS.angle.max}
+                  step={DEPTH_CONTROL_LIMITS.angle.step}
                   value={getTemplateEffectNumber('angle', -35)}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, angle: Number(e.target.value) }))}
                   className="mt-1 w-full"
@@ -3637,9 +3778,9 @@ export default function ParametricPage() {
                 <span className="text-[11px] text-zinc-500">Intensity {getTemplateEffectNumber('intensity', 0.46).toFixed(2)}</span>
                 <input
                   type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
+                  min={DEPTH_CONTROL_LIMITS.intensity.min}
+                  max={DEPTH_CONTROL_LIMITS.intensity.max}
+                  step={DEPTH_CONTROL_LIMITS.intensity.step}
                   value={getTemplateEffectNumber('intensity', 0.46)}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
                   className="mt-1 w-full"
@@ -3650,9 +3791,9 @@ export default function ParametricPage() {
                 <span className="text-[11px] text-zinc-500">Falloff {getTemplateEffectNumber('falloff', 1).toFixed(2)}</span>
                 <input
                   type="range"
-                  min={0.2}
-                  max={3}
-                  step={0.01}
+                  min={DEPTH_CONTROL_LIMITS.falloff.min}
+                  max={DEPTH_CONTROL_LIMITS.falloff.max}
+                  step={DEPTH_CONTROL_LIMITS.falloff.step}
                   value={getTemplateEffectNumber('falloff', 1)}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, falloff: Number(e.target.value) }))}
                   className="mt-1 w-full"
@@ -3663,9 +3804,9 @@ export default function ParametricPage() {
                 <span className="text-[11px] text-zinc-500">White Balance {getTemplateEffectNumber('whiteBalance', 0).toFixed(2)}</span>
                 <input
                   type="range"
-                  min={-1}
-                  max={1}
-                  step={0.01}
+                  min={DEPTH_CONTROL_LIMITS.whiteBalance.min}
+                  max={DEPTH_CONTROL_LIMITS.whiteBalance.max}
+                  step={DEPTH_CONTROL_LIMITS.whiteBalance.step}
                   value={getTemplateEffectNumber('whiteBalance', 0)}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, whiteBalance: Number(e.target.value) }))}
                   className="mt-1 w-full"
@@ -3676,9 +3817,9 @@ export default function ParametricPage() {
                 <span className="text-[11px] text-zinc-500">Spreading {getTemplateEffectNumber('spread', 0).toFixed(2)}</span>
                 <input
                   type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
+                  min={DEPTH_CONTROL_LIMITS.spread.min}
+                  max={DEPTH_CONTROL_LIMITS.spread.max}
+                  step={DEPTH_CONTROL_LIMITS.spread.step}
                   value={getTemplateEffectNumber('spread', 0)}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, spread: Number(e.target.value) }))}
                   className="mt-1 w-full"
@@ -5451,9 +5592,9 @@ export default function ParametricPage() {
                     <span className="text-[11px] text-zinc-500">Depth Intensity {getSelectedEffect3dNumber('intensity', 0.46).toFixed(2)}</span>
                     <input
                       type="range"
-                      min={0}
-                      max={1}
-                      step={0.01}
+                      min={DEPTH_CONTROL_LIMITS.intensity.min}
+                      max={DEPTH_CONTROL_LIMITS.intensity.max}
+                      step={DEPTH_CONTROL_LIMITS.intensity.step}
                       value={getSelectedEffect3dNumber('intensity', 0.46)}
                       onChange={(e) => setSelectedEffect3dNumber('intensity', Number(e.target.value))}
                       className="w-full"
@@ -5464,9 +5605,9 @@ export default function ParametricPage() {
                     <span className="text-[11px] text-zinc-500">Light Angle {Math.round(getSelectedEffect3dNumber('angle', -35))}deg</span>
                     <input
                       type="range"
-                      min={-180}
-                      max={180}
-                      step={1}
+                      min={DEPTH_CONTROL_LIMITS.angle.min}
+                      max={DEPTH_CONTROL_LIMITS.angle.max}
+                      step={DEPTH_CONTROL_LIMITS.angle.step}
                       value={getSelectedEffect3dNumber('angle', -35)}
                       onChange={(e) => setSelectedEffect3dNumber('angle', Number(e.target.value))}
                       className="w-full"
@@ -5477,11 +5618,50 @@ export default function ParametricPage() {
                     <span className="text-[11px] text-zinc-500">Depth Distance {getSelectedEffect3dNumber('distance', 1.2).toFixed(2)}</span>
                     <input
                       type="range"
-                      min={0}
-                      max={6}
-                      step={0.05}
+                      min={DEPTH_CONTROL_LIMITS.distance.min}
+                      max={DEPTH_CONTROL_LIMITS.distance.max}
+                      step={DEPTH_CONTROL_LIMITS.distance.step}
                       value={getSelectedEffect3dNumber('distance', 1.2)}
                       onChange={(e) => setSelectedEffect3dNumber('distance', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Depth Falloff {getSelectedEffect3dNumber('falloff', 1).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={DEPTH_CONTROL_LIMITS.falloff.min}
+                      max={DEPTH_CONTROL_LIMITS.falloff.max}
+                      step={DEPTH_CONTROL_LIMITS.falloff.step}
+                      value={getSelectedEffect3dNumber('falloff', 1)}
+                      onChange={(e) => setSelectedEffect3dNumber('falloff', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Depth White Balance {getSelectedEffect3dNumber('whiteBalance', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={DEPTH_CONTROL_LIMITS.whiteBalance.min}
+                      max={DEPTH_CONTROL_LIMITS.whiteBalance.max}
+                      step={DEPTH_CONTROL_LIMITS.whiteBalance.step}
+                      value={getSelectedEffect3dNumber('whiteBalance', 0)}
+                      onChange={(e) => setSelectedEffect3dNumber('whiteBalance', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Depth Spread {getSelectedEffect3dNumber('spread', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={DEPTH_CONTROL_LIMITS.spread.min}
+                      max={DEPTH_CONTROL_LIMITS.spread.max}
+                      step={DEPTH_CONTROL_LIMITS.spread.step}
+                      value={getSelectedEffect3dNumber('spread', 0)}
+                      onChange={(e) => setSelectedEffect3dNumber('spread', Number(e.target.value))}
                       className="w-full"
                     />
                   </label>
@@ -5499,6 +5679,95 @@ export default function ParametricPage() {
                     >
                       {isEffectPanelCollapsed('textureFx') ? 'Expand' : 'Collapse'}
                     </button>
+
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Element Drop Shadow (All Types)</p>
+                    <button
+                      type="button"
+                      onClick={() => setEffectPanelCollapsed((prev) => ({ ...prev, shadowFx: !isEffectPanelCollapsed('shadowFx') }))}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      {isEffectPanelCollapsed('shadowFx') ? 'Expand' : 'Collapse'}
+                    </button>
+                  </div>
+                  {!isEffectPanelCollapsed('shadowFx') ? (
+                    <>
+                      <p className="text-[11px] text-zinc-500">Unified shadow controls for preview and export parity.</p>
+
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isSelectedDropShadowEnabled()}
+                          onChange={(e) => setSelectedDropShadowEnabled(e.target.checked)}
+                        />
+                        <span className="text-[11px] text-zinc-400">Enable drop shadow</span>
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Shadow Color</span>
+                        <input
+                          type="color"
+                          value={getSelectedDropShadowColor('#000000')}
+                          onChange={(e) => setSelectedDropShadowColor(e.target.value)}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-1"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Shadow Opacity {getSelectedDropShadowNumber('opacity', 0.45).toFixed(2)}</span>
+                        <input
+                          type="range"
+                          min={DROP_SHADOW_CONTROL_LIMITS.opacity.min}
+                          max={DROP_SHADOW_CONTROL_LIMITS.opacity.max}
+                          step={DROP_SHADOW_CONTROL_LIMITS.opacity.step}
+                          value={getSelectedDropShadowNumber('opacity', 0.45)}
+                          onChange={(e) => setSelectedDropShadowNumber('opacity', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Shadow Blur {Math.round(getSelectedDropShadowNumber('blur', 8))}</span>
+                        <input
+                          type="range"
+                          min={DROP_SHADOW_CONTROL_LIMITS.blur.min}
+                          max={DROP_SHADOW_CONTROL_LIMITS.blur.max}
+                          step={DROP_SHADOW_CONTROL_LIMITS.blur.step}
+                          value={getSelectedDropShadowNumber('blur', 8)}
+                          onChange={(e) => setSelectedDropShadowNumber('blur', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Offset X {Math.round(getSelectedDropShadowNumber('offsetX', 2))}px</span>
+                        <input
+                          type="range"
+                          min={DROP_SHADOW_CONTROL_LIMITS.offset.min}
+                          max={DROP_SHADOW_CONTROL_LIMITS.offset.max}
+                          step={DROP_SHADOW_CONTROL_LIMITS.offset.step}
+                          value={getSelectedDropShadowNumber('offsetX', 2)}
+                          onChange={(e) => setSelectedDropShadowNumber('offsetX', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Offset Y {Math.round(getSelectedDropShadowNumber('offsetY', 2))}px</span>
+                        <input
+                          type="range"
+                          min={DROP_SHADOW_CONTROL_LIMITS.offset.min}
+                          max={DROP_SHADOW_CONTROL_LIMITS.offset.max}
+                          step={DROP_SHADOW_CONTROL_LIMITS.offset.step}
+                          value={getSelectedDropShadowNumber('offsetY', 2)}
+                          onChange={(e) => setSelectedDropShadowNumber('offsetY', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                </div>
                   </div>
                   {!isEffectPanelCollapsed('textureFx') ? (
                     <>

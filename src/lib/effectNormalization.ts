@@ -2,8 +2,23 @@ import type { WatchFaceElement } from '@/types';
 
 export type DropShadowConfig = NonNullable<WatchFaceElement['dropShadow']>;
 
+export type DepthEffectRecord = {
+  enabled: boolean;
+  intensity: number;
+  angle: number;
+  distance: number;
+  falloff: number;
+  whiteBalance: number;
+  spread: number;
+};
+
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
+}
+
+function clampWithFallback(v: number, min: number, max: number, fallback: number): number {
+  const safe = Number.isFinite(v) ? v : fallback;
+  return clamp(safe, min, max);
 }
 
 function parseHexColor(hex: string): { r: number; g: number; b: number } {
@@ -44,6 +59,38 @@ export function normalizeDropShadowForBake(ds: DropShadowConfig): DropShadowConf
     offsetX: Math.round(ds.offsetX),
     offsetY: Math.round(ds.offsetY),
     opacity: clamp(ds.opacity, 0, 1),
+  };
+}
+
+export function dropShadowPaddingForBake(ds: DropShadowConfig): number {
+  const normalized = normalizeDropShadowForBake(ds);
+  return normalized.blur + Math.max(Math.abs(normalized.offsetX), Math.abs(normalized.offsetY)) + 4;
+}
+
+export function normalizeDepthEffectRecord(
+  source: Record<string, unknown> | null | undefined,
+  fallback: Partial<DepthEffectRecord> = {},
+): Record<string, unknown> {
+  const src = source && typeof source === 'object' ? source : {};
+  const base: DepthEffectRecord = {
+    enabled: fallback.enabled === true,
+    intensity: clamp(Number(fallback.intensity ?? 0.46), 0, 1),
+    angle: Number.isFinite(Number(fallback.angle)) ? Number(fallback.angle) : -35,
+    distance: clamp(Number(fallback.distance ?? 1.2), 0, 6),
+    falloff: clamp(Number(fallback.falloff ?? 1), 0.2, 3),
+    whiteBalance: clamp(Number(fallback.whiteBalance ?? 0), -1, 1),
+    spread: clamp(Number(fallback.spread ?? 0), 0, 1),
+  };
+
+  return {
+    ...src,
+    enabled: src.enabled === true,
+    intensity: clampWithFallback(Number(src.intensity), 0, 1, base.intensity),
+    angle: Number.isFinite(Number(src.angle)) ? Number(src.angle) : base.angle,
+    distance: clampWithFallback(Number(src.distance), 0, 6, base.distance),
+    falloff: clampWithFallback(Number(src.falloff), 0.2, 3, base.falloff),
+    whiteBalance: clampWithFallback(Number(src.whiteBalance), -1, 1, base.whiteBalance),
+    spread: clampWithFallback(Number(src.spread), 0, 1, base.spread),
   };
 }
 

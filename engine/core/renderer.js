@@ -450,8 +450,38 @@ function normalizeDepthEffect(source = {}, fallback = null) {
 	};
 }
 
-function buildLayerFilterDef(filterId, styleAdjust, depthEffect) {
-	if (!styleAdjust.enabled && !depthEffect.enabled) return "";
+function normalizeDropShadowEffect(source = {}) {
+	const src = source && typeof source === "object" ? source : {};
+	const hasMeaningfulField =
+		typeof src.color === "string" ||
+		Number.isFinite(Number(src.opacity)) ||
+		Number.isFinite(Number(src.blur)) ||
+		Number.isFinite(Number(src.offsetX)) ||
+		Number.isFinite(Number(src.offsetY));
+
+	if (!hasMeaningfulField) {
+		return {
+			enabled: false,
+			color: "#000000",
+			opacity: 0,
+			blur: 0,
+			offsetX: 0,
+			offsetY: 0,
+		};
+	}
+
+	return {
+		enabled: true,
+		color: typeof src.color === "string" ? src.color : "#000000",
+		opacity: clamp(src.opacity, 0, 1, 0.45),
+		blur: clamp(src.blur, 0, 40, 8),
+		offsetX: clamp(src.offsetX, -30, 30, 2),
+		offsetY: clamp(src.offsetY, -30, 30, 2),
+	};
+}
+
+function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffect = { enabled: false, opacity: 0 }) {
+	if (!styleAdjust.enabled && !depthEffect.enabled && !dropShadowEffect.enabled) return "";
 
 	const toneShift = (styleAdjust.highlight * 0.35) - (styleAdjust.shadows * 0.35);
 	const sharp = styleAdjust.sharpness;
@@ -502,6 +532,14 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect) {
 		parts.push(`<feDropShadow in="${chain}" dx="${depthEffect.dx.toFixed(3)}" dy="${depthEffect.dy.toFixed(3)}" stdDeviation="${blur}" flood-color="${shadowColor}" flood-opacity="${shadowOpacity}" result="depthA" />`);
 		parts.push(`<feDropShadow in="depthA" dx="${(-depthEffect.dx).toFixed(3)}" dy="${(-depthEffect.dy).toFixed(3)}" stdDeviation="${blur}" flood-color="${lightColor}" flood-opacity="${lightOpacity}" result="depthB" />`);
 		chain = "depthB";
+	}
+
+	if (dropShadowEffect.enabled && dropShadowEffect.opacity > 0) {
+		const shadowBlur = Math.max(0, Number(dropShadowEffect.blur) / 2);
+		parts.push(
+			`<feDropShadow in="${chain}" dx="${Number(dropShadowEffect.offsetX).toFixed(3)}" dy="${Number(dropShadowEffect.offsetY).toFixed(3)}" stdDeviation="${shadowBlur.toFixed(3)}" flood-color="${dropShadowEffect.color}" flood-opacity="${Number(dropShadowEffect.opacity).toFixed(3)}" result="dropShadow" />`,
+		);
+		chain = "dropShadow";
 	}
 
 	if (styleAdjust.color && styleAdjust.colorOpacity > 0) {
@@ -748,10 +786,10 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementNa
 	return fallbackBody;
 }
 
-function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, layoutMetrics, context = {}, currentElementName = "") {
+function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "") {
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
-	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect);
+	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect);
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
@@ -984,9 +1022,15 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					},
 					context.depthEffect,
 				);
+			const dropShadow = normalizeDropShadowEffect(
+				{
+					...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
+					...(renderParams.dropShadow && typeof renderParams.dropShadow === "object" ? renderParams.dropShadow : {}),
+				},
+			);
 			const localId = `el-${elementIndex}-${positionIndex}`;
 			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, context.layoutMetrics, context, currentElementName);
+			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName);
 		})
 		.join("");
 }

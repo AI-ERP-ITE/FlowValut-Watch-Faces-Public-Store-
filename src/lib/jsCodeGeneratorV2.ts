@@ -6,10 +6,11 @@ import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
+import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 
 /** Compute extra canvas padding required to contain a drop shadow (mirrors StudioApp helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
-  return ds.blur + Math.max(Math.abs(ds.offsetX), Math.abs(ds.offsetY)) + 4;
+  return dropShadowPaddingForBake(ds);
 }
 
 /** Emit an IMG widget that references a pre-baked shadow PNG with padded bounds. */

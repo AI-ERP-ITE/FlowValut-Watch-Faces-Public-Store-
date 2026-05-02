@@ -56,7 +56,7 @@ import { createParityCaptureSession, isInvestigationModeEnabled } from '@/lib/pa
 import { normalizePointerEffects } from '@/lib/pointerEffects';
 import { normalizeEngraveFrameForParity, renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
-import { normalizeDropShadowForBake, pointerEffectPaddingFromIntensity, pointerShadowToDropShadow } from '@/lib/effectNormalization';
+import { dropShadowPaddingForBake, normalizeDropShadowForBake, pointerEffectPaddingFromIntensity, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
   createDefaultGaugePointerDataUrl,
@@ -1478,8 +1478,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 
 /** Compute extra canvas padding required to contain a drop shadow. */
 function shadowPadding(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
-  const n = normalizeDropShadowForBake(ds);
-  return n.blur + Math.max(Math.abs(n.offsetX), Math.abs(n.offsetY)) + 4;
+  return dropShadowPaddingForBake(ds);
 }
 
 function applyShadowToCtx(ctx: CanvasRenderingContext2D, ds: NonNullable<WatchFaceElement['dropShadow']>) {

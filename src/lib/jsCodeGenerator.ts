@@ -7,10 +7,11 @@ import { generateWatchFaceCodeV2 } from './jsCodeGeneratorV2';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
+import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 
 /** Compute shadow-bake padding (mirrors V2 helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
-  return ds.blur + Math.max(Math.abs(ds.offsetX), Math.abs(ds.offsetY)) + 4;
+  return dropShadowPaddingForBake(ds);
 }
 
 function _shadowImgWidgetV3(element: WatchFaceElement, label: string): string {

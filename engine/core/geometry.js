@@ -7,6 +7,13 @@ function asObject(value, label) {
 	return value;
 }
 
+function cloneEffectLayers(value) {
+	if (!Array.isArray(value)) return [];
+	return value
+		.filter((entry) => entry && typeof entry === "object")
+		.map((entry) => ({ ...entry }));
+}
+
 export function buildGeometry(template) {
 	const templateObj = asObject(template, "template");
 	const sourceElements = Array.isArray(templateObj.elements) ? templateObj.elements : [];
@@ -37,6 +44,10 @@ export function buildGeometry(template) {
 			material: safeElement.material && typeof safeElement.material === "object" ? { ...safeElement.material } : null,
 			texture: safeElement.texture && typeof safeElement.texture === "object" ? { ...safeElement.texture } : null,
 			gradient: safeElement.gradient && typeof safeElement.gradient === "object" ? { ...safeElement.gradient } : null,
+			materialLayers: cloneEffectLayers(safeElement.materialLayers),
+			textureLayers: cloneEffectLayers(safeElement.textureLayers),
+			gradientLayers: cloneEffectLayers(safeElement.gradientLayers),
+			dropShadow: safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? { ...safeElement.dropShadow } : null,
 			styleAdjust: safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? { ...safeElement.styleAdjust } : null,
 			effect3d: safeElement.effect3d && typeof safeElement.effect3d === "object" ? { ...safeElement.effect3d } : null,
 			placement,
