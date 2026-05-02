@@ -489,6 +489,10 @@ const TICK_ICON_OPTIONS = [
   { value: 'sun', label: 'Sun (☀)' },
   { value: 'moon', label: 'Moon (☾)' },
 ] as const;
+const RECT_LAYOUT_SHAPE_MODE_OPTIONS = [
+  { value: 'rect', label: 'Rect (Follow Layout)' },
+  { value: 'circle', label: 'Circle (Keep Circular)' },
+] as const;
 const FIXED_RENDER_STYLE: StyleKey = 'gold_dark';
 
 function makeId(prefix = 'el'): string {
@@ -4766,46 +4770,63 @@ export default function ParametricPage() {
                 {isSelectedType('ring', 'bezel', 'ticks_radial', 'radialTicks', 'circle', 'outline_ring', 'outline_rect', 'free_rect', 'rect') ? (
                   <div className="space-y-2 rounded border border-zinc-800 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-400">Rect Layout Reshape</p>
-                    <p className="text-[11px] text-zinc-500">When layout is rectangle, this element can auto-stretch to follow width/height. Set strength to 0 to disable.</p>
+                    <p className="text-[11px] text-zinc-500">When layout is rectangle, choose whether this element stays circular or follows rectangular proportions.</p>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Auto Reshape Strength {getNumericParam('layoutShapeStrength', 1).toFixed(2)}</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={getNumericParam('layoutShapeStrength', 1)}
-                        onChange={(e) => setNumericParam('layoutShapeStrength', Number(e.target.value))}
-                        className="w-full"
-                      />
+                      <span className="text-[11px] text-zinc-500">Shape Follow Mode</span>
+                      <select
+                        value={getStringParam('layoutShapeMode', 'rect')}
+                        onChange={(e) => setStringParam('layoutShapeMode', e.target.value)}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      >
+                        {RECT_LAYOUT_SHAPE_MODE_OPTIONS.map((option) => (
+                          <option key={`layout-shape-mode-${option.value}`} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
                     </label>
 
-                    <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Manual Scale X {getNumericParam('layoutShapeScaleX', 1).toFixed(2)}</span>
-                      <input
-                        type="range"
-                        min={0.25}
-                        max={2.5}
-                        step={0.01}
-                        value={getNumericParam('layoutShapeScaleX', 1)}
-                        onChange={(e) => setNumericParam('layoutShapeScaleX', Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </label>
+                    {getStringParam('layoutShapeMode', 'rect') !== 'circle' ? (
+                      <>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Auto Reshape Strength {getNumericParam('layoutShapeStrength', 1).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={getNumericParam('layoutShapeStrength', 1)}
+                            onChange={(e) => setNumericParam('layoutShapeStrength', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
 
-                    <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Manual Scale Y {getNumericParam('layoutShapeScaleY', 1).toFixed(2)}</span>
-                      <input
-                        type="range"
-                        min={0.25}
-                        max={2.5}
-                        step={0.01}
-                        value={getNumericParam('layoutShapeScaleY', 1)}
-                        onChange={(e) => setNumericParam('layoutShapeScaleY', Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </label>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Manual Scale X {getNumericParam('layoutShapeScaleX', 1).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0.25}
+                            max={2.5}
+                            step={0.01}
+                            value={getNumericParam('layoutShapeScaleX', 1)}
+                            onChange={(e) => setNumericParam('layoutShapeScaleX', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Manual Scale Y {getNumericParam('layoutShapeScaleY', 1).toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min={0.25}
+                            max={2.5}
+                            step={0.01}
+                            value={getNumericParam('layoutShapeScaleY', 1)}
+                            onChange={(e) => setNumericParam('layoutShapeScaleY', Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </label>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
 

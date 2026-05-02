@@ -89,8 +89,15 @@ function resolveRectLayoutReshape(element, context = {}) {
 	const safeElement = element && typeof element === "object" ? element : {};
 	const elementType = typeof safeElement.type === "string" ? safeElement.type : "";
 	const params = safeElement.params && typeof safeElement.params === "object" ? safeElement.params : {};
+	const modeRaw = typeof params.layoutShapeMode === "string" ? params.layoutShapeMode.trim().toLowerCase() : "";
+	const shapeMode = modeRaw === "circle" || modeRaw === "rect" || modeRaw === "auto" ? modeRaw : "auto";
+	if (shapeMode === "circle") {
+		return { enabled: false, sx: 1, sy: 1 };
+	}
 	const userShapeLink = params.layoutShapeLink;
-	const shouldAutoLink = typeof userShapeLink === "boolean" ? userShapeLink : RECT_LAYOUT_ADAPTIVE_TYPES.has(elementType);
+	const shouldAutoLink = shapeMode === "rect"
+		? true
+		: (typeof userShapeLink === "boolean" ? userShapeLink : RECT_LAYOUT_ADAPTIVE_TYPES.has(elementType));
 	if (!shouldAutoLink) {
 		return { enabled: false, sx: 1, sy: 1 };
 	}
