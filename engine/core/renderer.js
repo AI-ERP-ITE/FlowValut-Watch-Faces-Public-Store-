@@ -1100,12 +1100,16 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const elementMaskId = `${maskId}-element`;
-	const sourceWorldBody = `<g transform="translate(${x} ${y}) rotate(${rotation})">${body}</g>`;
+	// body is already world-transformed by renderElement; use it as-is.
+	const sourceWorldBody = body;
 	const silhouetteSignature = toSignature({
-		sourceWorldBody,
+			sourceWorldBody,
 		elementMask,
 		layoutWidth: layoutMetrics.width,
 		layoutHeight: layoutMetrics.height,
+			x,
+			y,
+			rotation,
 	});
 	if (silhouetteSignature !== cached.silhouetteSignature) {
 		const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
@@ -1115,8 +1119,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		cached.silhouetteSignature = silhouetteSignature;
 	}
 
-	const sourceSilhouetteBody = cached.silhouetteBody;
-	const filterInputBody = sourceSilhouetteBody;
+	const filterInputBody = cached.silhouetteBody;
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
@@ -1389,7 +1392,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const localId = `el-${elementIndex}-${positionIndex}`;
 			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
 			const elementMask = safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null;
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask);
+			return renderLayer(localId, worldBody, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask);
 		})
 		.join("");
 }
