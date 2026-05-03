@@ -4346,7 +4346,7 @@ export default function ParametricPage() {
                       className={isDimMode && !isSoloMode && selectedElement ? 'opacity-45' : ''}
                       dangerouslySetInnerHTML={{ __html: svgMarkup }}
                     />
-                    {!isSoloMode && svgOverlayMarkup ? (
+                    {!isSoloMode && (isDimMode || showMaskCanvasEditor) && svgOverlayMarkup ? (
                       <div className="pointer-events-none absolute inset-0" dangerouslySetInnerHTML={{ __html: svgOverlayMarkup }} />
                     ) : null}
 
