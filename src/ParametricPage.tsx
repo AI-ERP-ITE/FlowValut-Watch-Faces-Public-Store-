@@ -3601,7 +3601,7 @@ export default function ParametricPage() {
   const textureImageRotationHandleX = Math.max(0, Math.min(100, textureImageOffsetHandleX + Math.cos((textureImageRotation * Math.PI) / 180) * textureImageRotationHandleRadius));
   const textureImageRotationHandleY = Math.max(0, Math.min(100, textureImageOffsetHandleY + Math.sin((textureImageRotation * Math.PI) / 180) * textureImageRotationHandleRadius));
   const showElementCanvasHandles = selectedPanelTarget === 'element' && !!selectedElement && contextTab === 'element';
-  const showMaskCanvasEditor = showElementCanvasHandles && isSelectedMaskEnabled();
+  const showMaskCanvasEditor = !!selectedElement && isSelectedMaskEnabled() && isMaskBrushEditEnabled;
   const selectedTextureClipEnabled = getSelectedTextureClipEnabled();
   const selectedGradientClipEnabled = getSelectedGradientClipEnabled();
   const selectedMaterialClipEnabled = getSelectedMaterialClipEnabled();
@@ -4371,9 +4371,9 @@ export default function ParametricPage() {
 
                     {selectedPanelTarget === 'element' && selectedElement ? (
                       <div
-                        className={`absolute inset-0 ${showMaskCanvasEditor && isMaskBrushEditEnabled ? 'cursor-crosshair' : ''}`}
+                        className={`absolute inset-0 ${showMaskCanvasEditor ? 'cursor-crosshair' : ''}`}
                         onMouseDown={(event) => {
-                          if (!showMaskCanvasEditor || !isMaskBrushEditEnabled) return;
+                          if (!showMaskCanvasEditor) return;
                           const target = event.target as HTMLElement;
                           if (target.closest('button')) return;
                           const rect = event.currentTarget.getBoundingClientRect();
@@ -4410,7 +4410,7 @@ export default function ParametricPage() {
                           if (rect.width <= 0 || rect.height <= 0) return;
                           const x = ((event.clientX - rect.left) / rect.width) * 100;
                           const y = ((event.clientY - rect.top) / rect.height) * 100;
-                          if (showMaskCanvasEditor && isMaskBrushEditEnabled && isBrushMaskMode) {
+                          if (showMaskCanvasEditor) {
                             setMaskCursorPoint({ x, y });
                           }
                           if (showGradientCanvasHandles && draggingGradientHandle) {
@@ -4944,7 +4944,7 @@ export default function ParametricPage() {
                                 );
                               })()
                             ) : null}
-                            {isMaskBrushEditEnabled && isBrushMaskMode && maskCursorPoint ? (
+                            {isBrushMaskMode && maskCursorPoint ? (
                               <>
                                 <circle
                                   cx={maskCursorPoint.x}
@@ -4967,7 +4967,7 @@ export default function ParametricPage() {
                                 />
                               </>
                             ) : null}
-                            {isMaskBrushEditEnabled && isSelectionMaskMode && maskCursorPoint && !activeMaskSelectionShape ? (
+                            {isSelectionMaskMode && maskCursorPoint && !activeMaskSelectionShape ? (
                               (() => {
                                 const previewStroke = maskBrushAction === 'reveal' ? '#4ade80' : '#f87171';
                                 if (selectedMaskSelectionShape === 'free') {
@@ -5044,6 +5044,19 @@ export default function ParametricPage() {
                               })()
                             ) : null}
                           </svg>
+                        ) : null}
+
+                        {showMaskCanvasEditor && isBrushMaskMode && maskCursorPoint ? (
+                          <div
+                            className="pointer-events-none absolute z-20 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.85),0_0_14px_rgba(255,255,255,0.35)]"
+                            style={{
+                              left: `${maskCursorPoint.x}%`,
+                              top: `${maskCursorPoint.y}%`,
+                              width: `${Math.max(0.2, getSelectedMaskNumber('brush.size', 16) / 5.2)}%`,
+                              height: `${Math.max(0.2, getSelectedMaskNumber('brush.size', 16) / 5.2)}%`,
+                              transform: 'translate(-50%, -50%)',
+                            }}
+                          />
                         ) : null}
                       </div>
                     ) : null}
