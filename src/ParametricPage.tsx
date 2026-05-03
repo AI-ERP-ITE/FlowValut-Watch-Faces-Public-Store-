@@ -428,6 +428,8 @@ function applyMaskToSvgMarkup(svgMarkup: string, mask: Record<string, unknown>, 
   return `${openTag}${defs}<g mask="url(#${maskId})">${inner}</g></svg>`;
 }
 
+void applyMaskToSvgMarkup;
+
 function namespaceSvgIds(svgMarkup: string, namespaceSeed: string): string {
   if (!svgMarkup || typeof svgMarkup !== 'string') return svgMarkup;
 
@@ -1300,11 +1302,6 @@ export default function ParametricPage() {
       const selectedVisibleElement = selectedElementId
         ? visibleElements.find((element) => element.id === selectedElementId)
         : null;
-      const resolveEnabledMask = (element: TemplateElement): Record<string, unknown> | null => {
-        if (!element.mask || typeof element.mask !== 'object') return null;
-        const mask = element.mask as Record<string, unknown>;
-        return mask.enabled === true ? mask : null;
-      };
 
       const sanitizeElements = (elements: TemplateElement[]) =>
         elements.map((element) => {
@@ -1348,11 +1345,7 @@ export default function ParametricPage() {
 
       if (!isSoloMode) {
         const stackedLayers = visibleElements.map((element, index) => {
-          const baseSvg = namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
-          const mask = resolveEnabledMask(element);
-          return mask
-            ? applyMaskToSvgMarkup(baseSvg, mask, namespaceForPass(String(element.id ?? `layer-${index}`)))
-            : baseSvg;
+          return namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
         });
 
         setSvgMarkup(stackedLayers[0] ?? '');
@@ -1369,13 +1362,7 @@ export default function ParametricPage() {
         const baseElements = isSoloMode && selectedVisibleElement
           ? [selectedVisibleElement]
           : visibleElements;
-        let baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
-        if (isSoloMode && selectedVisibleElement) {
-          const mask = resolveEnabledMask(selectedVisibleElement);
-          if (mask) {
-            baseSvg = applyMaskToSvgMarkup(baseSvg, mask, namespaceForPass(String(selectedVisibleElement.id ?? 'solo')));
-          }
-        }
+        const baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
         setSvgMarkup(baseSvg);
         setSvgOverlayLayers([]);
 
