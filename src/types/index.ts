@@ -170,6 +170,7 @@ export interface WatchFaceElement {
     color: string;      // CSS hex e.g. '#000000'
     opacity: number;    // 0–1
     blur: number;       // px 0–40
+    spread?: number;    // px 0–20 (grows shadow before blur)
     offsetX: number;    // px -30 to +30
     offsetY: number;    // px -30 to +30
   };

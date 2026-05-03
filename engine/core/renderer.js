@@ -447,7 +447,11 @@ function normalizeDepthEffect(source = {}, fallback = null) {
 	const base = fallback && typeof fallback === "object" ? { ...defaultBase, ...fallback } : defaultBase;
 	const hasExplicitEnabled = Object.prototype.hasOwnProperty.call(src, "enabled");
 	const enabled = hasExplicitEnabled ? src.enabled === true : base.enabled;
-	const mode = src.mode === "inner" ? "inner" : (base.mode === "inner" ? "inner" : "outer");
+	const mode = src.mode === "inner"
+		? "inner"
+		: (src.mode === "front"
+			? "front"
+			: (base.mode === "inner" ? "inner" : (base.mode === "front" ? "front" : "outer")));
 	const intensity = clamp(src.intensity, 0, 1, base.intensity);
 	const opacity = clamp(src.opacity, 0, 1, base.opacity ?? 0.8);
 	const angleDeg = Number.isFinite(Number(src.angle)) ? Number(src.angle) : null;
@@ -481,6 +485,7 @@ function normalizeDropShadowEffect(source = {}) {
 		typeof src.color === "string" ||
 		Number.isFinite(Number(src.opacity)) ||
 		Number.isFinite(Number(src.blur)) ||
+		Number.isFinite(Number(src.spread)) ||
 		Number.isFinite(Number(src.offsetX)) ||
 		Number.isFinite(Number(src.offsetY));
 
@@ -491,6 +496,7 @@ function normalizeDropShadowEffect(source = {}) {
 			color: "#000000",
 			opacity: 0,
 			blur: 0,
+			spread: 0,
 			offsetX: 0,
 			offsetY: 0,
 		};
@@ -502,6 +508,7 @@ function normalizeDropShadowEffect(source = {}) {
 		color: typeof src.color === "string" ? src.color : "#000000",
 		opacity: clamp(src.opacity, 0, 1, 0.45),
 		blur: clamp(src.blur, 0, 40, 8),
+		spread: clamp(src.spread, 0, 20, 0),
 		offsetX: clamp(src.offsetX, -30, 30, 2),
 		offsetY: clamp(src.offsetY, -30, 30, 2),
 	};
@@ -543,7 +550,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 	}
 
 	if (depthEffect.enabled && depthEffect.intensity > 0) {
-		const mode = depthEffect.mode === "inner" ? "inner" : "outer";
+		const mode = depthEffect.mode === "inner" ? "inner" : (depthEffect.mode === "front" ? "front" : "outer");
 		const falloff = clamp(depthEffect.falloff, 0.2, 3, 1);
 		const spread = clamp(depthEffect.spread, 0, 1, 0);
 		const wb = clamp(depthEffect.whiteBalance, -1, 1, 0);
@@ -566,7 +573,18 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 			chain = "spreadBase";
 		}
 
-		if (mode === "inner") {
+		if (mode === "front") {
+			const frontOpacity = clamp(0.46 * depthCurve * baseOpacity * Math.min(2, falloff), 0, 1, 0.4).toFixed(3);
+			const frontBlur = Math.max(0.08, (0.4 + depthCurve * 0.7) / falloff).toFixed(3);
+			const frontRadius = (Math.max(0.1, spread * 2.25 + (Math.hypot(depthEffect.dx, depthEffect.dy) * 0.35))).toFixed(3);
+			parts.push(`<feMorphology in="SourceAlpha" operator="dilate" radius="${frontRadius}" result="frontAlpha" />`);
+			parts.push(`<feGaussianBlur in="frontAlpha" stdDeviation="${frontBlur}" result="frontBlur" />`);
+			parts.push('<feComposite in="frontBlur" in2="SourceAlpha" operator="out" result="frontRim" />');
+			parts.push(`<feFlood flood-color="${lightColor}" flood-opacity="${frontOpacity}" result="frontFlood" />`);
+			parts.push('<feComposite in="frontFlood" in2="frontRim" operator="in" result="frontGlow" />');
+			parts.push(`<feBlend in="${chain}" in2="frontGlow" mode="screen" result="depthFront" />`);
+			chain = "depthFront";
+		} else if (mode === "inner") {
 			parts.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${blur}" result="depthInnerBlurA" />`);
 			parts.push(`<feOffset in="depthInnerBlurA" dx="${depthEffect.dx.toFixed(3)}" dy="${depthEffect.dy.toFixed(3)}" result="depthInnerOffsetA" />`);
 			parts.push('<feComposite in="depthInnerOffsetA" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskA" />');
@@ -592,8 +610,15 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 	if (dropShadowEffect.enabled && dropShadowEffect.opacity > 0) {
 		const mode = dropShadowEffect.mode === "inner" ? "inner" : "outer";
 		const shadowBlur = Math.max(0, Number(dropShadowEffect.blur) / 2);
+		const shadowSpread = clamp(dropShadowEffect.spread, 0, 20, 0);
+		const shadowBaseRef = shadowSpread > 0.001 ? "dsSpreadAlpha" : "SourceAlpha";
+
+		if (shadowSpread > 0.001) {
+			parts.push(`<feMorphology in="SourceAlpha" operator="dilate" radius="${shadowSpread.toFixed(3)}" result="dsSpreadAlpha" />`);
+		}
+
 		if (mode === "inner") {
-			parts.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${shadowBlur.toFixed(3)}" result="dsInnerBlur" />`);
+			parts.push(`<feGaussianBlur in="${shadowBaseRef}" stdDeviation="${shadowBlur.toFixed(3)}" result="dsInnerBlur" />`);
 			parts.push(`<feOffset in="dsInnerBlur" dx="${Number(dropShadowEffect.offsetX).toFixed(3)}" dy="${Number(dropShadowEffect.offsetY).toFixed(3)}" result="dsInnerOffset" />`);
 			parts.push('<feComposite in="dsInnerOffset" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="dsInnerMask" />');
 			parts.push(`<feFlood flood-color="${dropShadowEffect.color}" flood-opacity="${Number(dropShadowEffect.opacity).toFixed(3)}" result="dsInnerFlood" />`);
@@ -601,9 +626,11 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 			parts.push(`<feBlend in="${chain}" in2="dsInnerShade" mode="multiply" result="dropShadow" />`);
 			chain = "dropShadow";
 		} else {
-			parts.push(
-				`<feDropShadow in="${chain}" dx="${Number(dropShadowEffect.offsetX).toFixed(3)}" dy="${Number(dropShadowEffect.offsetY).toFixed(3)}" stdDeviation="${shadowBlur.toFixed(3)}" flood-color="${dropShadowEffect.color}" flood-opacity="${Number(dropShadowEffect.opacity).toFixed(3)}" result="dropShadow" />`,
-			);
+			parts.push(`<feGaussianBlur in="${shadowBaseRef}" stdDeviation="${shadowBlur.toFixed(3)}" result="dsOuterBlur" />`);
+			parts.push(`<feOffset in="dsOuterBlur" dx="${Number(dropShadowEffect.offsetX).toFixed(3)}" dy="${Number(dropShadowEffect.offsetY).toFixed(3)}" result="dsOuterOffset" />`);
+			parts.push(`<feFlood flood-color="${dropShadowEffect.color}" flood-opacity="${Number(dropShadowEffect.opacity).toFixed(3)}" result="dsOuterFlood" />`);
+			parts.push('<feComposite in="dsOuterFlood" in2="dsOuterOffset" operator="in" result="dsOuterShade" />');
+			parts.push(`<feBlend in="${chain}" in2="dsOuterShade" mode="normal" result="dropShadow" />`);
 			chain = "dropShadow";
 		}
 	}

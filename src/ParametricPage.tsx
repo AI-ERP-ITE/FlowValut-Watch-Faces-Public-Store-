@@ -587,46 +587,42 @@ const DEPTH_CONTROL_LIMITS = {
 const DROP_SHADOW_CONTROL_LIMITS = {
   opacity: { min: 0, max: 1, step: 0.02 },
   blur: { min: 0, max: 40, step: 0.5 },
+  spread: { min: 0, max: 20, step: 0.5 },
   offset: { min: -30, max: 30, step: 0.5 },
 } as const;
-const SHADOW_PRESET_OPTIONS = [
+const DEPTH_PRESET_OPTIONS = [
   {
     key: 'soft',
     label: 'Soft',
-    shadow: { mode: 'outer', color: '#000000', opacity: 0.28, blur: 16, offsetX: 2, offsetY: 4 },
-    depth: { enabled: true, mode: 'outer', intensity: 0.22, opacity: 0.44, distance: 1.2, falloff: 1.2, spread: 0 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.22, opacity: 0.44, distance: 1.2, falloff: 1.2, spread: 0, whiteBalance: 0.08 },
   },
   {
     key: 'natural',
     label: 'Natural',
-    shadow: { mode: 'outer', color: '#000000', opacity: 0.36, blur: 12, offsetX: 3, offsetY: 5 },
-    depth: { enabled: true, mode: 'outer', intensity: 0.34, opacity: 0.58, distance: 1.5, falloff: 1.1, spread: 0.05 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.34, opacity: 0.58, distance: 1.5, falloff: 1.1, spread: 0.05, whiteBalance: 0.12 },
   },
   {
     key: 'hard',
     label: 'Hard',
-    shadow: { mode: 'outer', color: '#000000', opacity: 0.58, blur: 6, offsetX: 4, offsetY: 7 },
-    depth: { enabled: true, mode: 'outer', intensity: 0.5, opacity: 0.74, distance: 2.1, falloff: 0.9, spread: 0.08 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.5, opacity: 0.74, distance: 2.1, falloff: 0.9, spread: 0.08, whiteBalance: 0 },
   },
   {
     key: 'studio-rim',
     label: 'Studio Rim',
-    shadow: { mode: 'outer', color: '#10131a', opacity: 0.42, blur: 14, offsetX: 6, offsetY: 2 },
     depth: { enabled: true, mode: 'outer', intensity: 0.52, opacity: 0.7, distance: 2.2, falloff: 1, spread: 0.12, whiteBalance: 0.25 },
   },
   {
     key: 'embossed',
     label: 'Embossed',
-    shadow: { mode: 'inner', color: '#000000', opacity: 0.4, blur: 8, offsetX: 2, offsetY: 2 },
     depth: { enabled: true, mode: 'inner', intensity: 0.56, opacity: 0.82, distance: 1.7, falloff: 1.25, spread: 0.18, whiteBalance: 0.14 },
   },
 ] as const;
 const LIGHT_DIRECTION_PRESET_OPTIONS = [
-  { key: 'top-left', label: 'Top Left', angle: -135 },
-  { key: 'top-right', label: 'Top Right', angle: -45 },
-  { key: 'bottom-left', label: 'Bottom Left', angle: 135 },
-  { key: 'bottom-right', label: 'Bottom Right', angle: 45 },
-  { key: 'front', label: 'Front', angle: -90 },
+  { key: 'top-left', label: 'Top Left', angle: -135, mode: 'outer' },
+  { key: 'top-right', label: 'Top Right', angle: -45, mode: 'outer' },
+  { key: 'bottom-left', label: 'Bottom Left', angle: 135, mode: 'outer' },
+  { key: 'bottom-right', label: 'Bottom Right', angle: 45, mode: 'outer' },
+  { key: 'front', label: 'Front', angle: -90, mode: 'front' },
 ] as const;
 
 function makeId(prefix = 'el'): string {
@@ -3677,6 +3673,7 @@ export default function ParametricPage() {
     const safeMode = source?.mode === 'inner' ? 'inner' : 'outer';
     const safeOpacity = Number(source?.opacity);
     const safeBlur = Number(source?.blur);
+    const safeSpread = Number(source?.spread);
     const safeOffsetX = Number(source?.offsetX);
     const safeOffsetY = Number(source?.offsetY);
 
@@ -3684,6 +3681,7 @@ export default function ParametricPage() {
       color: safeColor,
       opacity: Number.isFinite(safeOpacity) ? safeOpacity : 0.45,
       blur: Number.isFinite(safeBlur) ? safeBlur : 8,
+      spread: Number.isFinite(safeSpread) ? safeSpread : 0,
       offsetX: Number.isFinite(safeOffsetX) ? safeOffsetX : 2,
       offsetY: Number.isFinite(safeOffsetY) ? safeOffsetY : 2,
     }) as Record<string, unknown>;
@@ -3726,7 +3724,7 @@ export default function ParametricPage() {
     );
   };
 
-  const setSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'offsetX' | 'offsetY', value: number) => {
+  const setSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'spread' | 'offsetX' | 'offsetY', value: number) => {
     if (!selectedElement) return;
     updateTemplateElements(
       (elements) =>
@@ -3786,7 +3784,7 @@ export default function ParametricPage() {
     );
   };
 
-  const getSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'offsetX' | 'offsetY', fallback: number) => {
+  const getSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'spread' | 'offsetX' | 'offsetY', fallback: number) => {
     const shadow = getSelectedDropShadowRecord();
     const raw = Number(shadow[key]);
     return Number.isFinite(raw) ? raw : fallback;
@@ -3803,39 +3801,46 @@ export default function ParametricPage() {
     return typeof raw === 'string' ? raw : fallback;
   };
 
-  const applySelectedShadowPreset = (presetKey: string) => {
+  const applySelectedDepthPreset = (presetKey: string) => {
     if (!selectedElement) return;
-    const preset = SHADOW_PRESET_OPTIONS.find((entry) => entry.key === presetKey);
+    const preset = DEPTH_PRESET_OPTIONS.find((entry) => entry.key === presetKey);
     if (!preset) return;
 
     updateTemplateElements(
       (elements) =>
         elements.map((element) => {
           if (element.id !== selectedElement.id) return element;
-          const currentShadow = element.dropShadow && typeof element.dropShadow === 'object'
-            ? (element.dropShadow as Record<string, unknown>)
-            : undefined;
           const currentDepth = element.effect3d && typeof element.effect3d === 'object'
             ? (element.effect3d as Record<string, unknown>)
             : undefined;
 
           return {
             ...element,
-            dropShadow: normalizeDropShadowRecord({
-              ...(currentShadow ?? {}),
-              ...preset.shadow,
-            }),
             effect3d: normalizeDepthEffectRecord({
               ...(currentDepth ?? {}),
               ...preset.depth,
             }),
           };
         }),
-      `Apply ${preset.label} shadow preset`,
+      `Apply ${preset.label} depth preset`,
     );
   };
 
-  const applySelectedLightDirectionPreset = (angle: number) => {
+  const clearSelectedDepthPreset = () => {
+    if (!selectedElement) return;
+    updateTemplateElements(
+      (elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedElement.id) return element;
+          const nextElement = { ...element };
+          delete nextElement.effect3d;
+          return nextElement;
+        }),
+      'Clear depth preset',
+    );
+  };
+
+  const applySelectedLightDirectionPreset = (preset: (typeof LIGHT_DIRECTION_PRESET_OPTIONS)[number]) => {
     if (!selectedElement) return;
 
     updateTemplateElements(
@@ -3843,33 +3848,18 @@ export default function ParametricPage() {
         elements.map((element) => {
           if (element.id !== selectedElement.id) return element;
 
-          const currentShadow = element.dropShadow && typeof element.dropShadow === 'object'
-            ? (element.dropShadow as Record<string, unknown>)
-            : undefined;
           const currentDepth = element.effect3d && typeof element.effect3d === 'object'
             ? (element.effect3d as Record<string, unknown>)
             : undefined;
-          const shadow = normalizeDropShadowRecord(currentShadow);
           const depth = normalizeDepthEffectRecord(currentDepth);
-
-          const rad = (angle * Math.PI) / 180;
-          const distance = Number.isFinite(Number(depth.distance)) ? Number(depth.distance) : 1.6;
-          const travel = Math.max(1.5, Math.min(10, distance * 2.4));
-          const offsetX = Math.cos(rad) * travel;
-          const offsetY = Math.sin(rad) * travel;
 
           return {
             ...element,
             effect3d: normalizeDepthEffectRecord({
               ...depth,
               enabled: true,
-              angle,
-            }),
-            dropShadow: normalizeDropShadowRecord({
-              ...shadow,
-              mode: 'outer',
-              offsetX,
-              offsetY,
+              mode: preset.mode,
+              angle: preset.angle,
             }),
           };
         }),
@@ -6821,13 +6811,38 @@ export default function ParametricPage() {
                   <p className="text-[11px] text-zinc-500">Optional per-element light direction and depth strength.</p>
 
                   <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-wide text-zinc-500">Depth Presets</p>
+                      <button
+                        type="button"
+                        onClick={clearSelectedDepthPreset}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {DEPTH_PRESET_OPTIONS.map((preset) => (
+                        <button
+                          key={`depth-preset-${preset.key}`}
+                          type="button"
+                          onClick={() => applySelectedDepthPreset(preset.key)}
+                          className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">3D Light Direction Presets</p>
                     <div className="flex flex-wrap gap-1">
                       {LIGHT_DIRECTION_PRESET_OPTIONS.map((preset) => (
                         <button
                           key={`depth-light-preset-${preset.key}`}
                           type="button"
-                          onClick={() => applySelectedLightDirectionPreset(preset.angle)}
+                          onClick={() => applySelectedLightDirectionPreset(preset)}
                           className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
                         >
                           {preset.label}
@@ -6839,12 +6854,20 @@ export default function ParametricPage() {
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Depth Mode</span>
                     <select
-                      value={getSelectedEffect3dString('mode', 'outer') === 'inner' ? 'inner' : 'outer'}
-                      onChange={(e) => setSelectedEffect3dString('mode', e.target.value === 'inner' ? 'inner' : 'outer')}
+                      value={(() => {
+                        const mode = getSelectedEffect3dString('mode', 'outer');
+                        if (mode === 'inner' || mode === 'front') return mode;
+                        return 'outer';
+                      })()}
+                      onChange={(e) => {
+                        const next = e.target.value === 'inner' || e.target.value === 'front' ? e.target.value : 'outer';
+                        setSelectedEffect3dString('mode', next);
+                      }}
                       className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                     >
                       <option value="outer">Emboss (Outer)</option>
                       <option value="inner">Engrave (Inner)</option>
+                      <option value="front">Front Rim</option>
                     </select>
                   </label>
 
@@ -6977,37 +7000,13 @@ export default function ParametricPage() {
                     <>
                       <p className="text-[11px] text-zinc-500">Unified shadow controls for preview and export parity.</p>
 
-                      <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
-                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Shadow Presets</p>
-                        <div className="flex flex-wrap gap-1">
-                          {SHADOW_PRESET_OPTIONS.map((preset) => (
-                            <button
-                              key={`shadow-preset-${preset.key}`}
-                              type="button"
-                              onClick={() => applySelectedShadowPreset(preset.key)}
-                              className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
-                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">3D Light Direction (Depth + Shadow)</p>
-                        <div className="flex flex-wrap gap-1">
-                          {LIGHT_DIRECTION_PRESET_OPTIONS.map((preset) => (
-                            <button
-                              key={`shadow-light-preset-${preset.key}`}
-                              type="button"
-                              onClick={() => applySelectedLightDirectionPreset(preset.angle)}
-                              className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDropShadowEnabled(false)}
+                        className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                      >
+                        Clear Shadow
+                      </button>
 
                       <label className="flex items-center gap-2">
                         <input
@@ -7062,6 +7061,19 @@ export default function ParametricPage() {
                           step={DROP_SHADOW_CONTROL_LIMITS.blur.step}
                           value={getSelectedDropShadowNumber('blur', 8)}
                           onChange={(e) => setSelectedDropShadowNumber('blur', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Shadow Spread {Math.round(getSelectedDropShadowNumber('spread', 0))}</span>
+                        <input
+                          type="range"
+                          min={DROP_SHADOW_CONTROL_LIMITS.spread.min}
+                          max={DROP_SHADOW_CONTROL_LIMITS.spread.max}
+                          step={DROP_SHADOW_CONTROL_LIMITS.spread.step}
+                          value={getSelectedDropShadowNumber('spread', 0)}
+                          onChange={(e) => setSelectedDropShadowNumber('spread', Number(e.target.value))}
                           className="w-full"
                         />
                       </label>

@@ -56,6 +56,7 @@ export function normalizeDropShadowForBake(ds: DropShadowConfig): DropShadowConf
     ...ds,
     color: normalizeShadowColorForDevice(ds.color),
     blur: Math.max(0, Math.round(ds.blur)),
+    spread: Math.max(0, Math.round(Number.isFinite(Number(ds.spread)) ? Number(ds.spread) : 0)),
     offsetX: Math.round(ds.offsetX),
     offsetY: Math.round(ds.offsetY),
     opacity: clamp(ds.opacity, 0, 1),
@@ -64,7 +65,7 @@ export function normalizeDropShadowForBake(ds: DropShadowConfig): DropShadowConf
 
 export function dropShadowPaddingForBake(ds: DropShadowConfig): number {
   const normalized = normalizeDropShadowForBake(ds);
-  return normalized.blur + Math.max(Math.abs(normalized.offsetX), Math.abs(normalized.offsetY)) + 4;
+  return normalized.blur + (Number.isFinite(Number(normalized.spread)) ? Number(normalized.spread) : 0) + Math.max(Math.abs(normalized.offsetX), Math.abs(normalized.offsetY)) + 4;
 }
 
 export function normalizeDepthEffectRecord(
