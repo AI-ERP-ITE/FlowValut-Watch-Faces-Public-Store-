@@ -179,6 +179,23 @@ function normalizedKeyPath(metadata = {}) {
   return typeof metadata.keyPath === "string" ? metadata.keyPath.toLowerCase() : "";
 }
 
+function isReadabilityKeyPath(metadata = {}) {
+  const key = normalizedKeyPath(metadata);
+  if (!key) return false;
+  return (
+    key.includes("text") ||
+    key.includes("label") ||
+    key.includes("digit") ||
+    key.includes("number") ||
+    key.includes("time") ||
+    key.includes("date") ||
+    key.includes("status") ||
+    key.includes("value") ||
+    key.includes("pointer") ||
+    key.includes("hand")
+  );
+}
+
 function isShadowLikeKeyPath(metadata = {}) {
   const key = normalizedKeyPath(metadata);
   if (!key) return false;
@@ -230,6 +247,7 @@ function contrastRatio(colorA, colorB) {
 function ensureContrast(color, config, metadata = {}) {
   if (!config.amazfit.contrast.enabled) return color;
   if (isShadowLikeKeyPath(metadata)) return color;
+  if (!isReadabilityKeyPath(metadata)) return color;
   const key = normalizedKeyPath(metadata);
   const isBackground = config.amazfit.backgroundKeys.some((hint) => key === hint || key.endsWith(`.${hint}`));
   if (isBackground) return color;
@@ -277,7 +295,7 @@ function analyzeAmazfitRules(original, simulated, config, metadata = {}) {
     warnings.push(`Amazfit background rule: ${key || "background"} must be ${config.amazfit.absoluteBlack}.`);
   }
 
-  if (config.amazfit.contrast.enabled) {
+  if (config.amazfit.contrast.enabled && isReadabilityKeyPath(metadata)) {
     const ratio = contrastRatio(safeSimulated, config.amazfit.contrast.background);
     if (!isBackground && ratio < config.amazfit.contrast.minRatio) {
       warnings.push(
@@ -385,7 +403,12 @@ export function processColor(color, config = DEFAULT_COLOR_CONTROL_CONFIG, metad
     const simulated = simulate(safeColor, resolved, metadata);
     const result = analyze(safeColor, simulated, resolved);
     const extraWarnings = analyzeAmazfitRules(safeColor, simulated, resolved, metadata);
-    emitWarnings([...result.warnings, ...extraWarnings]);
+    const remapWarnings = [];
+    if (simulated !== safeColor) {
+      const key = normalizedKeyPath(metadata) || "(unknown key)";
+      remapWarnings.push(`Color remap at ${key}: ${safeColor} -> ${simulated}`);
+    }
+    emitWarnings([...result.warnings, ...extraWarnings, ...remapWarnings]);
     return safeColor;
   }
 

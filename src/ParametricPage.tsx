@@ -654,6 +654,25 @@ function buildUniqueElementName(existingElements: Array<TemplateElement>, candid
   return `${base} ${suffix}`;
 }
 
+function buildDuplicateElementName(existingElements: Array<TemplateElement>, sourceName: string): string {
+  const rawBase = (sourceName || 'element').trim() || 'element';
+  const base = rawBase.replace(/\s+copy\d+$/i, '').trim() || 'element';
+  const pattern = new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+copy(\\d+)$`, 'i');
+
+  let nextSuffix = 1;
+  for (const entry of existingElements) {
+    const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+    const match = name.match(pattern);
+    if (!match) continue;
+    const suffix = Number(match[1]);
+    if (Number.isFinite(suffix)) {
+      nextSuffix = Math.max(nextSuffix, suffix + 1);
+    }
+  }
+
+  return `${base} copy${nextSuffix}`;
+}
+
 function normalizeLibraryEntries(parsed: Array<unknown>): Array<LibraryEntry> {
   return parsed
     .filter((entry) => entry && typeof entry === 'object')
@@ -1527,24 +1546,35 @@ export default function ParametricPage() {
     if (!root) return;
 
     const emitControlChange = (control: HTMLInputElement | HTMLSelectElement, nextValue: string) => {
-      control.value = nextValue;
+      if (control instanceof HTMLSelectElement) {
+        const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+        if (selectSetter) {
+          selectSetter.call(control, nextValue);
+        } else {
+          control.value = nextValue;
+        }
+      } else {
+        const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        if (inputSetter) {
+          inputSetter.call(control, nextValue);
+        } else {
+          control.value = nextValue;
+        }
+      }
       control.dispatchEvent(new Event('input', { bubbles: true }));
       control.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
-    const resolveNumericResetValue = (control: HTMLInputElement): number => {
-      const min = Number(control.min);
-      const max = Number(control.max);
+    const resolveNumericResetValue = (labelText: string): number => {
+      const normalizedLabel = labelText.trim().toLowerCase();
+      const isLightDirectionControl = normalizedLabel.includes('light angle')
+        || normalizedLabel.includes('global light direction')
+        || (normalizedLabel === 'angle' || normalizedLabel.startsWith('angle '));
 
-      if (Number.isFinite(min) && Number.isFinite(max) && min <= 0 && max >= 0) {
-        return 0;
+      if (isLightDirectionControl) {
+        return -90;
       }
-      if (Number.isFinite(min) && Number.isFinite(max) && min <= 1 && max >= 1) {
-        return 1;
-      }
-      if (Number.isFinite(min)) {
-        return min;
-      }
+
       return 0;
     };
 
@@ -1567,6 +1597,7 @@ export default function ParametricPage() {
         chip.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
+          const labelText = title.textContent ?? '';
 
           if (control instanceof HTMLSelectElement) {
             if (control.options.length > 0) {
@@ -1575,7 +1606,7 @@ export default function ParametricPage() {
             return;
           }
 
-          const nextValue = resolveNumericResetValue(control);
+          const nextValue = resolveNumericResetValue(labelText);
           const min = Number(control.min);
           const max = Number(control.max);
           const clamped = Number.isFinite(min) && Number.isFinite(max)
@@ -1767,6 +1798,37 @@ export default function ParametricPage() {
       setSelectedElementId(null);
       setNameDraft('');
       setParamsDraft('{}');
+    }
+  };
+
+  const duplicateElement = (id: string) => {
+    let duplicatedId: string | null = null;
+    let duplicatedName = '';
+
+    updateTemplateElements((elements) => {
+      const index = elements.findIndex((element) => element.id === id);
+      if (index < 0) return elements;
+
+      const source = ensureElement(deepClone(elements[index]));
+      const copy = ensureElement(deepClone(source));
+      copy.id = makeId('layer');
+      copy.name = buildDuplicateElementName(
+        elements,
+        typeof source.name === 'string' ? source.name : source.type ?? 'element',
+      );
+
+      duplicatedId = copy.id ?? null;
+      duplicatedName = typeof copy.name === 'string' ? copy.name : 'layer copy';
+
+      const next = [...elements];
+      next.splice(index + 1, 0, copy);
+      return next;
+    }, 'Duplicate layer');
+
+    if (duplicatedId) {
+      setSelectedElementId(duplicatedId);
+      setSelectedPanelTarget('element');
+      setEditorNotice(`Duplicated layer: ${duplicatedName}`);
     }
   };
 
@@ -5420,6 +5482,14 @@ export default function ParametricPage() {
                           className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
                         >
                           ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateElement(element.id ?? '')}
+                          className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
+                          title="Duplicate layer"
+                        >
+                          dup
                         </button>
                         <button
                           type="button"
