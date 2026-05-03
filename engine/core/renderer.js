@@ -1096,36 +1096,27 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		filterDef: "",
 		filterAttr: "",
 	};
-	const dirtyFlags = {
-		silhouetteDirty: false,
-		materialDirty: false,
-		effectsDirty: false,
-	};
 
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const elementMaskId = `${maskId}-element`;
+	const sourceWorldBody = `<g transform="translate(${x} ${y}) rotate(${rotation})">${body}</g>`;
 	const silhouetteSignature = toSignature({
-		body,
-		x,
-		y,
-		rotation,
+		sourceWorldBody,
 		elementMask,
 		layoutWidth: layoutMetrics.width,
 		layoutHeight: layoutMetrics.height,
 	});
 	if (silhouetteSignature !== cached.silhouetteSignature) {
-		dirtyFlags.silhouetteDirty = true;
-		dirtyFlags.effectsDirty = true;
 		const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
 		cached.silhouetteDefs = elementMaskDef.defs;
 		cached.elementMaskActive = elementMaskDef.active;
-		const worldBody = `<g transform="translate(${x} ${y}) rotate(${rotation})">${body}</g>`;
-		cached.silhouetteBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${worldBody}</g>` : worldBody;
+		cached.silhouetteBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${sourceWorldBody}</g>` : sourceWorldBody;
 		cached.silhouetteSignature = silhouetteSignature;
 	}
 
-	const filterInputBody = cached.silhouetteBody;
+	const sourceSilhouetteBody = cached.silhouetteBody;
+	const filterInputBody = sourceSilhouetteBody;
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
@@ -1160,7 +1151,6 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		layoutHeight: layoutMetrics.height,
 	});
 	if (materialSignature !== cached.materialSignature) {
-		dirtyFlags.materialDirty = true;
 		const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
 		const textureMasksMarkup = textureDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskEntry.body}</mask>`).join("");
 		const gradientDefsMarkup = gradientDefs.map((entry) => entry.def.defs).join("");
@@ -1215,7 +1205,6 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		silhouetteSignature,
 	});
 	if (effectsSignature !== cached.effectsSignature) {
-		dirtyFlags.effectsDirty = true;
 		cached.filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect, {
 			masked: cached.elementMaskActive,
 			edgeRadius: 0.34,
