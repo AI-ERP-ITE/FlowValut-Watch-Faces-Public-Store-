@@ -48,6 +48,8 @@ const BLEND_MODE_ALIASES = {
 	"pass-through": "normal",
 };
 
+const LAYER_PASS_CACHE = new Map();
+
 function requireObject(value, label) {
 	if (!value || typeof value !== "object") {
 		throw new Error(`${label} must be an object.`);
@@ -59,6 +61,14 @@ function clamp(value, min, max, fallback) {
 	const n = Number(value);
 	if (!Number.isFinite(n)) return fallback;
 	return Math.max(min, Math.min(max, n));
+}
+
+function toSignature(value) {
+	try {
+		return JSON.stringify(value);
+	} catch {
+		return String(value);
+	}
 }
 
 const RECT_LAYOUT_ADAPTIVE_TYPES = new Set([
@@ -948,25 +958,49 @@ function buildGradientOverlayDefs(localId, gradient) {
 }
 
 function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementName = "") {
-	if (!clipConfig || clipConfig.enabled !== true) return fallbackBody;
+	const entry = resolveClipMaskEntry(clipConfig, context, fallbackBody, currentElementName);
+	return entry.body;
+}
+
+function resolveClipMaskEntry(clipConfig, context, fallbackBody, currentElementName = "") {
+	if (!clipConfig || clipConfig.enabled !== true) {
+		return {
+			body: fallbackBody,
+			signature: `none:${fallbackBody}`,
+		};
+	}
 
 	const explicitTarget = typeof clipConfig.targetName === "string" ? clipConfig.targetName.trim() : "";
 	const inheritedTarget = clipConfig.inheritPrevious === true && typeof context.previousElementName === "string"
 		? context.previousElementName.trim()
 		: "";
 	const resolvedTarget = explicitTarget || inheritedTarget;
-	if (!resolvedTarget) return fallbackBody;
+	if (!resolvedTarget) {
+		return {
+			body: fallbackBody,
+			signature: `unresolved:${fallbackBody}`,
+		};
+	}
 	if (typeof currentElementName === "string" && currentElementName.trim().length > 0 && resolvedTarget === currentElementName.trim()) {
-		return fallbackBody;
+		return {
+			body: fallbackBody,
+			signature: `self:${resolvedTarget}`,
+		};
 	}
 
 	const registry = context.layerMaskRegistry && typeof context.layerMaskRegistry === "object" ? context.layerMaskRegistry : {};
 	const targetBody = registry[resolvedTarget];
 	if (typeof targetBody === "string" && targetBody.length > 0) {
-		return targetBody;
+		return {
+			body: targetBody,
+			signature: `target:${resolvedTarget}:${targetBody}`,
+		};
 	}
 
-	return fallbackBody;
+	return {
+		body: fallbackBody,
+		signature: `fallback:${resolvedTarget}`,
+	};
 }
 
 function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
@@ -1043,23 +1077,57 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 }
 
 function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null) {
+	const frameKey = typeof context.cacheFrameKey === "string" ? context.cacheFrameKey : "default";
+	const cacheKey = `${frameKey}::${localId}`;
+	if (context.activeLayerCacheKeys && typeof context.activeLayerCacheKeys.add === "function") {
+		context.activeLayerCacheKeys.add(cacheKey);
+	}
+	const cached = LAYER_PASS_CACHE.get(cacheKey) || {
+		silhouetteSignature: "",
+		materialSignature: "",
+		effectsSignature: "",
+		silhouetteBody: body,
+		silhouetteDefs: "",
+		elementMaskActive: false,
+		materialDefsMarkup: "",
+		textureOverlay: "",
+		gradientOverlay: "",
+		materialOverlay: "",
+		filterDef: "",
+		filterAttr: "",
+	};
+	const dirtyFlags = {
+		silhouetteDirty: false,
+		materialDirty: false,
+		effectsDirty: false,
+	};
+
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const elementMaskId = `${maskId}-element`;
-	const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
-	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect, {
-		masked: elementMaskDef.active,
-		edgeRadius: 0.34,
-		edgeOpacity: 0.24,
-		edgeColor: typeof dropShadowEffect?.color === "string" ? dropShadowEffect.color : "#000000",
+	const silhouetteSignature = toSignature({
+		body,
+		elementMask,
+		layoutWidth: layoutMetrics.width,
+		layoutHeight: layoutMetrics.height,
 	});
-	const filterInputBody = body;
+	if (silhouetteSignature !== cached.silhouetteSignature) {
+		dirtyFlags.silhouetteDirty = true;
+		dirtyFlags.effectsDirty = true;
+		const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
+		cached.silhouetteDefs = elementMaskDef.defs;
+		cached.elementMaskActive = elementMaskDef.active;
+		cached.silhouetteBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${body}</g>` : body;
+		cached.silhouetteSignature = silhouetteSignature;
+	}
+
+	const filterInputBody = cached.silhouetteBody;
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
 			def: buildTextureDefs(`${localId}-texture-${index}`, layerTexture, layoutMetrics),
 			maskId: `${maskId}-texture-${index}`,
-			maskBody: resolveClipMaskBody(layerTexture.clip, context, filterInputBody, currentElementName),
+			maskEntry: resolveClipMaskEntry(layerTexture.clip, context, filterInputBody, currentElementName),
 		}))
 		: [];
 	const gradientDefs = Array.isArray(layerGradients)
@@ -1067,64 +1135,98 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			layerGradient,
 			def: buildGradientOverlayDefs(`${localId}-gradient-${index}`, layerGradient),
 			maskId: `${maskId}-gradient-${index}`,
-			maskBody: resolveClipMaskBody(layerGradient.clip, context, filterInputBody, currentElementName),
+			maskEntry: resolveClipMaskEntry(layerGradient.clip, context, filterInputBody, currentElementName),
 		}))
 		: [];
 	const materialDefs = Array.isArray(layerMaterials)
 		? layerMaterials.map((layerMaterial, index) => ({
 			layerMaterial,
 			maskId: `${maskId}-material-${index}`,
-			maskBody: resolveClipMaskBody(layerMaterial.clip, context, filterInputBody, currentElementName),
+			maskEntry: resolveClipMaskEntry(layerMaterial.clip, context, filterInputBody, currentElementName),
 		}))
 		: [];
-	const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
-	const textureMasksMarkup = textureDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
-	const gradientDefsMarkup = gradientDefs.map((entry) => entry.def.defs).join("");
-	const gradientMasksMarkup = gradientDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
-	const materialMasksMarkup = materialDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
-	const defs = `<defs>${filterDef}${elementMaskDef.defs}${textureDefsMarkup}${gradientDefsMarkup}${textureMasksMarkup}${gradientMasksMarkup}${materialMasksMarkup}</defs>`;
-	const filterAttr = filterDef.length > 0 ? ` filter=\"url(#${filterId})\"` : "";
+	const materialSignature = toSignature({
+		textures: layerTextures,
+		gradients: layerGradients,
+		materials: layerMaterials,
+		textureClips: textureDefs.map((entry) => entry.maskEntry.signature),
+		gradientClips: gradientDefs.map((entry) => entry.maskEntry.signature),
+		materialClips: materialDefs.map((entry) => entry.maskEntry.signature),
+		layoutWidth: layoutMetrics.width,
+		layoutHeight: layoutMetrics.height,
+	});
+	if (materialSignature !== cached.materialSignature) {
+		dirtyFlags.materialDirty = true;
+		const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
+		const textureMasksMarkup = textureDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskEntry.body}</mask>`).join("");
+		const gradientDefsMarkup = gradientDefs.map((entry) => entry.def.defs).join("");
+		const gradientMasksMarkup = gradientDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskEntry.body}</mask>`).join("");
+		const materialMasksMarkup = materialDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskEntry.body}</mask>`).join("");
+		cached.materialDefsMarkup = `${textureDefsMarkup}${gradientDefsMarkup}${textureMasksMarkup}${gradientMasksMarkup}${materialMasksMarkup}`;
 
-	const textureOverlay = textureDefs
-		.map((entry) => {
-			const { layerTexture, def, maskId: textureMaskId } = entry;
-			if (!def.gradientId || !layerTexture.enabled || layerTexture.opacity <= 0) return "";
-			const textureFilterAttr = def.filterId ? ` filter=\"url(#${def.filterId})\"` : "";
-			const tx = -layoutMetrics.width;
-			const ty = -layoutMetrics.height;
-			const tw = layoutMetrics.width * 2;
-			const th = layoutMetrics.height * 2;
-			return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${def.gradientId})\" opacity=\"${layerTexture.opacity.toFixed(3)}\" mask=\"url(#${textureMaskId})\" style=\"mix-blend-mode:${layerTexture.blendMode};\"${textureFilterAttr} />`;
-		})
-		.join("");
+		cached.textureOverlay = textureDefs
+			.map((entry) => {
+				const { layerTexture, def, maskId: textureMaskId } = entry;
+				if (!def.gradientId || !layerTexture.enabled || layerTexture.opacity <= 0) return "";
+				const textureFilterAttr = def.filterId ? ` filter=\"url(#${def.filterId})\"` : "";
+				const tx = -layoutMetrics.width;
+				const ty = -layoutMetrics.height;
+				const tw = layoutMetrics.width * 2;
+				const th = layoutMetrics.height * 2;
+				return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${def.gradientId})\" opacity=\"${layerTexture.opacity.toFixed(3)}\" mask=\"url(#${textureMaskId})\" style=\"mix-blend-mode:${layerTexture.blendMode};\"${textureFilterAttr} />`;
+			})
+			.join("");
 
-	const gradientOverlay = gradientDefs
-		.map((entry) => {
-			const { layerGradient, def, maskId: gradientMaskId } = entry;
-			if (!def.gradientId || !layerGradient.enabled || layerGradient.opacity <= 0) return "";
-			const gradientFilterAttr = def.filterId ? ` filter=\"url(#${def.filterId})\"` : "";
-			const tx = -layoutMetrics.width;
-			const ty = -layoutMetrics.height;
-			const tw = layoutMetrics.width * 2;
-			const th = layoutMetrics.height * 2;
-			return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${def.gradientId})\" opacity=\"${layerGradient.opacity.toFixed(3)}\" mask=\"url(#${gradientMaskId})\" style=\"mix-blend-mode:${layerGradient.blendMode};\"${gradientFilterAttr} />`;
-		})
-		.join("");
+		cached.gradientOverlay = gradientDefs
+			.map((entry) => {
+				const { layerGradient, def, maskId: gradientMaskId } = entry;
+				if (!def.gradientId || !layerGradient.enabled || layerGradient.opacity <= 0) return "";
+				const gradientFilterAttr = def.filterId ? ` filter=\"url(#${def.filterId})\"` : "";
+				const tx = -layoutMetrics.width;
+				const ty = -layoutMetrics.height;
+				const tw = layoutMetrics.width * 2;
+				const th = layoutMetrics.height * 2;
+				return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${def.gradientId})\" opacity=\"${layerGradient.opacity.toFixed(3)}\" mask=\"url(#${gradientMaskId})\" style=\"mix-blend-mode:${layerGradient.blendMode};\"${gradientFilterAttr} />`;
+			})
+			.join("");
 
-	const materialOverlay = materialDefs
-		.map((entry) => {
-			const { layerMaterial, maskId: materialMaskId } = entry;
-			if (!layerMaterial.enabled || layerMaterial.opacity <= 0) return "";
-			const tx = -layoutMetrics.width;
-			const ty = -layoutMetrics.height;
-			const tw = layoutMetrics.width * 2;
-			const th = layoutMetrics.height * 2;
-			return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"${layerMaterial.color}\" opacity=\"${layerMaterial.opacity.toFixed(3)}\" mask=\"url(#${materialMaskId})\" style=\"mix-blend-mode:${layerMaterial.blendMode};\" />`;
-		})
-		.join("");
+		cached.materialOverlay = materialDefs
+			.map((entry) => {
+				const { layerMaterial, maskId: materialMaskId } = entry;
+				if (!layerMaterial.enabled || layerMaterial.opacity <= 0) return "";
+				const tx = -layoutMetrics.width;
+				const ty = -layoutMetrics.height;
+				const tw = layoutMetrics.width * 2;
+				const th = layoutMetrics.height * 2;
+				return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"${layerMaterial.color}\" opacity=\"${layerMaterial.opacity.toFixed(3)}\" mask=\"url(#${materialMaskId})\" style=\"mix-blend-mode:${layerMaterial.blendMode};\" />`;
+			})
+			.join("");
+		cached.materialSignature = materialSignature;
+	}
 
-	const worldLayer = `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${textureOverlay}${gradientOverlay}${materialOverlay}</g>`;
-	return elementMaskDef.active ? `<g mask=\"url(#${elementMaskId})\">${worldLayer}</g>` : worldLayer;
+	const effectsSignature = toSignature({
+		style: layerStyle,
+		depthEffect,
+		dropShadowEffect,
+		silhouetteSignature,
+	});
+	if (effectsSignature !== cached.effectsSignature) {
+		dirtyFlags.effectsDirty = true;
+		cached.filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect, {
+			masked: cached.elementMaskActive,
+			edgeRadius: 0.34,
+			edgeOpacity: 0.24,
+			edgeColor: typeof dropShadowEffect?.color === "string" ? dropShadowEffect.color : "#000000",
+		});
+		cached.filterAttr = cached.filterDef.length > 0 ? ` filter=\"url(#${filterId})\"` : "";
+		cached.effectsSignature = effectsSignature;
+	}
+
+	const defs = `<defs>${cached.filterDef}${cached.silhouetteDefs}${cached.materialDefsMarkup}</defs>`;
+
+	const worldLayer = `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${cached.filterAttr}>${cached.silhouetteBody}</g>${cached.textureOverlay}${cached.gradientOverlay}${cached.materialOverlay}</g>`;
+	LAYER_PASS_CACHE.set(cacheKey, cached);
+	return worldLayer;
 }
 
 function renderLayoutBase(composition, context) {
@@ -1310,6 +1412,8 @@ export function renderSvg(resolvedComposition, context = {}) {
 		layoutMetrics,
 		depthEffect,
 		globalDepthEnabled: depthEffect.enabled && depthEffect.intensity > 0,
+		cacheFrameKey: `${layoutMetrics.width}x${layoutMetrics.height}`,
+		activeLayerCacheKeys: new Set(),
 		composition,
 		layerMaskRegistry: {},
 		previousElementName: "",
@@ -1333,6 +1437,17 @@ export function renderSvg(resolvedComposition, context = {}) {
 		? buildLayerFilterDef(globalDepthId, { enabled: false, contrast: 1, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0, color: null }, depthEffect)
 		: "";
 	const content = `${baseLayer}${body}`;
+	if (renderContext.activeLayerCacheKeys && renderContext.activeLayerCacheKeys.size > 0) {
+		const active = renderContext.activeLayerCacheKeys;
+		for (const key of LAYER_PASS_CACHE.keys()) {
+			if (key.startsWith(`${renderContext.cacheFrameKey}::`) && !active.has(key)) {
+				LAYER_PASS_CACHE.delete(key);
+			}
+		}
+	}
+	if (LAYER_PASS_CACHE.size > 1200) {
+		LAYER_PASS_CACHE.clear();
+	}
 	if (globalDepthDef.length > 0) {
 		return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layoutMetrics.width} ${layoutMetrics.height}"><defs>${globalDepthDef}</defs><g filter="url(#${globalDepthId})">${content}</g></svg>`;
 	}
