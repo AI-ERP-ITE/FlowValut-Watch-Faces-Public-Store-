@@ -527,7 +527,7 @@ function normalizeDropShadowEffect(source = {}) {
 	};
 }
 
-function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffect = { enabled: false, mode: "outer", opacity: 0 }) {
+function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffect = { enabled: false, mode: "outer", opacity: 0 }, silhouette = { masked: false }) {
 	if (!styleAdjust.enabled && !depthEffect.enabled && !dropShadowEffect.enabled) return "";
 
 	// Keep tone and sharpening responsive but avoid tiny slider movement causing heavy clipping.
@@ -547,6 +547,12 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 	].map((v) => Number(v).toFixed(4)).join(" ");
 
 	let chain = "tone";
+	const alphaRef = silhouette && silhouette.masked ? "silhouetteAlpha" : "SourceAlpha";
+	const edgeRadius = silhouette && silhouette.masked ? clamp(silhouette.edgeRadius, 0.08, 2.2, 0.36) : 0;
+	const edgeOpacity = silhouette && silhouette.masked ? clamp(silhouette.edgeOpacity, 0, 1, 0.26) : 0;
+	const edgeColor = silhouette && silhouette.masked && typeof silhouette.edgeColor === "string"
+		? silhouette.edgeColor
+		: (dropShadowEffect && typeof dropShadowEffect.color === "string" ? dropShadowEffect.color : "#000000");
 	const parts = [
 		`<filter id=\"${filterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
 		`<feColorMatrix in=\"SourceGraphic\" type=\"hueRotate\" values=\"${styleAdjust.hue.toFixed(3)}\" result=\"hue\" />`,
@@ -556,6 +562,15 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		`<feFuncB type=\"linear\" slope=\"${styleAdjust.contrast.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
 		"</feComponentTransfer>",
 	];
+
+	if (alphaRef !== "SourceAlpha") {
+		parts.push(`<feColorMatrix in=\"SourceAlpha\" type=\"matrix\" values=\"1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0\" result=\"${alphaRef}\" />`);
+		if (edgeOpacity > 0.0001) {
+			parts.push(`<feMorphology in=\"${alphaRef}\" operator=\"dilate\" radius=\"${edgeRadius.toFixed(3)}\" result=\"edgeDilate\" />`);
+			parts.push(`<feMorphology in=\"${alphaRef}\" operator=\"erode\" radius=\"${Math.max(0.01, edgeRadius * 0.7).toFixed(3)}\" result=\"edgeErode\" />`);
+			parts.push('<feComposite in="edgeDilate" in2="edgeErode" operator="out" result="silhouetteEdge" />');
+		}
+	}
 
 	if (sharpenStrength > 0.001) {
 		parts.push(`<feConvolveMatrix in=\"tone\" order=\"3\" kernelMatrix=\"${sharpenKernel}\" divisor=\"1\" result=\"sharp\" />`);
@@ -590,23 +605,23 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 			const frontOpacity = clamp(0.46 * depthCurve * baseOpacity * Math.min(2, falloff), 0, 1, 0.4).toFixed(3);
 			const frontBlur = Math.max(0.08, (0.4 + depthCurve * 0.7) / falloff).toFixed(3);
 			const frontRadius = (Math.max(0.1, spread * 2.25 + (Math.hypot(depthEffect.dx, depthEffect.dy) * 0.35))).toFixed(3);
-			parts.push(`<feMorphology in="SourceAlpha" operator="dilate" radius="${frontRadius}" result="frontAlpha" />`);
+			parts.push(`<feMorphology in="${alphaRef}" operator="dilate" radius="${frontRadius}" result="frontAlpha" />`);
 			parts.push(`<feGaussianBlur in="frontAlpha" stdDeviation="${frontBlur}" result="frontBlur" />`);
-			parts.push('<feComposite in="frontBlur" in2="SourceAlpha" operator="out" result="frontRim" />');
+			parts.push(`<feComposite in="frontBlur" in2="${alphaRef}" operator="out" result="frontRim" />`);
 			parts.push(`<feFlood flood-color="${lightColor}" flood-opacity="${frontOpacity}" result="frontFlood" />`);
 			parts.push('<feComposite in="frontFlood" in2="frontRim" operator="in" result="frontGlow" />');
 			parts.push(`<feBlend in="${chain}" in2="frontGlow" mode="screen" result="depthFront" />`);
 			chain = "depthFront";
 		} else if (mode === "inner") {
-			parts.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${blur}" result="depthInnerBlurA" />`);
+			parts.push(`<feGaussianBlur in="${alphaRef}" stdDeviation="${blur}" result="depthInnerBlurA" />`);
 			parts.push(`<feOffset in="depthInnerBlurA" dx="${depthEffect.dx.toFixed(3)}" dy="${depthEffect.dy.toFixed(3)}" result="depthInnerOffsetA" />`);
-			parts.push('<feComposite in="depthInnerOffsetA" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskA" />');
+			parts.push(`<feComposite in="depthInnerOffsetA" in2="${alphaRef}" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskA" />`);
 			parts.push(`<feFlood flood-color="${shadowColor}" flood-opacity="${shadowOpacity}" result="depthInnerFloodA" />`);
 			parts.push('<feComposite in="depthInnerFloodA" in2="depthInnerMaskA" operator="in" result="depthInnerShadeA" />');
 
-			parts.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${blur}" result="depthInnerBlurB" />`);
+			parts.push(`<feGaussianBlur in="${alphaRef}" stdDeviation="${blur}" result="depthInnerBlurB" />`);
 			parts.push(`<feOffset in="depthInnerBlurB" dx="${(-depthEffect.dx).toFixed(3)}" dy="${(-depthEffect.dy).toFixed(3)}" result="depthInnerOffsetB" />`);
-			parts.push('<feComposite in="depthInnerOffsetB" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskB" />');
+			parts.push(`<feComposite in="depthInnerOffsetB" in2="${alphaRef}" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskB" />`);
 			parts.push(`<feFlood flood-color="${lightColor}" flood-opacity="${lightOpacity}" result="depthInnerFloodB" />`);
 			parts.push('<feComposite in="depthInnerFloodB" in2="depthInnerMaskB" operator="in" result="depthInnerShadeB" />');
 
@@ -624,16 +639,16 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		const mode = dropShadowEffect.mode === "inner" ? "inner" : "outer";
 		const shadowBlur = Math.max(0, Number(dropShadowEffect.blur) / 2);
 		const shadowSpread = clamp(dropShadowEffect.spread, 0, 20, 0);
-		const shadowBaseRef = shadowSpread > 0.001 ? "dsSpreadAlpha" : "SourceAlpha";
+		const shadowBaseRef = shadowSpread > 0.001 ? "dsSpreadAlpha" : alphaRef;
 
 		if (shadowSpread > 0.001) {
-			parts.push(`<feMorphology in="SourceAlpha" operator="dilate" radius="${shadowSpread.toFixed(3)}" result="dsSpreadAlpha" />`);
+			parts.push(`<feMorphology in="${alphaRef}" operator="dilate" radius="${shadowSpread.toFixed(3)}" result="dsSpreadAlpha" />`);
 		}
 
 		if (mode === "inner") {
 			parts.push(`<feGaussianBlur in="${shadowBaseRef}" stdDeviation="${shadowBlur.toFixed(3)}" result="dsInnerBlur" />`);
 			parts.push(`<feOffset in="dsInnerBlur" dx="${Number(dropShadowEffect.offsetX).toFixed(3)}" dy="${Number(dropShadowEffect.offsetY).toFixed(3)}" result="dsInnerOffset" />`);
-			parts.push('<feComposite in="dsInnerOffset" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="dsInnerMask" />');
+			parts.push(`<feComposite in="dsInnerOffset" in2="${alphaRef}" operator="arithmetic" k2="-1" k3="1" result="dsInnerMask" />`);
 			parts.push(`<feFlood flood-color="${dropShadowEffect.color}" flood-opacity="${Number(dropShadowEffect.opacity).toFixed(3)}" result="dsInnerFlood" />`);
 			parts.push('<feComposite in="dsInnerFlood" in2="dsInnerMask" operator="in" result="dsInnerShade" />');
 			parts.push(`<feBlend in="${chain}" in2="dsInnerShade" mode="multiply" result="dropShadow" />`);
@@ -648,9 +663,16 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		}
 	}
 
+	if (alphaRef !== "SourceAlpha" && edgeOpacity > 0.0001) {
+		parts.push(`<feFlood flood-color="${edgeColor}" flood-opacity="${edgeOpacity.toFixed(3)}" result="edgeFlood" />`);
+		parts.push('<feComposite in="edgeFlood" in2="silhouetteEdge" operator="in" result="edgeTint" />');
+		parts.push(`<feBlend in="${chain}" in2="edgeTint" mode="multiply" result="maskedEdge" />`);
+		chain = "maskedEdge";
+	}
+
 	if (styleAdjust.color && styleAdjust.colorOpacity > 0) {
 		parts.push(`<feFlood flood-color=\"${styleAdjust.color}\" flood-opacity=\"${styleAdjust.colorOpacity.toFixed(3)}\" result=\"tintFill\" />`);
-		parts.push("<feComposite in=\"tintFill\" in2=\"SourceAlpha\" operator=\"in\" result=\"tintMask\" />");
+		parts.push(`<feComposite in=\"tintFill\" in2=\"${alphaRef}\" operator=\"in\" result=\"tintMask\" />`);
 		parts.push(`<feBlend in=\"${chain}\" in2=\"tintMask\" mode=\"multiply\" result=\"tinted\" />`);
 		chain = "tinted";
 	}
@@ -662,7 +684,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		// Preserve outer shadow pixels. SourceAlpha clipping removes visible depth/drop shadows.
 		parts.push(`<feMerge><feMergeNode in=\"${chain}\" /></feMerge>`);
 	} else {
-		parts.push(`<feComposite in=\"${chain}\" in2=\"SourceAlpha\" operator=\"in\" result=\"final\" />`);
+		parts.push(`<feComposite in=\"${chain}\" in2=\"${alphaRef}\" operator=\"in\" result=\"final\" />`);
 		parts.push("<feMerge><feMergeNode in=\"final\" /></feMerge>");
 	}
 	parts.push("</filter>");
@@ -1016,8 +1038,13 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const elementMaskId = `${maskId}-element`;
-	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect);
 	const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
+	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect, {
+		masked: elementMaskDef.active,
+		edgeRadius: 0.34,
+		edgeOpacity: 0.24,
+		edgeColor: typeof dropShadowEffect?.color === "string" ? dropShadowEffect.color : "#000000",
+	});
 	const filterInputBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${body}</g>` : body;
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
