@@ -788,6 +788,7 @@ export default function ParametricPage() {
   const [error, setError] = useState<string | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
   const previewRenderSerialRef = useRef(0);
+  const contextInspectorRef = useRef<HTMLElement | null>(null);
   const historyPastRef = useRef<Array<TemplateCommand>>([]);
   const historyFutureRef = useRef<Array<TemplateCommand>>([]);
   const isHistoryApplyingRef = useRef(false);
@@ -1519,6 +1520,82 @@ export default function ParametricPage() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [contextTab, runRedoCommand, runUndoCommand, selectedElement]);
+
+  useEffect(() => {
+    const root = contextInspectorRef.current;
+    if (!root) return;
+
+    const emitControlChange = (control: HTMLInputElement | HTMLSelectElement, nextValue: string) => {
+      control.value = nextValue;
+      control.dispatchEvent(new Event('input', { bubbles: true }));
+      control.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const resolveNumericResetValue = (control: HTMLInputElement): number => {
+      const min = Number(control.min);
+      const max = Number(control.max);
+
+      if (Number.isFinite(min) && Number.isFinite(max) && min <= 0 && max >= 0) {
+        return 0;
+      }
+      if (Number.isFinite(min) && Number.isFinite(max) && min <= 1 && max >= 1) {
+        return 1;
+      }
+      if (Number.isFinite(min)) {
+        return min;
+      }
+      return 0;
+    };
+
+    const applyResetChips = () => {
+      const labels = root.querySelectorAll('label');
+      labels.forEach((label) => {
+        const title = label.querySelector('span');
+        if (!title) return;
+        if (title.querySelector('[data-reset-chip="true"]')) return;
+
+        const control = label.querySelector('input[type="range"], input[type="number"], select') as HTMLInputElement | HTMLSelectElement | null;
+        if (!control) return;
+
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.textContent = '✓';
+        chip.setAttribute('data-reset-chip', 'true');
+        chip.className = 'ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-800';
+        chip.title = 'Reset this control';
+        chip.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (control instanceof HTMLSelectElement) {
+            if (control.options.length > 0) {
+              emitControlChange(control, control.options[0].value);
+            }
+            return;
+          }
+
+          const nextValue = resolveNumericResetValue(control);
+          const min = Number(control.min);
+          const max = Number(control.max);
+          const clamped = Number.isFinite(min) && Number.isFinite(max)
+            ? Math.max(min, Math.min(max, nextValue))
+            : nextValue;
+          emitControlChange(control, String(clamped));
+        });
+
+        title.classList.add('inline-flex', 'items-center', 'gap-1');
+        title.appendChild(chip);
+      });
+    };
+
+    applyResetChips();
+    const observer = new MutationObserver(() => applyResetChips());
+    observer.observe(root, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [contextTab, historyTick, isFocusMode, selectedElementId, selectedPanelTarget]);
 
   const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>, label = 'Update elements') => {
     applyTemplateCommand(label, (prev) => ({
@@ -5283,7 +5360,10 @@ export default function ParametricPage() {
           </section>
 
           {!isFocusMode ? (
-          <aside className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto">
+          <aside
+            ref={contextInspectorRef}
+            className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900/70 p-4 space-y-4 xl:sticky xl:top-6 xl:max-h-[calc(100vh-14rem)] xl:overflow-y-auto"
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-zinc-100">Right Context Inspector</h2>
               <span className="text-[11px] text-zinc-500">Docked right for non-overlap editing.</span>
