@@ -589,6 +589,45 @@ const DROP_SHADOW_CONTROL_LIMITS = {
   blur: { min: 0, max: 40, step: 0.5 },
   offset: { min: -30, max: 30, step: 0.5 },
 } as const;
+const SHADOW_PRESET_OPTIONS = [
+  {
+    key: 'soft',
+    label: 'Soft',
+    shadow: { mode: 'outer', color: '#000000', opacity: 0.28, blur: 16, offsetX: 2, offsetY: 4 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.22, opacity: 0.44, distance: 1.2, falloff: 1.2, spread: 0 },
+  },
+  {
+    key: 'natural',
+    label: 'Natural',
+    shadow: { mode: 'outer', color: '#000000', opacity: 0.36, blur: 12, offsetX: 3, offsetY: 5 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.34, opacity: 0.58, distance: 1.5, falloff: 1.1, spread: 0.05 },
+  },
+  {
+    key: 'hard',
+    label: 'Hard',
+    shadow: { mode: 'outer', color: '#000000', opacity: 0.58, blur: 6, offsetX: 4, offsetY: 7 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.5, opacity: 0.74, distance: 2.1, falloff: 0.9, spread: 0.08 },
+  },
+  {
+    key: 'studio-rim',
+    label: 'Studio Rim',
+    shadow: { mode: 'outer', color: '#10131a', opacity: 0.42, blur: 14, offsetX: 6, offsetY: 2 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.52, opacity: 0.7, distance: 2.2, falloff: 1, spread: 0.12, whiteBalance: 0.25 },
+  },
+  {
+    key: 'embossed',
+    label: 'Embossed',
+    shadow: { mode: 'inner', color: '#000000', opacity: 0.4, blur: 8, offsetX: 2, offsetY: 2 },
+    depth: { enabled: true, mode: 'inner', intensity: 0.56, opacity: 0.82, distance: 1.7, falloff: 1.25, spread: 0.18, whiteBalance: 0.14 },
+  },
+] as const;
+const LIGHT_DIRECTION_PRESET_OPTIONS = [
+  { key: 'top-left', label: 'Top Left', angle: -135 },
+  { key: 'top-right', label: 'Top Right', angle: -45 },
+  { key: 'bottom-left', label: 'Bottom Left', angle: 135 },
+  { key: 'bottom-right', label: 'Bottom Right', angle: 45 },
+  { key: 'front', label: 'Front', angle: -90 },
+] as const;
 
 function makeId(prefix = 'el'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -3764,6 +3803,80 @@ export default function ParametricPage() {
     return typeof raw === 'string' ? raw : fallback;
   };
 
+  const applySelectedShadowPreset = (presetKey: string) => {
+    if (!selectedElement) return;
+    const preset = SHADOW_PRESET_OPTIONS.find((entry) => entry.key === presetKey);
+    if (!preset) return;
+
+    updateTemplateElements(
+      (elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedElement.id) return element;
+          const currentShadow = element.dropShadow && typeof element.dropShadow === 'object'
+            ? (element.dropShadow as Record<string, unknown>)
+            : undefined;
+          const currentDepth = element.effect3d && typeof element.effect3d === 'object'
+            ? (element.effect3d as Record<string, unknown>)
+            : undefined;
+
+          return {
+            ...element,
+            dropShadow: normalizeDropShadowRecord({
+              ...(currentShadow ?? {}),
+              ...preset.shadow,
+            }),
+            effect3d: normalizeDepthEffectRecord({
+              ...(currentDepth ?? {}),
+              ...preset.depth,
+            }),
+          };
+        }),
+      `Apply ${preset.label} shadow preset`,
+    );
+  };
+
+  const applySelectedLightDirectionPreset = (angle: number) => {
+    if (!selectedElement) return;
+
+    updateTemplateElements(
+      (elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedElement.id) return element;
+
+          const currentShadow = element.dropShadow && typeof element.dropShadow === 'object'
+            ? (element.dropShadow as Record<string, unknown>)
+            : undefined;
+          const currentDepth = element.effect3d && typeof element.effect3d === 'object'
+            ? (element.effect3d as Record<string, unknown>)
+            : undefined;
+          const shadow = normalizeDropShadowRecord(currentShadow);
+          const depth = normalizeDepthEffectRecord(currentDepth);
+
+          const rad = (angle * Math.PI) / 180;
+          const distance = Number.isFinite(Number(depth.distance)) ? Number(depth.distance) : 1.6;
+          const travel = Math.max(1.5, Math.min(10, distance * 2.4));
+          const offsetX = Math.cos(rad) * travel;
+          const offsetY = Math.sin(rad) * travel;
+
+          return {
+            ...element,
+            effect3d: normalizeDepthEffectRecord({
+              ...depth,
+              enabled: true,
+              angle,
+            }),
+            dropShadow: normalizeDropShadowRecord({
+              ...shadow,
+              mode: 'outer',
+              offsetX,
+              offsetY,
+            }),
+          };
+        }),
+      'Apply 3D light direction preset',
+    );
+  };
+
   useEffect(() => {
     if (!workingTemplate) return;
     try {
@@ -6707,6 +6820,22 @@ export default function ParametricPage() {
                     <>
                   <p className="text-[11px] text-zinc-500">Optional per-element light direction and depth strength.</p>
 
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">3D Light Direction Presets</p>
+                    <div className="flex flex-wrap gap-1">
+                      {LIGHT_DIRECTION_PRESET_OPTIONS.map((preset) => (
+                        <button
+                          key={`depth-light-preset-${preset.key}`}
+                          type="button"
+                          onClick={() => applySelectedLightDirectionPreset(preset.angle)}
+                          className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Depth Mode</span>
                     <select
@@ -6847,6 +6976,38 @@ export default function ParametricPage() {
                   {!isEffectPanelCollapsed('shadowFx') ? (
                     <>
                       <p className="text-[11px] text-zinc-500">Unified shadow controls for preview and export parity.</p>
+
+                      <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Shadow Presets</p>
+                        <div className="flex flex-wrap gap-1">
+                          {SHADOW_PRESET_OPTIONS.map((preset) => (
+                            <button
+                              key={`shadow-preset-${preset.key}`}
+                              type="button"
+                              onClick={() => applySelectedShadowPreset(preset.key)}
+                              className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">3D Light Direction (Depth + Shadow)</p>
+                        <div className="flex flex-wrap gap-1">
+                          {LIGHT_DIRECTION_PRESET_OPTIONS.map((preset) => (
+                            <button
+                              key={`shadow-light-preset-${preset.key}`}
+                              type="button"
+                              onClick={() => applySelectedLightDirectionPreset(preset.angle)}
+                              className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
                       <label className="flex items-center gap-2">
                         <input

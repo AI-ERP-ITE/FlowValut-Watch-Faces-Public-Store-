@@ -145,6 +145,13 @@ function normalizeTextureKind(value, fallback = "grain") {
 	return "grain";
 }
 
+function normalizeImageTextureFit(value, fallback = "cover") {
+	const next = typeof value === "string" ? value.trim().toLowerCase() : "";
+	if (next === "contain" || next === "stretch") return next;
+	if (next === "cover") return next;
+	return fallback === "contain" || fallback === "stretch" ? fallback : "cover";
+}
+
 function normalizeBlur(source = {}, fallback = {}) {
 	const src = source && typeof source === "object" ? source : {};
 	const nextType = typeof src.type === "string" && BLUR_TYPES.has(src.type)
@@ -338,10 +345,17 @@ function normalizeTexture(source = {}, fallback = {}) {
 		fiber,
 		seed,
 		image: {
+			src: typeof image.src === "string"
+				? image.src
+				: (typeof fallbackImage.src === "string" ? fallbackImage.src : ""),
 			offsetX: clamp(image.offsetX, -100, 100, clamp(fallbackImage.offsetX, -100, 100, 0)),
 			offsetY: clamp(image.offsetY, -100, 100, clamp(fallbackImage.offsetY, -100, 100, 0)),
 			scale: clamp(image.scale, 0.1, 5, clamp(fallbackImage.scale, 0.1, 5, 1)),
 			rotation: clamp(image.rotation, -180, 180, clamp(fallbackImage.rotation, -180, 180, 0)),
+			radius: clamp(image.radius, 0, 120, clamp(fallbackImage.radius, 0, 120, 0)),
+			fit: normalizeImageTextureFit(image.fit, normalizeImageTextureFit(fallbackImage.fit, "cover")),
+			naturalWidth: clamp(image.naturalWidth, 1, 8192, clamp(fallbackImage.naturalWidth, 1, 8192, 1024)),
+			naturalHeight: clamp(image.naturalHeight, 1, 8192, clamp(fallbackImage.naturalHeight, 1, 8192, 1024)),
 		},
 		blur: normalizeBlur(blur, fallbackBlur),
 		clip: {
@@ -496,17 +510,19 @@ function normalizeDropShadowEffect(source = {}) {
 function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffect = { enabled: false, mode: "outer", opacity: 0 }) {
 	if (!styleAdjust.enabled && !depthEffect.enabled && !dropShadowEffect.enabled) return "";
 
-	const toneShift = (styleAdjust.highlight * 0.35) - (styleAdjust.shadows * 0.35);
-	const sharp = styleAdjust.sharpness;
+	// Keep tone and sharpening responsive but avoid tiny slider movement causing heavy clipping.
+	const toneShift = (styleAdjust.highlight - styleAdjust.shadows) * 0.12;
+	const sharp = clamp(styleAdjust.sharpness, 0, 1, 0);
+	const sharpenStrength = Math.pow(sharp, 1.35) * 0.45;
 	const sharpenKernel = [
 		0,
-		-1 * sharp,
+		-1 * sharpenStrength,
 		0,
-		-1 * sharp,
-		1 + 4 * sharp,
-		-1 * sharp,
+		-1 * sharpenStrength,
+		1 + 4 * sharpenStrength,
+		-1 * sharpenStrength,
 		0,
-		-1 * sharp,
+		-1 * sharpenStrength,
 		0,
 	].map((v) => Number(v).toFixed(4)).join(" ");
 
@@ -521,7 +537,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		"</feComponentTransfer>",
 	];
 
-	if (sharp > 0.001) {
+	if (sharpenStrength > 0.001) {
 		parts.push(`<feConvolveMatrix in=\"tone\" order=\"3\" kernelMatrix=\"${sharpenKernel}\" divisor=\"1\" result=\"sharp\" />`);
 		chain = "sharp";
 	}
@@ -753,15 +769,60 @@ function buildTextureKindPrimitives(texture, inputRef) {
 		return { parts, result: chain };
 	}
 
+	if (kind === "image") {
+		if (noiseAmount > 0) {
+			const frequency = (1 / Math.max(10, noiseRadius * 2.4)).toFixed(4);
+			const alpha = clamp(noiseAmount * 0.45, 0, 0.75, 0.2).toFixed(3);
+			parts.push(`<feTurbulence type="fractalNoise" baseFrequency="${frequency}" numOctaves="2" seed="19" result="imgNoise" />`);
+			parts.push(`<feColorMatrix in="imgNoise" type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 ${alpha} 0" result="imgNoiseAlpha" />`);
+			parts.push(`<feBlend in="${chain}" in2="imgNoiseAlpha" mode="soft-light" result="texture-image-noise" />`);
+			chain = "texture-image-noise";
+		}
+
+		const softness = clamp(texture.image?.radius, 0, 120, 0);
+		if (softness > 0) {
+			const sigma = Math.max(0.001, softness / 18);
+			parts.push(`<feGaussianBlur in="${chain}" stdDeviation="${sigma.toFixed(3)}" result="texture-image-soft" />`);
+			chain = "texture-image-soft";
+		}
+
+		return { parts, result: chain };
+	}
+
 	return { parts, result: chain };
 }
 
-function buildTextureDefs(localId, texture) {
+function buildTextureImagePatternDefinition(patternId, texture, layoutMetrics) {
+	const image = texture.image && typeof texture.image === "object" ? texture.image : {};
+	const src = typeof image.src === "string" ? image.src.trim() : "";
+	if (!src) return "";
+
+	const widthBase = Math.max(1, Number(layoutMetrics?.width) * 2 || 960);
+	const heightBase = Math.max(1, Number(layoutMetrics?.height) * 2 || 960);
+	const scale = clamp(image.scale, 0.1, 5, 1);
+	const tileWidth = Math.max(1, widthBase / scale);
+	const tileHeight = Math.max(1, heightBase / scale);
+	const offsetX = clamp(image.offsetX, -100, 100, 0);
+	const offsetY = clamp(image.offsetY, -100, 100, 0);
+	const patternX = (-widthBase / 2) + ((offsetX / 100) * (widthBase / 2));
+	const patternY = (-heightBase / 2) + ((offsetY / 100) * (heightBase / 2));
+	const rotation = clamp(image.rotation, -180, 180, 0);
+	const centerX = patternX + (tileWidth / 2);
+	const centerY = patternY + (tileHeight / 2);
+	const fit = normalizeImageTextureFit(image.fit, "cover");
+	const preserveAspectRatio = fit === "contain" ? "xMidYMid meet" : fit === "stretch" ? "none" : "xMidYMid slice";
+	const safeHref = src.replace(/"/g, "%22");
+
+	return `<pattern id="${patternId}" patternUnits="userSpaceOnUse" x="${patternX.toFixed(3)}" y="${patternY.toFixed(3)}" width="${tileWidth.toFixed(3)}" height="${tileHeight.toFixed(3)}" patternTransform="rotate(${rotation.toFixed(3)} ${centerX.toFixed(3)} ${centerY.toFixed(3)})"><image href="${safeHref}" x="0" y="0" width="${tileWidth.toFixed(3)}" height="${tileHeight.toFixed(3)}" preserveAspectRatio="${preserveAspectRatio}"/></pattern>`;
+}
+
+function buildTextureDefs(localId, texture, layoutMetrics) {
 	if (!texture.enabled || texture.opacity <= 0) {
 		return { defs: "", gradientId: null, filterId: null };
 	}
 
 	const gradientId = `grad-${localId}`;
+	const patternId = `teximg-${localId}`;
 	const textureFilterId = `textureFx-${localId}`;
 	const stops = texture.gradient.stops
 		.map((stop, index) => {
@@ -773,7 +834,9 @@ function buildTextureDefs(localId, texture) {
 		})
 		.join("");
 
-	const gradientDef = buildTextureGradientDefinition(gradientId, texture, stops);
+	const kind = normalizeTextureKind(texture.kind, "grain");
+	const imagePatternDef = kind === "image" ? buildTextureImagePatternDefinition(patternId, texture, layoutMetrics) : "";
+	const gradientDef = imagePatternDef || buildTextureGradientDefinition(gradientId, texture, stops);
 
 	let chain = "SourceGraphic";
 	const filterParts = [];
@@ -786,13 +849,13 @@ function buildTextureDefs(localId, texture) {
 	chain = blurPass.result;
 
 	if (filterParts.length === 0) {
-		return { defs: gradientDef, gradientId, filterId: null };
+		return { defs: gradientDef, gradientId: imagePatternDef ? patternId : gradientId, filterId: null };
 	}
 
 	const filterDef = [`<filter id=\"${textureFilterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`, ...filterParts, `<feMerge><feMergeNode in=\"${chain}\" /></feMerge>`, "</filter>"].join("");
 	return {
 		defs: `${gradientDef}${filterDef}`,
-		gradientId,
+		gradientId: imagePatternDef ? patternId : gradientId,
 		filterId: textureFilterId,
 	};
 }
@@ -851,7 +914,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
-			def: buildTextureDefs(`${localId}-texture-${index}`, layerTexture),
+			def: buildTextureDefs(`${localId}-texture-${index}`, layerTexture, layoutMetrics),
 			maskId: `${maskId}-texture-${index}`,
 			maskBody: resolveClipMaskBody(layerTexture.clip, context, body, currentElementName),
 		}))
