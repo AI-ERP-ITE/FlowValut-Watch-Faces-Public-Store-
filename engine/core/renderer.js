@@ -969,27 +969,11 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementNa
 	return fallbackBody;
 }
 
-function buildElementMaskPrimitives(mask = {}, layoutMetrics, transform = { x: 0, y: 0, rotation: 0 }) {
+function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
-	const tx = Number.isFinite(Number(transform?.x)) ? Number(transform.x) : 0;
-	const ty = Number.isFinite(Number(transform?.y)) ? Number(transform.y) : 0;
-	const rotation = Number.isFinite(Number(transform?.rotation)) ? Number(transform.rotation) : 0;
-	const radians = (rotation * Math.PI) / 180;
-	const cos = Math.cos(radians);
-	const sin = Math.sin(radians);
-	const toWorldX = (value) => (clamp(value, 0, 100, 0) / 100) * width;
-	const toWorldY = (value) => (clamp(value, 0, 100, 0) / 100) * height;
-	const toLocalPoint = (xPercent, yPercent) => {
-		const wx = toWorldX(xPercent);
-		const wy = toWorldY(yPercent);
-		const dx = wx - tx;
-		const dy = wy - ty;
-		return {
-			x: dx * cos + dy * sin,
-			y: -dx * sin + dy * cos,
-		};
-	};
+	const toMaskX = (value) => (clamp(value, 0, 100, 0) / 100) * width;
+	const toMaskY = (value) => (clamp(value, 0, 100, 0) / 100) * height;
 	const scale = Math.max(0.0001, Math.min(width, height) / 100);
 	const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
 
@@ -1008,38 +992,24 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics, transform = { x: 0
 					if (points.length >= 3) {
 						const pointsString = points
 							.map((point) => {
-								const local = toLocalPoint(point.x, point.y);
-								return `${local.x},${local.y}`;
+								return `${toMaskX(point.x)},${toMaskY(point.y)}`;
 							})
 							.join(" ");
 						return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
 					}
 				}
 
-				const sx = clamp(stroke.x, 0, 100, 0);
-				const sy = clamp(stroke.y, 0, 100, 0);
-				const sw = clamp(stroke.width, 0, 100, 0);
-				const sh = clamp(stroke.height, 0, 100, 0);
-				const p1 = toLocalPoint(sx, sy);
-				const p2 = toLocalPoint(sx + sw, sy);
-				const p3 = toLocalPoint(sx + sw, sy + sh);
-				const p4 = toLocalPoint(sx, sy + sh);
+					const sx = toMaskX(stroke.x);
+					const sy = toMaskY(stroke.y);
+					const sw = (clamp(stroke.width, 0, 100, 0) / 100) * width;
+					const sh = (clamp(stroke.height, 0, 100, 0) / 100) * height;
 				if (shape === "circle") {
-					const cx = (p1.x + p3.x) / 2;
-					const cy = (p1.y + p3.y) / 2;
-					const rx = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2;
-					const ry = Math.hypot(p4.x - p1.x, p4.y - p1.y) / 2;
-					return `<ellipse cx="${cx}" cy="${cy}" rx="${Math.max(0, Math.min(rx, ry))}" ry="${Math.max(0, Math.min(rx, ry))}" fill="${tone}" fill-opacity="${opacity}" />`;
+						return `<circle cx="${sx + sw / 2}" cy="${sy + sh / 2}" r="${Math.max(0, Math.min(sw, sh) / 2)}" fill="${tone}" fill-opacity="${opacity}" />`;
 				}
 				if (shape === "oval") {
-					const cx = (p1.x + p3.x) / 2;
-					const cy = (p1.y + p3.y) / 2;
-					const rx = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2;
-					const ry = Math.hypot(p4.x - p1.x, p4.y - p1.y) / 2;
-					return `<ellipse cx="${cx}" cy="${cy}" rx="${Math.max(0, rx)}" ry="${Math.max(0, ry)}" fill="${tone}" fill-opacity="${opacity}" />`;
+						return `<ellipse cx="${sx + sw / 2}" cy="${sy + sh / 2}" rx="${Math.max(0, sw / 2)}" ry="${Math.max(0, sh / 2)}" fill="${tone}" fill-opacity="${opacity}" />`;
 				}
-				const pointsString = [p1, p2, p3, p4].map((point) => `${point.x},${point.y}`).join(" ");
-				return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
+					return `<rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="${tone}" fill-opacity="${opacity}" />`;
 			}
 
 			const points = Array.isArray(stroke.points) ? stroke.points : [];
@@ -1047,8 +1017,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics, transform = { x: 0
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
 				const pointsString = points
 					.map((point) => {
-						const local = toLocalPoint(point.x, point.y);
-						return `${local.x},${local.y}`;
+						return `${toMaskX(point.x)},${toMaskY(point.y)}`;
 					})
 					.join(" ");
 				return `<polyline points="${pointsString}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
@@ -1059,7 +1028,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics, transform = { x: 0
 		.join("");
 }
 
-function buildElementMaskDef(maskId, mask = {}, layoutMetrics, transform = { x: 0, y: 0, rotation: 0 }) {
+function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	if (!mask || typeof mask !== "object" || mask.enabled !== true) {
 		return { defs: "", active: false };
 	}
@@ -1067,7 +1036,7 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics, transform = { x: 
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
 	const baseFill = mask.invert === true ? "black" : "white";
-	const primitives = buildElementMaskPrimitives(mask, layoutMetrics, transform);
+	const primitives = buildElementMaskPrimitives(mask, layoutMetrics);
 	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="${-width}" y="${-height}" width="${width * 2}" height="${height * 2}"><rect x="${-width}" y="${-height}" width="${width * 2}" height="${height * 2}" fill="${baseFill}" />${primitives}</mask>`;
 
 	return { defs, active: true };
@@ -1077,7 +1046,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const elementMaskId = `${maskId}-element`;
-	const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics, { x, y, rotation });
+	const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
 	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect, {
 		masked: elementMaskDef.active,
 		edgeRadius: 0.34,
