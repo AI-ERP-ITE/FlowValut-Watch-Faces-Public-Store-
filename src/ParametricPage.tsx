@@ -763,6 +763,7 @@ export default function ParametricPage() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isSoloMode, setIsSoloMode] = useState(false);
   const [isDimMode, setIsDimMode] = useState(false);
+  const [showGlobalMaskGuides, setShowGlobalMaskGuides] = useState(false);
   const [gradientHandleTarget, setGradientHandleTarget] = useState<'texture' | 'gradient'>('gradient');
   const [activeTextureLayerIndex, setActiveTextureLayerIndex] = useState(0);
   const [activeGradientLayerIndex, setActiveGradientLayerIndex] = useState(0);
@@ -4076,6 +4077,34 @@ export default function ParametricPage() {
   const isDepthLightingOwnerActive = isSelectedEffect3dEnabled();
   const isCircumferenceLightingEnabled = !isDepthLightingOwnerActive;
   const showGlobalLightingCanvasOverlay = contextTab === 'fx' && isCircumferenceLightingEnabled;
+  const globalMaskGuideStrokes = (() => {
+    if (!showGlobalMaskGuides || !workingTemplate || !Array.isArray(workingTemplate.elements)) {
+      return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+    }
+
+    return workingTemplate.elements.flatMap((element, elementIndex) => {
+      if (!element || typeof element !== 'object' || element.visible === false) {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+      if (!element.mask || typeof element.mask !== 'object') {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+
+      const mask = element.mask as Record<string, unknown>;
+      if (mask.enabled !== true) {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+
+      const strokes = Array.isArray(mask.strokes)
+        ? (mask.strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>)
+        : [];
+
+      return strokes.map((stroke, strokeIndex) => ({
+        key: `${String(element.id ?? `layer-${elementIndex}`)}-${strokeIndex}`,
+        stroke,
+      }));
+    });
+  })();
   const canvasMarkerLegendEntries = (() => {
     const entries: Array<{ key: string; meaning: string }> = [];
     if (showLinearGradientCanvasHandles) {
@@ -4423,6 +4452,15 @@ export default function ParametricPage() {
               >
                 {isDimMode ? 'Dim On' : 'Dim Off'}
               </button>
+
+              <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={showGlobalMaskGuides}
+                  onChange={(e) => setShowGlobalMaskGuides(e.target.checked)}
+                />
+                Global mask guides
+              </label>
 
               <button
                 type="button"
@@ -4964,6 +5002,103 @@ export default function ParametricPage() {
                         style={isolatedPreviewLayerStyle}
                         dangerouslySetInnerHTML={{ __html: svgTopOverlayMarkup }}
                       />
+                    ) : null}
+
+                    {showGlobalMaskGuides && globalMaskGuideStrokes.length > 0 ? (
+                      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        {globalMaskGuideStrokes.map(({ key, stroke }) => {
+                          const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
+                          const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
+                          const strokeColor = action === 'reveal' ? '#22c55e' : '#ef4444';
+                          const opacity = Math.max(0.08, Math.min(1, Number(stroke.opacity) || 1)) * 0.72;
+                          if (stroke.tool === 'selection') {
+                            const shape = typeof stroke.shape === 'string' ? stroke.shape : 'rect';
+                            if (shape === 'free' && points.length >= 3) {
+                              const pointsString = points.map((point) => `${point.x},${point.y}`).join(' ');
+                              return (
+                                <polygon
+                                  key={`global-mask-free-${key}`}
+                                  points={pointsString}
+                                  fill={strokeColor}
+                                  fillOpacity={opacity * 0.2}
+                                  stroke={strokeColor}
+                                  strokeOpacity={opacity}
+                                  strokeWidth={0.42}
+                                />
+                              );
+                            }
+
+                            const x = Math.max(0, Math.min(100, Number(stroke.x) || 0));
+                            const y = Math.max(0, Math.min(100, Number(stroke.y) || 0));
+                            const width = Math.max(0, Math.min(100, Number(stroke.width) || 0));
+                            const height = Math.max(0, Math.min(100, Number(stroke.height) || 0));
+                            if (shape === 'circle') {
+                              const radius = Math.max(0, Math.min(width, height) / 2);
+                              return (
+                                <circle
+                                  key={`global-mask-circle-${key}`}
+                                  cx={x + width / 2}
+                                  cy={y + height / 2}
+                                  r={radius}
+                                  fill={strokeColor}
+                                  fillOpacity={opacity * 0.2}
+                                  stroke={strokeColor}
+                                  strokeOpacity={opacity}
+                                  strokeWidth={0.46}
+                                />
+                              );
+                            }
+
+                            if (shape === 'oval') {
+                              return (
+                                <ellipse
+                                  key={`global-mask-oval-${key}`}
+                                  cx={x + width / 2}
+                                  cy={y + height / 2}
+                                  rx={Math.max(0, width / 2)}
+                                  ry={Math.max(0, height / 2)}
+                                  fill={strokeColor}
+                                  fillOpacity={opacity * 0.2}
+                                  stroke={strokeColor}
+                                  strokeOpacity={opacity}
+                                  strokeWidth={0.46}
+                                />
+                              );
+                            }
+
+                            return (
+                              <rect
+                                key={`global-mask-rect-${key}`}
+                                x={x}
+                                y={y}
+                                width={width}
+                                height={height}
+                                fill={strokeColor}
+                                fillOpacity={opacity * 0.2}
+                                stroke={strokeColor}
+                                strokeOpacity={opacity}
+                                strokeWidth={0.46}
+                              />
+                            );
+                          }
+
+                          if (points.length === 0) return null;
+                          const pointsString = points.map((point) => `${point.x},${point.y}`).join(' ');
+                          const strokeWidth = Math.max(0.2, Number(stroke.size) / 5.2);
+                          return (
+                            <polyline
+                              key={`global-mask-stroke-${key}`}
+                              points={pointsString}
+                              fill="none"
+                              stroke={strokeColor}
+                              strokeOpacity={opacity}
+                              strokeWidth={strokeWidth}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          );
+                        })}
+                      </svg>
                     ) : null}
 
                     {showGlobalLightingCanvasOverlay ? (
