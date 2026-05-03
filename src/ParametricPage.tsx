@@ -781,6 +781,7 @@ export default function ParametricPage() {
 
   const [draftError, setDraftError] = useState<string | null>(null);
   const [svgMarkup, setSvgMarkup] = useState('');
+  const [svgOverlayLayers, setSvgOverlayLayers] = useState<string[]>([]);
   const [svgOverlayMarkup, setSvgOverlayMarkup] = useState<string | null>(null);
   const [svgTopOverlayMarkup, setSvgTopOverlayMarkup] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(false);
@@ -1235,10 +1236,11 @@ export default function ParametricPage() {
       const selectedVisibleElement = selectedElementId
         ? visibleElements.find((element) => element.id === selectedElementId)
         : null;
-      const selectedMask = selectedVisibleElement && selectedVisibleElement.mask && typeof selectedVisibleElement.mask === 'object'
-        ? selectedVisibleElement.mask as Record<string, unknown>
-        : null;
-      const isSelectedMaskEnabled = selectedMask?.enabled === true;
+      const resolveEnabledMask = (element: TemplateElement): Record<string, unknown> | null => {
+        if (!element.mask || typeof element.mask !== 'object') return null;
+        const mask = element.mask as Record<string, unknown>;
+        return mask.enabled === true ? mask : null;
+      };
 
       const sanitizeElements = (elements: TemplateElement[]) =>
         elements.map((element) => {
@@ -1280,29 +1282,38 @@ export default function ParametricPage() {
       const renderSerial = previewRenderSerialRef.current;
       const namespaceForPass = (pass: string) => `pv-${renderSerial}-${pass}`;
 
-      if (!isSoloMode && selectedVisibleElement && isSelectedMaskEnabled) {
-        const selectedIndex = visibleElements.findIndex((element) => element.id === selectedVisibleElement.id);
-        const beforeElements = selectedIndex > 0 ? visibleElements.slice(0, selectedIndex) : [];
-        const afterElements = selectedIndex >= 0 ? visibleElements.slice(selectedIndex + 1) : [];
+      if (!isSoloMode) {
+        const stackedLayers = visibleElements.map((element, index) => {
+          const baseSvg = namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
+          const mask = resolveEnabledMask(element);
+          return mask
+            ? applyMaskToSvgMarkup(baseSvg, mask, namespaceForPass(String(element.id ?? `layer-${index}`)))
+            : baseSvg;
+        });
 
-        const baseSvg = namespaceSvgIds(renderWithElements(beforeElements), namespaceForPass('before'));
-        const selectedSvg = namespaceSvgIds(renderWithElements([selectedVisibleElement]), namespaceForPass('selected'));
-        const maskedSelectedSvg = selectedMask
-          ? applyMaskToSvgMarkup(selectedSvg, selectedMask, namespaceForPass(String(selectedVisibleElement.id ?? 'selected')))
-          : selectedSvg;
-        const topSvg = afterElements.length > 0
-          ? namespaceSvgIds(renderWithElements(afterElements), namespaceForPass('after'))
-          : null;
+        setSvgMarkup(stackedLayers[0] ?? '');
+        setSvgOverlayLayers(stackedLayers.slice(1));
 
-        setSvgMarkup(baseSvg);
-        setSvgOverlayMarkup(maskedSelectedSvg);
-        setSvgTopOverlayMarkup(topSvg);
+        if (isDimMode && selectedVisibleElement) {
+          const overlaySvg = namespaceSvgIds(renderWithElements([selectedVisibleElement]), namespaceForPass('dim'));
+          setSvgOverlayMarkup(overlaySvg);
+        } else {
+          setSvgOverlayMarkup(null);
+        }
+        setSvgTopOverlayMarkup(null);
       } else {
         const baseElements = isSoloMode && selectedVisibleElement
           ? [selectedVisibleElement]
           : visibleElements;
-        const baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
+        let baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
+        if (isSoloMode && selectedVisibleElement) {
+          const mask = resolveEnabledMask(selectedVisibleElement);
+          if (mask) {
+            baseSvg = applyMaskToSvgMarkup(baseSvg, mask, namespaceForPass(String(selectedVisibleElement.id ?? 'solo')));
+          }
+        }
         setSvgMarkup(baseSvg);
+        setSvgOverlayLayers([]);
 
         if (!isSoloMode && selectedVisibleElement && isDimMode) {
           const overlaySvg = namespaceSvgIds(renderWithElements([selectedVisibleElement]), namespaceForPass('dim'));
@@ -1323,6 +1334,7 @@ export default function ParametricPage() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to render preview.');
+      setSvgOverlayLayers([]);
       setSvgOverlayMarkup(null);
       setSvgTopOverlayMarkup(null);
     } finally {
@@ -4393,6 +4405,16 @@ export default function ParametricPage() {
                       className={isDimMode && !isSoloMode && selectedElement ? 'opacity-45' : ''}
                       dangerouslySetInnerHTML={{ __html: svgMarkup }}
                     />
+                    {!isSoloMode && svgOverlayLayers.length > 0
+                      ? svgOverlayLayers.map((layerMarkup, layerIndex) => (
+                        <div
+                          key={`stacked-layer-${layerIndex}`}
+                          className="pointer-events-none absolute inset-0"
+                          style={isolatedPreviewLayerStyle}
+                          dangerouslySetInnerHTML={{ __html: layerMarkup }}
+                        />
+                      ))
+                      : null}
                     {!isSoloMode && svgOverlayMarkup ? (
                       <div
                         className="pointer-events-none absolute inset-0"
