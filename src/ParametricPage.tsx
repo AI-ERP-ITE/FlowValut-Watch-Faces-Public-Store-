@@ -4074,8 +4074,8 @@ export default function ParametricPage() {
   const selectionControlWidth = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.width', 24)));
   const selectionControlHeight = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.height', 16)));
   const selectionControlDiameter = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.diameter', 18)));
-  const isDepthLightingOwnerActive = isSelectedEffect3dEnabled();
-  const isCircumferenceLightingEnabled = !isDepthLightingOwnerActive;
+  const isGlobalDepthLightingEnabled = getTemplateEffectEnabled();
+  const isCircumferenceLightingEnabled = !isGlobalDepthLightingEnabled;
   const showGlobalLightingCanvasOverlay = contextTab === 'fx' && isCircumferenceLightingEnabled;
   const globalMaskGuideStrokes = (() => {
     if (!showGlobalMaskGuides || !workingTemplate || !Array.isArray(workingTemplate.elements)) {
@@ -4513,15 +4513,14 @@ export default function ParametricPage() {
                 <input
                   type="checkbox"
                   checked={getTemplateEffectEnabled()}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, enabled: e.target.checked }))}
                 />
                 Global light
               </label>
 
-              {!isCircumferenceLightingEnabled ? (
+              {isGlobalDepthLightingEnabled ? (
                 <span className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-500">
-                  Circumference light disabled while 3D depth is enabled
+                  Circumference light direction disabled while Global 3D light is enabled
                 </span>
               ) : null}
 
@@ -4544,8 +4543,8 @@ export default function ParametricPage() {
 
           {!isGlobalPanelCollapsed ? (
             <div
-              className={`mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4 ${isCircumferenceLightingEnabled ? '' : 'pointer-events-none opacity-45'}`}
-              aria-disabled={!isCircumferenceLightingEnabled}
+              className={`mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4 ${isGlobalDepthLightingEnabled ? '' : 'pointer-events-none opacity-45'}`}
+              aria-disabled={!isGlobalDepthLightingEnabled}
             >
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
                 <span className="text-[11px] text-zinc-500">Mode</span>
@@ -4556,7 +4555,7 @@ export default function ParametricPage() {
                       : undefined;
                     return raw === 'inner' ? 'inner' : 'outer';
                   })()}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, mode: e.target.value === 'inner' ? 'inner' : 'outer' }))}
                   className="mt-1 h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                 >
@@ -4573,7 +4572,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.angle.max}
                   step={DEPTH_CONTROL_LIMITS.angle.step}
                   value={getTemplateEffectNumber('angle', -35)}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, angle: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4587,7 +4586,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.intensity.max}
                   step={DEPTH_CONTROL_LIMITS.intensity.step}
                   value={getTemplateEffectNumber('intensity', 0.46)}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4601,7 +4600,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.opacity.max}
                   step={DEPTH_CONTROL_LIMITS.opacity.step}
                   value={getTemplateEffectNumber('opacity', 0.8)}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, opacity: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4615,7 +4614,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.distance.max}
                   step={DEPTH_CONTROL_LIMITS.distance.step}
                   value={getTemplateEffectNumber('distance', 1.2)}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, distance: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4629,7 +4628,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.falloff.max}
                   step={DEPTH_CONTROL_LIMITS.falloff.step}
                   value={getTemplateEffectNumber('falloff', 1)}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, falloff: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4643,7 +4642,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.whiteBalance.max}
                   step={DEPTH_CONTROL_LIMITS.whiteBalance.step}
                   value={getTemplateEffectNumber('whiteBalance', 0)}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, whiteBalance: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4657,7 +4656,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.spread.max}
                   step={DEPTH_CONTROL_LIMITS.spread.step}
                   value={getTemplateEffectNumber('spread', 0)}
-                  disabled={!isCircumferenceLightingEnabled}
+                  disabled={!isGlobalDepthLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, spread: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />

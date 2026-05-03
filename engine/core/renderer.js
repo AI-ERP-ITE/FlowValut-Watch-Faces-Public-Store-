@@ -1053,7 +1053,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		edgeOpacity: 0.24,
 		edgeColor: typeof dropShadowEffect?.color === "string" ? dropShadowEffect.color : "#000000",
 	});
-	const filterInputBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${body}</g>` : body;
+	const filterInputBody = body;
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
@@ -1123,7 +1123,8 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		})
 		.join("");
 
-	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${textureOverlay}${gradientOverlay}${materialOverlay}</g>`;
+	const worldLayer = `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${textureOverlay}${gradientOverlay}${materialOverlay}</g>`;
+	return elementMaskDef.active ? `<g mask=\"url(#${elementMaskId})\">${worldLayer}</g>` : worldLayer;
 }
 
 function renderLayoutBase(composition, context) {
@@ -1277,15 +1278,13 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const materialLayers = materialLayerSources.map((entry) =>
 				normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
 			);
-			const depth = context.globalDepthEnabled
-				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
-				: normalizeDepthEffect(
-					{
-						...(safeElement.effect3d && typeof safeElement.effect3d === "object" ? safeElement.effect3d : {}),
-						...(renderParams.effect3d && typeof renderParams.effect3d === "object" ? renderParams.effect3d : {}),
-					},
-					null,
-				);
+			const depth = normalizeDepthEffect(
+				{
+					...(safeElement.effect3d && typeof safeElement.effect3d === "object" ? safeElement.effect3d : {}),
+					...(renderParams.effect3d && typeof renderParams.effect3d === "object" ? renderParams.effect3d : {}),
+				},
+				null,
+			);
 			const dropShadow = normalizeDropShadowEffect(
 				{
 					...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
@@ -1305,20 +1304,12 @@ export function renderSvg(resolvedComposition, context = {}) {
 	const layoutMetrics = buildLayoutMetrics(composition);
 	const depthEffect = buildDepthEffect(composition);
 	const elements = Array.isArray(composition.elements) ? composition.elements : [];
-	const elementDepthOwnerEnabled = elements.some((entry) => {
-		if (!entry || typeof entry !== "object") return false;
-		const effect3d = entry.effect3d && typeof entry.effect3d === "object" ? entry.effect3d : null;
-		if (effect3d && effect3d.enabled === true) return true;
-		const params = entry.params && typeof entry.params === "object" ? entry.params : null;
-		const paramEffect3d = params && params.effect3d && typeof params.effect3d === "object" ? params.effect3d : null;
-		return !!(paramEffect3d && paramEffect3d.enabled === true);
-	});
 	let uid = 0;
 	const renderContext = {
 		...context,
 		layoutMetrics,
 		depthEffect,
-		globalDepthEnabled: !elementDepthOwnerEnabled && depthEffect.enabled && depthEffect.intensity > 0,
+		globalDepthEnabled: depthEffect.enabled && depthEffect.intensity > 0,
 		composition,
 		layerMaskRegistry: {},
 		previousElementName: "",
