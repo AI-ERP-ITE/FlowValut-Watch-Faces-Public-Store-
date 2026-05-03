@@ -637,6 +637,22 @@ function inferCategory(element: TemplateElement): string {
   return 'General';
 }
 
+function buildUniqueElementName(existingElements: Array<TemplateElement>, candidate: string): string {
+  const base = (candidate || 'element').trim() || 'element';
+  const existing = new Set(
+    existingElements
+      .map((entry) => (typeof entry.name === 'string' ? entry.name.trim() : ''))
+      .filter((name) => name.length > 0),
+  );
+  if (!existing.has(base)) return base;
+
+  let suffix = 2;
+  while (existing.has(`${base} ${suffix}`)) {
+    suffix += 1;
+  }
+  return `${base} ${suffix}`;
+}
+
 function normalizeLibraryEntries(parsed: Array<unknown>): Array<LibraryEntry> {
   return parsed
     .filter((entry) => entry && typeof entry === 'object')
@@ -1593,8 +1609,16 @@ export default function ParametricPage() {
   const addElementToCanvas = (source: TemplateElement) => {
     const copy = ensureElement(deepClone(source));
     copy.id = makeId('layer');
+    copy.visible = true;
+    delete copy.mask;
 
-    updateTemplateElements((elements) => [...elements, copy], 'Add element to canvas');
+    updateTemplateElements((elements) => {
+      const withUniqueName = {
+        ...copy,
+        name: buildUniqueElementName(elements, typeof copy.name === 'string' ? copy.name : copy.type ?? 'element'),
+      };
+      return [...elements, withUniqueName];
+    }, 'Add element to canvas');
 
     setSelectedElementId(copy.id ?? null);
     setSelectedPanelTarget('element');
