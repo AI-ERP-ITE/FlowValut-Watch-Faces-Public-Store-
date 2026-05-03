@@ -1583,10 +1583,73 @@ export default function ParametricPage() {
       labels.forEach((label) => {
         const title = label.querySelector('span');
         if (!title) return;
-        if (title.querySelector('[data-reset-chip="true"]')) return;
 
         const control = label.querySelector('input[type="range"], input[type="number"], select') as HTMLInputElement | HTMLSelectElement | null;
         if (!control) return;
+
+        if (
+          control instanceof HTMLInputElement
+          && control.type === 'range'
+          && !title.querySelector('[data-manual-range="true"]')
+        ) {
+          const minRaw = control.getAttribute('min');
+          const maxRaw = control.getAttribute('max');
+          const min = Number(minRaw);
+          const max = Number(maxRaw);
+          const hasMin = Number.isFinite(min);
+          const hasMax = Number.isFinite(max);
+
+          // Allow exact manual values even when authored slider step is coarse.
+          control.step = 'any';
+
+          const manual = document.createElement('input');
+          manual.type = 'number';
+          manual.inputMode = 'decimal';
+          manual.setAttribute('data-manual-range', 'true');
+          manual.className = 'h-5 w-20 rounded border border-zinc-600 bg-zinc-900 px-1 text-[10px] leading-none text-zinc-200';
+          manual.title = 'Type exact value';
+          manual.step = 'any';
+          if (hasMin && minRaw !== null) manual.min = minRaw;
+          if (hasMax && maxRaw !== null) manual.max = maxRaw;
+          manual.value = control.value;
+
+          const syncFromRange = () => {
+            manual.value = control.value;
+          };
+
+          const applyManualValue = () => {
+            const raw = manual.value.trim();
+            if (!raw) {
+              syncFromRange();
+              return;
+            }
+            const parsed = Number(raw);
+            if (!Number.isFinite(parsed)) {
+              syncFromRange();
+              return;
+            }
+            const clamped = Math.max(hasMin ? min : parsed, Math.min(hasMax ? max : parsed, parsed));
+            emitControlChange(control, String(clamped));
+            syncFromRange();
+          };
+
+          manual.addEventListener('change', applyManualValue);
+          manual.addEventListener('blur', applyManualValue);
+          manual.addEventListener('keydown', (event) => {
+            event.stopPropagation();
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              applyManualValue();
+            }
+          });
+
+          control.addEventListener('input', syncFromRange);
+          control.addEventListener('change', syncFromRange);
+
+          title.appendChild(manual);
+        }
+
+        if (title.querySelector('[data-reset-chip="true"]')) return;
 
         const chip = document.createElement('button');
         chip.type = 'button';
