@@ -459,6 +459,19 @@ function normalizeDepthEffect(source = {}, fallback = null) {
 	const falloff = clamp(src.falloff, 0.2, 3, base.falloff ?? 1);
 	const whiteBalance = clamp(src.whiteBalance, -1, 1, base.whiteBalance ?? 0);
 	const spread = clamp(src.spread, 0, 1, base.spread ?? 0);
+	const light = src.light && typeof src.light === "object" ? src.light : {};
+	const lightX = Number(light.x);
+	const lightY = Number(light.y);
+	const lightZ = Number(light.z);
+	const hasManualLightVector = Number.isFinite(lightX) && Number.isFinite(lightY);
+
+	if (hasManualLightVector) {
+		const safeZ = Number.isFinite(lightZ) ? lightZ : 1;
+		const len = Math.hypot(lightX, lightY, safeZ);
+		if (len > 0.0001) {
+			return { enabled, mode, intensity, opacity, dx: (lightX / len) * distance, dy: (lightY / len) * distance, falloff, whiteBalance, spread };
+		}
+	}
 
 	if (angleDeg === null) {
 		return { enabled, mode, intensity, opacity, dx: base.dx, dy: base.dy, falloff, whiteBalance, spread };
@@ -1168,7 +1181,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 						...(safeElement.effect3d && typeof safeElement.effect3d === "object" ? safeElement.effect3d : {}),
 						...(renderParams.effect3d && typeof renderParams.effect3d === "object" ? renderParams.effect3d : {}),
 					},
-					context.depthEffect,
+					null,
 				);
 			const dropShadow = normalizeDropShadowEffect(
 				{
@@ -1188,12 +1201,20 @@ export function renderSvg(resolvedComposition, context = {}) {
 	const layoutMetrics = buildLayoutMetrics(composition);
 	const depthEffect = buildDepthEffect(composition);
 	const elements = Array.isArray(composition.elements) ? composition.elements : [];
+	const elementDepthOwnerEnabled = elements.some((entry) => {
+		if (!entry || typeof entry !== "object") return false;
+		const effect3d = entry.effect3d && typeof entry.effect3d === "object" ? entry.effect3d : null;
+		if (effect3d && effect3d.enabled === true) return true;
+		const params = entry.params && typeof entry.params === "object" ? entry.params : null;
+		const paramEffect3d = params && params.effect3d && typeof params.effect3d === "object" ? params.effect3d : null;
+		return !!(paramEffect3d && paramEffect3d.enabled === true);
+	});
 	let uid = 0;
 	const renderContext = {
 		...context,
 		layoutMetrics,
 		depthEffect,
-		globalDepthEnabled: depthEffect.enabled && depthEffect.intensity > 0,
+		globalDepthEnabled: !elementDepthOwnerEnabled && depthEffect.enabled && depthEffect.intensity > 0,
 		composition,
 		layerMaskRegistry: {},
 		previousElementName: "",

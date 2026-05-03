@@ -579,6 +579,8 @@ const DEPTH_CONTROL_LIMITS = {
   intensity: { min: 0, max: 1, step: 0.02 },
   opacity: { min: 0, max: 1, step: 0.02 },
   angle: { min: -180, max: 180, step: 1 },
+  lightAxis: { min: -1, max: 1, step: 0.01 },
+  lightAxisZ: { min: -1, max: 1, step: 0.01 },
   distance: { min: 0, max: 6, step: 0.1 },
   falloff: { min: 0.2, max: 3, step: 0.02 },
   whiteBalance: { min: -1, max: 1, step: 0.02 },
@@ -594,37 +596,31 @@ const DEPTH_PRESET_OPTIONS = [
   {
     key: 'soft',
     label: 'Soft',
-    depth: { enabled: true, mode: 'outer', intensity: 0.22, opacity: 0.44, distance: 1.2, falloff: 1.2, spread: 0, whiteBalance: 0.08 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.22, opacity: 0.44, distance: 1.2, falloff: 1.2, spread: 0, whiteBalance: 0.08, light: { x: -0.56, y: -0.56, z: 0.62 } },
   },
   {
     key: 'natural',
     label: 'Natural',
-    depth: { enabled: true, mode: 'outer', intensity: 0.34, opacity: 0.58, distance: 1.5, falloff: 1.1, spread: 0.05, whiteBalance: 0.12 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.34, opacity: 0.58, distance: 1.5, falloff: 1.1, spread: 0.05, whiteBalance: 0.12, light: { x: -0.62, y: -0.44, z: 0.65 } },
   },
   {
     key: 'hard',
     label: 'Hard',
-    depth: { enabled: true, mode: 'outer', intensity: 0.5, opacity: 0.74, distance: 2.1, falloff: 0.9, spread: 0.08, whiteBalance: 0 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.5, opacity: 0.74, distance: 2.1, falloff: 0.9, spread: 0.08, whiteBalance: 0, light: { x: -0.68, y: -0.32, z: 0.58 } },
   },
   {
     key: 'studio-rim',
     label: 'Studio Rim',
-    depth: { enabled: true, mode: 'outer', intensity: 0.52, opacity: 0.7, distance: 2.2, falloff: 1, spread: 0.12, whiteBalance: 0.25 },
+    depth: { enabled: true, mode: 'outer', intensity: 0.52, opacity: 0.7, distance: 2.2, falloff: 1, spread: 0.12, whiteBalance: 0.25, light: { x: -0.75, y: -0.18, z: 0.63 } },
   },
   {
     key: 'embossed',
     label: 'Embossed',
-    depth: { enabled: true, mode: 'inner', intensity: 0.56, opacity: 0.82, distance: 1.7, falloff: 1.25, spread: 0.18, whiteBalance: 0.14 },
+    depth: { enabled: true, mode: 'inner', intensity: 0.56, opacity: 0.82, distance: 1.7, falloff: 1.25, spread: 0.18, whiteBalance: 0.14, light: { x: -0.44, y: -0.72, z: 0.54 } },
   },
 ] as const;
-const LIGHT_DIRECTION_PRESET_OPTIONS = [
-  { key: 'top-left', label: 'Top Left', angle: -135, mode: 'outer' },
-  { key: 'top-right', label: 'Top Right', angle: -45, mode: 'outer' },
-  { key: 'bottom-left', label: 'Bottom Left', angle: 135, mode: 'outer' },
-  { key: 'bottom-right', label: 'Bottom Right', angle: 45, mode: 'outer' },
-  { key: 'front', label: 'Front', angle: -90, mode: 'front' },
-] as const;
-
+const DEPTH_PRESET_CUSTOM_KEY = 'custom';
+const DEFAULT_DEPTH_LIGHT_VECTOR = { x: 0, y: 0, z: 1 };
 function makeId(prefix = 'el'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -3584,7 +3580,9 @@ export default function ParametricPage() {
         const effect3d = element.effect3d && typeof element.effect3d === 'object'
           ? deepClone(element.effect3d) as Record<string, unknown>
           : {};
-        return { ...element, effect3d: normalizeDepthEffectRecord({ ...effect3d, enabled }) };
+        const normalized = normalizeDepthEffectRecord({ ...effect3d, enabled }) as Record<string, unknown>;
+        normalized.presetKey = DEPTH_PRESET_CUSTOM_KEY;
+        return { ...element, effect3d: normalized };
       }),
     );
   };
@@ -3608,7 +3606,9 @@ export default function ParametricPage() {
           cursor = cursor[key] as Record<string, unknown>;
         }
         cursor[segments[segments.length - 1]] = value;
-        return { ...element, effect3d: normalizeDepthEffectRecord(effect3d) };
+        const normalized = normalizeDepthEffectRecord(effect3d) as Record<string, unknown>;
+        normalized.presetKey = DEPTH_PRESET_CUSTOM_KEY;
+        return { ...element, effect3d: normalized };
       }),
     );
   };
@@ -3632,7 +3632,9 @@ export default function ParametricPage() {
           cursor = cursor[key] as Record<string, unknown>;
         }
         cursor[segments[segments.length - 1]] = value;
-        return { ...element, effect3d: normalizeDepthEffectRecord(effect3d) };
+        const normalized = normalizeDepthEffectRecord(effect3d) as Record<string, unknown>;
+        normalized.presetKey = DEPTH_PRESET_CUSTOM_KEY;
+        return { ...element, effect3d: normalized };
       }),
     );
   };
@@ -3666,6 +3668,13 @@ export default function ParametricPage() {
     if (!selectedElement) return false;
     const normalized = normalizeDepthEffectRecord(selectedElement.effect3d as Record<string, unknown> | undefined);
     return normalized.enabled === true;
+  };
+
+  const getSelectedDepthPresetKey = () => {
+    if (!selectedElement || !selectedElement.effect3d || typeof selectedElement.effect3d !== 'object') return null;
+    const presetKey = (selectedElement.effect3d as Record<string, unknown>).presetKey;
+    if (typeof presetKey !== 'string') return null;
+    return presetKey;
   };
 
   const normalizeDropShadowRecord = (source?: Record<string, unknown>) => {
@@ -3810,15 +3819,21 @@ export default function ParametricPage() {
       (elements) =>
         elements.map((element) => {
           if (element.id !== selectedElement.id) return element;
-          const currentDepth = element.effect3d && typeof element.effect3d === 'object'
-            ? (element.effect3d as Record<string, unknown>)
-            : undefined;
-
+          const normalizedDefaults = normalizeDepthEffectRecord({ light: { ...DEFAULT_DEPTH_LIGHT_VECTOR } }) as Record<string, unknown>;
+          const presetDepth = deepClone(preset.depth) as Record<string, unknown>;
+          const presetLight = presetDepth.light && typeof presetDepth.light === 'object'
+            ? (presetDepth.light as Record<string, unknown>)
+            : {};
           return {
             ...element,
             effect3d: normalizeDepthEffectRecord({
-              ...(currentDepth ?? {}),
-              ...preset.depth,
+              ...normalizedDefaults,
+              ...presetDepth,
+              light: {
+                ...DEFAULT_DEPTH_LIGHT_VECTOR,
+                ...presetLight,
+              },
+              presetKey: preset.key,
             }),
           };
         }),
@@ -3837,33 +3852,6 @@ export default function ParametricPage() {
           return nextElement;
         }),
       'Clear depth preset',
-    );
-  };
-
-  const applySelectedLightDirectionPreset = (preset: (typeof LIGHT_DIRECTION_PRESET_OPTIONS)[number]) => {
-    if (!selectedElement) return;
-
-    updateTemplateElements(
-      (elements) =>
-        elements.map((element) => {
-          if (element.id !== selectedElement.id) return element;
-
-          const currentDepth = element.effect3d && typeof element.effect3d === 'object'
-            ? (element.effect3d as Record<string, unknown>)
-            : undefined;
-          const depth = normalizeDepthEffectRecord(currentDepth);
-
-          return {
-            ...element,
-            effect3d: normalizeDepthEffectRecord({
-              ...depth,
-              enabled: true,
-              mode: preset.mode,
-              angle: preset.angle,
-            }),
-          };
-        }),
-      'Apply 3D light direction preset',
     );
   };
 
@@ -4098,7 +4086,9 @@ export default function ParametricPage() {
   const selectionControlWidth = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.width', 24)));
   const selectionControlHeight = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.height', 16)));
   const selectionControlDiameter = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.diameter', 18)));
-  const showGlobalLightingCanvasOverlay = contextTab === 'fx';
+  const isDepthLightingOwnerActive = isSelectedEffect3dEnabled();
+  const isCircumferenceLightingEnabled = !isDepthLightingOwnerActive;
+  const showGlobalLightingCanvasOverlay = contextTab === 'fx' && isCircumferenceLightingEnabled;
   const canvasMarkerLegendEntries = (() => {
     const entries: Array<{ key: string; meaning: string }> = [];
     if (showLinearGradientCanvasHandles) {
@@ -4498,10 +4488,17 @@ export default function ParametricPage() {
                 <input
                   type="checkbox"
                   checked={getTemplateEffectEnabled()}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, enabled: e.target.checked }))}
                 />
                 Global light
               </label>
+
+              {!isCircumferenceLightingEnabled ? (
+                <span className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-500">
+                  Circumference light disabled while 3D depth is enabled
+                </span>
+              ) : null}
 
               <button
                 type="button"
@@ -4521,7 +4518,10 @@ export default function ParametricPage() {
           </div>
 
           {!isGlobalPanelCollapsed ? (
-            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <div
+              className={`mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4 ${isCircumferenceLightingEnabled ? '' : 'pointer-events-none opacity-45'}`}
+              aria-disabled={!isCircumferenceLightingEnabled}
+            >
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
                 <span className="text-[11px] text-zinc-500">Mode</span>
                 <select
@@ -4531,6 +4531,7 @@ export default function ParametricPage() {
                       : undefined;
                     return raw === 'inner' ? 'inner' : 'outer';
                   })()}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, mode: e.target.value === 'inner' ? 'inner' : 'outer' }))}
                   className="mt-1 h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                 >
@@ -4547,6 +4548,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.angle.max}
                   step={DEPTH_CONTROL_LIMITS.angle.step}
                   value={getTemplateEffectNumber('angle', -35)}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, angle: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4560,6 +4562,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.intensity.max}
                   step={DEPTH_CONTROL_LIMITS.intensity.step}
                   value={getTemplateEffectNumber('intensity', 0.46)}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4573,6 +4576,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.opacity.max}
                   step={DEPTH_CONTROL_LIMITS.opacity.step}
                   value={getTemplateEffectNumber('opacity', 0.8)}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, opacity: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4586,6 +4590,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.distance.max}
                   step={DEPTH_CONTROL_LIMITS.distance.step}
                   value={getTemplateEffectNumber('distance', 1.2)}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, distance: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4599,6 +4604,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.falloff.max}
                   step={DEPTH_CONTROL_LIMITS.falloff.step}
                   value={getTemplateEffectNumber('falloff', 1)}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, falloff: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4612,6 +4618,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.whiteBalance.max}
                   step={DEPTH_CONTROL_LIMITS.whiteBalance.step}
                   value={getTemplateEffectNumber('whiteBalance', 0)}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, whiteBalance: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4625,6 +4632,7 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.spread.max}
                   step={DEPTH_CONTROL_LIMITS.spread.step}
                   value={getTemplateEffectNumber('spread', 0)}
+                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, spread: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -6821,29 +6829,20 @@ export default function ParametricPage() {
                         Clear
                       </button>
                     </div>
+                    {getSelectedDepthPresetKey() ? (
+                      <p className="text-[11px] text-zinc-500">
+                        Active: {getSelectedDepthPresetKey() === DEPTH_PRESET_CUSTOM_KEY
+                          ? 'Custom'
+                          : (DEPTH_PRESET_OPTIONS.find((entry) => entry.key === getSelectedDepthPresetKey())?.label ?? 'Custom')}
+                      </p>
+                    ) : null}
                     <div className="flex flex-wrap gap-1">
                       {DEPTH_PRESET_OPTIONS.map((preset) => (
                         <button
                           key={`depth-preset-${preset.key}`}
                           type="button"
                           onClick={() => applySelectedDepthPreset(preset.key)}
-                          className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
-                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">3D Light Direction Presets</p>
-                    <div className="flex flex-wrap gap-1">
-                      {LIGHT_DIRECTION_PRESET_OPTIONS.map((preset) => (
-                        <button
-                          key={`depth-light-preset-${preset.key}`}
-                          type="button"
-                          onClick={() => applySelectedLightDirectionPreset(preset)}
-                          className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                          className={`rounded border px-2 py-1 text-[11px] hover:bg-zinc-800 ${getSelectedDepthPresetKey() === preset.key ? 'border-amber-400 bg-amber-500/10 text-amber-200' : 'border-zinc-700 text-zinc-300'}`}
                         >
                           {preset.label}
                         </button>
@@ -6906,18 +6905,48 @@ export default function ParametricPage() {
                     />
                   </label>
 
-                  <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Light Angle {Math.round(getSelectedEffect3dNumber('angle', -35))}deg</span>
-                    <input
-                      type="range"
-                      min={DEPTH_CONTROL_LIMITS.angle.min}
-                      max={DEPTH_CONTROL_LIMITS.angle.max}
-                      step={DEPTH_CONTROL_LIMITS.angle.step}
-                      value={getSelectedEffect3dNumber('angle', -35)}
-                      onChange={(e) => setSelectedEffect3dNumber('angle', Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </label>
+                  <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-500">Manual 3D Light Vector</p>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Light X {getSelectedEffect3dNumber('light.x', 0).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={DEPTH_CONTROL_LIMITS.lightAxis.min}
+                        max={DEPTH_CONTROL_LIMITS.lightAxis.max}
+                        step={DEPTH_CONTROL_LIMITS.lightAxis.step}
+                        value={getSelectedEffect3dNumber('light.x', 0)}
+                        onChange={(e) => setSelectedEffect3dNumber('light.x', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Light Y {getSelectedEffect3dNumber('light.y', 0).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={DEPTH_CONTROL_LIMITS.lightAxis.min}
+                        max={DEPTH_CONTROL_LIMITS.lightAxis.max}
+                        step={DEPTH_CONTROL_LIMITS.lightAxis.step}
+                        value={getSelectedEffect3dNumber('light.y', 0)}
+                        onChange={(e) => setSelectedEffect3dNumber('light.y', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Light Z {getSelectedEffect3dNumber('light.z', 1).toFixed(2)}</span>
+                      <input
+                        type="range"
+                        min={DEPTH_CONTROL_LIMITS.lightAxisZ.min}
+                        max={DEPTH_CONTROL_LIMITS.lightAxisZ.max}
+                        step={DEPTH_CONTROL_LIMITS.lightAxisZ.step}
+                        value={getSelectedEffect3dNumber('light.z', 1)}
+                        onChange={(e) => setSelectedEffect3dNumber('light.z', Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </label>
+                  </div>
 
                   <label className="block space-y-1">
                     <span className="text-[11px] text-zinc-500">Depth Distance {getSelectedEffect3dNumber('distance', 1.2).toFixed(2)}</span>
