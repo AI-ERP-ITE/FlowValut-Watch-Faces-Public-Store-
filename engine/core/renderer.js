@@ -1107,6 +1107,9 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const elementMaskId = `${maskId}-element`;
 	const silhouetteSignature = toSignature({
 		body,
+		x,
+		y,
+		rotation,
 		elementMask,
 		layoutWidth: layoutMetrics.width,
 		layoutHeight: layoutMetrics.height,
@@ -1117,7 +1120,8 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
 		cached.silhouetteDefs = elementMaskDef.defs;
 		cached.elementMaskActive = elementMaskDef.active;
-		cached.silhouetteBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${body}</g>` : body;
+		const worldBody = `<g transform="translate(${x} ${y}) rotate(${rotation})">${body}</g>`;
+		cached.silhouetteBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${worldBody}</g>` : worldBody;
 		cached.silhouetteSignature = silhouetteSignature;
 	}
 
@@ -1224,7 +1228,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 
 	const defs = `<defs>${cached.filterDef}${cached.silhouetteDefs}${cached.materialDefsMarkup}</defs>`;
 
-	const worldLayer = `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${cached.filterAttr}>${cached.silhouetteBody}</g>${cached.textureOverlay}${cached.gradientOverlay}${cached.materialOverlay}</g>`;
+	const worldLayer = `<g>${defs}<g${cached.filterAttr}>${cached.silhouetteBody}</g>${cached.textureOverlay}${cached.gradientOverlay}${cached.materialOverlay}</g>`;
 	LAYER_PASS_CACHE.set(cacheKey, cached);
 	return worldLayer;
 }
