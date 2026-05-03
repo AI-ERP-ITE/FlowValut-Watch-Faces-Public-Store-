@@ -735,6 +735,7 @@ export default function ParametricPage() {
   const [draftError, setDraftError] = useState<string | null>(null);
   const [svgMarkup, setSvgMarkup] = useState('');
   const [svgOverlayMarkup, setSvgOverlayMarkup] = useState<string | null>(null);
+  const [svgTopOverlayMarkup, setSvgTopOverlayMarkup] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
@@ -1191,75 +1192,33 @@ export default function ParametricPage() {
         : null;
       const isSelectedMaskEnabled = selectedMask?.enabled === true;
 
-      const baseElements = isSoloMode && selectedVisibleElement
-        ? [selectedVisibleElement]
-        : isSelectedMaskEnabled && selectedVisibleElement
-          ? visibleElements.filter((element) => element.id !== selectedVisibleElement.id)
-          : visibleElements;
+      const sanitizeElements = (elements: TemplateElement[]) =>
+        elements.map((element) => {
+          const clone = deepClone(element);
+          clone.effect3d = normalizeDepthEffectRecord(clone.effect3d as Record<string, unknown> | undefined);
+          if (clone.dropShadow && typeof clone.dropShadow === 'object') {
+            const source = clone.dropShadow as Record<string, unknown>;
+            clone.dropShadow = normalizeDropShadowForBake({
+              color: typeof source.color === 'string' ? source.color : '#000000',
+              opacity: Number.isFinite(Number(source.opacity)) ? Number(source.opacity) : 0.45,
+              blur: Number.isFinite(Number(source.blur)) ? Number(source.blur) : 8,
+              offsetX: Number.isFinite(Number(source.offsetX)) ? Number(source.offsetX) : 2,
+              offsetY: Number.isFinite(Number(source.offsetY)) ? Number(source.offsetY) : 2,
+            }) as unknown as TemplateElement['dropShadow'];
+          }
+          delete clone.id;
+          delete clone.visible;
+          return clone;
+        });
 
-      const renderInput: TemplateModel = {
-        ...template,
-        effects3d: normalizeDepthEffectRecord(template.effects3d as Record<string, unknown> | undefined),
-        elements: baseElements
-          .map((element) => {
-            const clone = deepClone(element);
-            clone.effect3d = normalizeDepthEffectRecord(clone.effect3d as Record<string, unknown> | undefined);
-            if (clone.dropShadow && typeof clone.dropShadow === 'object') {
-              const source = clone.dropShadow as Record<string, unknown>;
-              clone.dropShadow = normalizeDropShadowForBake({
-                color: typeof source.color === 'string' ? source.color : '#000000',
-                opacity: Number.isFinite(Number(source.opacity)) ? Number(source.opacity) : 0.45,
-                blur: Number.isFinite(Number(source.blur)) ? Number(source.blur) : 8,
-                offsetX: Number.isFinite(Number(source.offsetX)) ? Number(source.offsetX) : 2,
-                offsetY: Number.isFinite(Number(source.offsetY)) ? Number(source.offsetY) : 2,
-              }) as unknown as TemplateElement['dropShadow'];
-            }
-            delete clone.id;
-            delete clone.visible;
-            return clone;
-          }),
-      };
-
-      const svg = engineModule.runEngine({
-        activeStyle: FIXED_RENDER_STYLE,
-        templateInput: renderInput,
-        colorControl: {
-          ...DEFAULT_COLOR_CONTROL,
-          colorControl: {
-            ...DEFAULT_COLOR_CONTROL.colorControl,
-            mode: colorMode,
-          },
-        },
-      });
-
-      setSvgMarkup(svg);
-
-      if (!isSoloMode && selectedVisibleElement && (isDimMode || isSelectedMaskEnabled)) {
-        const overlayInput: TemplateModel = {
-          ...template,
-          effects3d: normalizeDepthEffectRecord(template.effects3d as Record<string, unknown> | undefined),
-          elements: [selectedVisibleElement].map((element) => {
-            const clone = deepClone(element);
-            clone.effect3d = normalizeDepthEffectRecord(clone.effect3d as Record<string, unknown> | undefined);
-            if (clone.dropShadow && typeof clone.dropShadow === 'object') {
-              const source = clone.dropShadow as Record<string, unknown>;
-              clone.dropShadow = normalizeDropShadowForBake({
-                color: typeof source.color === 'string' ? source.color : '#000000',
-                opacity: Number.isFinite(Number(source.opacity)) ? Number(source.opacity) : 0.45,
-                blur: Number.isFinite(Number(source.blur)) ? Number(source.blur) : 8,
-                offsetX: Number.isFinite(Number(source.offsetX)) ? Number(source.offsetX) : 2,
-                offsetY: Number.isFinite(Number(source.offsetY)) ? Number(source.offsetY) : 2,
-              }) as unknown as TemplateElement['dropShadow'];
-            }
-            delete clone.id;
-            delete clone.visible;
-            return clone;
-          }),
-        };
-
-        const overlaySvg = engineModule.runEngine({
+      const renderWithElements = (elements: TemplateElement[]) =>
+        engineModule.runEngine({
           activeStyle: FIXED_RENDER_STYLE,
-          templateInput: overlayInput,
+          templateInput: {
+            ...template,
+            effects3d: normalizeDepthEffectRecord(template.effects3d as Record<string, unknown> | undefined),
+            elements: sanitizeElements(elements),
+          },
           colorControl: {
             ...DEFAULT_COLOR_CONTROL,
             colorControl: {
@@ -1269,12 +1228,35 @@ export default function ParametricPage() {
           },
         });
 
-        const maskedOverlay = isSelectedMaskEnabled && selectedMask
-          ? applyMaskToSvgMarkup(overlaySvg, selectedMask, String(selectedVisibleElement.id ?? 'selected'))
-          : overlaySvg;
-        setSvgOverlayMarkup(maskedOverlay);
+      if (!isSoloMode && selectedVisibleElement && isSelectedMaskEnabled) {
+        const selectedIndex = visibleElements.findIndex((element) => element.id === selectedVisibleElement.id);
+        const beforeElements = selectedIndex > 0 ? visibleElements.slice(0, selectedIndex) : [];
+        const afterElements = selectedIndex >= 0 ? visibleElements.slice(selectedIndex + 1) : [];
+
+        const baseSvg = renderWithElements(beforeElements);
+        const selectedSvg = renderWithElements([selectedVisibleElement]);
+        const maskedSelectedSvg = selectedMask
+          ? applyMaskToSvgMarkup(selectedSvg, selectedMask, String(selectedVisibleElement.id ?? 'selected'))
+          : selectedSvg;
+        const topSvg = afterElements.length > 0 ? renderWithElements(afterElements) : null;
+
+        setSvgMarkup(baseSvg);
+        setSvgOverlayMarkup(maskedSelectedSvg);
+        setSvgTopOverlayMarkup(topSvg);
       } else {
-        setSvgOverlayMarkup(null);
+        const baseElements = isSoloMode && selectedVisibleElement
+          ? [selectedVisibleElement]
+          : visibleElements;
+        const baseSvg = renderWithElements(baseElements);
+        setSvgMarkup(baseSvg);
+
+        if (!isSoloMode && selectedVisibleElement && isDimMode) {
+          const overlaySvg = renderWithElements([selectedVisibleElement]);
+          setSvgOverlayMarkup(overlaySvg);
+        } else {
+          setSvgOverlayMarkup(null);
+        }
+        setSvgTopOverlayMarkup(null);
       }
       } finally {
         window.removeEventListener('engine-color-warning', warningHandler as EventListener);
@@ -1288,6 +1270,7 @@ export default function ParametricPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to render preview.');
       setSvgOverlayMarkup(null);
+      setSvgTopOverlayMarkup(null);
     } finally {
       setIsRendering(false);
     }
@@ -4348,6 +4331,9 @@ export default function ParametricPage() {
                     />
                     {!isSoloMode && svgOverlayMarkup ? (
                       <div className="pointer-events-none absolute inset-0" dangerouslySetInnerHTML={{ __html: svgOverlayMarkup }} />
+                    ) : null}
+                    {!isSoloMode && svgTopOverlayMarkup ? (
+                      <div className="pointer-events-none absolute inset-0" dangerouslySetInnerHTML={{ __html: svgTopOverlayMarkup }} />
                     ) : null}
 
                     {showGlobalLightingCanvasOverlay ? (
