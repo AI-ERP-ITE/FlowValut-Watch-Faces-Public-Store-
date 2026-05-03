@@ -33,8 +33,12 @@ export function renderFreeRing(params = {}, position = {}, context = {}) {
 	const radius = clamp01(p.radius, DEFAULTS.radius) * baseRadius * scale;
 	const rawStroke = p.strokeWidth ?? p.thickness;
 	const thickness = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
+	const rawFill = typeof p.fill === "string" ? p.fill.trim() : "";
+	const fill = rawFill.toLowerCase() === "none" ? "none" : rawFill || DEFAULTS.fill;
+	const rawStrokeColor = typeof p.stroke === "string" ? p.stroke.trim() : "";
+	const stroke = thickness > 0 && rawStrokeColor.toLowerCase() !== "none" ? (rawStrokeColor || DEFAULTS.stroke) : "none";
 
-	return `<circle cx="0" cy="0" r="${radius}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${thickness}" />`;
+	return `<circle cx="0" cy="0" r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="${thickness}" />`;
 }
 
 export const freeRingElement = {

@@ -54,9 +54,13 @@ export function renderFreeHexagon(params = {}, position = {}, context = {}) {
 	const scale = getScale(context);
 	const rawStroke = p.strokeWidth ?? p.thickness;
 	const strokeWidth = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
+	const rawFill = typeof p.fill === "string" ? p.fill.trim() : "";
+	const fill = rawFill.toLowerCase() === "none" ? "none" : rawFill || DEFAULTS.fill;
+	const rawStrokeColor = typeof p.stroke === "string" ? p.stroke.trim() : "";
+	const stroke = strokeWidth > 0 && rawStrokeColor.toLowerCase() !== "none" ? (rawStrokeColor || DEFAULTS.stroke) : "none";
 	const points = buildPoints([p.side1, p.side2, p.side3, p.side4, p.side5, p.side6], p.rotation, baseRadius, scale);
 
-	return `<polygon points="${points}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${strokeWidth}" />`;
+	return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
 }
 
 export const freeHexagonElement = {

@@ -2509,6 +2509,8 @@ export default function ParametricPage() {
     return types.includes(selectedElement.type);
   };
 
+  const isFreeShapeFillDisabled = () => getStringParam('fill', '#58657b').trim().toLowerCase() === 'none';
+
   const getSideLength = (index: number, fallback = 0.1) => {
     if (!selectedElement || !selectedElement.params || typeof selectedElement.params !== 'object') return fallback;
     const params = selectedElement.params as Record<string, unknown>;
@@ -6451,6 +6453,23 @@ export default function ParametricPage() {
                     <p className="text-[11px] uppercase tracking-wide text-zinc-400">Free Shape Paint</p>
                     <p className="text-[11px] text-zinc-500">Use color wheel or hex picker for fill and stroke.</p>
 
+                    <label className="flex items-center justify-between gap-2 rounded border border-zinc-800 bg-zinc-950/40 px-2 py-1.5">
+                      <span className="text-[11px] text-zinc-400">Fill Enabled</span>
+                      <input
+                        type="checkbox"
+                        checked={!isFreeShapeFillDisabled()}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const currentFill = getStringParam('fill', '#58657b').trim();
+                            setStringParam('fill', currentFill.toLowerCase() === 'none' || currentFill.length === 0 ? '#58657b' : currentFill);
+                            return;
+                          }
+                          setStringParam('fill', 'none');
+                        }}
+                        className="h-4 w-4 accent-zinc-200"
+                      />
+                    </label>
+
                     <label className="block space-y-1">
                       <span className="text-[11px] text-zinc-500">Fill Color</span>
                       <div className="flex items-center gap-2">
@@ -6458,11 +6477,13 @@ export default function ParametricPage() {
                           type="color"
                           value={getColorParam('fill', '#58657b')}
                           onChange={(e) => setStringParam('fill', e.target.value)}
+                          disabled={isFreeShapeFillDisabled()}
                           className="h-8 w-10 rounded border border-zinc-700 bg-zinc-900 p-1"
                         />
                         <input
                           value={getStringParam('fill', '#58657b')}
                           onChange={(e) => setStringParam('fill', e.target.value)}
+                          disabled={isFreeShapeFillDisabled()}
                           className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                         />
                       </div>

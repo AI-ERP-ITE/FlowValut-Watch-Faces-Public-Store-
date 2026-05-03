@@ -37,10 +37,14 @@ export function renderFreeRect(params = {}, position = {}, context = {}) {
 	const cornerRadius = clamp01(p.cornerRadius, DEFAULTS.cornerRadius) * baseRadius * scale;
 	const rawStroke = p.strokeWidth ?? p.thickness;
 	const strokeWidth = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
+	const rawFill = typeof p.fill === "string" ? p.fill.trim() : "";
+	const fill = rawFill.toLowerCase() === "none" ? "none" : rawFill || DEFAULTS.fill;
+	const rawStrokeColor = typeof p.stroke === "string" ? p.stroke.trim() : "";
+	const stroke = strokeWidth > 0 && rawStrokeColor.toLowerCase() !== "none" ? (rawStrokeColor || DEFAULTS.stroke) : "none";
 	const x = -width / 2;
 	const y = -height / 2;
 
-	return `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${strokeWidth}" />`;
+	return `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${cornerRadius}" ry="${cornerRadius}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
 }
 
 export const freeRectElement = {
