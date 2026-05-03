@@ -754,6 +754,96 @@ function isLikelyRawLayoutObject(value: Record<string, unknown>): boolean {
   return keys.every((key) => layoutKeys.has(key));
 }
 
+type ColorViolationAuditResult = {
+  violationPixels: number;
+  drawablePixels: number;
+  overlayDataUrl: string | null;
+};
+
+const COLOR_VIOLATION_RULE = Object.freeze({ min: 1, max: 46 });
+
+function pixelHasColorViolation(r: number, g: number, b: number): boolean {
+  const { min, max } = COLOR_VIOLATION_RULE;
+  return (
+    (r >= min && r <= max)
+    || (g >= min && g <= max)
+    || (b >= min && b <= max)
+  );
+}
+
+async function buildColorViolationAudit(
+  svgMarkup: string,
+  options: { width?: number; height?: number; includeOverlay?: boolean } = {},
+): Promise<ColorViolationAuditResult> {
+  if (!svgMarkup || typeof window === 'undefined') {
+    return { violationPixels: 0, drawablePixels: 0, overlayDataUrl: null };
+  }
+
+  const width = Math.max(1, Math.floor(Number(options.width) || 480));
+  const height = Math.max(1, Math.floor(Number(options.height) || 480));
+  const includeOverlay = options.includeOverlay === true;
+  const renderCanvas = document.createElement('canvas');
+  renderCanvas.width = width;
+  renderCanvas.height = height;
+  const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
+  if (!renderCtx) {
+    return { violationPixels: 0, drawablePixels: 0, overlayDataUrl: null };
+  }
+
+  const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('Failed to decode preview SVG for color audit.'));
+      image.src = svgUrl;
+    });
+
+    renderCtx.clearRect(0, 0, width, height);
+    renderCtx.drawImage(img, 0, 0, width, height);
+    const source = renderCtx.getImageData(0, 0, width, height);
+    const data = source.data;
+
+    let violationPixels = 0;
+    let drawablePixels = 0;
+    let overlayDataUrl: string | null = null;
+    const overlayData = includeOverlay ? new Uint8ClampedArray(data.length) : null;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3];
+      if (alpha <= 0) continue;
+      drawablePixels += 1;
+      const violates = pixelHasColorViolation(data[i], data[i + 1], data[i + 2]);
+      if (!violates) continue;
+
+      violationPixels += 1;
+      if (overlayData) {
+        overlayData[i] = 255;
+        overlayData[i + 1] = 153;
+        overlayData[i + 2] = 0;
+        overlayData[i + 3] = 170;
+      }
+    }
+
+    if (overlayData) {
+      const overlayCanvas = document.createElement('canvas');
+      overlayCanvas.width = width;
+      overlayCanvas.height = height;
+      const overlayCtx = overlayCanvas.getContext('2d');
+      if (overlayCtx) {
+        overlayCtx.putImageData(new ImageData(overlayData, width, height), 0, 0);
+        overlayDataUrl = overlayCanvas.toDataURL('image/png');
+      }
+    }
+
+    return { violationPixels, drawablePixels, overlayDataUrl };
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+}
+
 export default function ParametricPage() {
   const navigate = useNavigate();
   const [colorMode, setColorMode] = useState<ColorMode>('off');
@@ -840,6 +930,10 @@ export default function ParametricPage() {
   const [svgOverlayLayers, setSvgOverlayLayers] = useState<string[]>([]);
   const [svgOverlayMarkup, setSvgOverlayMarkup] = useState<string | null>(null);
   const [svgTopOverlayMarkup, setSvgTopOverlayMarkup] = useState<string | null>(null);
+  const [colorViolationOverlayDataUrl, setColorViolationOverlayDataUrl] = useState<string | null>(null);
+  const [colorViolationPixelCount, setColorViolationPixelCount] = useState(0);
+  const [colorDrawablePixelCount, setColorDrawablePixelCount] = useState(0);
+  const [colorViolationElementSummary, setColorViolationElementSummary] = useState<Array<{ name: string; count: number }>>([]);
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
@@ -1343,10 +1437,17 @@ export default function ParametricPage() {
       previewRenderSerialRef.current += 1;
       const renderSerial = previewRenderSerialRef.current;
       const namespaceForPass = (pass: string) => `pv-${renderSerial}-${pass}`;
+      let layerAuditEntries: Array<{ name: string; svg: string }> = [];
 
       if (!isSoloMode) {
         const stackedLayers = visibleElements.map((element, index) => {
           return namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
+        });
+        layerAuditEntries = visibleElements.map((element, index) => {
+          const name = typeof element.name === 'string' && element.name.trim().length > 0
+            ? element.name
+            : `${element.type}-${index + 1}`;
+          return { name, svg: stackedLayers[index] ?? '' };
         });
 
         setSvgMarkup(stackedLayers[0] ?? '');
@@ -1364,6 +1465,15 @@ export default function ParametricPage() {
           ? [selectedVisibleElement]
           : visibleElements;
         const baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
+        layerAuditEntries = visibleElements.map((element, index) => {
+          const name = typeof element.name === 'string' && element.name.trim().length > 0
+            ? element.name
+            : `${element.type}-${index + 1}`;
+          return {
+            name,
+            svg: namespaceSvgIds(renderWithElements([element]), namespaceForPass(`solo-layer-${index}`)),
+          };
+        });
         setSvgMarkup(baseSvg);
         setSvgOverlayLayers([]);
 
@@ -1374,6 +1484,34 @@ export default function ParametricPage() {
           setSvgOverlayMarkup(null);
         }
         setSvgTopOverlayMarkup(null);
+      }
+
+      if (colorMode === 'warning') {
+        const fullSvg = namespaceSvgIds(renderWithElements(visibleElements), namespaceForPass('audit-full'));
+        const fullAudit = await buildColorViolationAudit(fullSvg, { includeOverlay: true });
+        if (renderSerial !== previewRenderSerialRef.current) return;
+
+        setColorViolationOverlayDataUrl(fullAudit.overlayDataUrl);
+        setColorViolationPixelCount(fullAudit.violationPixels);
+        setColorDrawablePixelCount(fullAudit.drawablePixels);
+
+        const perElement: Array<{ name: string; count: number }> = [];
+        for (const entry of layerAuditEntries) {
+          if (!entry.svg) continue;
+          const audit = await buildColorViolationAudit(entry.svg, { includeOverlay: false });
+          if (audit.violationPixels > 0) {
+            perElement.push({ name: entry.name, count: audit.violationPixels });
+          }
+        }
+        if (renderSerial !== previewRenderSerialRef.current) return;
+
+        perElement.sort((a, b) => b.count - a.count);
+        setColorViolationElementSummary(perElement.slice(0, 6));
+      } else {
+        setColorViolationOverlayDataUrl(null);
+        setColorViolationPixelCount(0);
+        setColorDrawablePixelCount(0);
+        setColorViolationElementSummary([]);
       }
       } finally {
         window.removeEventListener('engine-color-warning', warningHandler as EventListener);
@@ -1389,6 +1527,10 @@ export default function ParametricPage() {
       setSvgOverlayLayers([]);
       setSvgOverlayMarkup(null);
       setSvgTopOverlayMarkup(null);
+      setColorViolationOverlayDataUrl(null);
+      setColorViolationPixelCount(0);
+      setColorDrawablePixelCount(0);
+      setColorViolationElementSummary([]);
     } finally {
       setIsRendering(false);
     }
@@ -4147,6 +4289,13 @@ export default function ParametricPage() {
   const globalLightRadius = 22 + globalLightIntensity * 20;
   const globalLightTipX = 50 + Math.cos((globalLightAngle * Math.PI) / 180) * globalLightRadius;
   const globalLightTipY = 50 + Math.sin((globalLightAngle * Math.PI) / 180) * globalLightRadius;
+  const colorViolationRatio = colorDrawablePixelCount > 0
+    ? (colorViolationPixelCount / colorDrawablePixelCount) * 100
+    : 0;
+  const colorViolationSummary = colorViolationElementSummary
+    .slice(0, 3)
+    .map((entry) => `${entry.name}: ${entry.count}`)
+    .join(' | ');
   const selectedOffsetX = getSelectedPlacementOffset(0);
   const selectedOffsetY = getSelectedPlacementOffset(1);
   const offsetHandleX = Math.max(0, Math.min(100, 50 + selectedOffsetX));
@@ -4508,6 +4657,18 @@ export default function ParametricPage() {
                   <option value="enforce">enforce</option>
                 </select>
               </label>
+
+              {colorMode === 'warning' ? (
+                <span className="rounded border border-red-500/70 bg-red-500/10 px-2 py-1 text-[11px] text-red-300">
+                  LIVE WARNING: {colorViolationPixelCount} px ({colorViolationRatio.toFixed(2)}%)
+                </span>
+              ) : null}
+
+              {colorMode === 'warning' && colorViolationSummary.length > 0 ? (
+                <span className="rounded border border-orange-500/60 bg-orange-500/10 px-2 py-1 text-[11px] text-orange-200">
+                  Top offenders: {colorViolationSummary}
+                </span>
+              ) : null}
 
               <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300">
                 <input
@@ -5000,6 +5161,15 @@ export default function ParametricPage() {
                         className="pointer-events-none absolute inset-0"
                         style={isolatedPreviewLayerStyle}
                         dangerouslySetInnerHTML={{ __html: svgTopOverlayMarkup }}
+                      />
+                    ) : null}
+
+                    {colorMode === 'warning' && colorViolationOverlayDataUrl ? (
+                      <img
+                        src={colorViolationOverlayDataUrl}
+                        alt="Color limit warning overlay"
+                        className="pointer-events-none absolute inset-0 h-full w-full"
+                        style={{ imageRendering: 'pixelated' }}
                       />
                     ) : null}
 
