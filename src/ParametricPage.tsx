@@ -496,6 +496,8 @@ const FREE_OBJECT_SHAPE_BY_TYPE = new Map<string, { label: string; type: string;
 );
 
 const EFFECT_PANEL_KEYS = ['styleFx', 'depthFx', 'shadowFx', 'textureFx', 'gradientFx', 'materialFx'] as const;
+const EDITOR_FONTS_URL =
+  'https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Orbitron:wght@400;700&family=Oswald:wght@400;700&family=Bebas+Neue&family=Rajdhani:wght@400;700&family=Share+Tech+Mono&family=Goldman:wght@400;700&family=Russo+One&family=Audiowide&family=Rationale&family=Black+Ops+One&family=Michroma&family=Exo+2:wght@400;700&family=Syncopate:wght@400;700&family=Nova+Mono&family=VT323&family=Press+Start+2P&family=Chakra+Petch:wght@400;700&family=Quantico:wght@400;700&family=Oxanium:wght@400;700&family=Wallpoet&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&family=Nunito:wght@400;700&family=Raleway:wght@400;700&family=Josefin+Sans:wght@400;700&family=Righteous&family=Ubuntu:wght@400;700&family=Oxygen+Mono&display=swap';
 type EffectPanelKey = (typeof EFFECT_PANEL_KEYS)[number];
 const BLUR_MODE_OPTIONS = [
   { value: 'gaussian', label: 'Gaussian' },
@@ -816,6 +818,16 @@ export default function ParametricPage() {
   const dragBatchBeforeRef = useRef<TemplateModel | null>(null);
   const dragBatchLabelRef = useRef('Canvas drag');
   const authConfigured = isFirebaseAuthConfigured();
+
+  // Match Studio font availability so font-family changes are visually obvious in parametric preview.
+  useEffect(() => {
+    if (!document.querySelector(`link[href="${EDITOR_FONTS_URL}"]`)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = EDITOR_FONTS_URL;
+      document.head.appendChild(link);
+    }
+  }, []);
 
   const getTemplateFingerprint = useCallback((template: TemplateModel | null): string => {
     if (!template) return 'null';
@@ -1584,7 +1596,7 @@ export default function ParametricPage() {
         const title = label.querySelector('span');
         if (!title) return;
 
-        const control = label.querySelector('input[type="range"], input[type="number"], select') as HTMLInputElement | HTMLSelectElement | null;
+        const control = label.querySelector('input[type="range"], select, input[type="number"]:not([data-manual-range="true"])') as HTMLInputElement | HTMLSelectElement | null;
         if (!control) return;
 
         if (
@@ -1617,24 +1629,26 @@ export default function ParametricPage() {
             manual.value = control.value;
           };
 
-          const applyManualValue = () => {
+          const applyManualValue = (syncAfterApply = true) => {
             const raw = manual.value.trim();
             if (!raw) {
               syncFromRange();
               return;
             }
-            const parsed = Number(raw);
+            const normalizedRaw = raw.replace(',', '.');
+            const parsed = Number(normalizedRaw);
             if (!Number.isFinite(parsed)) {
-              syncFromRange();
+              if (syncAfterApply) syncFromRange();
               return;
             }
             const clamped = Math.max(hasMin ? min : parsed, Math.min(hasMax ? max : parsed, parsed));
             emitControlChange(control, String(clamped));
-            syncFromRange();
+            if (syncAfterApply) syncFromRange();
           };
 
-          manual.addEventListener('change', applyManualValue);
-          manual.addEventListener('blur', applyManualValue);
+          manual.addEventListener('input', () => applyManualValue(false));
+          manual.addEventListener('change', () => applyManualValue(true));
+          manual.addEventListener('blur', () => applyManualValue(true));
           manual.addEventListener('keydown', (event) => {
             event.stopPropagation();
             if (event.key === 'Enter') {
