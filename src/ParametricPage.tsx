@@ -3623,6 +3623,7 @@ export default function ParametricPage() {
   const textureImageRotationHandleY = Math.max(0, Math.min(100, textureImageOffsetHandleY + Math.sin((textureImageRotation * Math.PI) / 180) * textureImageRotationHandleRadius));
   const showElementCanvasHandles = selectedPanelTarget === 'element' && !!selectedElement && contextTab === 'element';
   const showMaskCanvasEditor = !!selectedElement && isSelectedMaskEnabled() && isMaskBrushEditEnabled;
+  const isolatedPreviewLayerStyle = { isolation: 'isolate' as const };
   const selectedTextureClipEnabled = getSelectedTextureClipEnabled();
   const selectedGradientClipEnabled = getSelectedGradientClipEnabled();
   const selectedMaterialClipEnabled = getSelectedMaterialClipEnabled();
@@ -4364,14 +4365,23 @@ export default function ParametricPage() {
                 {svgMarkup ? (
                   <div className="relative w-full max-w-[520px]">
                     <div
+                      style={isolatedPreviewLayerStyle}
                       className={isDimMode && !isSoloMode && selectedElement ? 'opacity-45' : ''}
                       dangerouslySetInnerHTML={{ __html: svgMarkup }}
                     />
                     {!isSoloMode && svgOverlayMarkup ? (
-                      <div className="pointer-events-none absolute inset-0" dangerouslySetInnerHTML={{ __html: svgOverlayMarkup }} />
+                      <div
+                        className="pointer-events-none absolute inset-0"
+                        style={isolatedPreviewLayerStyle}
+                        dangerouslySetInnerHTML={{ __html: svgOverlayMarkup }}
+                      />
                     ) : null}
                     {!isSoloMode && svgTopOverlayMarkup ? (
-                      <div className="pointer-events-none absolute inset-0" dangerouslySetInnerHTML={{ __html: svgTopOverlayMarkup }} />
+                      <div
+                        className="pointer-events-none absolute inset-0"
+                        style={isolatedPreviewLayerStyle}
+                        dangerouslySetInnerHTML={{ __html: svgTopOverlayMarkup }}
+                      />
                     ) : null}
 
                     {showGlobalLightingCanvasOverlay ? (
