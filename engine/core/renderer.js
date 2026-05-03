@@ -549,8 +549,14 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		chain = "tinted";
 	}
 
-	parts.push(`<feComposite in=\"${chain}\" in2=\"SourceAlpha\" operator=\"in\" result=\"final\" />`);
-	parts.push("<feMerge><feMergeNode in=\"final\" /></feMerge>");
+	const hasExternalShadow = (depthEffect.enabled && depthEffect.intensity > 0) || (dropShadowEffect.enabled && dropShadowEffect.opacity > 0);
+	if (hasExternalShadow) {
+		// Preserve outer shadow pixels. SourceAlpha clipping removes visible depth/drop shadows.
+		parts.push(`<feMerge><feMergeNode in=\"${chain}\" /></feMerge>`);
+	} else {
+		parts.push(`<feComposite in=\"${chain}\" in2=\"SourceAlpha\" operator=\"in\" result=\"final\" />`);
+		parts.push("<feMerge><feMergeNode in=\"final\" /></feMerge>");
+	}
 	parts.push("</filter>");
 
 	return parts.join("");

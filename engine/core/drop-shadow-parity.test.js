@@ -90,6 +90,16 @@ describe('drop shadow pipeline parity', () => {
     expect(shadowSvg).toContain('result="dropShadow"');
   });
 
+  it('does not clip outer drop-shadow to SourceAlpha', () => {
+    const shadowSvg = runEngine({
+      activeStyle: 'gold_dark',
+      templateInput: createTemplateWithDropShadow(true),
+    });
+
+    // Clipping to SourceAlpha removes outer shadow pixels.
+    expect(shadowSvg).not.toContain('in="dropShadow" in2="SourceAlpha" operator="in" result="final"');
+  });
+
   it('keeps subtle and aggressive depth presets visually distinct', () => {
     const subtleSvg = runEngine({
       activeStyle: 'gold_dark',
