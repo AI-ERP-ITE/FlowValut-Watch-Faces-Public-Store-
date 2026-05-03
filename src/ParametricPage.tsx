@@ -6450,6 +6450,10 @@ export default function ParametricPage() {
 
                 {isSelectedType('free_circle', 'free_rect', 'free_ring', 'free_triangle', 'free_hexagon', 'free_octagon', 'free_polygon') ? (
                   <div className="space-y-2 rounded border border-zinc-800 p-2">
+                    {(() => {
+                      const freeShapeStrokeWidth = getNumericParam('thickness', getNumericParam('strokeWidth', 0.008));
+                      return (
+                        <>
                     <p className="text-[11px] uppercase tracking-wide text-zinc-400">Free Shape Paint</p>
                     <p className="text-[11px] text-zinc-500">Use color wheel or hex picker for fill and stroke.</p>
 
@@ -6507,21 +6511,23 @@ export default function ParametricPage() {
                     </label>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Stroke Width {getNumericParam('strokeWidth', getNumericParam('thickness', 0.008)).toFixed(3)}</span>
+                      <span className="text-[11px] text-zinc-500">Stroke Width {freeShapeStrokeWidth.toFixed(3)}</span>
                       <input
                         type="range"
                         min={0}
                         max={0.06}
                         step={0.001}
-                        value={getNumericParam('strokeWidth', getNumericParam('thickness', 0.008))}
+                        value={freeShapeStrokeWidth}
                         onChange={(e) => {
                           const next = Number(e.target.value);
-                          setNumericParam('strokeWidth', next);
                           setNumericParam('thickness', next);
                         }}
                         className="w-full"
                       />
                     </label>
+                        </>
+                      );
+                    })()}
                   </div>
                 ) : null}
 

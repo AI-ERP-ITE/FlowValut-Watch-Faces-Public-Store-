@@ -54,7 +54,7 @@ export function renderFreeOctagon(params = {}, position = {}, context = {}) {
 	const p = { ...DEFAULTS, ...params };
 	const baseRadius = getBaseRadius(context);
 	const scale = getScale(context);
-	const rawStroke = p.strokeWidth ?? p.thickness;
+	const rawStroke = p.thickness ?? p.strokeWidth;
 	const strokeWidth = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
 	const rawFill = typeof p.fill === "string" ? p.fill.trim() : "";
 	const fill = rawFill.toLowerCase() === "none" ? "none" : rawFill || DEFAULTS.fill;

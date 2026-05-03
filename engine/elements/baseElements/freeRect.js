@@ -35,7 +35,7 @@ export function renderFreeRect(params = {}, position = {}, context = {}) {
 	const width = clamp01(p.width, DEFAULTS.width) * baseRadius * 2 * scale;
 	const height = clamp01(p.height, DEFAULTS.height) * baseRadius * 2 * scale;
 	const cornerRadius = clamp01(p.cornerRadius, DEFAULTS.cornerRadius) * baseRadius * scale;
-	const rawStroke = p.strokeWidth ?? p.thickness;
+	const rawStroke = p.thickness ?? p.strokeWidth;
 	const strokeWidth = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
 	const rawFill = typeof p.fill === "string" ? p.fill.trim() : "";
 	const fill = rawFill.toLowerCase() === "none" ? "none" : rawFill || DEFAULTS.fill;

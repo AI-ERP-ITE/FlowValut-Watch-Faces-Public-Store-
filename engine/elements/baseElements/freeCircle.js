@@ -31,7 +31,7 @@ export function renderFreeCircle(params = {}, position = {}, context = {}) {
 	const baseRadius = getBaseRadius(context);
 	const scale = getScale(context);
 	const radius = clamp01(p.radius, DEFAULTS.radius) * baseRadius * scale;
-	const rawStroke = p.strokeWidth ?? p.thickness;
+	const rawStroke = p.thickness ?? p.strokeWidth;
 	const strokeWidth = Math.max(0, clamp01(rawStroke, DEFAULTS.strokeWidth) * baseRadius * scale);
 	const rawFill = typeof p.fill === "string" ? p.fill.trim() : "";
 	const fill = rawFill.toLowerCase() === "none" ? "none" : rawFill || DEFAULTS.fill;
