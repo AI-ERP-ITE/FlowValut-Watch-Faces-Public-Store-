@@ -2666,6 +2666,37 @@ export default function ParametricPage() {
     return typeof cursor === 'string' ? cursor : fallback;
   };
 
+  const handleTextureImageFileSelection = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setEditorNotice('Texture image must be a valid image file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setEditorNotice('Failed to read image file for texture.');
+    };
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!dataUrl) {
+        setEditorNotice('Texture image could not be loaded.');
+        return;
+      }
+
+      setSelectedTextureString('image.src', dataUrl);
+      const probe = new Image();
+      probe.onload = () => {
+        setSelectedTextureNumber('image.naturalWidth', probe.naturalWidth || 1024);
+        setSelectedTextureNumber('image.naturalHeight', probe.naturalHeight || 1024);
+      };
+      probe.src = dataUrl;
+      setEditorNotice(`Texture image loaded: ${file.name}`);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const getSelectedTextureBoolean = (path: string, fallback: boolean) => {
     const layer = getSelectedTextureLayer();
     if (!layer) return fallback;
@@ -4056,7 +4087,7 @@ export default function ParametricPage() {
       if (activeMaskSelectionShape.shape === 'free') {
         const points = Array.isArray(activeMaskSelectionShape.points) ? activeMaskSelectionShape.points : [];
         if (points.length >= 3) {
-          appendSelectionStrokeWithMirrors({
+          const freeStroke = {
             tool: 'selection',
             shape: 'free',
             action: activeMaskSelectionShape.action,
@@ -4065,10 +4096,11 @@ export default function ParametricPage() {
               x: Math.max(0, Math.min(100, Number(point.x) || 0)),
               y: Math.max(0, Math.min(100, Number(point.y) || 0)),
             })),
-          });
+          };
+          appendSelectionStrokeWithMirrors(freeStroke);
         }
       } else {
-        const shapeStroke = buildSelectionStrokeFromBounds(
+        let shapeStroke = buildSelectionStrokeFromBounds(
           activeMaskSelectionShape.shape,
           activeMaskSelectionShape.action,
           activeMaskSelectionShape.opacity,
@@ -4077,7 +4109,39 @@ export default function ParametricPage() {
           activeMaskSelectionShape.endX,
           activeMaskSelectionShape.endY,
         );
-        if (shapeStroke) appendSelectionStrokeWithMirrors(shapeStroke);
+        if (!shapeStroke) {
+          // Single-click placement: use configured size centered at click point.
+          const halfWidth = (activeMaskSelectionShape.shape === 'circle' || activeMaskSelectionShape.shape === 'square')
+            ? selectionControlDiameter / 2
+            : selectionControlWidth / 2;
+          const halfHeight = (activeMaskSelectionShape.shape === 'circle' || activeMaskSelectionShape.shape === 'square')
+            ? selectionControlDiameter / 2
+            : selectionControlHeight / 2;
+          shapeStroke = buildSelectionStrokeFromBounds(
+            activeMaskSelectionShape.shape,
+            activeMaskSelectionShape.action,
+            activeMaskSelectionShape.opacity,
+            activeMaskSelectionShape.startX - halfWidth,
+            activeMaskSelectionShape.startY - halfHeight,
+            activeMaskSelectionShape.startX + halfWidth,
+            activeMaskSelectionShape.startY + halfHeight,
+          );
+        }
+        if (shapeStroke) {
+          appendSelectionStrokeWithMirrors(shapeStroke);
+          const sx = Math.max(0, Math.min(100, Number(shapeStroke.x) || 0));
+          const sy = Math.max(0, Math.min(100, Number(shapeStroke.y) || 0));
+          const sw = Math.max(0.2, Math.min(100, Number(shapeStroke.width) || 0));
+          const sh = Math.max(0.2, Math.min(100, Number(shapeStroke.height) || 0));
+          setSelectedMaskNumber('selection.x', sx + sw / 2);
+          setSelectedMaskNumber('selection.y', sy + sh / 2);
+          if (activeMaskSelectionShape.shape === 'circle' || activeMaskSelectionShape.shape === 'square') {
+            setSelectedMaskNumber('selection.diameter', Math.max(sw, sh));
+          } else {
+            setSelectedMaskNumber('selection.width', sw);
+            setSelectedMaskNumber('selection.height', sh);
+          }
+        }
       }
     }
     setActiveMaskSelectionShape(null);
@@ -4100,8 +4164,53 @@ export default function ParametricPage() {
       selectionControlX + halfWidth,
       selectionControlY + halfHeight,
     );
-    if (stroke) appendSelectionStrokeWithMirrors(stroke);
+    if (stroke) {
+      appendSelectionStrokeWithMirrors(stroke);
+      const sx = Math.max(0, Math.min(100, Number(stroke.x) || 0));
+      const sy = Math.max(0, Math.min(100, Number(stroke.y) || 0));
+      const sw = Math.max(0.2, Math.min(100, Number(stroke.width) || 0));
+      const sh = Math.max(0.2, Math.min(100, Number(stroke.height) || 0));
+      setSelectedMaskNumber('selection.x', sx + sw / 2);
+      setSelectedMaskNumber('selection.y', sy + sh / 2);
+      if (selectedMaskSelectionShape === 'circle' || selectedMaskSelectionShape === 'square') {
+        setSelectedMaskNumber('selection.diameter', Math.max(sw, sh));
+      } else {
+        setSelectedMaskNumber('selection.width', sw);
+        setSelectedMaskNumber('selection.height', sh);
+      }
+    }
   };
+
+  const activeSelectionDraftMetrics = (() => {
+    if (!activeMaskSelectionShape || activeMaskSelectionShape.shape === 'free') return null;
+    const stroke = buildSelectionStrokeFromBounds(
+      activeMaskSelectionShape.shape,
+      activeMaskSelectionShape.action,
+      activeMaskSelectionShape.opacity,
+      activeMaskSelectionShape.startX,
+      activeMaskSelectionShape.startY,
+      activeMaskSelectionShape.endX,
+      activeMaskSelectionShape.endY,
+    );
+    if (!stroke) return null;
+    const x = Math.max(0, Math.min(100, Number(stroke.x) || 0));
+    const y = Math.max(0, Math.min(100, Number(stroke.y) || 0));
+    const width = Math.max(0.2, Math.min(100, Number(stroke.width) || 0));
+    const height = Math.max(0.2, Math.min(100, Number(stroke.height) || 0));
+    return {
+      x: x + width / 2,
+      y: y + height / 2,
+      width,
+      height,
+      diameter: Math.max(width, height),
+    };
+  })();
+
+  const selectionControlDisplayX = activeSelectionDraftMetrics ? activeSelectionDraftMetrics.x : selectionControlX;
+  const selectionControlDisplayY = activeSelectionDraftMetrics ? activeSelectionDraftMetrics.y : selectionControlY;
+  const selectionControlDisplayWidth = activeSelectionDraftMetrics ? activeSelectionDraftMetrics.width : selectionControlWidth;
+  const selectionControlDisplayHeight = activeSelectionDraftMetrics ? activeSelectionDraftMetrics.height : selectionControlHeight;
+  const selectionControlDisplayDiameter = activeSelectionDraftMetrics ? activeSelectionDraftMetrics.diameter : selectionControlDiameter;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_8%_12%,#1e293b_0%,#0b1020_35%,#08090c_100%)] text-white p-4 md:p-6">
@@ -5191,26 +5300,54 @@ export default function ParametricPage() {
                                 if (activeMaskSelectionShape.shape === 'free') {
                                   const points = Array.isArray(activeMaskSelectionShape.points) ? activeMaskSelectionShape.points : [];
                                   if (points.length < 2) return null;
+                                  const mirrorPoints = (src: Array<{ x: number; y: number }>, mirrorHorizontal: boolean, mirrorVertical: boolean) =>
+                                    src.map((point) => ({
+                                      x: mirrorHorizontal ? 100 - Math.max(0, Math.min(100, Number(point.x) || 0)) : Math.max(0, Math.min(100, Number(point.x) || 0)),
+                                      y: mirrorVertical ? 100 - Math.max(0, Math.min(100, Number(point.y) || 0)) : Math.max(0, Math.min(100, Number(point.y) || 0)),
+                                    }));
+                                  const variants: Array<Array<{ x: number; y: number }>> = [points];
+                                  if (selectionMirrorHorizontal) variants.push(mirrorPoints(points, true, false));
+                                  if (selectionMirrorVertical) variants.push(mirrorPoints(points, false, true));
+                                  if (selectionMirrorHorizontal && selectionMirrorVertical) variants.push(mirrorPoints(points, true, true));
+
+                                  const unique = new Set<string>();
+                                  const uniqueVariants = variants.filter((variant) => {
+                                    const key = JSON.stringify(variant);
+                                    if (unique.has(key)) return false;
+                                    unique.add(key);
+                                    return true;
+                                  });
+
                                   if (points.length < 3) {
                                     return (
-                                      <polyline
-                                        points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-                                        fill="none"
-                                        stroke={previewStroke}
-                                        strokeOpacity={0.95}
-                                        strokeWidth={0.65}
-                                      />
+                                      <>
+                                        {uniqueVariants.map((variant, index) => (
+                                          <polyline
+                                            key={`active-mask-free-line-${index}`}
+                                            points={variant.map((point) => `${point.x},${point.y}`).join(' ')}
+                                            fill="none"
+                                            stroke={previewStroke}
+                                            strokeOpacity={0.95}
+                                            strokeWidth={0.65}
+                                          />
+                                        ))}
+                                      </>
                                     );
                                   }
                                   return (
-                                    <polygon
-                                      points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-                                      fill={previewColor}
-                                      fillOpacity={0.15}
-                                      stroke={previewStroke}
-                                      strokeOpacity={0.95}
-                                      strokeWidth={0.7}
-                                    />
+                                    <>
+                                      {uniqueVariants.map((variant, index) => (
+                                        <polygon
+                                          key={`active-mask-free-poly-${index}`}
+                                          points={variant.map((point) => `${point.x},${point.y}`).join(' ')}
+                                          fill={previewColor}
+                                          fillOpacity={0.15}
+                                          stroke={previewStroke}
+                                          strokeOpacity={0.95}
+                                          strokeWidth={0.7}
+                                        />
+                                      ))}
+                                    </>
                                   );
                                 }
                                 const x1 = Math.max(0, Math.min(100, activeMaskSelectionShape.startX));
@@ -5230,12 +5367,45 @@ export default function ParametricPage() {
                                   width = side;
                                   height = side;
                                 }
-                                if (activeMaskSelectionShape.shape === 'circle') {
+                                const renderPreviewShape = (shapeX: number, shapeY: number, shapeWidth: number, shapeHeight: number, key: string) => {
+                                  if (activeMaskSelectionShape.shape === 'circle') {
+                                    return (
+                                      <circle
+                                        key={key}
+                                        cx={shapeX + shapeWidth / 2}
+                                        cy={shapeY + shapeHeight / 2}
+                                        r={Math.max(0, Math.min(shapeWidth, shapeHeight) / 2)}
+                                        fill={previewColor}
+                                        fillOpacity={0.15}
+                                        stroke={previewStroke}
+                                        strokeOpacity={0.95}
+                                        strokeWidth={0.7}
+                                      />
+                                    );
+                                  }
+                                  if (activeMaskSelectionShape.shape === 'oval') {
+                                    return (
+                                      <ellipse
+                                        key={key}
+                                        cx={shapeX + shapeWidth / 2}
+                                        cy={shapeY + shapeHeight / 2}
+                                        rx={Math.max(0, shapeWidth / 2)}
+                                        ry={Math.max(0, shapeHeight / 2)}
+                                        fill={previewColor}
+                                        fillOpacity={0.15}
+                                        stroke={previewStroke}
+                                        strokeOpacity={0.95}
+                                        strokeWidth={0.7}
+                                      />
+                                    );
+                                  }
                                   return (
-                                    <circle
-                                      cx={minX + width / 2}
-                                      cy={minY + height / 2}
-                                      r={Math.max(0, Math.min(width, height) / 2)}
+                                    <rect
+                                      key={key}
+                                      x={shapeX}
+                                      y={shapeY}
+                                      width={shapeWidth}
+                                      height={shapeHeight}
                                       fill={previewColor}
                                       fillOpacity={0.15}
                                       stroke={previewStroke}
@@ -5243,34 +5413,35 @@ export default function ParametricPage() {
                                       strokeWidth={0.7}
                                     />
                                   );
+                                };
+
+                                const variants: Array<{ x: number; y: number; width: number; height: number }> = [
+                                  { x: minX, y: minY, width, height },
+                                ];
+                                if (selectionMirrorHorizontal) {
+                                  variants.push({ x: Math.max(0, Math.min(100, 100 - (minX + width))), y: minY, width, height });
                                 }
-                                if (activeMaskSelectionShape.shape === 'oval') {
-                                  return (
-                                    <ellipse
-                                      cx={minX + width / 2}
-                                      cy={minY + height / 2}
-                                      rx={Math.max(0, width / 2)}
-                                      ry={Math.max(0, height / 2)}
-                                      fill={previewColor}
-                                      fillOpacity={0.15}
-                                      stroke={previewStroke}
-                                      strokeOpacity={0.95}
-                                      strokeWidth={0.7}
-                                    />
-                                  );
+                                if (selectionMirrorVertical) {
+                                  variants.push({ x: minX, y: Math.max(0, Math.min(100, 100 - (minY + height))), width, height });
                                 }
+                                if (selectionMirrorHorizontal && selectionMirrorVertical) {
+                                  variants.push({ x: Math.max(0, Math.min(100, 100 - (minX + width))), y: Math.max(0, Math.min(100, 100 - (minY + height))), width, height });
+                                }
+
+                                const unique = new Set<string>();
+                                const uniqueVariants = variants.filter((variant) => {
+                                  const key = `${variant.x.toFixed(3)}|${variant.y.toFixed(3)}|${variant.width.toFixed(3)}|${variant.height.toFixed(3)}`;
+                                  if (unique.has(key)) return false;
+                                  unique.add(key);
+                                  return true;
+                                });
+
                                 return (
-                                  <rect
-                                    x={minX}
-                                    y={minY}
-                                    width={width}
-                                    height={height}
-                                    fill={previewColor}
-                                    fillOpacity={0.15}
-                                    stroke={previewStroke}
-                                    strokeOpacity={0.95}
-                                    strokeWidth={0.7}
-                                  />
+                                  <>
+                                    {uniqueVariants.map((variant, index) =>
+                                      renderPreviewShape(variant.x, variant.y, variant.width, variant.height, `active-mask-shape-${index}`),
+                                    )}
+                                  </>
                                 );
                               })()
                             ) : null}
@@ -5301,17 +5472,36 @@ export default function ParametricPage() {
                               (() => {
                                 const previewStroke = maskBrushAction === 'reveal' ? '#4ade80' : '#f87171';
                                 if (selectedMaskSelectionShape === 'free') {
+                                  const points = [
+                                    { x: maskCursorPoint.x, y: maskCursorPoint.y },
+                                  ];
+                                  const variants: Array<{ x: number; y: number }> = [points[0]];
+                                  if (selectionMirrorHorizontal) variants.push({ x: 100 - points[0].x, y: points[0].y });
+                                  if (selectionMirrorVertical) variants.push({ x: points[0].x, y: 100 - points[0].y });
+                                  if (selectionMirrorHorizontal && selectionMirrorVertical) variants.push({ x: 100 - points[0].x, y: 100 - points[0].y });
+                                  const unique = new Set<string>();
+                                  const uniqueVariants = variants.filter((variant) => {
+                                    const key = `${variant.x.toFixed(3)}|${variant.y.toFixed(3)}`;
+                                    if (unique.has(key)) return false;
+                                    unique.add(key);
+                                    return true;
+                                  });
                                   return (
-                                    <circle
-                                      cx={maskCursorPoint.x}
-                                      cy={maskCursorPoint.y}
-                                      r={0.9}
-                                      fill={previewStroke}
-                                      fillOpacity={0.9}
-                                      stroke="#ffffff"
-                                      strokeOpacity={0.9}
-                                      strokeWidth={0.2}
-                                    />
+                                    <>
+                                      {uniqueVariants.map((variant, index) => (
+                                        <circle
+                                          key={`mask-cursor-dot-${index}`}
+                                          cx={variant.x}
+                                          cy={variant.y}
+                                          r={0.9}
+                                          fill={previewStroke}
+                                          fillOpacity={0.9}
+                                          stroke="#ffffff"
+                                          strokeOpacity={0.9}
+                                          strokeWidth={0.2}
+                                        />
+                                      ))}
+                                    </>
                                   );
                                 }
 
@@ -5324,29 +5514,70 @@ export default function ParametricPage() {
                                 const x = Math.max(0, Math.min(100, maskCursorPoint.x - width / 2));
                                 const y = Math.max(0, Math.min(100, maskCursorPoint.y - height / 2));
 
-                                if (selectedMaskSelectionShape === 'circle') {
-                                  return (
-                                    <circle
-                                      cx={x + width / 2}
-                                      cy={y + height / 2}
-                                      r={Math.max(0.2, Math.min(width, height) / 2)}
-                                      fill={previewStroke}
-                                      fillOpacity={0.08}
-                                      stroke={previewStroke}
-                                      strokeOpacity={0.92}
-                                      strokeWidth={0.45}
-                                      strokeDasharray="1.2 1.2"
-                                    />
-                                  );
+                                const variants: Array<{ x: number; y: number; width: number; height: number }> = [
+                                  { x, y, width: Math.max(0.2, width), height: Math.max(0.2, height) },
+                                ];
+                                if (selectionMirrorHorizontal) {
+                                  variants.push({ x: Math.max(0, Math.min(100, 100 - (x + width))), y, width: Math.max(0.2, width), height: Math.max(0.2, height) });
+                                }
+                                if (selectionMirrorVertical) {
+                                  variants.push({ x, y: Math.max(0, Math.min(100, 100 - (y + height))), width: Math.max(0.2, width), height: Math.max(0.2, height) });
+                                }
+                                if (selectionMirrorHorizontal && selectionMirrorVertical) {
+                                  variants.push({ x: Math.max(0, Math.min(100, 100 - (x + width))), y: Math.max(0, Math.min(100, 100 - (y + height))), width: Math.max(0.2, width), height: Math.max(0.2, height) });
                                 }
 
-                                if (selectedMaskSelectionShape === 'oval') {
+                                const unique = new Set<string>();
+                                const uniqueVariants = variants.filter((variant) => {
+                                  const key = `${variant.x.toFixed(3)}|${variant.y.toFixed(3)}|${variant.width.toFixed(3)}|${variant.height.toFixed(3)}`;
+                                  if (unique.has(key)) return false;
+                                  unique.add(key);
+                                  return true;
+                                });
+
+                                const renderVariant = (variant: { x: number; y: number; width: number; height: number }, key: string) => {
+                                  if (selectedMaskSelectionShape === 'circle') {
+                                    return (
+                                      <circle
+                                        key={key}
+                                        cx={variant.x + variant.width / 2}
+                                        cy={variant.y + variant.height / 2}
+                                        r={Math.max(0.2, Math.min(variant.width, variant.height) / 2)}
+                                        fill={previewStroke}
+                                        fillOpacity={0.08}
+                                        stroke={previewStroke}
+                                        strokeOpacity={0.92}
+                                        strokeWidth={0.45}
+                                        strokeDasharray="1.2 1.2"
+                                      />
+                                    );
+                                  }
+
+                                  if (selectedMaskSelectionShape === 'oval') {
+                                    return (
+                                      <ellipse
+                                        key={key}
+                                        cx={variant.x + variant.width / 2}
+                                        cy={variant.y + variant.height / 2}
+                                        rx={Math.max(0.2, variant.width / 2)}
+                                        ry={Math.max(0.2, variant.height / 2)}
+                                        fill={previewStroke}
+                                        fillOpacity={0.08}
+                                        stroke={previewStroke}
+                                        strokeOpacity={0.92}
+                                        strokeWidth={0.45}
+                                        strokeDasharray="1.2 1.2"
+                                      />
+                                    );
+                                  }
+
                                   return (
-                                    <ellipse
-                                      cx={x + width / 2}
-                                      cy={y + height / 2}
-                                      rx={Math.max(0.2, width / 2)}
-                                      ry={Math.max(0.2, height / 2)}
+                                    <rect
+                                      key={key}
+                                      x={variant.x}
+                                      y={variant.y}
+                                      width={variant.width}
+                                      height={variant.height}
                                       fill={previewStroke}
                                       fillOpacity={0.08}
                                       stroke={previewStroke}
@@ -5355,21 +5586,12 @@ export default function ParametricPage() {
                                       strokeDasharray="1.2 1.2"
                                     />
                                   );
-                                }
+                                };
 
                                 return (
-                                  <rect
-                                    x={x}
-                                    y={y}
-                                    width={Math.max(0.2, width)}
-                                    height={Math.max(0.2, height)}
-                                    fill={previewStroke}
-                                    fillOpacity={0.08}
-                                    stroke={previewStroke}
-                                    strokeOpacity={0.92}
-                                    strokeWidth={0.45}
-                                    strokeDasharray="1.2 1.2"
-                                  />
+                                  <>
+                                    {uniqueVariants.map((variant, index) => renderVariant(variant, `mask-cursor-shape-${index}`))}
+                                  </>
                                 );
                               })()
                             ) : null}
@@ -5938,7 +6160,7 @@ export default function ParametricPage() {
                     </label>
                     <label className="block space-y-1">
                       <span className="text-[11px] text-zinc-500">Width {getNumericParam('width', 0.003).toFixed(3)}</span>
-                      <input type="range" min={0.001} max={0.05} step={0.001} value={getNumericParam('width', 0.003)} onChange={(e) => setNumericParam('width', Number(e.target.value))} className="w-full" />
+                      <input type="range" min={0.001} max={0.1} step={0.001} value={getNumericParam('width', 0.003)} onChange={(e) => setNumericParam('width', Number(e.target.value))} className="w-full" />
                     </label>
 
                     <div className="rounded border border-zinc-800 bg-zinc-900/35 p-2 space-y-2">
@@ -6772,6 +6994,38 @@ export default function ParametricPage() {
 
                   {getSelectedTextureString('kind', 'grain') === 'image' ? (
                     <>
+                      <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Image Texture Source</p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files && e.target.files.length > 0 ? e.target.files[0] : null;
+                            handleTextureImageFileSelection(file);
+                            e.currentTarget.value = '';
+                          }}
+                          className="block w-full text-[11px] text-zinc-300 file:mr-3 file:rounded file:border file:border-zinc-700 file:bg-zinc-900 file:px-2 file:py-1 file:text-[11px] file:text-zinc-200"
+                        />
+                        {getSelectedTextureString('image.src', '').trim().length > 0 ? (
+                          <>
+                            <img
+                              src={getSelectedTextureString('image.src', '')}
+                              alt="Texture source"
+                              className="h-24 w-full rounded border border-zinc-800 bg-zinc-900 object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTextureString('image.src', '')}
+                              className="h-7 rounded border border-zinc-700 px-2 text-[11px] text-zinc-300 hover:border-zinc-500"
+                            >
+                              Clear image
+                            </button>
+                          </>
+                        ) : (
+                          <p className="text-[11px] text-zinc-500">Upload image to drive texture mapping.</p>
+                        )}
+                      </div>
+
                       <label className="block space-y-1">
                         <span className="text-[11px] text-zinc-500">Offset X {Math.round(getSelectedTextureNumber('image.offsetX', 0))}%</span>
                         <input
@@ -6820,6 +7074,32 @@ export default function ParametricPage() {
                           step={1}
                           value={getSelectedTextureNumber('image.rotation', 0)}
                           onChange={(e) => setSelectedTextureNumber('image.rotation', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Image Fit</span>
+                        <select
+                          value={getSelectedTextureString('image.fit', 'cover')}
+                          onChange={(e) => setSelectedTextureString('image.fit', e.target.value)}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                        >
+                          <option value="cover">Cover</option>
+                          <option value="contain">Contain</option>
+                          <option value="stretch">Stretch</option>
+                        </select>
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Texture Radius {getSelectedTextureNumber('image.radius', 0).toFixed(1)}</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={120}
+                          step={0.1}
+                          value={getSelectedTextureNumber('image.radius', 0)}
+                          onChange={(e) => setSelectedTextureNumber('image.radius', Number(e.target.value))}
                           className="w-full"
                         />
                       </label>
@@ -7824,7 +8104,7 @@ export default function ParametricPage() {
                                 min={0}
                                 max={100}
                                 step={0.1}
-                                value={selectionControlX}
+                                value={selectionControlDisplayX}
                                 onChange={(e) => setSelectedMaskNumber('selection.x', Number(e.target.value))}
                                 className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                               />
@@ -7836,7 +8116,7 @@ export default function ParametricPage() {
                                 min={0}
                                 max={100}
                                 step={0.1}
-                                value={selectionControlY}
+                                value={selectionControlDisplayY}
                                 onChange={(e) => setSelectedMaskNumber('selection.y', Number(e.target.value))}
                                 className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                               />
@@ -7851,7 +8131,7 @@ export default function ParametricPage() {
                                 min={0.2}
                                 max={100}
                                 step={0.1}
-                                value={selectionControlDiameter}
+                                value={selectionControlDisplayDiameter}
                                 onChange={(e) => setSelectedMaskNumber('selection.diameter', Number(e.target.value))}
                                 className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                               />
@@ -7865,7 +8145,7 @@ export default function ParametricPage() {
                                   min={0.2}
                                   max={100}
                                   step={0.1}
-                                  value={selectionControlWidth}
+                                  value={selectionControlDisplayWidth}
                                   onChange={(e) => setSelectedMaskNumber('selection.width', Number(e.target.value))}
                                   className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                                 />
@@ -7877,7 +8157,7 @@ export default function ParametricPage() {
                                   min={0.2}
                                   max={100}
                                   step={0.1}
-                                  value={selectionControlHeight}
+                                  value={selectionControlDisplayHeight}
                                   onChange={(e) => setSelectedMaskNumber('selection.height', Number(e.target.value))}
                                   className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                                 />
