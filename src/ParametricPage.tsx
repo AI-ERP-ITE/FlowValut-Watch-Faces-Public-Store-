@@ -4346,7 +4346,7 @@ export default function ParametricPage() {
                       className={isDimMode && !isSoloMode && selectedElement ? 'opacity-45' : ''}
                       dangerouslySetInnerHTML={{ __html: svgMarkup }}
                     />
-                    {isDimMode && !isSoloMode && svgOverlayMarkup ? (
+                    {!isSoloMode && svgOverlayMarkup ? (
                       <div className="pointer-events-none absolute inset-0" dangerouslySetInnerHTML={{ __html: svgOverlayMarkup }} />
                     ) : null}
 
@@ -4966,6 +4966,82 @@ export default function ParametricPage() {
                                   strokeWidth={0.3}
                                 />
                               </>
+                            ) : null}
+                            {isMaskBrushEditEnabled && isSelectionMaskMode && maskCursorPoint && !activeMaskSelectionShape ? (
+                              (() => {
+                                const previewStroke = maskBrushAction === 'reveal' ? '#4ade80' : '#f87171';
+                                if (selectedMaskSelectionShape === 'free') {
+                                  return (
+                                    <circle
+                                      cx={maskCursorPoint.x}
+                                      cy={maskCursorPoint.y}
+                                      r={0.9}
+                                      fill={previewStroke}
+                                      fillOpacity={0.9}
+                                      stroke="#ffffff"
+                                      strokeOpacity={0.9}
+                                      strokeWidth={0.2}
+                                    />
+                                  );
+                                }
+
+                                const width = selectedMaskSelectionShape === 'circle' || selectedMaskSelectionShape === 'square'
+                                  ? selectionControlDiameter
+                                  : selectionControlWidth;
+                                const height = selectedMaskSelectionShape === 'circle' || selectedMaskSelectionShape === 'square'
+                                  ? selectionControlDiameter
+                                  : selectionControlHeight;
+                                const x = Math.max(0, Math.min(100, maskCursorPoint.x - width / 2));
+                                const y = Math.max(0, Math.min(100, maskCursorPoint.y - height / 2));
+
+                                if (selectedMaskSelectionShape === 'circle') {
+                                  return (
+                                    <circle
+                                      cx={x + width / 2}
+                                      cy={y + height / 2}
+                                      r={Math.max(0.2, Math.min(width, height) / 2)}
+                                      fill={previewStroke}
+                                      fillOpacity={0.08}
+                                      stroke={previewStroke}
+                                      strokeOpacity={0.92}
+                                      strokeWidth={0.45}
+                                      strokeDasharray="1.2 1.2"
+                                    />
+                                  );
+                                }
+
+                                if (selectedMaskSelectionShape === 'oval') {
+                                  return (
+                                    <ellipse
+                                      cx={x + width / 2}
+                                      cy={y + height / 2}
+                                      rx={Math.max(0.2, width / 2)}
+                                      ry={Math.max(0.2, height / 2)}
+                                      fill={previewStroke}
+                                      fillOpacity={0.08}
+                                      stroke={previewStroke}
+                                      strokeOpacity={0.92}
+                                      strokeWidth={0.45}
+                                      strokeDasharray="1.2 1.2"
+                                    />
+                                  );
+                                }
+
+                                return (
+                                  <rect
+                                    x={x}
+                                    y={y}
+                                    width={Math.max(0.2, width)}
+                                    height={Math.max(0.2, height)}
+                                    fill={previewStroke}
+                                    fillOpacity={0.08}
+                                    stroke={previewStroke}
+                                    strokeOpacity={0.92}
+                                    strokeWidth={0.45}
+                                    strokeDasharray="1.2 1.2"
+                                  />
+                                );
+                              })()
                             ) : null}
                           </svg>
                         ) : null}
@@ -7289,7 +7365,10 @@ export default function ParametricPage() {
                     <input
                       type="checkbox"
                       checked={isSelectedMaskEnabled()}
-                      onChange={(e) => setSelectedMaskEnabled(e.target.checked)}
+                      onChange={(e) => {
+                        setSelectedMaskEnabled(e.target.checked);
+                        if (e.target.checked) setIsMaskBrushEditEnabled(true);
+                      }}
                     />
                     <span className="text-[11px] text-zinc-400">Enable mask model on this element</span>
                   </label>
