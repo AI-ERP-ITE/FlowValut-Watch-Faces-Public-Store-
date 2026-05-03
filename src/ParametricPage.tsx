@@ -428,6 +428,37 @@ function applyMaskToSvgMarkup(svgMarkup: string, mask: Record<string, unknown>, 
   return `${openTag}${defs}<g mask="url(#${maskId})">${inner}</g></svg>`;
 }
 
+function namespaceSvgIds(svgMarkup: string, namespaceSeed: string): string {
+  if (!svgMarkup || typeof svgMarkup !== 'string') return svgMarkup;
+
+  const safeNamespace = namespaceSeed.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safeNamespace) return svgMarkup;
+
+  const idPattern = /\bid\s*=\s*"([^"]+)"/g;
+  const idMap = new Map<string, string>();
+  let match: RegExpExecArray | null;
+  while ((match = idPattern.exec(svgMarkup)) !== null) {
+    const originalId = match[1];
+    if (!idMap.has(originalId)) {
+      idMap.set(originalId, `${safeNamespace}-${originalId}`);
+    }
+  }
+
+  if (idMap.size === 0) return svgMarkup;
+
+  let nextMarkup = svgMarkup;
+  for (const [originalId, namespacedId] of idMap.entries()) {
+    const escaped = originalId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    nextMarkup = nextMarkup
+      .replace(new RegExp(`id\\s*=\\s*"${escaped}"`, 'g'), `id="${namespacedId}"`)
+      .replace(new RegExp(`url\\(#${escaped}\\)`, 'g'), `url(#${namespacedId})`)
+      .replace(new RegExp(`href\\s*=\\s*"#${escaped}"`, 'g'), `href="#${namespacedId}"`)
+      .replace(new RegExp(`xlink:href\\s*=\\s*"#${escaped}"`, 'g'), `xlink:href="#${namespacedId}"`);
+  }
+
+  return nextMarkup;
+}
+
 const DEFAULT_DRAWER_CATEGORY_ORDER = ['Base', 'Bezel', 'Ticks', 'Outline', 'Free Objects', 'Texture', 'General'] as const;
 
 const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
@@ -739,6 +770,7 @@ export default function ParametricPage() {
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
+  const previewRenderSerialRef = useRef(0);
   const historyPastRef = useRef<Array<TemplateCommand>>([]);
   const historyFutureRef = useRef<Array<TemplateCommand>>([]);
   const isHistoryApplyingRef = useRef(false);
@@ -1228,17 +1260,23 @@ export default function ParametricPage() {
           },
         });
 
+      previewRenderSerialRef.current += 1;
+      const renderSerial = previewRenderSerialRef.current;
+      const namespaceForPass = (pass: string) => `pv-${renderSerial}-${pass}`;
+
       if (!isSoloMode && selectedVisibleElement && isSelectedMaskEnabled) {
         const selectedIndex = visibleElements.findIndex((element) => element.id === selectedVisibleElement.id);
         const beforeElements = selectedIndex > 0 ? visibleElements.slice(0, selectedIndex) : [];
         const afterElements = selectedIndex >= 0 ? visibleElements.slice(selectedIndex + 1) : [];
 
-        const baseSvg = renderWithElements(beforeElements);
-        const selectedSvg = renderWithElements([selectedVisibleElement]);
+        const baseSvg = namespaceSvgIds(renderWithElements(beforeElements), namespaceForPass('before'));
+        const selectedSvg = namespaceSvgIds(renderWithElements([selectedVisibleElement]), namespaceForPass('selected'));
         const maskedSelectedSvg = selectedMask
-          ? applyMaskToSvgMarkup(selectedSvg, selectedMask, String(selectedVisibleElement.id ?? 'selected'))
+          ? applyMaskToSvgMarkup(selectedSvg, selectedMask, namespaceForPass(String(selectedVisibleElement.id ?? 'selected')))
           : selectedSvg;
-        const topSvg = afterElements.length > 0 ? renderWithElements(afterElements) : null;
+        const topSvg = afterElements.length > 0
+          ? namespaceSvgIds(renderWithElements(afterElements), namespaceForPass('after'))
+          : null;
 
         setSvgMarkup(baseSvg);
         setSvgOverlayMarkup(maskedSelectedSvg);
@@ -1247,11 +1285,11 @@ export default function ParametricPage() {
         const baseElements = isSoloMode && selectedVisibleElement
           ? [selectedVisibleElement]
           : visibleElements;
-        const baseSvg = renderWithElements(baseElements);
+        const baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
         setSvgMarkup(baseSvg);
 
         if (!isSoloMode && selectedVisibleElement && isDimMode) {
-          const overlaySvg = renderWithElements([selectedVisibleElement]);
+          const overlaySvg = namespaceSvgIds(renderWithElements([selectedVisibleElement]), namespaceForPass('dim'));
           setSvgOverlayMarkup(overlaySvg);
         } else {
           setSvgOverlayMarkup(null);
