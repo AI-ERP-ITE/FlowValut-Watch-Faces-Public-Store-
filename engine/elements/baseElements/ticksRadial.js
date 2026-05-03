@@ -210,7 +210,11 @@ export function renderTicksRadial(params = {}, position = {}, context = {}) {
 		const tickLength = i % majorEvery === 0 ? lengthMajor : lengthMinor;
 
 		if (isLineMode) {
-			const start = polarToCartesian(0, 0, Math.max(0, radius - tickLength), angle);
+			if (i % token.every !== 0) {
+				continue;
+			}
+			// In line mode, keep the visible tick length controlled by the Length slider.
+			const start = polarToCartesian(0, 0, Math.max(0, radius - lengthMinor), angle);
 			const end = polarToCartesian(0, 0, radius, angle);
 			svg += `<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="${p.stroke}" stroke-width="${width}" stroke-linecap="round" />`;
 			continue;
