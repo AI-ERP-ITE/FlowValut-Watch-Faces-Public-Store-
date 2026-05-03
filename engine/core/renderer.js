@@ -1228,7 +1228,10 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 
 	const defs = `<defs>${cached.filterDef}${cached.silhouetteDefs}${cached.materialDefsMarkup}</defs>`;
 
-	const worldLayer = `<g>${defs}<g${cached.filterAttr}>${cached.silhouetteBody}</g>${cached.textureOverlay}${cached.gradientOverlay}${cached.materialOverlay}</g>`;
+	const transformedOverlays = (cached.textureOverlay.length > 0 || cached.gradientOverlay.length > 0 || cached.materialOverlay.length > 0)
+		? `<g transform="translate(${x} ${y}) rotate(${rotation})">${cached.textureOverlay}${cached.gradientOverlay}${cached.materialOverlay}</g>`
+		: "";
+	const worldLayer = `<g>${defs}<g${cached.filterAttr}>${cached.silhouetteBody}</g>${transformedOverlays}</g>`;
 	LAYER_PASS_CACHE.set(cacheKey, cached);
 	return worldLayer;
 }
