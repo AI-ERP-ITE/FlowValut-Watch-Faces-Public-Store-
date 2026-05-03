@@ -1165,7 +1165,6 @@ export default function ParametricPage() {
               }) as unknown as TemplateElement['dropShadow'];
             }
             delete clone.id;
-            delete clone.name;
             delete clone.visible;
             return clone;
           }),
@@ -1203,7 +1202,6 @@ export default function ParametricPage() {
               }) as unknown as TemplateElement['dropShadow'];
             }
             delete clone.id;
-            delete clone.name;
             delete clone.visible;
             return clone;
           }),

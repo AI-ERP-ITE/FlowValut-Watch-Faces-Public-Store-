@@ -63,6 +63,87 @@ function createTemplateWithLayers() {
   };
 }
 
+function extractLayerMaskCircleRadius(svg, maskId) {
+  const escapedMaskId = maskId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`${escapedMaskId}"[^>]*>[\\s\\S]*?<circle[^>]*r="([0-9.]+)"`);
+  const match = svg.match(regex);
+  return match ? Number(match[1]) : null;
+}
+
+function createTargetNameClipTemplate(keepNames) {
+  return {
+    layout: { width: 100, height: 100, shape: 'rectangle' },
+    elements: [
+      {
+        ...(keepNames ? { name: 'targetA' } : {}),
+        type: 'circle',
+        role: 'shape',
+        params: { r: 12, fill: '#ffffff' },
+        placement: { mode: 'center', config: { offset: [-20, 0], rotation: 0 } },
+        symmetry: { mode: 'none', config: {} },
+      },
+      {
+        ...(keepNames ? { name: 'clipB' } : {}),
+        type: 'circle',
+        role: 'shape',
+        params: { r: 6, fill: '#ff0000' },
+        placement: { mode: 'center', config: { offset: [20, 0], rotation: 0 } },
+        symmetry: { mode: 'none', config: {} },
+        textureLayers: [
+          {
+            enabled: true,
+            opacity: 0.9,
+            blendMode: 'normal',
+            texture: 'none',
+            clip: { enabled: true, targetName: 'targetA' },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function createInheritPreviousClipTemplate(keepNames) {
+  return {
+    layout: { width: 100, height: 100, shape: 'rectangle' },
+    elements: [
+      {
+        ...(keepNames ? { name: 'firstA' } : {}),
+        type: 'circle',
+        role: 'shape',
+        params: { r: 14, fill: '#ffffff' },
+        placement: { mode: 'center', config: { offset: [-30, 0], rotation: 0 } },
+        symmetry: { mode: 'none', config: {} },
+      },
+      {
+        ...(keepNames ? { name: 'secondB' } : {}),
+        type: 'circle',
+        role: 'shape',
+        params: { r: 7, fill: '#00ff00' },
+        placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+        symmetry: { mode: 'none', config: {} },
+      },
+      {
+        ...(keepNames ? { name: 'thirdC' } : {}),
+        type: 'circle',
+        role: 'shape',
+        params: { r: 4, fill: '#ff0000' },
+        placement: { mode: 'center', config: { offset: [30, 0], rotation: 0 } },
+        symmetry: { mode: 'none', config: {} },
+        textureLayers: [
+          {
+            enabled: true,
+            opacity: 0.9,
+            blendMode: 'normal',
+            texture: 'none',
+            clip: { enabled: true, inheritPrevious: true },
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe('layered effects pipeline parity', () => {
   it('keeps layer arrays through geometry and compose stages', () => {
     const geometry = buildGeometry(createTemplateWithLayers());
@@ -117,5 +198,27 @@ describe('layered effects pipeline parity', () => {
       templateInput: materialOffTemplate,
     });
     expect(materialOffSvg).not.toBe(baseSvg);
+  });
+
+  it('uses named clip target when targetName is present and falls back without names', () => {
+    const withNamesSvg = runEngine({ templateInput: createTargetNameClipTemplate(true) });
+    const withoutNamesSvg = runEngine({ templateInput: createTargetNameClipTemplate(false) });
+
+    const withNamesRadius = extractLayerMaskCircleRadius(withNamesSvg, 'layerMask-el-1-0-texture-0');
+    const withoutNamesRadius = extractLayerMaskCircleRadius(withoutNamesSvg, 'layerMask-el-1-0-texture-0');
+
+    expect(withNamesRadius).toBe(12);
+    expect(withoutNamesRadius).toBe(6);
+  });
+
+  it('uses previous named element for inheritPrevious and falls back without names', () => {
+    const withNamesSvg = runEngine({ templateInput: createInheritPreviousClipTemplate(true) });
+    const withoutNamesSvg = runEngine({ templateInput: createInheritPreviousClipTemplate(false) });
+
+    const withNamesRadius = extractLayerMaskCircleRadius(withNamesSvg, 'layerMask-el-2-0-texture-0');
+    const withoutNamesRadius = extractLayerMaskCircleRadius(withoutNamesSvg, 'layerMask-el-2-0-texture-0');
+
+    expect(withNamesRadius).toBe(7);
+    expect(withoutNamesRadius).toBe(4);
   });
 });
