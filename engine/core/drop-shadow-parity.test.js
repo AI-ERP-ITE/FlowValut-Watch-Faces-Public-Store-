@@ -138,6 +138,110 @@ describe('drop shadow pipeline parity', () => {
     expect(aggressiveOpacity).toBeGreaterThan(subtleOpacity);
   });
 
+  it('supports inner and outer depth modes', () => {
+    const outerSvg = runEngine({
+      activeStyle: 'gold_dark',
+      templateInput: createTemplateWithDepthEffect({
+        enabled: true,
+        mode: 'outer',
+        intensity: 0.6,
+        opacity: 0.9,
+        angle: -35,
+        distance: 1.8,
+        falloff: 1,
+        whiteBalance: 0,
+        spread: 0.1,
+      }),
+    });
+
+    const innerSvg = runEngine({
+      activeStyle: 'gold_dark',
+      templateInput: createTemplateWithDepthEffect({
+        enabled: true,
+        mode: 'inner',
+        intensity: 0.6,
+        opacity: 0.9,
+        angle: -35,
+        distance: 1.8,
+        falloff: 1,
+        whiteBalance: 0,
+        spread: 0.1,
+      }),
+    });
+
+    expect(outerSvg).toContain('feDropShadow');
+    expect(innerSvg).toContain('depthInnerMaskA');
+    expect(innerSvg).toContain('depthInnerMaskB');
+    expect(innerSvg).not.toBe(outerSvg);
+  });
+
+  it('uses depth opacity independently from depth intensity', () => {
+    const lowOpacitySvg = runEngine({
+      activeStyle: 'gold_dark',
+      templateInput: createTemplateWithDepthEffect({
+        enabled: true,
+        mode: 'outer',
+        intensity: 0.7,
+        opacity: 0.2,
+        angle: 15,
+        distance: 2,
+        falloff: 1,
+        whiteBalance: 0,
+        spread: 0,
+      }),
+    });
+
+    const highOpacitySvg = runEngine({
+      activeStyle: 'gold_dark',
+      templateInput: createTemplateWithDepthEffect({
+        enabled: true,
+        mode: 'outer',
+        intensity: 0.7,
+        opacity: 1,
+        angle: 15,
+        distance: 2,
+        falloff: 1,
+        whiteBalance: 0,
+        spread: 0,
+      }),
+    });
+
+    const lowOpacity = extractDepthAOpacity(lowOpacitySvg);
+    const highOpacity = extractDepthAOpacity(highOpacitySvg);
+    expect(lowOpacity).not.toBeNull();
+    expect(highOpacity).not.toBeNull();
+    expect(highOpacity).toBeGreaterThan(lowOpacity);
+  });
+
+  it('supports inner and outer drop-shadow modes', () => {
+    const outer = createTemplateWithDropShadow(true);
+    outer.elements[0].dropShadow = {
+      mode: 'outer',
+      color: '#000000',
+      opacity: 0.6,
+      blur: 12,
+      offsetX: 5,
+      offsetY: 3,
+    };
+
+    const inner = createTemplateWithDropShadow(true);
+    inner.elements[0].dropShadow = {
+      mode: 'inner',
+      color: '#000000',
+      opacity: 0.6,
+      blur: 12,
+      offsetX: 5,
+      offsetY: 3,
+    };
+
+    const outerSvg = runEngine({ activeStyle: 'gold_dark', templateInput: outer });
+    const innerSvg = runEngine({ activeStyle: 'gold_dark', templateInput: inner });
+
+    expect(outerSvg).toContain('feDropShadow');
+    expect(innerSvg).toContain('dsInnerMask');
+    expect(innerSvg).not.toBe(outerSvg);
+  });
+
   it('keeps subtle and aggressive drop-shadow presets visually distinct', () => {
     const subtle = createTemplateWithDropShadow(true);
     subtle.elements[0].dropShadow = {

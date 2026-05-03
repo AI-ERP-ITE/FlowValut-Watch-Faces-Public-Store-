@@ -575,6 +575,7 @@ const RECT_LAYOUT_SHAPE_MODE_OPTIONS = [
 const FIXED_RENDER_STYLE: StyleKey = 'gold_dark';
 const DEPTH_CONTROL_LIMITS = {
   intensity: { min: 0, max: 1, step: 0.02 },
+  opacity: { min: 0, max: 1, step: 0.02 },
   angle: { min: -180, max: 180, step: 1 },
   distance: { min: 0, max: 6, step: 0.1 },
   falloff: { min: 0.2, max: 3, step: 0.02 },
@@ -3405,6 +3406,30 @@ export default function ParametricPage() {
     );
   };
 
+  const setSelectedEffect3dString = (path: string, value: string) => {
+    if (!selectedElement) return;
+    const segments = path.split('.');
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const effect3d = element.effect3d && typeof element.effect3d === 'object'
+          ? deepClone(element.effect3d) as Record<string, unknown>
+          : {};
+        let cursor: Record<string, unknown> = effect3d;
+        for (let i = 0; i < segments.length - 1; i += 1) {
+          const key = segments[i];
+          const child = cursor[key];
+          if (!child || typeof child !== 'object') {
+            cursor[key] = {};
+          }
+          cursor = cursor[key] as Record<string, unknown>;
+        }
+        cursor[segments[segments.length - 1]] = value;
+        return { ...element, effect3d: normalizeDepthEffectRecord(effect3d) };
+      }),
+    );
+  };
+
   const getSelectedEffect3dNumber = (path: string, fallback: number) => {
     if (!selectedElement) return fallback;
     const normalized = normalizeDepthEffectRecord(selectedElement.effect3d as Record<string, unknown> | undefined);
@@ -3418,6 +3443,18 @@ export default function ParametricPage() {
     return Number.isFinite(n) ? n : fallback;
   };
 
+  const getSelectedEffect3dString = (path: string, fallback: string) => {
+    if (!selectedElement) return fallback;
+    const normalized = normalizeDepthEffectRecord(selectedElement.effect3d as Record<string, unknown> | undefined);
+    const segments = path.split('.');
+    let cursor: unknown = normalized;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    return typeof cursor === 'string' ? cursor : fallback;
+  };
+
   const isSelectedEffect3dEnabled = () => {
     if (!selectedElement) return false;
     const normalized = normalizeDepthEffectRecord(selectedElement.effect3d as Record<string, unknown> | undefined);
@@ -3426,18 +3463,21 @@ export default function ParametricPage() {
 
   const normalizeDropShadowRecord = (source?: Record<string, unknown>) => {
     const safeColor = typeof source?.color === 'string' ? source.color : '#000000';
+    const safeMode = source?.mode === 'inner' ? 'inner' : 'outer';
     const safeOpacity = Number(source?.opacity);
     const safeBlur = Number(source?.blur);
     const safeOffsetX = Number(source?.offsetX);
     const safeOffsetY = Number(source?.offsetY);
 
-    return normalizeDropShadowForBake({
+    const normalized = normalizeDropShadowForBake({
       color: safeColor,
       opacity: Number.isFinite(safeOpacity) ? safeOpacity : 0.45,
       blur: Number.isFinite(safeBlur) ? safeBlur : 8,
       offsetX: Number.isFinite(safeOffsetX) ? safeOffsetX : 2,
       offsetY: Number.isFinite(safeOffsetY) ? safeOffsetY : 2,
     }) as Record<string, unknown>;
+    normalized.mode = safeMode;
+    return normalized;
   };
 
   const getSelectedDropShadowRecord = () => {
@@ -3515,6 +3555,26 @@ export default function ParametricPage() {
     );
   };
 
+  const setSelectedDropShadowString = (key: 'mode', value: string) => {
+    if (!selectedElement) return;
+    updateTemplateElements(
+      (elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedElement.id) return element;
+          const current = element.dropShadow && typeof element.dropShadow === 'object'
+            ? (element.dropShadow as Record<string, unknown>)
+            : undefined;
+          const next = normalizeDropShadowRecord(current);
+          next[key] = value;
+          return {
+            ...element,
+            dropShadow: normalizeDropShadowRecord(next),
+          };
+        }),
+      'Set element drop shadow mode',
+    );
+  };
+
   const getSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'offsetX' | 'offsetY', fallback: number) => {
     const shadow = getSelectedDropShadowRecord();
     const raw = Number(shadow[key]);
@@ -3524,6 +3584,12 @@ export default function ParametricPage() {
   const getSelectedDropShadowColor = (fallback: string) => {
     const shadow = getSelectedDropShadowRecord();
     return typeof shadow.color === 'string' ? shadow.color : fallback;
+  };
+
+  const getSelectedDropShadowString = (key: 'mode', fallback: string) => {
+    const shadow = getSelectedDropShadowRecord();
+    const raw = shadow[key];
+    return typeof raw === 'string' ? raw : fallback;
   };
 
   useEffect(() => {
@@ -3743,6 +3809,8 @@ export default function ParametricPage() {
   const selectedMaskMode = getSelectedMaskString('mode', 'brush');
   const isBrushMaskMode = selectedMaskMode === 'brush';
   const isSelectionMaskMode = selectedMaskMode === 'selection';
+  const selectedTickTokenMode = getStringParam('token.mode', 'line');
+  const tickStepApplicable = selectedTickTokenMode === 'line' || selectedTickTokenMode === 'text' || selectedTickTokenMode === 'icon';
   const selectedMaskSelectionShape = (() => {
     const shape = getSelectedMaskString('selection.shape', 'rect');
     if (shape === 'square' || shape === 'circle' || shape === 'oval' || shape === 'free') return shape;
@@ -4100,7 +4168,24 @@ export default function ParametricPage() {
           </div>
 
           {!isGlobalPanelCollapsed ? (
-            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">Mode</span>
+                <select
+                  value={(() => {
+                    const raw = workingTemplate?.effects3d && typeof workingTemplate.effects3d === 'object'
+                      ? (workingTemplate.effects3d as Record<string, unknown>).mode
+                      : undefined;
+                    return raw === 'inner' ? 'inner' : 'outer';
+                  })()}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, mode: e.target.value === 'inner' ? 'inner' : 'outer' }))}
+                  className="mt-1 h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                >
+                  <option value="outer">Emboss (Outer)</option>
+                  <option value="inner">Engrave (Inner)</option>
+                </select>
+              </label>
+
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
                 <span className="text-[11px] text-zinc-500">Angle {Math.round(getTemplateEffectNumber('angle', -35))}deg</span>
                 <input
@@ -4123,6 +4208,32 @@ export default function ParametricPage() {
                   step={DEPTH_CONTROL_LIMITS.intensity.step}
                   value={getTemplateEffectNumber('intensity', 0.46)}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
+                  className="mt-1 w-full"
+                />
+              </label>
+
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">Opacity {getTemplateEffectNumber('opacity', 0.8).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={DEPTH_CONTROL_LIMITS.opacity.min}
+                  max={DEPTH_CONTROL_LIMITS.opacity.max}
+                  step={DEPTH_CONTROL_LIMITS.opacity.step}
+                  value={getTemplateEffectNumber('opacity', 0.8)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, opacity: Number(e.target.value) }))}
+                  className="mt-1 w-full"
+                />
+              </label>
+
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">Distance {getTemplateEffectNumber('distance', 1.2).toFixed(2)}</span>
+                <input
+                  type="range"
+                  min={DEPTH_CONTROL_LIMITS.distance.min}
+                  max={DEPTH_CONTROL_LIMITS.distance.max}
+                  step={DEPTH_CONTROL_LIMITS.distance.step}
+                  value={getTemplateEffectNumber('distance', 1.2)}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, distance: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
               </label>
@@ -5765,7 +5876,7 @@ export default function ParametricPage() {
                       <label className="block space-y-1">
                         <span className="text-[11px] text-zinc-500">Mode</span>
                         <select
-                          value={getStringParam('token.mode', 'line')}
+                          value={selectedTickTokenMode}
                           onChange={(e) => setStringParam('token.mode', e.target.value)}
                           className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                         >
@@ -5775,7 +5886,21 @@ export default function ParametricPage() {
                         </select>
                       </label>
 
-                      {getStringParam('token.mode', 'line') !== 'line' ? (
+                      {tickStepApplicable ? (
+                        <label className="block space-y-1">
+                          <span className="text-[11px] text-zinc-500">Tick Step (Every N ticks)</span>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={getNumericParam('token.every', Math.max(1, getNumericParam('majorEvery', 5)))}
+                            onChange={(e) => setNumericParam('token.every', Math.max(1, Number(e.target.value)))}
+                            className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                          />
+                        </label>
+                      ) : null}
+
+                      {selectedTickTokenMode !== 'line' ? (
                         <>
                           <label className="block space-y-1">
                             <span className="text-[11px] text-zinc-500">Font Style (Library)</span>
@@ -5795,18 +5920,6 @@ export default function ParametricPage() {
                                 <option key={style.key} value={style.key}>{style.label}</option>
                               ))}
                             </select>
-                          </label>
-
-                          <label className="block space-y-1">
-                            <span className="text-[11px] text-zinc-500">Token Every N Ticks</span>
-                            <input
-                              type="number"
-                              min={1}
-                              step={1}
-                              value={getNumericParam('token.every', Math.max(1, getNumericParam('majorEvery', 5)))}
-                              onChange={(e) => setNumericParam('token.every', Math.max(1, Number(e.target.value)))}
-                              className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                            />
                           </label>
 
                           <label className="block space-y-1">
@@ -5872,7 +5985,7 @@ export default function ParametricPage() {
                             </div>
                           </label>
 
-                          {getStringParam('token.mode', 'line') === 'number' ? (
+                          {selectedTickTokenMode === 'number' ? (
                             <div className="grid grid-cols-3 gap-2">
                               <label className="block space-y-1">
                                 <span className="text-[11px] text-zinc-500">Start</span>
@@ -5906,7 +6019,7 @@ export default function ParametricPage() {
                             </div>
                           ) : null}
 
-                          {getStringParam('token.mode', 'line') === 'text' ? (
+                          {selectedTickTokenMode === 'text' ? (
                             <div className="space-y-2">
                               <label className="block space-y-1">
                                 <span className="text-[11px] text-zinc-500">Single Text Value</span>
@@ -5929,7 +6042,7 @@ export default function ParametricPage() {
                             </div>
                           ) : null}
 
-                          {getStringParam('token.mode', 'line') === 'icon' ? (
+                          {selectedTickTokenMode === 'icon' ? (
                             <div className="space-y-2">
                               <label className="block space-y-1">
                                 <span className="text-[11px] text-zinc-500">Icon Preset</span>
@@ -6198,6 +6311,18 @@ export default function ParametricPage() {
                     <>
                   <p className="text-[11px] text-zinc-500">Optional per-element light direction and depth strength.</p>
 
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Depth Mode</span>
+                    <select
+                      value={getSelectedEffect3dString('mode', 'outer') === 'inner' ? 'inner' : 'outer'}
+                      onChange={(e) => setSelectedEffect3dString('mode', e.target.value === 'inner' ? 'inner' : 'outer')}
+                      className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                    >
+                      <option value="outer">Emboss (Outer)</option>
+                      <option value="inner">Engrave (Inner)</option>
+                    </select>
+                  </label>
+
                   <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -6216,6 +6341,19 @@ export default function ParametricPage() {
                       step={DEPTH_CONTROL_LIMITS.intensity.step}
                       value={getSelectedEffect3dNumber('intensity', 0.46)}
                       onChange={(e) => setSelectedEffect3dNumber('intensity', Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </label>
+
+                  <label className="block space-y-1">
+                    <span className="text-[11px] text-zinc-500">Depth Opacity {getSelectedEffect3dNumber('opacity', 0.8).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={DEPTH_CONTROL_LIMITS.opacity.min}
+                      max={DEPTH_CONTROL_LIMITS.opacity.max}
+                      step={DEPTH_CONTROL_LIMITS.opacity.step}
+                      value={getSelectedEffect3dNumber('opacity', 0.8)}
+                      onChange={(e) => setSelectedEffect3dNumber('opacity', Number(e.target.value))}
                       className="w-full"
                     />
                   </label>
@@ -6321,6 +6459,18 @@ export default function ParametricPage() {
                           onChange={(e) => setSelectedDropShadowEnabled(e.target.checked)}
                         />
                         <span className="text-[11px] text-zinc-400">Enable drop shadow</span>
+                      </label>
+
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Shadow Mode</span>
+                        <select
+                          value={getSelectedDropShadowString('mode', 'outer') === 'inner' ? 'inner' : 'outer'}
+                          onChange={(e) => setSelectedDropShadowString('mode', e.target.value === 'inner' ? 'inner' : 'outer')}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                        >
+                          <option value="outer">Outer</option>
+                          <option value="inner">Inner</option>
+                        </select>
                       </label>
 
                       <label className="block space-y-1">

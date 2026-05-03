@@ -166,6 +166,7 @@ export interface WatchFaceElement {
 
   // Universal drop shadow (canvas preview + ZPK PNG baking for simple elements)
   dropShadow?: {
+    mode?: 'inner' | 'outer'; // inner = inset shadow, outer = normal drop shadow
     color: string;      // CSS hex e.g. '#000000'
     opacity: number;    // 0–1
     blur: number;       // px 0–40
