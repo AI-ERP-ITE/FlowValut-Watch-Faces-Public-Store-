@@ -947,16 +947,84 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementNa
 	return fallbackBody;
 }
 
-function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "") {
+function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
+	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
+	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
+	const toViewX = (value) => (clamp(value, 0, 100, 0) / 100) * width;
+	const toViewY = (value) => (clamp(value, 0, 100, 0) / 100) * height;
+	const scale = Math.max(0.0001, Math.min(width, height) / 100);
+	const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
+
+	return strokes
+		.map((entry) => {
+			if (!entry || typeof entry !== "object") return "";
+			const stroke = entry;
+			const action = stroke.action === "reveal" ? "reveal" : "hide";
+			const tone = action === "hide" ? "black" : "white";
+			const opacity = clamp(stroke.opacity, 0.04, 1, 1);
+
+			if (stroke.tool === "selection") {
+				const shape = typeof stroke.shape === "string" ? stroke.shape : "rect";
+				if (shape === "free") {
+					const points = Array.isArray(stroke.points) ? stroke.points : [];
+					if (points.length >= 3) {
+						const pointsString = points.map((point) => `${toViewX(point.x)},${toViewY(point.y)}`).join(" ");
+						return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
+					}
+				}
+
+				const x = toViewX(stroke.x);
+				const y = toViewY(stroke.y);
+				const w = (clamp(stroke.width, 0, 100, 0) / 100) * width;
+				const h = (clamp(stroke.height, 0, 100, 0) / 100) * height;
+				if (shape === "circle") {
+					return `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${Math.max(0, Math.min(w, h) / 2)}" fill="${tone}" fill-opacity="${opacity}" />`;
+				}
+				if (shape === "oval") {
+					return `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${Math.max(0, w / 2)}" ry="${Math.max(0, h / 2)}" fill="${tone}" fill-opacity="${opacity}" />`;
+				}
+				return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${tone}" fill-opacity="${opacity}" />`;
+			}
+
+			const points = Array.isArray(stroke.points) ? stroke.points : [];
+			if (points.length > 0) {
+				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
+				const pointsString = points.map((point) => `${toViewX(point.x)},${toViewY(point.y)}`).join(" ");
+				return `<polyline points="${pointsString}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
+			}
+
+			return "";
+		})
+		.join("");
+}
+
+function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
+	if (!mask || typeof mask !== "object" || mask.enabled !== true) {
+		return { defs: "", active: false };
+	}
+
+	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
+	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
+	const baseFill = mask.invert === true ? "black" : "white";
+	const primitives = buildElementMaskPrimitives(mask, layoutMetrics);
+	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${primitives}</mask>`;
+
+	return { defs, active: true };
+}
+
+function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null) {
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
+	const elementMaskId = `${maskId}-element`;
 	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect);
+	const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
+	const filterInputBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${body}</g>` : body;
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
 			def: buildTextureDefs(`${localId}-texture-${index}`, layerTexture, layoutMetrics),
 			maskId: `${maskId}-texture-${index}`,
-			maskBody: resolveClipMaskBody(layerTexture.clip, context, body, currentElementName),
+			maskBody: resolveClipMaskBody(layerTexture.clip, context, filterInputBody, currentElementName),
 		}))
 		: [];
 	const gradientDefs = Array.isArray(layerGradients)
@@ -964,14 +1032,14 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			layerGradient,
 			def: buildGradientOverlayDefs(`${localId}-gradient-${index}`, layerGradient),
 			maskId: `${maskId}-gradient-${index}`,
-			maskBody: resolveClipMaskBody(layerGradient.clip, context, body, currentElementName),
+			maskBody: resolveClipMaskBody(layerGradient.clip, context, filterInputBody, currentElementName),
 		}))
 		: [];
 	const materialDefs = Array.isArray(layerMaterials)
 		? layerMaterials.map((layerMaterial, index) => ({
 			layerMaterial,
 			maskId: `${maskId}-material-${index}`,
-			maskBody: resolveClipMaskBody(layerMaterial.clip, context, body, currentElementName),
+			maskBody: resolveClipMaskBody(layerMaterial.clip, context, filterInputBody, currentElementName),
 		}))
 		: [];
 	const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
@@ -979,7 +1047,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const gradientDefsMarkup = gradientDefs.map((entry) => entry.def.defs).join("");
 	const gradientMasksMarkup = gradientDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
 	const materialMasksMarkup = materialDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
-	const defs = `<defs>${filterDef}${textureDefsMarkup}${gradientDefsMarkup}${textureMasksMarkup}${gradientMasksMarkup}${materialMasksMarkup}</defs>`;
+	const defs = `<defs>${filterDef}${elementMaskDef.defs}${textureDefsMarkup}${gradientDefsMarkup}${textureMasksMarkup}${gradientMasksMarkup}${materialMasksMarkup}</defs>`;
 	const filterAttr = filterDef.length > 0 ? ` filter=\"url(#${filterId})\"` : "";
 
 	const textureOverlay = textureDefs
@@ -1020,7 +1088,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		})
 		.join("");
 
-	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${body}</g>${textureOverlay}${gradientOverlay}${materialOverlay}</g>`;
+	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${textureOverlay}${gradientOverlay}${materialOverlay}</g>`;
 }
 
 function renderLayoutBase(composition, context) {
@@ -1191,7 +1259,8 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			);
 			const localId = `el-${elementIndex}-${positionIndex}`;
 			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName);
+			const elementMask = safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null;
+			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask);
 		})
 		.join("");
 }
