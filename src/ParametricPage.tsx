@@ -3038,11 +3038,17 @@ export default function ParametricPage() {
         if (element.id !== selectedElement.id) return element;
         const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
         const brush = mask.brush && typeof mask.brush === 'object' ? mask.brush as Record<string, unknown> : {};
+        const hasCoordinateSpace = typeof mask.coordinateSpace === 'string';
+        const hasStrokes = Array.isArray(mask.strokes) && mask.strokes.length > 0;
+        const coordinateSpace = hasCoordinateSpace
+          ? getMaskCoordinateSpace(mask)
+          : (hasStrokes ? 'global' : 'local');
         return {
           ...element,
           mask: {
             ...mask,
             enabled,
+            coordinateSpace,
             mode: typeof mask.mode === 'string' ? mask.mode : 'brush',
             invert: mask.invert === true,
             brush: {
@@ -3185,7 +3191,14 @@ export default function ParametricPage() {
         const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
         const strokes = Array.isArray(mask.strokes) ? [...mask.strokes] : [];
         strokes.push(stroke);
-        return { ...element, mask: { ...mask, strokes } };
+        return {
+          ...element,
+          mask: {
+            ...mask,
+            coordinateSpace: 'local',
+            strokes,
+          },
+        };
       }),
     );
   };
@@ -4018,13 +4031,17 @@ export default function ParametricPage() {
         return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
       }
 
+      const coordinateSpace = getMaskCoordinateSpace(mask);
+
       const strokes = Array.isArray(mask.strokes)
         ? (mask.strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>)
         : [];
 
       return strokes.map((stroke, strokeIndex) => ({
         key: `${String(element.id ?? `layer-${elementIndex}`)}-${strokeIndex}`,
-        stroke,
+        stroke: coordinateSpace === 'local'
+          ? convertMaskStrokePoints(stroke, (point) => elementMaskLocalToCanvasPoint(point, element))
+          : stroke,
       }));
     });
   })();
@@ -4078,11 +4095,17 @@ export default function ParametricPage() {
   const hasRadiusHandle = Number.isFinite(selectedRadius);
   const radiusHandleX = hasRadiusHandle ? Math.max(0, Math.min(100, 50 + selectedRadius * 50)) : 50;
 
-  const resolveSelectedPlacementPoint = () => {
-    if (!selectedElement || !selectedElement.placement || typeof selectedElement.placement !== 'object') {
+  const getMaskCoordinateSpace = (mask: Record<string, unknown> | null | undefined): 'local' | 'global' => {
+    if (!mask || typeof mask !== 'object') return 'global';
+    const raw = typeof mask.coordinateSpace === 'string' ? mask.coordinateSpace.trim().toLowerCase() : '';
+    return raw === 'local' ? 'local' : 'global';
+  };
+
+  const resolveElementPlacementPoint = (element: TemplateElement | null | undefined) => {
+    if (!element || !element.placement || typeof element.placement !== 'object') {
       return { x: 50, y: 50, rotation: 0 };
     }
-    const placement = selectedElement.placement as { mode?: string; config?: Record<string, unknown> };
+    const placement = element.placement as { mode?: string; config?: Record<string, unknown> };
     const config = placement.config && typeof placement.config === 'object' ? placement.config : {};
     const mode = typeof placement.mode === 'string' ? placement.mode : 'center';
     const rotation = Number.isFinite(Number(config.rotation)) ? Number(config.rotation) : 0;
@@ -4129,8 +4152,8 @@ export default function ParametricPage() {
     };
   };
 
-  const selectedMaskTransform = (() => {
-    const placement = resolveSelectedPlacementPoint();
+  const resolveMaskTransformForElement = (element: TemplateElement | null | undefined) => {
+    const placement = resolveElementPlacementPoint(element);
     const layout = workingTemplate?.layout && typeof workingTemplate.layout === 'object'
       ? workingTemplate.layout
       : {};
@@ -4143,56 +4166,68 @@ export default function ParametricPage() {
       centerY: (placement.y / 100) * height,
       rotation: placement.rotation,
     };
-  })();
+  };
 
-  const canvasToSelectedMaskLocalPoint = (canvasPoint: { x: number; y: number }) => {
+  const canvasToElementMaskLocalPoint = (canvasPoint: { x: number; y: number }, element: TemplateElement | null | undefined) => {
+    const transform = resolveMaskTransformForElement(element);
     const xPct = Math.max(0, Math.min(100, Number(canvasPoint.x) || 0));
     const yPct = Math.max(0, Math.min(100, Number(canvasPoint.y) || 0));
-    const worldX = (xPct / 100) * selectedMaskTransform.width;
-    const worldY = (yPct / 100) * selectedMaskTransform.height;
-    const dx = worldX - selectedMaskTransform.centerX;
-    const dy = worldY - selectedMaskTransform.centerY;
-    const rad = (-selectedMaskTransform.rotation * Math.PI) / 180;
+    const worldX = (xPct / 100) * transform.width;
+    const worldY = (yPct / 100) * transform.height;
+    const dx = worldX - transform.centerX;
+    const dy = worldY - transform.centerY;
+    const rad = (-transform.rotation * Math.PI) / 180;
     const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
     const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
     return {
-      x: Math.max(0, Math.min(100, ((lx / selectedMaskTransform.width) * 100) + 50)),
-      y: Math.max(0, Math.min(100, ((ly / selectedMaskTransform.height) * 100) + 50)),
+      x: Math.max(0, Math.min(100, ((lx / transform.width) * 100) + 50)),
+      y: Math.max(0, Math.min(100, ((ly / transform.height) * 100) + 50)),
     };
+  };
+
+  const elementMaskLocalToCanvasPoint = (localPoint: { x: number; y: number }, element: TemplateElement | null | undefined) => {
+    const transform = resolveMaskTransformForElement(element);
+    const xPct = Math.max(0, Math.min(100, Number(localPoint.x) || 0));
+    const yPct = Math.max(0, Math.min(100, Number(localPoint.y) || 0));
+    const lx = ((xPct - 50) / 100) * transform.width;
+    const ly = ((yPct - 50) / 100) * transform.height;
+    const rad = (transform.rotation * Math.PI) / 180;
+    const wx = transform.centerX + (lx * Math.cos(rad) - ly * Math.sin(rad));
+    const wy = transform.centerY + (lx * Math.sin(rad) + ly * Math.cos(rad));
+    return {
+      x: Math.max(0, Math.min(100, (wx / transform.width) * 100)),
+      y: Math.max(0, Math.min(100, (wy / transform.height) * 100)),
+    };
+  };
+
+  const canvasToSelectedMaskLocalPoint = (canvasPoint: { x: number; y: number }) => {
+    return canvasToElementMaskLocalPoint(canvasPoint, selectedElement);
   };
 
   const selectedMaskLocalToCanvasPoint = (localPoint: { x: number; y: number }) => {
-    const xPct = Math.max(0, Math.min(100, Number(localPoint.x) || 0));
-    const yPct = Math.max(0, Math.min(100, Number(localPoint.y) || 0));
-    const lx = ((xPct - 50) / 100) * selectedMaskTransform.width;
-    const ly = ((yPct - 50) / 100) * selectedMaskTransform.height;
-    const rad = (selectedMaskTransform.rotation * Math.PI) / 180;
-    const wx = selectedMaskTransform.centerX + (lx * Math.cos(rad) - ly * Math.sin(rad));
-    const wy = selectedMaskTransform.centerY + (lx * Math.sin(rad) + ly * Math.cos(rad));
-    return {
-      x: Math.max(0, Math.min(100, (wx / selectedMaskTransform.width) * 100)),
-      y: Math.max(0, Math.min(100, (wy / selectedMaskTransform.height) * 100)),
-    };
+    return elementMaskLocalToCanvasPoint(localPoint, selectedElement);
   };
 
-  const mapMaskStrokeLocalToCanvas = (stroke: Record<string, unknown>) => {
+  const convertMaskStrokePoints = (
+    stroke: Record<string, unknown>,
+    mapPoint: (point: { x: number; y: number }) => { x: number; y: number },
+  ) => {
     const next = deepClone(stroke);
     const points = Array.isArray(next.points) ? next.points as Array<{ x: number; y: number }> : [];
     if (points.length > 0) {
-      next.points = points.map((point) => selectedMaskLocalToCanvasPoint(point));
+      next.points = points.map((point) => mapPoint({ x: Number(point.x) || 0, y: Number(point.y) || 0 }));
     }
-
     if (next.tool === 'selection') {
       const shape = typeof next.shape === 'string' ? next.shape : 'rect';
       if (shape !== 'free') {
-        const localX = Math.max(0, Math.min(100, Number(next.x) || 0));
-        const localY = Math.max(0, Math.min(100, Number(next.y) || 0));
-        const localW = Math.max(0, Math.min(100, Number(next.width) || 0));
-        const localH = Math.max(0, Math.min(100, Number(next.height) || 0));
-        const p1 = selectedMaskLocalToCanvasPoint({ x: localX, y: localY });
-        const p2 = selectedMaskLocalToCanvasPoint({ x: localX + localW, y: localY });
-        const p3 = selectedMaskLocalToCanvasPoint({ x: localX, y: localY + localH });
-        const p4 = selectedMaskLocalToCanvasPoint({ x: localX + localW, y: localY + localH });
+        const x = Math.max(0, Math.min(100, Number(next.x) || 0));
+        const y = Math.max(0, Math.min(100, Number(next.y) || 0));
+        const width = Math.max(0, Math.min(100, Number(next.width) || 0));
+        const height = Math.max(0, Math.min(100, Number(next.height) || 0));
+        const p1 = mapPoint({ x, y });
+        const p2 = mapPoint({ x: x + width, y });
+        const p3 = mapPoint({ x, y: y + height });
+        const p4 = mapPoint({ x: x + width, y: y + height });
         const xs = [p1.x, p2.x, p3.x, p4.x];
         const ys = [p1.y, p2.y, p3.y, p4.y];
         const minX = Math.max(0, Math.min(...xs));
@@ -4205,16 +4240,50 @@ export default function ParametricPage() {
         next.height = Math.max(0, maxY - minY);
       }
     }
-
     return next;
   };
 
+  const ensureSelectedMaskLocalCoordinateSpace = () => {
+    if (!selectedElement) return;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedElement.id) return element;
+        const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : null;
+        if (!mask) return element;
+        const space = getMaskCoordinateSpace(mask);
+        if (space === 'local') return element;
+        const strokes = Array.isArray(mask.strokes)
+          ? (mask.strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>)
+          : [];
+        const convertedStrokes = strokes.map((stroke) =>
+          convertMaskStrokePoints(stroke, (point) => canvasToElementMaskLocalPoint(point, element)),
+        );
+        return {
+          ...element,
+          mask: {
+            ...mask,
+            coordinateSpace: 'local',
+            strokes: convertedStrokes,
+          },
+        };
+      }),
+      'Migrate mask to local space',
+    );
+  };
+
+  const mapMaskStrokeLocalToCanvas = (stroke: Record<string, unknown>) =>
+    convertMaskStrokePoints(stroke, (point) => selectedMaskLocalToCanvasPoint(point));
+
   const selectedMaskStrokes = (() => {
     if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return [] as Array<Record<string, unknown>>;
-    const strokes = (selectedElement.mask as Record<string, unknown>).strokes;
+    const mask = selectedElement.mask as Record<string, unknown>;
+    const strokes = mask.strokes;
     if (!Array.isArray(strokes)) return [] as Array<Record<string, unknown>>;
     const base = strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>;
-    return base.map((stroke) => mapMaskStrokeLocalToCanvas(stroke));
+    const coordinateSpace = getMaskCoordinateSpace(mask);
+    return coordinateSpace === 'local'
+      ? base.map((stroke) => mapMaskStrokeLocalToCanvas(stroke))
+      : base;
   })();
 
   const finishMaskStroke = () => {
@@ -5252,6 +5321,7 @@ export default function ParametricPage() {
                           if (!showMaskCanvasEditor) return;
                           const target = event.target as HTMLElement;
                           if (target.closest('button')) return;
+                          ensureSelectedMaskLocalCoordinateSpace();
                           const rect = event.currentTarget.getBoundingClientRect();
                           if (rect.width <= 0 || rect.height <= 0) return;
                           const x = ((event.clientX - rect.left) / rect.width) * 100;

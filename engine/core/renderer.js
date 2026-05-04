@@ -934,11 +934,22 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementNa
 	return fallbackBody;
 }
 
+function resolveMaskCoordinateSpace(mask = {}) {
+	if (!mask || typeof mask !== "object") return "global";
+	const space = typeof mask.coordinateSpace === "string" ? mask.coordinateSpace.trim().toLowerCase() : "";
+	return space === "local" ? "local" : "global";
+}
+
 function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
+	const coordinateSpace = resolveMaskCoordinateSpace(mask);
+	const toGlobalX = (value) => (clamp(value, 0, 100, 0) / 100) * width;
+	const toGlobalY = (value) => (clamp(value, 0, 100, 0) / 100) * height;
 	const toLocalX = (value) => ((clamp(value, 0, 100, 50) - 50) / 100) * width;
 	const toLocalY = (value) => ((clamp(value, 0, 100, 50) - 50) / 100) * height;
+	const mapX = coordinateSpace === "local" ? toLocalX : toGlobalX;
+	const mapY = coordinateSpace === "local" ? toLocalY : toGlobalY;
 	const scale = Math.max(0.0001, Math.min(width, height) / 100);
 	const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
 
@@ -955,13 +966,13 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 				if (shape === "free") {
 					const points = Array.isArray(stroke.points) ? stroke.points : [];
 					if (points.length >= 3) {
-						const pointsString = points.map((point) => `${toLocalX(point.x)},${toLocalY(point.y)}`).join(" ");
+						const pointsString = points.map((point) => `${mapX(point.x)},${mapY(point.y)}`).join(" ");
 						return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
 					}
 				}
 
-				const x = toLocalX(stroke.x);
-				const y = toLocalY(stroke.y);
+				const x = mapX(stroke.x);
+				const y = mapY(stroke.y);
 				const w = (clamp(stroke.width, 0, 100, 0) / 100) * width;
 				const h = (clamp(stroke.height, 0, 100, 0) / 100) * height;
 				if (shape === "circle") {
@@ -976,7 +987,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 			const points = Array.isArray(stroke.points) ? stroke.points : [];
 			if (points.length > 0) {
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
-				const pointsString = points.map((point) => `${toLocalX(point.x)},${toLocalY(point.y)}`).join(" ");
+				const pointsString = points.map((point) => `${mapX(point.x)},${mapY(point.y)}`).join(" ");
 				return `<polyline points="${pointsString}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
 			}
 
@@ -1128,7 +1139,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		console.log({
 			elementId: localId,
 			elementTransform,
-			maskTransform: "local-body-space",
+			coordinateSpace: resolveMaskCoordinateSpace(elementMask || {}),
 			maskId: elementMaskId,
 		});
 	}
