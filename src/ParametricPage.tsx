@@ -335,99 +335,6 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function buildMaskPrimitives(
-  mask: Record<string, unknown>,
-  viewport: { minX: number; minY: number; width: number; height: number },
-): string {
-  const toViewX = (value: unknown) => viewport.minX + (Math.max(0, Math.min(100, Number(value) || 0)) / 100) * viewport.width;
-  const toViewY = (value: unknown) => viewport.minY + (Math.max(0, Math.min(100, Number(value) || 0)) / 100) * viewport.height;
-  const scale = Math.max(0.0001, Math.min(viewport.width, viewport.height) / 100);
-  const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
-  return strokes
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object') return '';
-      const stroke = entry as Record<string, unknown>;
-      const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
-      const tone = action === 'hide' ? 'black' : 'white';
-      const opacity = Math.max(0.04, Math.min(1, Number(stroke.opacity) || 1));
-      if (stroke.tool === 'selection') {
-        const shape = typeof stroke.shape === 'string' ? stroke.shape : 'rect';
-        if (shape === 'free') {
-          const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
-          if (points.length >= 3) {
-            const pointsString = points
-              .map((point) => `${toViewX(point.x)},${toViewY(point.y)}`)
-              .join(' ');
-            return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
-          }
-        }
-
-        const x = toViewX(stroke.x);
-        const y = toViewY(stroke.y);
-        const width = (Math.max(0, Math.min(100, Number(stroke.width) || 0)) / 100) * viewport.width;
-        const height = (Math.max(0, Math.min(100, Number(stroke.height) || 0)) / 100) * viewport.height;
-        if (shape === 'circle') {
-          return `<circle cx="${x + width / 2}" cy="${y + height / 2}" r="${Math.max(0, Math.min(width, height) / 2)}" fill="${tone}" fill-opacity="${opacity}" />`;
-        }
-        if (shape === 'oval') {
-          return `<ellipse cx="${x + width / 2}" cy="${y + height / 2}" rx="${Math.max(0, width / 2)}" ry="${Math.max(0, height / 2)}" fill="${tone}" fill-opacity="${opacity}" />`;
-        }
-        return `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${tone}" fill-opacity="${opacity}" />`;
-      }
-
-      const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
-      if (points.length > 0) {
-        const size = Math.max(0.2, (Number(stroke.size) || 16) / 5.2) * scale;
-        const pointsString = points
-          .map((point) => `${toViewX(point.x)},${toViewY(point.y)}`)
-          .join(' ');
-        return `<polyline points="${pointsString}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
-      }
-
-      return '';
-    })
-    .join('');
-}
-
-function applyMaskToSvgMarkup(svgMarkup: string, mask: Record<string, unknown>, seed: string): string {
-  const openTagMatch = svgMarkup.match(/^<svg[^>]*>/i);
-  if (!openTagMatch) return svgMarkup;
-  const closeIndex = svgMarkup.lastIndexOf('</svg>');
-  if (closeIndex <= openTagMatch[0].length) return svgMarkup;
-
-  const openTag = openTagMatch[0];
-  const inner = svgMarkup.slice(openTag.length, closeIndex);
-  const maskId = `uiMask-${seed.replace(/[^a-zA-Z0-9_-]/g, '') || 'selected'}`;
-  const baseFill = mask.invert === true ? 'black' : 'white';
-  const viewBoxMatch = openTag.match(/viewBox\s*=\s*"\s*([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s*"/i);
-  const widthMatch = openTag.match(/\swidth\s*=\s*"\s*([-+]?\d*\.?\d+)\s*"/i);
-  const heightMatch = openTag.match(/\sheight\s*=\s*"\s*([-+]?\d*\.?\d+)\s*"/i);
-  const viewport = (() => {
-    if (viewBoxMatch) {
-      const minX = Number(viewBoxMatch[1]);
-      const minY = Number(viewBoxMatch[2]);
-      const width = Number(viewBoxMatch[3]);
-      const height = Number(viewBoxMatch[4]);
-      if (Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
-        return { minX, minY, width, height };
-      }
-    }
-
-    const width = Number(widthMatch?.[1]);
-    const height = Number(heightMatch?.[1]);
-    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
-      return { minX: 0, minY: 0, width, height };
-    }
-
-    return { minX: 0, minY: 0, width: 100, height: 100 };
-  })();
-
-  const primitives = buildMaskPrimitives(mask, viewport);
-  const defs = `<defs><mask id="${maskId}" maskUnits="userSpaceOnUse" x="${viewport.minX}" y="${viewport.minY}" width="${viewport.width}" height="${viewport.height}"><rect x="${viewport.minX}" y="${viewport.minY}" width="${viewport.width}" height="${viewport.height}" fill="${baseFill}" />${primitives}</mask></defs>`;
-
-  return `${openTag}${defs}<g mask="url(#${maskId})">${inner}</g></svg>`;
-}
-
 function namespaceSvgIds(svgMarkup: string, namespaceSeed: string): string {
   if (!svgMarkup || typeof svgMarkup !== 'string') return svgMarkup;
 
@@ -1301,11 +1208,6 @@ export default function ParametricPage() {
       const selectedVisibleElement = selectedElementId
         ? visibleElements.find((element) => element.id === selectedElementId)
         : null;
-      const resolveEnabledMask = (element: TemplateElement): Record<string, unknown> | null => {
-        if (!element.mask || typeof element.mask !== 'object') return null;
-        const mask = element.mask as Record<string, unknown>;
-        return mask.enabled === true ? mask : null;
-      };
 
       const sanitizeElements = (elements: TemplateElement[]) =>
         elements.map((element) => {
@@ -1349,11 +1251,7 @@ export default function ParametricPage() {
 
       if (!isSoloMode) {
         const stackedLayers = visibleElements.map((element, index) => {
-          const baseSvg = namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
-          const mask = resolveEnabledMask(element);
-          return mask
-            ? applyMaskToSvgMarkup(baseSvg, mask, namespaceForPass(String(element.id ?? `layer-${index}`)))
-            : baseSvg;
+          return namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
         });
 
         setSvgMarkup(stackedLayers[0] ?? '');
@@ -1370,13 +1268,7 @@ export default function ParametricPage() {
         const baseElements = isSoloMode && selectedVisibleElement
           ? [selectedVisibleElement]
           : visibleElements;
-        let baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
-        if (isSoloMode && selectedVisibleElement) {
-          const mask = resolveEnabledMask(selectedVisibleElement);
-          if (mask) {
-            baseSvg = applyMaskToSvgMarkup(baseSvg, mask, namespaceForPass(String(selectedVisibleElement.id ?? 'solo')));
-          }
-        }
+        const baseSvg = namespaceSvgIds(renderWithElements(baseElements), namespaceForPass('base'));
         setSvgMarkup(baseSvg);
         setSvgOverlayLayers([]);
 
