@@ -937,8 +937,8 @@ function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementNa
 function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
-	const toViewX = (value) => (clamp(value, 0, 100, 0) / 100) * width;
-	const toViewY = (value) => (clamp(value, 0, 100, 0) / 100) * height;
+	const toLocalX = (value) => ((clamp(value, 0, 100, 50) - 50) / 100) * width;
+	const toLocalY = (value) => ((clamp(value, 0, 100, 50) - 50) / 100) * height;
 	const scale = Math.max(0.0001, Math.min(width, height) / 100);
 	const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
 
@@ -955,13 +955,13 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 				if (shape === "free") {
 					const points = Array.isArray(stroke.points) ? stroke.points : [];
 					if (points.length >= 3) {
-						const pointsString = points.map((point) => `${toViewX(point.x)},${toViewY(point.y)}`).join(" ");
+						const pointsString = points.map((point) => `${toLocalX(point.x)},${toLocalY(point.y)}`).join(" ");
 						return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
 					}
 				}
 
-				const x = toViewX(stroke.x);
-				const y = toViewY(stroke.y);
+				const x = toLocalX(stroke.x);
+				const y = toLocalY(stroke.y);
 				const w = (clamp(stroke.width, 0, 100, 0) / 100) * width;
 				const h = (clamp(stroke.height, 0, 100, 0) / 100) * height;
 				if (shape === "circle") {
@@ -976,7 +976,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 			const points = Array.isArray(stroke.points) ? stroke.points : [];
 			if (points.length > 0) {
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
-				const pointsString = points.map((point) => `${toViewX(point.x)},${toViewY(point.y)}`).join(" ");
+				const pointsString = points.map((point) => `${toLocalX(point.x)},${toLocalY(point.y)}`).join(" ");
 				return `<polyline points="${pointsString}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
 			}
 
@@ -985,7 +985,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 		.join("");
 }
 
-function buildElementMaskDef(maskId, mask = {}, layoutMetrics, maskTransform = "") {
+function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	if (!mask || typeof mask !== "object" || mask.enabled !== true) {
 		return { defs: "", active: false, primitives: "" };
 	}
@@ -994,10 +994,7 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics, maskTransform = "
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
 	const baseFill = mask.invert === true ? "black" : "white";
 	const primitives = buildElementMaskPrimitives(mask, layoutMetrics);
-	const transformedPrimitives = maskTransform
-		? `<g transform="${maskTransform}">${primitives}</g>`
-		: primitives;
-	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${transformedPrimitives}</mask>`;
+	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${primitives}</mask>`;
 
 	return { defs, active: true, primitives };
 }
@@ -1017,7 +1014,7 @@ function buildSilhouetteCacheSignature(body, elementMask, layoutMetrics) {
 	return `${width}x${height}|${body}|${maskSignature}`;
 }
 
-function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layoutMetrics, maskTransform = "", context = {}) {
+function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layoutMetrics, context = {}) {
 	const signature = buildSilhouetteCacheSignature(body, elementMask, layoutMetrics);
 	if (context && typeof context === "object") {
 		if (!context.silhouetteSurfaceCacheByLayer || typeof context.silhouetteSurfaceCacheByLayer !== "object") {
@@ -1033,7 +1030,7 @@ function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layou
 		}
 	}
 
-	const elementMaskDef = buildElementMaskDef(maskId, elementMask, layoutMetrics, maskTransform);
+	const elementMaskDef = buildElementMaskDef(maskId, elementMask, layoutMetrics);
 	const geometryPath = body;
 	const silhouettePath = elementMaskDef.active ? `<g mask="url(#${maskId})">${body}</g>` : body;
 	const silhouetteAlpha = elementMaskDef.active ? elementMaskDef.primitives : null;
@@ -1115,7 +1112,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const maskId = buildLayerMaskBaseId(localId, context);
 	const elementMaskId = `${maskId}-element`;
 	const elementTransform = `translate(${x} ${y}) rotate(${rotation})`;
-	const localSilhouette = computeLocalSilhouetteSources(localId, body, elementMaskId, elementMask, layoutMetrics, elementTransform, context);
+	const localSilhouette = computeLocalSilhouetteSources(localId, body, elementMaskId, elementMask, layoutMetrics, context);
 	const layerControllerSources = resolveLayerControllerSources(localSilhouette);
 	const filterInputBody = typeof layerControllerSources.globalLight?.body === "string" && layerControllerSources.globalLight.body.length > 0
 		? layerControllerSources.globalLight.body
@@ -1131,7 +1128,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		console.log({
 			elementId: localId,
 			elementTransform,
-			maskTransform: elementTransform,
+			maskTransform: "local-body-space",
 			maskId: elementMaskId,
 		});
 	}

@@ -4077,10 +4077,144 @@ export default function ParametricPage() {
   const selectedRadius = getNumericParam('radius', Number.NaN);
   const hasRadiusHandle = Number.isFinite(selectedRadius);
   const radiusHandleX = hasRadiusHandle ? Math.max(0, Math.min(100, 50 + selectedRadius * 50)) : 50;
+
+  const resolveSelectedPlacementPoint = () => {
+    if (!selectedElement || !selectedElement.placement || typeof selectedElement.placement !== 'object') {
+      return { x: 50, y: 50, rotation: 0 };
+    }
+    const placement = selectedElement.placement as { mode?: string; config?: Record<string, unknown> };
+    const config = placement.config && typeof placement.config === 'object' ? placement.config : {};
+    const mode = typeof placement.mode === 'string' ? placement.mode : 'center';
+    const rotation = Number.isFinite(Number(config.rotation)) ? Number(config.rotation) : 0;
+
+    if (mode === 'polar') {
+      const radius = Math.max(0, Math.min(1, Number(config.radius) || 0));
+      const angle = Number(config.angle) || 0;
+      const rad = (angle * Math.PI) / 180;
+      const r = radius * 50;
+      return {
+        x: 50 + r * Math.cos(rad),
+        y: 50 + r * Math.sin(rad),
+        rotation,
+      };
+    }
+
+    if (mode === 'anchor') {
+      const anchorKey = typeof config.anchor === 'string' ? config.anchor : 'center';
+      const anchors: Record<string, { x: number; y: number }> = {
+        center: { x: 50, y: 50 },
+        top: { x: 50, y: 0 },
+        bottom: { x: 50, y: 100 },
+        left: { x: 0, y: 50 },
+        right: { x: 100, y: 50 },
+      };
+      const anchor = anchors[anchorKey] ?? anchors.center;
+      const offset = Array.isArray(config.offset) ? config.offset : [0, 0];
+      const dx = Math.max(-50, Math.min(50, Number(offset[0]) || 0));
+      const dy = Math.max(-50, Math.min(50, Number(offset[1]) || 0));
+      return {
+        x: anchor.x + dx,
+        y: anchor.y + dy,
+        rotation,
+      };
+    }
+
+    const offset = Array.isArray(config.offset) ? config.offset : [0, 0];
+    const dx = Math.max(-50, Math.min(50, Number(offset[0]) || 0));
+    const dy = Math.max(-50, Math.min(50, Number(offset[1]) || 0));
+    return {
+      x: 50 + dx,
+      y: 50 + dy,
+      rotation,
+    };
+  };
+
+  const selectedMaskTransform = (() => {
+    const placement = resolveSelectedPlacementPoint();
+    const layout = workingTemplate?.layout && typeof workingTemplate.layout === 'object'
+      ? workingTemplate.layout
+      : {};
+    const width = Math.max(1, Number((layout as Record<string, unknown>).width) || 100);
+    const height = Math.max(1, Number((layout as Record<string, unknown>).height) || 100);
+    return {
+      width,
+      height,
+      centerX: (placement.x / 100) * width,
+      centerY: (placement.y / 100) * height,
+      rotation: placement.rotation,
+    };
+  })();
+
+  const canvasToSelectedMaskLocalPoint = (canvasPoint: { x: number; y: number }) => {
+    const xPct = Math.max(0, Math.min(100, Number(canvasPoint.x) || 0));
+    const yPct = Math.max(0, Math.min(100, Number(canvasPoint.y) || 0));
+    const worldX = (xPct / 100) * selectedMaskTransform.width;
+    const worldY = (yPct / 100) * selectedMaskTransform.height;
+    const dx = worldX - selectedMaskTransform.centerX;
+    const dy = worldY - selectedMaskTransform.centerY;
+    const rad = (-selectedMaskTransform.rotation * Math.PI) / 180;
+    const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
+    const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
+    return {
+      x: Math.max(0, Math.min(100, ((lx / selectedMaskTransform.width) * 100) + 50)),
+      y: Math.max(0, Math.min(100, ((ly / selectedMaskTransform.height) * 100) + 50)),
+    };
+  };
+
+  const selectedMaskLocalToCanvasPoint = (localPoint: { x: number; y: number }) => {
+    const xPct = Math.max(0, Math.min(100, Number(localPoint.x) || 0));
+    const yPct = Math.max(0, Math.min(100, Number(localPoint.y) || 0));
+    const lx = ((xPct - 50) / 100) * selectedMaskTransform.width;
+    const ly = ((yPct - 50) / 100) * selectedMaskTransform.height;
+    const rad = (selectedMaskTransform.rotation * Math.PI) / 180;
+    const wx = selectedMaskTransform.centerX + (lx * Math.cos(rad) - ly * Math.sin(rad));
+    const wy = selectedMaskTransform.centerY + (lx * Math.sin(rad) + ly * Math.cos(rad));
+    return {
+      x: Math.max(0, Math.min(100, (wx / selectedMaskTransform.width) * 100)),
+      y: Math.max(0, Math.min(100, (wy / selectedMaskTransform.height) * 100)),
+    };
+  };
+
+  const mapMaskStrokeLocalToCanvas = (stroke: Record<string, unknown>) => {
+    const next = deepClone(stroke);
+    const points = Array.isArray(next.points) ? next.points as Array<{ x: number; y: number }> : [];
+    if (points.length > 0) {
+      next.points = points.map((point) => selectedMaskLocalToCanvasPoint(point));
+    }
+
+    if (next.tool === 'selection') {
+      const shape = typeof next.shape === 'string' ? next.shape : 'rect';
+      if (shape !== 'free') {
+        const localX = Math.max(0, Math.min(100, Number(next.x) || 0));
+        const localY = Math.max(0, Math.min(100, Number(next.y) || 0));
+        const localW = Math.max(0, Math.min(100, Number(next.width) || 0));
+        const localH = Math.max(0, Math.min(100, Number(next.height) || 0));
+        const p1 = selectedMaskLocalToCanvasPoint({ x: localX, y: localY });
+        const p2 = selectedMaskLocalToCanvasPoint({ x: localX + localW, y: localY });
+        const p3 = selectedMaskLocalToCanvasPoint({ x: localX, y: localY + localH });
+        const p4 = selectedMaskLocalToCanvasPoint({ x: localX + localW, y: localY + localH });
+        const xs = [p1.x, p2.x, p3.x, p4.x];
+        const ys = [p1.y, p2.y, p3.y, p4.y];
+        const minX = Math.max(0, Math.min(...xs));
+        const maxX = Math.min(100, Math.max(...xs));
+        const minY = Math.max(0, Math.min(...ys));
+        const maxY = Math.min(100, Math.max(...ys));
+        next.x = minX;
+        next.y = minY;
+        next.width = Math.max(0, maxX - minX);
+        next.height = Math.max(0, maxY - minY);
+      }
+    }
+
+    return next;
+  };
+
   const selectedMaskStrokes = (() => {
     if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return [] as Array<Record<string, unknown>>;
     const strokes = (selectedElement.mask as Record<string, unknown>).strokes;
-    return Array.isArray(strokes) ? strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>> : [];
+    if (!Array.isArray(strokes)) return [] as Array<Record<string, unknown>>;
+    const base = strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>;
+    return base.map((stroke) => mapMaskStrokeLocalToCanvas(stroke));
   })();
 
   const finishMaskStroke = () => {
@@ -5122,6 +5256,7 @@ export default function ParametricPage() {
                           if (rect.width <= 0 || rect.height <= 0) return;
                           const x = ((event.clientX - rect.left) / rect.width) * 100;
                           const y = ((event.clientY - rect.top) / rect.height) * 100;
+                          const localPoint = canvasToSelectedMaskLocalPoint({ x, y });
                           setMaskCursorPoint({ x, y });
                           const maskMode = getSelectedMaskString('mode', 'brush');
                           if (maskMode === 'selection') {
@@ -5129,12 +5264,12 @@ export default function ParametricPage() {
                             setActiveMaskSelectionShape({
                               action: maskBrushAction,
                               shape,
-                              startX: x,
-                              startY: y,
-                              endX: x,
-                              endY: y,
+                              startX: localPoint.x,
+                              startY: localPoint.y,
+                              endX: localPoint.x,
+                              endY: localPoint.y,
                               opacity: getSelectedMaskNumber('brush.opacity', 1),
-                              points: shape === 'free' ? [{ x, y }] : undefined,
+                              points: shape === 'free' ? [{ x: localPoint.x, y: localPoint.y }] : undefined,
                             });
                             return;
                           }
@@ -5144,7 +5279,7 @@ export default function ParametricPage() {
                             size: getSelectedMaskNumber('brush.size', 16),
                             hardness: getSelectedMaskNumber('brush.hardness', 0.8),
                             opacity: getSelectedMaskNumber('brush.opacity', 1),
-                            points: [{ x, y }],
+                            points: [{ x: localPoint.x, y: localPoint.y }],
                           });
                         }}
                         onMouseMove={(event) => {
@@ -5152,6 +5287,7 @@ export default function ParametricPage() {
                           if (rect.width <= 0 || rect.height <= 0) return;
                           const x = ((event.clientX - rect.left) / rect.width) * 100;
                           const y = ((event.clientY - rect.top) / rect.height) * 100;
+                          const localPoint = canvasToSelectedMaskLocalPoint({ x, y });
                           if (showMaskCanvasEditor) {
                             setMaskCursorPoint({ x, y });
                           }
@@ -5207,11 +5343,11 @@ export default function ParametricPage() {
                               if (!prev) return prev;
                               const last = prev.points[prev.points.length - 1];
                               if (last) {
-                                const dx = x - last.x;
-                                const dy = y - last.y;
+                                const dx = localPoint.x - last.x;
+                                const dy = localPoint.y - last.y;
                                 if (Math.sqrt(dx * dx + dy * dy) < 0.6) return prev;
                               }
-                              return { ...prev, points: [...prev.points, { x, y }] };
+                              return { ...prev, points: [...prev.points, { x: localPoint.x, y: localPoint.y }] };
                             });
                           }
                           if (showMaskCanvasEditor && activeMaskSelectionShape) {
@@ -5221,13 +5357,13 @@ export default function ParametricPage() {
                                 const points = Array.isArray(prev.points) ? prev.points : [];
                                 const last = points[points.length - 1];
                                 if (last) {
-                                  const dx = x - last.x;
-                                  const dy = y - last.y;
+                                  const dx = localPoint.x - last.x;
+                                  const dy = localPoint.y - last.y;
                                   if (Math.sqrt(dx * dx + dy * dy) < 0.6) return prev;
                                 }
-                                return { ...prev, points: [...points, { x, y }], endX: x, endY: y };
+                                return { ...prev, points: [...points, { x: localPoint.x, y: localPoint.y }], endX: localPoint.x, endY: localPoint.y };
                               }
-                              return { ...prev, endX: x, endY: y };
+                              return { ...prev, endX: localPoint.x, endY: localPoint.y };
                             });
                           }
                         }}
@@ -5587,7 +5723,10 @@ export default function ParametricPage() {
                             })}
                             {activeMaskStroke && activeMaskStroke.points.length > 0 ? (
                               <polyline
-                                points={activeMaskStroke.points.map((point) => `${point.x},${point.y}`).join(' ')}
+                                points={activeMaskStroke.points.map((point) => {
+                                  const canvasPoint = selectedMaskLocalToCanvasPoint(point);
+                                  return `${canvasPoint.x},${canvasPoint.y}`;
+                                }).join(' ')}
                                 fill="none"
                                 stroke={activeMaskStroke.action === 'reveal' ? '#4ade80' : '#f87171'}
                                 strokeOpacity={0.95}
@@ -5627,7 +5766,10 @@ export default function ParametricPage() {
                                         {uniqueVariants.map((variant, index) => (
                                           <polyline
                                             key={`active-mask-free-line-${index}`}
-                                            points={variant.map((point) => `${point.x},${point.y}`).join(' ')}
+                                            points={variant.map((point) => {
+                                              const canvasPoint = selectedMaskLocalToCanvasPoint(point);
+                                              return `${canvasPoint.x},${canvasPoint.y}`;
+                                            }).join(' ')}
                                             fill="none"
                                             stroke={previewStroke}
                                             strokeOpacity={0.95}
@@ -5642,7 +5784,10 @@ export default function ParametricPage() {
                                       {uniqueVariants.map((variant, index) => (
                                         <polygon
                                           key={`active-mask-free-poly-${index}`}
-                                          points={variant.map((point) => `${point.x},${point.y}`).join(' ')}
+                                          points={variant.map((point) => {
+                                            const canvasPoint = selectedMaskLocalToCanvasPoint(point);
+                                            return `${canvasPoint.x},${canvasPoint.y}`;
+                                          }).join(' ')}
                                           fill={previewColor}
                                           fillOpacity={0.15}
                                           stroke={previewStroke}
@@ -5653,10 +5798,18 @@ export default function ParametricPage() {
                                     </>
                                   );
                                 }
-                                const x1 = Math.max(0, Math.min(100, activeMaskSelectionShape.startX));
-                                const y1 = Math.max(0, Math.min(100, activeMaskSelectionShape.startY));
-                                const x2 = Math.max(0, Math.min(100, activeMaskSelectionShape.endX));
-                                const y2 = Math.max(0, Math.min(100, activeMaskSelectionShape.endY));
+                                const startPoint = selectedMaskLocalToCanvasPoint({
+                                  x: activeMaskSelectionShape.startX,
+                                  y: activeMaskSelectionShape.startY,
+                                });
+                                const endPoint = selectedMaskLocalToCanvasPoint({
+                                  x: activeMaskSelectionShape.endX,
+                                  y: activeMaskSelectionShape.endY,
+                                });
+                                const x1 = Math.max(0, Math.min(100, startPoint.x));
+                                const y1 = Math.max(0, Math.min(100, startPoint.y));
+                                const x2 = Math.max(0, Math.min(100, endPoint.x));
+                                const y2 = Math.max(0, Math.min(100, endPoint.y));
                                 let minX = Math.min(x1, x2);
                                 let minY = Math.min(y1, y2);
                                 let width = Math.abs(x2 - x1);
