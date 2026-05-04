@@ -1,5 +1,12 @@
 # Tasks — Spec 074 Mask Pipeline Surgical Fix
 
+**STATUS: ✅ COMPLETED & DEPLOYED LIVE (May 4, 2026)**
+- Live bundle: `index-BMKIVjr9.js` on https://ai-erp-ite.github.io/Watch-Faces/
+- Commit: `5b69e51` on `main`
+- Tests: maskFrame 15/15, maskRegression 11/11
+- Live verification by user: PASSED for old (migrated) masks
+- ⚠️ Follow-up bug discovered for newly-created masks → see Spec 075
+
 Execution one-by-one. Each task ends with verification before next starts.
 
 ## T1 — Add shared coordinate helper
