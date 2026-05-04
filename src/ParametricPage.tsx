@@ -761,6 +761,7 @@ export default function ParametricPage() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isSoloMode, setIsSoloMode] = useState(false);
   const [isDimMode, setIsDimMode] = useState(false);
+  const [showGlobalMaskGuides, setShowGlobalMaskGuides] = useState(false);
   const [gradientHandleTarget, setGradientHandleTarget] = useState<'texture' | 'gradient'>('gradient');
   const [activeTextureLayerIndex, setActiveTextureLayerIndex] = useState(0);
   const [activeGradientLayerIndex, setActiveGradientLayerIndex] = useState(0);
@@ -1774,6 +1775,23 @@ export default function ParametricPage() {
   const getTemplateEffectEnabled = (): boolean => {
     const effects = normalizeDepthEffectRecord(workingTemplate?.effects3d as Record<string, unknown> | undefined);
     return effects.enabled === true;
+  };
+
+  const getTemplateEffectPathNumber = (path: string, fallback: number): number => {
+    const effects = normalizeDepthEffectRecord(workingTemplate?.effects3d as Record<string, unknown> | undefined);
+    const segments = path.split('.');
+    let cursor: unknown = effects;
+    for (const key of segments) {
+      if (!cursor || typeof cursor !== 'object' || !(key in cursor)) return fallback;
+      cursor = (cursor as Record<string, unknown>)[key];
+    }
+    const value = Number(cursor);
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  const getTemplateLightingMode = (): '2d' | '3d' => {
+    const effects = normalizeDepthEffectRecord(workingTemplate?.effects3d as Record<string, unknown> | undefined);
+    return effects.lightingMode === '3d' ? '3d' : '2d';
   };
 
   const syncBaseElementShapeToLayout = (shape: 'circle' | 'rectangle') => {
@@ -4086,9 +4104,36 @@ export default function ParametricPage() {
   const selectionControlWidth = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.width', 24)));
   const selectionControlHeight = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.height', 16)));
   const selectionControlDiameter = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.diameter', 18)));
-  const isDepthLightingOwnerActive = isSelectedEffect3dEnabled();
-  const isCircumferenceLightingEnabled = !isDepthLightingOwnerActive;
-  const showGlobalLightingCanvasOverlay = contextTab === 'fx' && isCircumferenceLightingEnabled;
+  const isGlobal3DLightingMode = getTemplateLightingMode() === '3d';
+  const showGlobalLightingCanvasOverlay = contextTab === 'fx' && getTemplateEffectEnabled() && !isGlobal3DLightingMode;
+  const globalMaskGuideStrokes = (() => {
+    if (!showGlobalMaskGuides || !workingTemplate || !Array.isArray(workingTemplate.elements)) {
+      return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+    }
+
+    return workingTemplate.elements.flatMap((element, elementIndex) => {
+      if (!element || typeof element !== 'object' || element.visible === false) {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+      if (!element.mask || typeof element.mask !== 'object') {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+
+      const mask = element.mask as Record<string, unknown>;
+      if (mask.enabled !== true) {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+
+      const strokes = Array.isArray(mask.strokes)
+        ? (mask.strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>)
+        : [];
+
+      return strokes.map((stroke, strokeIndex) => ({
+        key: `${String(element.id ?? `layer-${elementIndex}`)}-${strokeIndex}`,
+        stroke,
+      }));
+    });
+  })();
   const canvasMarkerLegendEntries = (() => {
     const entries: Array<{ key: string; meaning: string }> = [];
     if (showLinearGradientCanvasHandles) {
@@ -4437,6 +4482,15 @@ export default function ParametricPage() {
                 {isDimMode ? 'Dim On' : 'Dim Off'}
               </button>
 
+              <label className="flex items-center gap-2 rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={showGlobalMaskGuides}
+                  onChange={(e) => setShowGlobalMaskGuides(e.target.checked)}
+                />
+                Global mask guides
+              </label>
+
               <button
                 type="button"
                 onClick={runUndoCommand}
@@ -4488,17 +4542,10 @@ export default function ParametricPage() {
                 <input
                   type="checkbox"
                   checked={getTemplateEffectEnabled()}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, enabled: e.target.checked }))}
                 />
                 Global light
               </label>
-
-              {!isCircumferenceLightingEnabled ? (
-                <span className="rounded border border-zinc-700 bg-zinc-950/70 px-2 py-1 text-[11px] text-zinc-500">
-                  Circumference light disabled while 3D depth is enabled
-                </span>
-              ) : null}
 
               <button
                 type="button"
@@ -4518,25 +4565,46 @@ export default function ParametricPage() {
           </div>
 
           {!isGlobalPanelCollapsed ? (
-            <div
-              className={`mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4 ${isCircumferenceLightingEnabled ? '' : 'pointer-events-none opacity-45'}`}
-              aria-disabled={!isCircumferenceLightingEnabled}
-            >
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                <span className="text-[11px] text-zinc-500">Mode</span>
+                <span className="text-[11px] text-zinc-500">Lighting Space</span>
+                <select
+                  value={getTemplateLightingMode()}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({
+                    ...fx,
+                    lightingMode: e.target.value === '3d' ? '3d' : '2d',
+                    mode: e.target.value === '3d'
+                      ? ((fx.mode === 'inner' || fx.mode === 'front') ? fx.mode : 'outer')
+                      : (fx.mode === 'inner' ? 'inner' : 'outer'),
+                  }))}
+                  className="mt-1 h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                >
+                  <option value="2d">2D Circumference</option>
+                  <option value="3d">3D Depth</option>
+                </select>
+              </label>
+
+              <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                <span className="text-[11px] text-zinc-500">{isGlobal3DLightingMode ? 'Depth Mode' : 'Mode'}</span>
                 <select
                   value={(() => {
                     const raw = workingTemplate?.effects3d && typeof workingTemplate.effects3d === 'object'
                       ? (workingTemplate.effects3d as Record<string, unknown>).mode
                       : undefined;
+                    if (isGlobal3DLightingMode && raw === 'front') return 'front';
                     return raw === 'inner' ? 'inner' : 'outer';
                   })()}
-                  disabled={!isCircumferenceLightingEnabled}
-                  onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, mode: e.target.value === 'inner' ? 'inner' : 'outer' }))}
+                  onChange={(e) => updateTemplateEffects3d((fx) => ({
+                    ...fx,
+                    mode: e.target.value === 'inner'
+                      ? 'inner'
+                      : (isGlobal3DLightingMode && e.target.value === 'front' ? 'front' : 'outer'),
+                  }))}
                   className="mt-1 h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                 >
                   <option value="outer">Emboss (Outer)</option>
                   <option value="inner">Engrave (Inner)</option>
+                  {isGlobal3DLightingMode ? <option value="front">Front Rim</option> : null}
                 </select>
               </label>
 
@@ -4548,11 +4616,71 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.angle.max}
                   step={DEPTH_CONTROL_LIMITS.angle.step}
                   value={getTemplateEffectNumber('angle', -35)}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, angle: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
               </label>
+
+              {isGlobal3DLightingMode ? (
+                <>
+                  <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                    <span className="text-[11px] text-zinc-500">Light X {getTemplateEffectPathNumber('light.x', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={DEPTH_CONTROL_LIMITS.lightAxis.min}
+                      max={DEPTH_CONTROL_LIMITS.lightAxis.max}
+                      step={DEPTH_CONTROL_LIMITS.lightAxis.step}
+                      value={getTemplateEffectPathNumber('light.x', 0)}
+                      onChange={(e) => updateTemplateEffects3d((fx) => ({
+                        ...fx,
+                        light: {
+                          ...(fx.light && typeof fx.light === 'object' ? fx.light as Record<string, unknown> : {}),
+                          x: Number(e.target.value),
+                        },
+                      }))}
+                      className="mt-1 w-full"
+                    />
+                  </label>
+
+                  <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                    <span className="text-[11px] text-zinc-500">Light Y {getTemplateEffectPathNumber('light.y', 0).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={DEPTH_CONTROL_LIMITS.lightAxis.min}
+                      max={DEPTH_CONTROL_LIMITS.lightAxis.max}
+                      step={DEPTH_CONTROL_LIMITS.lightAxis.step}
+                      value={getTemplateEffectPathNumber('light.y', 0)}
+                      onChange={(e) => updateTemplateEffects3d((fx) => ({
+                        ...fx,
+                        light: {
+                          ...(fx.light && typeof fx.light === 'object' ? fx.light as Record<string, unknown> : {}),
+                          y: Number(e.target.value),
+                        },
+                      }))}
+                      className="mt-1 w-full"
+                    />
+                  </label>
+
+                  <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
+                    <span className="text-[11px] text-zinc-500">Light Z {getTemplateEffectPathNumber('light.z', 1).toFixed(2)}</span>
+                    <input
+                      type="range"
+                      min={DEPTH_CONTROL_LIMITS.lightAxisZ.min}
+                      max={DEPTH_CONTROL_LIMITS.lightAxisZ.max}
+                      step={DEPTH_CONTROL_LIMITS.lightAxisZ.step}
+                      value={getTemplateEffectPathNumber('light.z', 1)}
+                      onChange={(e) => updateTemplateEffects3d((fx) => ({
+                        ...fx,
+                        light: {
+                          ...(fx.light && typeof fx.light === 'object' ? fx.light as Record<string, unknown> : {}),
+                          z: Number(e.target.value),
+                        },
+                      }))}
+                      className="mt-1 w-full"
+                    />
+                  </label>
+                </>
+              ) : null}
 
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
                 <span className="text-[11px] text-zinc-500">Intensity {getTemplateEffectNumber('intensity', 0.46).toFixed(2)}</span>
@@ -4562,7 +4690,6 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.intensity.max}
                   step={DEPTH_CONTROL_LIMITS.intensity.step}
                   value={getTemplateEffectNumber('intensity', 0.46)}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, intensity: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4576,7 +4703,6 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.opacity.max}
                   step={DEPTH_CONTROL_LIMITS.opacity.step}
                   value={getTemplateEffectNumber('opacity', 0.8)}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, opacity: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4590,7 +4716,6 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.distance.max}
                   step={DEPTH_CONTROL_LIMITS.distance.step}
                   value={getTemplateEffectNumber('distance', 1.2)}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, distance: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4604,7 +4729,6 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.falloff.max}
                   step={DEPTH_CONTROL_LIMITS.falloff.step}
                   value={getTemplateEffectNumber('falloff', 1)}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, falloff: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4618,7 +4742,6 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.whiteBalance.max}
                   step={DEPTH_CONTROL_LIMITS.whiteBalance.step}
                   value={getTemplateEffectNumber('whiteBalance', 0)}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, whiteBalance: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4632,7 +4755,6 @@ export default function ParametricPage() {
                   max={DEPTH_CONTROL_LIMITS.spread.max}
                   step={DEPTH_CONTROL_LIMITS.spread.step}
                   value={getTemplateEffectNumber('spread', 0)}
-                  disabled={!isCircumferenceLightingEnabled}
                   onChange={(e) => updateTemplateEffects3d((fx) => ({ ...fx, spread: Number(e.target.value) }))}
                   className="mt-1 w-full"
                 />
@@ -4977,6 +5099,103 @@ export default function ParametricPage() {
                         style={isolatedPreviewLayerStyle}
                         dangerouslySetInnerHTML={{ __html: svgTopOverlayMarkup }}
                       />
+                    ) : null}
+
+                    {showGlobalMaskGuides && globalMaskGuideStrokes.length > 0 ? (
+                      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        {globalMaskGuideStrokes.map(({ key, stroke }) => {
+                          const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
+                          const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
+                          const strokeColor = action === 'reveal' ? '#22c55e' : '#ef4444';
+                          const opacity = Math.max(0.08, Math.min(1, Number(stroke.opacity) || 1)) * 0.72;
+                          if (stroke.tool === 'selection') {
+                            const shape = typeof stroke.shape === 'string' ? stroke.shape : 'rect';
+                            if (shape === 'free' && points.length >= 3) {
+                              const pointsString = points.map((point) => `${point.x},${point.y}`).join(' ');
+                              return (
+                                <polygon
+                                  key={`global-mask-free-${key}`}
+                                  points={pointsString}
+                                  fill={strokeColor}
+                                  fillOpacity={opacity * 0.2}
+                                  stroke={strokeColor}
+                                  strokeOpacity={opacity}
+                                  strokeWidth={0.42}
+                                />
+                              );
+                            }
+
+                            const x = Math.max(0, Math.min(100, Number(stroke.x) || 0));
+                            const y = Math.max(0, Math.min(100, Number(stroke.y) || 0));
+                            const width = Math.max(0, Math.min(100, Number(stroke.width) || 0));
+                            const height = Math.max(0, Math.min(100, Number(stroke.height) || 0));
+                            if (shape === 'circle') {
+                              const radius = Math.max(0, Math.min(width, height) / 2);
+                              return (
+                                <circle
+                                  key={`global-mask-circle-${key}`}
+                                  cx={x + width / 2}
+                                  cy={y + height / 2}
+                                  r={radius}
+                                  fill={strokeColor}
+                                  fillOpacity={opacity * 0.2}
+                                  stroke={strokeColor}
+                                  strokeOpacity={opacity}
+                                  strokeWidth={0.46}
+                                />
+                              );
+                            }
+
+                            if (shape === 'oval') {
+                              return (
+                                <ellipse
+                                  key={`global-mask-oval-${key}`}
+                                  cx={x + width / 2}
+                                  cy={y + height / 2}
+                                  rx={Math.max(0, width / 2)}
+                                  ry={Math.max(0, height / 2)}
+                                  fill={strokeColor}
+                                  fillOpacity={opacity * 0.2}
+                                  stroke={strokeColor}
+                                  strokeOpacity={opacity}
+                                  strokeWidth={0.46}
+                                />
+                              );
+                            }
+
+                            return (
+                              <rect
+                                key={`global-mask-rect-${key}`}
+                                x={x}
+                                y={y}
+                                width={width}
+                                height={height}
+                                fill={strokeColor}
+                                fillOpacity={opacity * 0.2}
+                                stroke={strokeColor}
+                                strokeOpacity={opacity}
+                                strokeWidth={0.46}
+                              />
+                            );
+                          }
+
+                          if (points.length === 0) return null;
+                          const pointsString = points.map((point) => `${point.x},${point.y}`).join(' ');
+                          const strokeWidth = Math.max(0.2, Number(stroke.size) / 5.2);
+                          return (
+                            <polyline
+                              key={`global-mask-stroke-${key}`}
+                              points={pointsString}
+                              fill="none"
+                              stroke={strokeColor}
+                              strokeOpacity={opacity}
+                              strokeWidth={strokeWidth}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          );
+                        })}
+                      </svg>
                     ) : null}
 
                     {showGlobalLightingCanvasOverlay ? (

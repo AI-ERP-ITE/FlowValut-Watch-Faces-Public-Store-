@@ -250,30 +250,17 @@ function buildLayoutMetrics(composition) {
 
 function buildDepthEffect(composition) {
 	const effect = composition.effects3d && typeof composition.effects3d === "object" ? composition.effects3d : {};
-	const enabled = effect.enabled === true;
-	const mode = effect.mode === "inner" ? "inner" : "outer";
-	const intensity = clamp(effect.intensity, 0, 1, 0.46);
-	const opacity = clamp(effect.opacity, 0, 1, 0.8);
-	const angleDeg = Number.isFinite(Number(effect.angle)) ? Number(effect.angle) : -35;
-	const distance = clamp(effect.distance, 0, 6, 1.2);
-	const falloff = clamp(effect.falloff, 0.2, 3, 1);
-	const whiteBalance = clamp(effect.whiteBalance, -1, 1, 0);
-	const spread = clamp(effect.spread, 0, 1, 0);
-	const radians = (angleDeg * Math.PI) / 180;
-	const dx = Math.cos(radians) * distance;
-	const dy = Math.sin(radians) * distance;
-
-	return {
-		enabled,
-		mode,
-		intensity,
-		opacity,
-		dx,
-		dy,
-		falloff,
-		whiteBalance,
-		spread,
-	};
+	return normalizeDepthEffect(effect, {
+		enabled: false,
+		mode: "outer",
+		intensity: 0.46,
+		opacity: 0.8,
+		dx: Math.cos((-35 * Math.PI) / 180) * 1.2,
+		dy: Math.sin((-35 * Math.PI) / 180) * 1.2,
+		falloff: 1,
+		whiteBalance: 0,
+		spread: 0,
+	});
 }
 
 function normalizeStyleAdjust(source = {}, fallback = {}) {
@@ -1407,21 +1394,13 @@ export function renderSvg(resolvedComposition, context = {}) {
 	const layoutMetrics = buildLayoutMetrics(composition);
 	const depthEffect = buildDepthEffect(composition);
 	const elements = Array.isArray(composition.elements) ? composition.elements : [];
-	const elementDepthOwnerEnabled = elements.some((entry) => {
-		if (!entry || typeof entry !== "object") return false;
-		const effect3d = entry.effect3d && typeof entry.effect3d === "object" ? entry.effect3d : null;
-		if (effect3d && effect3d.enabled === true) return true;
-		const params = entry.params && typeof entry.params === "object" ? entry.params : null;
-		const paramEffect3d = params && params.effect3d && typeof params.effect3d === "object" ? params.effect3d : null;
-		return !!(paramEffect3d && paramEffect3d.enabled === true);
-	});
 	let uid = 0;
 	const renderContext = {
 		...context,
 		layoutMetrics,
 		depthEffect,
 		globalControllerSources: resolveGlobalControllerSources(),
-		globalDepthEnabled: !elementDepthOwnerEnabled && depthEffect.enabled && depthEffect.intensity > 0,
+		globalDepthEnabled: depthEffect.enabled && depthEffect.intensity > 0,
 		composition,
 		layerMaskRegistry: {},
 		silhouetteSurfaceCacheByLayer: context && typeof context === "object" && context.silhouetteSurfaceCacheByLayer && typeof context.silhouetteSurfaceCacheByLayer === "object"
