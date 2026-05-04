@@ -661,6 +661,9 @@ function isLikelyRawLayoutObject(value: Record<string, unknown>): boolean {
 
 export default function ParametricPage() {
   const navigate = useNavigate();
+  const buildVersion = typeof import.meta.env.VITE_APP_BUILD_VERSION === 'string' && import.meta.env.VITE_APP_BUILD_VERSION.trim().length > 0
+    ? import.meta.env.VITE_APP_BUILD_VERSION.trim()
+    : 'dev-local';
   const [colorMode, setColorMode] = useState<ColorMode>('off');
   const [selectedPanelTarget, setSelectedPanelTarget] = useState<'layout' | 'element'>('layout');
   const [contextTab, setContextTab] = useState<'element' | 'fx' | 'texture' | 'gradient' | 'material' | 'json'>('element');
@@ -4535,6 +4538,9 @@ export default function ParametricPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-amber-300">Deterministic Engine</p>
             <h1 className="mt-2 text-2xl font-semibold">Parametric Watchface Designer</h1>
+            <p className="mt-2 inline-flex items-center rounded border border-zinc-700 bg-zinc-900/70 px-2 py-1 text-[11px] tracking-[0.08em] text-zinc-300">
+              Build {buildVersion}
+            </p>
             <p className="mt-2 text-sm text-zinc-300">
               Left: element library. Center: preview + layers. Right: tabbed control inspector.
             </p>
