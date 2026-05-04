@@ -985,7 +985,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 		.join("");
 }
 
-function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
+function buildElementMaskDef(maskId, mask = {}, layoutMetrics, maskTransform = "") {
 	if (!mask || typeof mask !== "object" || mask.enabled !== true) {
 		return { defs: "", active: false, primitives: "" };
 	}
@@ -994,7 +994,10 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
 	const baseFill = mask.invert === true ? "black" : "white";
 	const primitives = buildElementMaskPrimitives(mask, layoutMetrics);
-	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${primitives}</mask>`;
+	const transformedPrimitives = maskTransform
+		? `<g transform="${maskTransform}">${primitives}</g>`
+		: primitives;
+	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${transformedPrimitives}</mask>`;
 
 	return { defs, active: true, primitives };
 }
@@ -1014,7 +1017,7 @@ function buildSilhouetteCacheSignature(body, elementMask, layoutMetrics) {
 	return `${width}x${height}|${body}|${maskSignature}`;
 }
 
-function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layoutMetrics, context = {}) {
+function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layoutMetrics, maskTransform = "", context = {}) {
 	const signature = buildSilhouetteCacheSignature(body, elementMask, layoutMetrics);
 	if (context && typeof context === "object") {
 		if (!context.silhouetteSurfaceCacheByLayer || typeof context.silhouetteSurfaceCacheByLayer !== "object") {
@@ -1030,7 +1033,7 @@ function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layou
 		}
 	}
 
-	const elementMaskDef = buildElementMaskDef(maskId, elementMask, layoutMetrics);
+	const elementMaskDef = buildElementMaskDef(maskId, elementMask, layoutMetrics, maskTransform);
 	const geometryPath = body;
 	const silhouettePath = elementMaskDef.active ? `<g mask="url(#${maskId})">${body}</g>` : body;
 	const silhouetteAlpha = elementMaskDef.active ? elementMaskDef.primitives : null;
@@ -1052,6 +1055,21 @@ function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layou
 		cacheHit: false,
 		cacheSignature: signature,
 	};
+}
+
+function sanitizeSvgIdToken(value) {
+	const raw = typeof value === "string" ? value : "";
+	const token = raw.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+	return token.length > 0 ? token : "layer";
+}
+
+function buildLayerMaskBaseId(localId, context = {}) {
+	const safeLocalId = sanitizeSvgIdToken(localId);
+	if (context && typeof context.allocId === "function") {
+		const uniqueToken = sanitizeSvgIdToken(context.allocId("mask"));
+		return `layerMask-${safeLocalId}-${uniqueToken}`;
+	}
+	return `layerMask-${safeLocalId}`;
 }
 
 function resolveLayerControllerSources(surfaceSources) {
@@ -1094,9 +1112,10 @@ function resolveGlobalControllerSources() {
 
 function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null) {
 	const filterId = `layerFx-${localId}`;
-	const maskId = `layerMask-${localId}`;
+	const maskId = buildLayerMaskBaseId(localId, context);
 	const elementMaskId = `${maskId}-element`;
-	const localSilhouette = computeLocalSilhouetteSources(localId, body, elementMaskId, elementMask, layoutMetrics, context);
+	const elementTransform = `translate(${x} ${y}) rotate(${rotation})`;
+	const localSilhouette = computeLocalSilhouetteSources(localId, body, elementMaskId, elementMask, layoutMetrics, elementTransform, context);
 	const layerControllerSources = resolveLayerControllerSources(localSilhouette);
 	const filterInputBody = typeof layerControllerSources.globalLight?.body === "string" && layerControllerSources.globalLight.body.length > 0
 		? layerControllerSources.globalLight.body
@@ -1108,6 +1127,14 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		: filterInputBody;
 	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect);
 	const elementMaskDef = localSilhouette.elementMaskDef;
+	if (context && context.maskDebug === true && elementMaskDef.active) {
+		console.log({
+			elementId: localId,
+			elementTransform,
+			maskTransform: elementTransform,
+			maskId: elementMaskId,
+		});
+	}
 	if (context && typeof context === "object") {
 		if (!context.localSilhouetteRegistry || typeof context.localSilhouetteRegistry !== "object") {
 			context.localSilhouetteRegistry = {};
