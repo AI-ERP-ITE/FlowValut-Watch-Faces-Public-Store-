@@ -964,7 +964,9 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 			if (stroke.tool === "selection") {
 				const shape = typeof stroke.shape === "string" ? stroke.shape : "rect";
 				if (shape === "free") {
-					const points = Array.isArray(stroke.points) ? stroke.points : [];
+					const points = Array.isArray(stroke.points)
+						? stroke.points.filter((point) => point && typeof point === "object")
+						: [];
 					if (points.length >= 3) {
 						const pointsString = points.map((point) => `${mapX(point.x)},${mapY(point.y)}`).join(" ");
 						return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
@@ -984,7 +986,9 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 				return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${tone}" fill-opacity="${opacity}" />`;
 			}
 
-			const points = Array.isArray(stroke.points) ? stroke.points : [];
+			const points = Array.isArray(stroke.points)
+				? stroke.points.filter((point) => point && typeof point === "object")
+				: [];
 			if (points.length > 0) {
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
 				const pointsString = points.map((point) => `${mapX(point.x)},${mapY(point.y)}`).join(" ");
@@ -1005,6 +1009,10 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
 	const baseFill = mask.invert === true ? "black" : "white";
 	const primitives = buildElementMaskPrimitives(mask, layoutMetrics);
+	const hasPrimitives = typeof primitives === "string" && primitives.trim().length > 0;
+	if (!hasPrimitives && mask.invert !== true) {
+		return { defs: "", active: false, primitives: "" };
+	}
 	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${primitives}</mask>`;
 
 	return { defs, active: true, primitives };

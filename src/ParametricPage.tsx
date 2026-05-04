@@ -4213,7 +4213,9 @@ export default function ParametricPage() {
     mapPoint: (point: { x: number; y: number }) => { x: number; y: number },
   ) => {
     const next = deepClone(stroke);
-    const points = Array.isArray(next.points) ? next.points as Array<{ x: number; y: number }> : [];
+    const points = Array.isArray(next.points)
+      ? (next.points.filter((point) => point && typeof point === 'object') as Array<Record<string, unknown>>)
+      : [];
     if (points.length > 0) {
       next.points = points.map((point) => mapPoint({ x: Number(point.x) || 0, y: Number(point.y) || 0 }));
     }
@@ -5201,7 +5203,14 @@ export default function ParametricPage() {
                     {showGlobalMaskGuides && globalMaskGuideStrokes.length > 0 ? (
                       <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                         {globalMaskGuideStrokes.map(({ key, stroke }) => {
-                          const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
+                          const points = Array.isArray(stroke.points)
+                            ? (stroke.points
+                              .filter((point) => point && typeof point === 'object')
+                              .map((point) => ({
+                                x: Math.max(0, Math.min(100, Number((point as Record<string, unknown>).x) || 0)),
+                                y: Math.max(0, Math.min(100, Number((point as Record<string, unknown>).y) || 0)),
+                              })) as Array<{ x: number; y: number }>)
+                            : [];
                           const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
                           const strokeColor = action === 'reveal' ? '#22c55e' : '#ef4444';
                           const opacity = Math.max(0.08, Math.min(1, Number(stroke.opacity) || 1)) * 0.72;
