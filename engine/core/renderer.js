@@ -5,6 +5,7 @@ import { validateElementModel } from "../elements/elementRegistry.js";
 import { analyzeGradient, processColor } from "../color/colorController.js";
 import { resolvePlacement } from "./placement.js";
 import { applySymmetry } from "./symmetry.js";
+import { getMaskFrame, mapLocalPointToFrame } from "./maskFrame.js";
 
 const COLOR_KEYS = new Set(["fill", "stroke", "color", "stopColor", "shadowColor", "highlightColor"]);
 const GRADIENT_KEYS = new Set(["gradientStops", "stops"]);
@@ -944,14 +945,36 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
 	const coordinateSpace = resolveMaskCoordinateSpace(mask);
-	const toGlobalX = (value) => (clamp(value, 0, 100, 0) / 100) * width;
-	const toGlobalY = (value) => (clamp(value, 0, 100, 0) / 100) * height;
-	const toLocalX = (value) => ((clamp(value, 0, 100, 50) - 50) / 100) * width;
-	const toLocalY = (value) => ((clamp(value, 0, 100, 50) - 50) / 100) * height;
-	const mapX = coordinateSpace === "local" ? toLocalX : toGlobalX;
-	const mapY = coordinateSpace === "local" ? toLocalY : toGlobalY;
+	// Spec 074 T3 / E.06–E.08 / L.04: NaN-safe mapping. Returns null when the
+	// input coord is non-finite OR null/undefined — caller MUST drop the
+	// primitive (do not silently coerce to 0/50, that produces phantom marks
+	// at the origin). Note: Number(null) === 0, so the explicit null check is
+	// required even though isFinite(0) is true.
+	const finite = (value) => {
+		if (value === null || value === undefined) return null;
+		const n = Number(value);
+		return Number.isFinite(n) ? n : null;
+	};
+	// Spec 074 T4: shared origin-centered frame for the local path; legacy
+	// 'global' path is kept inline (top-left frame) until migration retires it.
+	const frame = getMaskFrame({ width, height });
+	const mapPoint = coordinateSpace === "local"
+		? (xVal, yVal) => {
+			const mapped = mapLocalPointToFrame({ x: finite(xVal), y: finite(yVal) }, frame);
+			return mapped === null ? null : { px: mapped.px, py: mapped.py };
+		}
+		: (xVal, yVal) => {
+			const fx = finite(xVal);
+			const fy = finite(yVal);
+			if (fx === null || fy === null) return null;
+			return { px: (fx / 100) * width, py: (fy / 100) * height };
+		};
 	const scale = Math.max(0.0001, Math.min(width, height) / 100);
 	const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
+
+	// Spec 074 L.11: hard cap on points per stroke (10000) to bound work.
+	const POINT_HARD_CAP = 10000;
+	const POINT_WARN_CAP = 5000;
 
 	return strokes
 		.map((entry) => {
@@ -964,19 +987,30 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 			if (stroke.tool === "selection") {
 				const shape = typeof stroke.shape === "string" ? stroke.shape : "rect";
 				if (shape === "free") {
-					const points = Array.isArray(stroke.points)
+					const rawPoints = Array.isArray(stroke.points)
 						? stroke.points.filter((point) => point && typeof point === "object")
 						: [];
-					if (points.length >= 3) {
-						const pointsString = points.map((point) => `${mapX(point.x)},${mapY(point.y)}`).join(" ");
-						return `<polygon points="${pointsString}" fill="${tone}" fill-opacity="${opacity}" />`;
+					const mapped = rawPoints
+						.map((point) => {
+							const m = mapPoint(point.x, point.y);
+							return m === null ? null : `${m.px},${m.py}`;
+						})
+						.filter((entry) => entry !== null);
+					if (mapped.length >= 3) {
+						return `<polygon points="${mapped.join(" ")}" fill="${tone}" fill-opacity="${opacity}" />`;
 					}
+					return "";
 				}
 
-				const x = mapX(stroke.x);
-				const y = mapY(stroke.y);
-				const w = (clamp(stroke.width, 0, 100, 0) / 100) * width;
-				const h = (clamp(stroke.height, 0, 100, 0) / 100) * height;
+				const corner = mapPoint(stroke.x, stroke.y);
+				const wRaw = finite(stroke.width);
+				const hRaw = finite(stroke.height);
+				if (corner === null || wRaw === null || hRaw === null) return "";
+				const x = corner.px;
+				const y = corner.py;
+				const w = (Math.max(0, Math.min(100, wRaw)) / 100) * width;
+				const h = (Math.max(0, Math.min(100, hRaw)) / 100) * height;
+				if (!(w > 0) || !(h > 0)) return "";
 				if (shape === "circle") {
 					return `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${Math.max(0, Math.min(w, h) / 2)}" fill="${tone}" fill-opacity="${opacity}" />`;
 				}
@@ -986,13 +1020,22 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 				return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${tone}" fill-opacity="${opacity}" />`;
 			}
 
-			const points = Array.isArray(stroke.points)
+			const rawPoints = Array.isArray(stroke.points)
 				? stroke.points.filter((point) => point && typeof point === "object")
 				: [];
-			if (points.length > 0) {
+			if (rawPoints.length > POINT_WARN_CAP && typeof console !== "undefined" && console.warn) {
+				console.warn(`[mask] stroke has ${rawPoints.length} points (warn cap ${POINT_WARN_CAP}); will truncate at ${POINT_HARD_CAP}.`);
+			}
+			const limited = rawPoints.length > POINT_HARD_CAP ? rawPoints.slice(0, POINT_HARD_CAP) : rawPoints;
+			const mapped = limited
+				.map((point) => {
+					const m = mapPoint(point.x, point.y);
+					return m === null ? null : `${m.px},${m.py}`;
+				})
+				.filter((entry) => entry !== null);
+			if (mapped.length > 0) {
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
-				const pointsString = points.map((point) => `${mapX(point.x)},${mapY(point.y)}`).join(" ");
-				return `<polyline points="${pointsString}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
+				return `<polyline points="${mapped.join(" ")}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
 			}
 
 			return "";
@@ -1013,9 +1056,16 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	if (!hasPrimitives && mask.invert !== true) {
 		return { defs: "", active: false, primitives: "" };
 	}
-	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${primitives}</mask>`;
+	// Spec 074 D.13/D.14/E.04/E.05: region MUST cover the body's frame.
+	// Element bodies live around the origin (origin-centered local frame), so when
+	// mask primitives are mapped in local space the region is (-W/2,-H/2)..(W,H).
+	// Legacy 'global' coordinateSpace still uses (0,0)..(W,H) until migration.
+	const coordinateSpace = resolveMaskCoordinateSpace(mask);
+	const regionX = coordinateSpace === "local" ? -width / 2 : 0;
+	const regionY = coordinateSpace === "local" ? -height / 2 : 0;
+	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="${regionX}" y="${regionY}" width="${width}" height="${height}"><rect x="${regionX}" y="${regionY}" width="${width}" height="${height}" fill="${baseFill}" />${primitives}</mask>`;
 
-	return { defs, active: true, primitives };
+	return { defs, active: true, primitives, region: { x: regionX, y: regionY, width, height }, coordinateSpace };
 }
 
 function buildSilhouetteCacheSignature(body, elementMask, layoutMetrics) {
@@ -1149,6 +1199,8 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			elementTransform,
 			coordinateSpace: resolveMaskCoordinateSpace(elementMask || {}),
 			maskId: elementMaskId,
+			region: elementMaskDef.region,
+			silhouettePathLength: typeof localSilhouette.silhouettePath === "string" ? localSilhouette.silhouettePath.length : 0,
 		});
 	}
 	if (context && typeof context === "object") {
@@ -1491,3 +1543,11 @@ export function renderSvg(resolvedComposition, context = {}) {
 	}
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layoutMetrics.width} ${layoutMetrics.height}">${content}</svg>`;
 }
+
+// Spec 074 T8: expose internals for the regression test harness only.
+// Not part of the public API; treat as testing-private.
+export const __maskInternalsForTest = {
+	buildElementMaskPrimitives,
+	buildElementMaskDef,
+	resolveMaskCoordinateSpace,
+};

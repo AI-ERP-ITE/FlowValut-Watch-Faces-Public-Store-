@@ -14,6 +14,7 @@ import {
   writeNormalizedTextureLayers,
 } from '@/lib/effects/legacyEffectNormalization';
 import { normalizeDepthEffectRecord, normalizeDropShadowForBake } from '@/lib/effectNormalization';
+import { mapCanvasPointToLocal as mapCanvasPointToLocalShared, mapLocalPointToCanvas as mapLocalPointToCanvasShared } from '@/lib/maskFrame';
 import {
   pushHistoryCommand,
   redoHistory,
@@ -4016,38 +4017,12 @@ export default function ParametricPage() {
   const selectionControlDiameter = Math.max(0.2, Math.min(100, getSelectedMaskNumber('selection.diameter', 18)));
   const isGlobal3DLightingMode = getTemplateLightingMode() === '3d';
   const showGlobalLightingCanvasOverlay = contextTab === 'fx' && getTemplateEffectEnabled() && !isGlobal3DLightingMode;
-  const globalMaskGuideStrokes = (() => {
-    if (!showGlobalMaskGuides || !workingTemplate || !Array.isArray(workingTemplate.elements)) {
-      return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
-    }
-
-    return workingTemplate.elements.flatMap((element, elementIndex) => {
-      if (!element || typeof element !== 'object' || element.visible === false) {
-        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
-      }
-      if (!element.mask || typeof element.mask !== 'object') {
-        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
-      }
-
-      const mask = element.mask as Record<string, unknown>;
-      if (mask.enabled !== true) {
-        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
-      }
-
-      const coordinateSpace = getMaskCoordinateSpace(mask);
-
-      const strokes = Array.isArray(mask.strokes)
-        ? (mask.strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>)
-        : [];
-
-      return strokes.map((stroke, strokeIndex) => ({
-        key: `${String(element.id ?? `layer-${elementIndex}`)}-${strokeIndex}`,
-        stroke: coordinateSpace === 'local'
-          ? convertMaskStrokePoints(stroke, (point) => elementMaskLocalToCanvasPoint(point, element))
-          : stroke,
-      }));
-    });
-  })();
+  // Spec 074 T5: globalMaskGuideStrokes IIFE was previously here, but it
+  // referenced helpers (getMaskCoordinateSpace, convertMaskStrokePoints,
+  // elementMaskLocalToCanvasPoint) declared later in the function body —
+  // hitting TDZ ReferenceError on every render that toggled global mask
+  // guides on. The IIFE has been moved below those helpers (search for
+  // `globalMaskGuideStrokes` further down in this file).
   const canvasMarkerLegendEntries = (() => {
     const entries: Array<{ key: string; meaning: string }> = [];
     if (showLinearGradientCanvasHandles) {
@@ -4172,35 +4147,15 @@ export default function ParametricPage() {
   };
 
   const canvasToElementMaskLocalPoint = (canvasPoint: { x: number; y: number }, element: TemplateElement | null | undefined) => {
+    // Spec 074 T4: route through shared helper (single source of truth).
     const transform = resolveMaskTransformForElement(element);
-    const xPct = Math.max(0, Math.min(100, Number(canvasPoint.x) || 0));
-    const yPct = Math.max(0, Math.min(100, Number(canvasPoint.y) || 0));
-    const worldX = (xPct / 100) * transform.width;
-    const worldY = (yPct / 100) * transform.height;
-    const dx = worldX - transform.centerX;
-    const dy = worldY - transform.centerY;
-    const rad = (-transform.rotation * Math.PI) / 180;
-    const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
-    const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
-    return {
-      x: Math.max(0, Math.min(100, ((lx / transform.width) * 100) + 50)),
-      y: Math.max(0, Math.min(100, ((ly / transform.height) * 100) + 50)),
-    };
+    return mapCanvasPointToLocalShared(canvasPoint, transform);
   };
 
   const elementMaskLocalToCanvasPoint = (localPoint: { x: number; y: number }, element: TemplateElement | null | undefined) => {
+    // Spec 074 T4: route through shared helper (single source of truth).
     const transform = resolveMaskTransformForElement(element);
-    const xPct = Math.max(0, Math.min(100, Number(localPoint.x) || 0));
-    const yPct = Math.max(0, Math.min(100, Number(localPoint.y) || 0));
-    const lx = ((xPct - 50) / 100) * transform.width;
-    const ly = ((yPct - 50) / 100) * transform.height;
-    const rad = (transform.rotation * Math.PI) / 180;
-    const wx = transform.centerX + (lx * Math.cos(rad) - ly * Math.sin(rad));
-    const wy = transform.centerY + (lx * Math.sin(rad) + ly * Math.cos(rad));
-    return {
-      x: Math.max(0, Math.min(100, (wx / transform.width) * 100)),
-      y: Math.max(0, Math.min(100, (wy / transform.height) * 100)),
-    };
+    return mapLocalPointToCanvasShared(localPoint, transform);
   };
 
   const canvasToSelectedMaskLocalPoint = (canvasPoint: { x: number; y: number }) => {
@@ -4276,8 +4231,102 @@ export default function ParametricPage() {
     );
   };
 
+  // Spec 074 T6 / K.04 / K.05 / K.08 / V.02: load-time migration. Walks every
+  // element in the working template, converts any mask whose strokes are still
+  // stored in legacy 'global' canvas-space into the canonical 'local' space.
+  // Idempotent: re-runs are no-ops once all masks are local.
+  // Logs to console.debug for audit (dev-only via Vite DCE in prod).
+  useEffect(() => {
+    if (!workingTemplate || !Array.isArray(workingTemplate.elements)) return;
+    const needsMigration = workingTemplate.elements.some((element) => {
+      if (!element || typeof element !== 'object') return false;
+      const mask = element.mask;
+      if (!mask || typeof mask !== 'object') return false;
+      if ((mask as Record<string, unknown>).enabled !== true) return false;
+      return getMaskCoordinateSpace(mask as Record<string, unknown>) !== 'local';
+    });
+    if (!needsMigration) return;
+    const migratedIds: Array<string> = [];
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (!element || typeof element !== 'object') return element;
+        const mask = element.mask && typeof element.mask === 'object'
+          ? deepClone(element.mask) as Record<string, unknown>
+          : null;
+        if (!mask) return element;
+        if (mask.enabled !== true) return element;
+        const space = getMaskCoordinateSpace(mask);
+        if (space === 'local') return element;
+        const strokes = Array.isArray(mask.strokes)
+          ? (mask.strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>)
+          : [];
+        const convertedStrokes = strokes.map((stroke) =>
+          convertMaskStrokePoints(stroke, (point) => canvasToElementMaskLocalPoint(point, element)),
+        );
+        migratedIds.push(String(element.id ?? '?'));
+        return {
+          ...element,
+          mask: {
+            ...mask,
+            coordinateSpace: 'local',
+            strokes: convertedStrokes,
+          },
+        };
+      }),
+      'Migrate masks to local space (load)',
+    );
+    if (migratedIds.length > 0 && typeof console !== 'undefined' && console.debug) {
+      console.debug('[mask] migrated to local space:', migratedIds);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workingTemplate]);
+
+  // Spec 074 T7 / B.08 / B.09: stroke abort policy. When the selected element
+  // changes or the mask edit mode is turned off, any in-progress paint stroke
+  // or selection-shape draft must be discarded so it cannot leak onto the new
+  // element / persist into a non-edit state.
+  useEffect(() => {
+    setActiveMaskStroke(null);
+    setActiveMaskSelectionShape(null);
+    setIsMaskPainting(false);
+  }, [selectedElement?.id, showMaskCanvasEditor]);
+
   const mapMaskStrokeLocalToCanvas = (stroke: Record<string, unknown>) =>
     convertMaskStrokePoints(stroke, (point) => selectedMaskLocalToCanvasPoint(point));
+
+  // Spec 074 T5: relocated below its helper dependencies to avoid TDZ.
+  const globalMaskGuideStrokes = (() => {
+    if (!showGlobalMaskGuides || !workingTemplate || !Array.isArray(workingTemplate.elements)) {
+      return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+    }
+
+    return workingTemplate.elements.flatMap((element, elementIndex) => {
+      if (!element || typeof element !== 'object' || element.visible === false) {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+      if (!element.mask || typeof element.mask !== 'object') {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+
+      const mask = element.mask as Record<string, unknown>;
+      if (mask.enabled !== true) {
+        return [] as Array<{ key: string; stroke: Record<string, unknown> }>;
+      }
+
+      const coordinateSpace = getMaskCoordinateSpace(mask);
+
+      const strokes = Array.isArray(mask.strokes)
+        ? (mask.strokes.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>)
+        : [];
+
+      return strokes.map((stroke, strokeIndex) => ({
+        key: `${String(element.id ?? `layer-${elementIndex}`)}-${strokeIndex}`,
+        stroke: coordinateSpace === 'local'
+          ? convertMaskStrokePoints(stroke, (point) => elementMaskLocalToCanvasPoint(point, element))
+          : stroke,
+      }));
+    });
+  })();
 
   const selectedMaskStrokes = (() => {
     if (!selectedElement || !selectedElement.mask || typeof selectedElement.mask !== 'object') return [] as Array<Record<string, unknown>>;
