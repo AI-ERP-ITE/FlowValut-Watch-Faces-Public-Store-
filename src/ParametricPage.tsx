@@ -464,19 +464,19 @@ const TICK_TOKEN_MODE_OPTIONS = [
   { value: 'icon', label: 'Icon' },
 ] as const;
 const TICK_ICON_OPTIONS = [
-  { value: 'dot', label: 'Dot (•)' },
-  { value: 'circle', label: 'Circle (○)' },
-  { value: 'bullet', label: 'Bullet (●)' },
-  { value: 'square', label: 'Square (■)' },
-  { value: 'diamond', label: 'Diamond (◆)' },
-  { value: 'triangle', label: 'Triangle (▲)' },
-  { value: 'star', label: 'Star (★)' },
-  { value: 'heart', label: 'Heart (❤)' },
+  { value: 'dot', label: 'Dot (â€¢)' },
+  { value: 'circle', label: 'Circle (â—‹)' },
+  { value: 'bullet', label: 'Bullet (â—)' },
+  { value: 'square', label: 'Square (â– )' },
+  { value: 'diamond', label: 'Diamond (â—†)' },
+  { value: 'triangle', label: 'Triangle (â–²)' },
+  { value: 'star', label: 'Star (â˜…)' },
+  { value: 'heart', label: 'Heart (â¤)' },
   { value: 'plus', label: 'Plus (+)' },
-  { value: 'cross', label: 'Cross (✕)' },
-  { value: 'bolt', label: 'Bolt (⚡)' },
-  { value: 'sun', label: 'Sun (☀)' },
-  { value: 'moon', label: 'Moon (☾)' },
+  { value: 'cross', label: 'Cross (âœ•)' },
+  { value: 'bolt', label: 'Bolt (âš¡)' },
+  { value: 'sun', label: 'Sun (â˜€)' },
+  { value: 'moon', label: 'Moon (â˜¾)' },
 ] as const;
 const RECT_LAYOUT_SHAPE_MODE_OPTIONS = [
   { value: 'rect', label: 'Rect (Follow Layout)' },
@@ -749,6 +749,8 @@ export default function ParametricPage() {
   const [svgOverlayLayers, setSvgOverlayLayers] = useState<string[]>([]);
   const [svgOverlayMarkup, setSvgOverlayMarkup] = useState<string | null>(null);
   const [svgTopOverlayMarkup, setSvgTopOverlayMarkup] = useState<string | null>(null);
+  const [debugExportText, setDebugExportText] = useState<string | null>(null);
+  const [debugExportCopied, setDebugExportCopied] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyTick, setHistoryTick] = useState(0);
@@ -1595,7 +1597,7 @@ export default function ParametricPage() {
 
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.textContent = '✓';
+        chip.textContent = 'âœ“';
         chip.setAttribute('data-reset-chip', 'true');
         chip.className = 'ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-800';
         chip.title = 'Reset this control';
@@ -4019,7 +4021,7 @@ export default function ParametricPage() {
   const showGlobalLightingCanvasOverlay = contextTab === 'fx' && getTemplateEffectEnabled() && !isGlobal3DLightingMode;
   // Spec 074 T5: globalMaskGuideStrokes IIFE was previously here, but it
   // referenced helpers (getMaskCoordinateSpace, convertMaskStrokePoints,
-  // elementMaskLocalToCanvasPoint) declared later in the function body —
+  // elementMaskLocalToCanvasPoint) declared later in the function body â€”
   // hitting TDZ ReferenceError on every render that toggled global mask
   // guides on. The IIFE has been moved below those helpers (search for
   // `globalMaskGuideStrokes` further down in this file).
@@ -4663,6 +4665,53 @@ export default function ParametricPage() {
                 title="Redo last template command"
               >
                 Redo
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  let lsTemplate: unknown = null;
+                  let lsTemplateRaw: string | null = null;
+                  try {
+                    lsTemplateRaw = window.localStorage.getItem(PARAMETRIC_TEMPLATE_STORAGE_KEY);
+                    if (lsTemplateRaw) lsTemplate = JSON.parse(lsTemplateRaw);
+                  } catch (err) {
+                    lsTemplate = { __error: String(err) };
+                  }
+                  const payload = {
+                    spec: '075-debug-export-v1',
+                    ts: new Date().toISOString(),
+                    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+                    href: typeof window !== 'undefined' ? window.location.href : '',
+                    selectedElementId,
+                    selectedElement: selectedElement ?? null,
+                    workingTemplate,
+                    localStorageTemplate: lsTemplate,
+                    localStorageRawLength: lsTemplateRaw ? lsTemplateRaw.length : 0,
+                    svgMarkupLength: svgMarkup ? svgMarkup.length : 0,
+                    svgOverlayLayersCount: svgOverlayLayers.length,
+                    svgMarkup,
+                    svgOverlayLayers,
+                    svgOverlayMarkup,
+                    svgTopOverlayMarkup,
+                    colorMode,
+                    isSoloMode,
+                    isDimMode,
+                  };
+                  const text = JSON.stringify(payload, null, 2);
+                  setDebugExportText(text);
+                  setDebugExportCopied(false);
+                  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    navigator.clipboard.writeText(text).then(
+                      () => setDebugExportCopied(true),
+                      () => setDebugExportCopied(false),
+                    );
+                  }
+                }}
+                className="rounded border border-amber-700 bg-amber-950/60 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-900"
+                title="Spec 075 â€” copy live template + selected element + preview SVG to clipboard for diagnosis"
+              >
+                ðŸ”§ Debug Export
               </button>
 
               {contextTab === 'gradient' ? (
@@ -6269,7 +6318,7 @@ export default function ParametricPage() {
                         className="min-w-0 flex-1 text-left"
                       >
                         <p className="truncate font-medium text-zinc-200">{element.name ?? `layer-${index + 1}`}</p>
-                        <p className="truncate text-zinc-500">{element.type} · {element.role}</p>
+                        <p className="truncate text-zinc-500">{element.type} Â· {element.role}</p>
                       </button>
 
                       <div className="flex items-center gap-1">
@@ -6286,14 +6335,14 @@ export default function ParametricPage() {
                           onClick={() => moveElement(element.id ?? '', 'up')}
                           className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
                         >
-                          ↑
+                          â†‘
                         </button>
                         <button
                           type="button"
                           onClick={() => moveElement(element.id ?? '', 'down')}
                           className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
                         >
-                          ↓
+                          â†“
                         </button>
                         <button
                           type="button"
@@ -6909,7 +6958,7 @@ export default function ParametricPage() {
                                   value={getStringParam('token.text.value', '')}
                                   onChange={(e) => setStringParam('token.text.value', e.target.value)}
                                   className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                                  placeholder="مثال"
+                                  placeholder="Ù…Ø«Ø§Ù„"
                                 />
                               </label>
                               <label className="block space-y-1">
@@ -6918,7 +6967,7 @@ export default function ParametricPage() {
                                   value={getStringParam('token.text.values', '')}
                                   onChange={(e) => setStringParam('token.text.values', e.target.value)}
                                   className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                                  placeholder="一|二|三|四 or الاثنين|الثلاثاء"
+                                  placeholder="ä¸€|äºŒ|ä¸‰|å›› or Ø§Ù„Ø§Ø«Ù†ÙŠÙ†|Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡"
                                 />
                               </label>
                             </div>
@@ -6944,7 +6993,7 @@ export default function ParametricPage() {
                                   value={getStringParam('token.icon.glyph', '')}
                                   onChange={(e) => setStringParam('token.icon.glyph', e.target.value)}
                                   className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
-                                  placeholder="★"
+                                  placeholder="â˜…"
                                 />
                               </label>
                             </div>
@@ -9054,6 +9103,52 @@ export default function ParametricPage() {
 
 
       </section>
+      {debugExportText !== null && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setDebugExportText(null)}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col gap-2 rounded border border-amber-700 bg-zinc-950 p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[12px] font-semibold text-amber-200">
+                Debug Export {debugExportCopied ? '(copied)' : '(select all + copy)'}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (debugExportText && navigator.clipboard) {
+                      navigator.clipboard.writeText(debugExportText).then(
+                        () => setDebugExportCopied(true),
+                        () => setDebugExportCopied(false),
+                      );
+                    }
+                  }}
+                  className="rounded border border-amber-700 bg-amber-950/60 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-900"
+                >
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDebugExportText(null)}
+                  className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <textarea
+              readOnly
+              value={debugExportText}
+              className="min-h-[60vh] w-full flex-1 resize-none rounded border border-zinc-800 bg-black p-2 font-mono text-[10px] text-zinc-200"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          </div>
+        </div>
+      )}
     </main>
   );
 }
