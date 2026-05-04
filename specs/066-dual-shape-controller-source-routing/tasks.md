@@ -29,4 +29,4 @@
 ## Phase E — Build, Verify, Deploy
 - [x] T014 Run `npx tsc -b`.
 - [x] T015 Run `node scripts/verify.mjs`.
-- [ ] T016 Execute deploy parity checks and push deployment artifacts.
+- [x] T016 Execute deploy parity checks and push deployment artifacts.
