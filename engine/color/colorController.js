@@ -162,24 +162,15 @@ function inForbiddenBand(rgb, min, max) {
   return (rgb.r >= min && rgb.r <= max) || (rgb.g >= min && rgb.g <= max) || (rgb.b >= min && rgb.b <= max);
 }
 
-function toNearestAllowedGrayscaleChannel(value, rule) {
-  const n = clampByte(value);
-  if (n === 0) return 0;
-  if (n < rule.min || n > rule.max) return n;
-  const toBlack = n;
-  const toSafeMin = Math.abs(rule.safeMin - n);
-  return toBlack <= toSafeMin ? 0 : rule.safeMin;
-}
-
 function applyGrayscaleExclusion(color, config) {
   const rule = config.amazfit.grayscaleExclusion;
   if (!rule.enabled) return color;
   if (isPureBlack(color)) return color;
   const rgb = hexToRgb(color);
   const next = {
-    r: toNearestAllowedGrayscaleChannel(rgb.r, rule),
-    g: toNearestAllowedGrayscaleChannel(rgb.g, rule),
-    b: toNearestAllowedGrayscaleChannel(rgb.b, rule),
+    r: rgb.r >= rule.min && rgb.r <= rule.max ? rule.safeMin : rgb.r,
+    g: rgb.g >= rule.min && rgb.g <= rule.max ? rule.safeMin : rgb.g,
+    b: rgb.b >= rule.min && rgb.b <= rule.max ? rule.safeMin : rgb.b,
   };
   return rgbToHex(next);
 }

@@ -61,7 +61,6 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 				...(element.params || {}),
 				...roleOverrides,
 			},
-			mask: element.mask && typeof element.mask === "object" ? { ...element.mask } : null,
 			material: element.material && typeof element.material === "object" ? { ...element.material } : null,
 			texture: element.texture && typeof element.texture === "object" ? { ...element.texture } : null,
 			gradient: element.gradient && typeof element.gradient === "object" ? { ...element.gradient } : null,

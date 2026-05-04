@@ -41,7 +41,6 @@ export function buildGeometry(template) {
 			visible: safeElement.visible,
 			materialRef: safeElement.materialRef,
 			params: { ...safeElement.params },
-			mask: safeElement.mask && typeof safeElement.mask === "object" ? { ...safeElement.mask } : null,
 			material: safeElement.material && typeof safeElement.material === "object" ? { ...safeElement.material } : null,
 			texture: safeElement.texture && typeof safeElement.texture === "object" ? { ...safeElement.texture } : null,
 			gradient: safeElement.gradient && typeof safeElement.gradient === "object" ? { ...safeElement.gradient } : null,
