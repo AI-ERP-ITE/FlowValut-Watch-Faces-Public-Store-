@@ -234,10 +234,23 @@ export interface AppearanceInherit {
 
 export type AppearanceEntry = AppearanceItem | AppearanceInherit;
 
+// ─── Decomposition (optional compiler payload helper) ───────────────────────
+
+export interface DecompositionEntry {
+  id: string;
+  basePrimitiveIntent: string;
+  materialClass: string;
+  textureRecipe?: Record<string, unknown>;
+  depthRecipe?: Record<string, unknown>;
+  colorRoleSet?: Record<string, unknown>;
+  compositionRecipe?: Record<string, unknown>;
+}
+
 // ─── Envelope ─────────────────────────────────────────────────────────────────
 
 export interface VisualEnvelope {
   inventory: InventoryDoc;
+  decomposition?: DecompositionEntry[];
   geometry: GeometryEntry[];
   appearance: AppearanceEntry[];
 }

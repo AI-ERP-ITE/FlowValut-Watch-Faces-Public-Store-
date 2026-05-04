@@ -1000,7 +1000,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 
 function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	if (!mask || typeof mask !== "object" || mask.enabled !== true) {
-		return { defs: "", active: false };
+		return { defs: "", active: false, primitives: "" };
 	}
 
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
@@ -1009,22 +1009,159 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	const primitives = buildElementMaskPrimitives(mask, layoutMetrics);
 	const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}"><rect x="0" y="0" width="${width}" height="${height}" fill="${baseFill}" />${primitives}</mask>`;
 
-	return { defs, active: true };
+	return { defs, active: true, primitives };
+}
+
+function buildSilhouetteCacheSignature(body, elementMask, layoutMetrics) {
+	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
+	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
+	let maskSignature = "null";
+	if (elementMask && typeof elementMask === "object") {
+		try {
+			maskSignature = JSON.stringify(elementMask);
+		} catch (_error) {
+			maskSignature = "unserializable-mask";
+		}
+	}
+
+	return `${width}x${height}|${body}|${maskSignature}`;
+}
+
+function computeLocalSilhouetteSources(localId, body, maskId, elementMask, layoutMetrics, context = {}) {
+	const signature = buildSilhouetteCacheSignature(body, elementMask, layoutMetrics);
+	if (context && typeof context === "object") {
+		if (!context.silhouetteSurfaceCacheByLayer || typeof context.silhouetteSurfaceCacheByLayer !== "object") {
+			context.silhouetteSurfaceCacheByLayer = {};
+		}
+		const cached = context.silhouetteSurfaceCacheByLayer[localId];
+		if (cached && cached.signature === signature && cached.value && typeof cached.value === "object") {
+			return {
+				...cached.value,
+				cacheHit: true,
+				cacheSignature: signature,
+			};
+		}
+	}
+
+	const elementMaskDef = buildElementMaskDef(maskId, elementMask, layoutMetrics);
+	const geometryPath = body;
+	const silhouettePath = elementMaskDef.active ? `<g mask="url(#${maskId})">${body}</g>` : body;
+	const silhouetteAlpha = elementMaskDef.active ? elementMaskDef.primitives : null;
+	const value = {
+		geometryPath,
+		silhouettePath,
+		silhouetteAlpha,
+		elementMaskDef,
+	};
+	if (context && typeof context === "object") {
+		context.silhouetteSurfaceCacheByLayer[localId] = {
+			signature,
+			value,
+		};
+	}
+
+	return {
+		...value,
+		cacheHit: false,
+		cacheSignature: signature,
+	};
+}
+
+function resolveLayerControllerSources(surfaceSources) {
+	const sources = surfaceSources && typeof surfaceSources === "object" ? surfaceSources : {};
+	const geometryBody = typeof sources.geometryPath === "string" ? sources.geometryPath : "";
+	const silhouetteBody = typeof sources.silhouettePath === "string" && sources.silhouettePath.length > 0
+		? sources.silhouettePath
+		: geometryBody;
+	return {
+		styleFx: {
+			source: "silhouettePath",
+			body: silhouetteBody,
+		},
+		depthFx: {
+			source: "silhouettePath",
+			body: silhouetteBody,
+		},
+		dropShadow: {
+			source: "silhouettePath",
+			body: silhouetteBody,
+		},
+		globalLight: {
+			source: "silhouettePath",
+			body: silhouetteBody,
+		},
+		uvLocal: {
+			source: "geometryPath",
+			body: geometryBody,
+		},
+	};
+}
+
+function resolveGlobalControllerSources() {
+	return {
+		postCompositeGrading: {
+			source: "postComposite",
+		},
+	};
 }
 
 function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null) {
 	const filterId = `layerFx-${localId}`;
 	const maskId = `layerMask-${localId}`;
 	const elementMaskId = `${maskId}-element`;
+	const localSilhouette = computeLocalSilhouetteSources(localId, body, elementMaskId, elementMask, layoutMetrics, context);
+	const layerControllerSources = resolveLayerControllerSources(localSilhouette);
+	const filterInputBody = typeof layerControllerSources.globalLight?.body === "string" && layerControllerSources.globalLight.body.length > 0
+		? layerControllerSources.globalLight.body
+		: (typeof layerControllerSources.depthFx?.body === "string" && layerControllerSources.depthFx.body.length > 0
+			? layerControllerSources.depthFx.body
+			: layerControllerSources.styleFx.body);
+	const localUvInputBody = typeof layerControllerSources.uvLocal?.body === "string" && layerControllerSources.uvLocal.body.length > 0
+		? layerControllerSources.uvLocal.body
+		: filterInputBody;
 	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect);
-	const elementMaskDef = buildElementMaskDef(elementMaskId, elementMask, layoutMetrics);
-	const filterInputBody = elementMaskDef.active ? `<g mask="url(#${elementMaskId})">${body}</g>` : body;
+	const elementMaskDef = localSilhouette.elementMaskDef;
+	if (context && typeof context === "object") {
+		if (!context.localSilhouetteRegistry || typeof context.localSilhouetteRegistry !== "object") {
+			context.localSilhouetteRegistry = {};
+		}
+		const surfaceSources = {
+			geometryPath: localSilhouette.geometryPath,
+			silhouettePath: localSilhouette.silhouettePath,
+			silhouetteAlpha: localSilhouette.silhouetteAlpha,
+		};
+		context.localSilhouetteRegistry[localId] = surfaceSources;
+		if (!context.renderSurfaceSourcesByLayer || typeof context.renderSurfaceSourcesByLayer !== "object") {
+			context.renderSurfaceSourcesByLayer = {};
+		}
+		context.renderSurfaceSourcesByLayer[localId] = surfaceSources;
+		if (!context.renderSurfaceSourceDebugByLayer || typeof context.renderSurfaceSourceDebugByLayer !== "object") {
+			context.renderSurfaceSourceDebugByLayer = {};
+		}
+		context.renderSurfaceSourceDebugByLayer[localId] = {
+			cacheHit: localSilhouette.cacheHit === true,
+			cacheSignature: localSilhouette.cacheSignature,
+			controllerSources: {
+				styleFx: layerControllerSources.styleFx.source,
+				depthFx: layerControllerSources.depthFx.source,
+				dropShadow: layerControllerSources.dropShadow.source,
+				globalLight: layerControllerSources.globalLight.source,
+				uvLocal: layerControllerSources.uvLocal.source,
+			},
+		};
+		if (typeof currentElementName === "string" && currentElementName.trim().length > 0) {
+			if (!context.renderSurfaceSourcesByName || typeof context.renderSurfaceSourcesByName !== "object") {
+				context.renderSurfaceSourcesByName = {};
+			}
+			context.renderSurfaceSourcesByName[currentElementName.trim()] = surfaceSources;
+		};
+	}
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
 			def: buildTextureDefs(`${localId}-texture-${index}`, layerTexture, layoutMetrics),
 			maskId: `${maskId}-texture-${index}`,
-			maskBody: resolveClipMaskBody(layerTexture.clip, context, filterInputBody, currentElementName),
+			maskBody: resolveClipMaskBody(layerTexture.clip, context, localUvInputBody, currentElementName),
 		}))
 		: [];
 	const gradientDefs = Array.isArray(layerGradients)
@@ -1032,14 +1169,14 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			layerGradient,
 			def: buildGradientOverlayDefs(`${localId}-gradient-${index}`, layerGradient),
 			maskId: `${maskId}-gradient-${index}`,
-			maskBody: resolveClipMaskBody(layerGradient.clip, context, filterInputBody, currentElementName),
+			maskBody: resolveClipMaskBody(layerGradient.clip, context, localUvInputBody, currentElementName),
 		}))
 		: [];
 	const materialDefs = Array.isArray(layerMaterials)
 		? layerMaterials.map((layerMaterial, index) => ({
 			layerMaterial,
 			maskId: `${maskId}-material-${index}`,
-			maskBody: resolveClipMaskBody(layerMaterial.clip, context, filterInputBody, currentElementName),
+			maskBody: resolveClipMaskBody(layerMaterial.clip, context, localUvInputBody, currentElementName),
 		}))
 		: [];
 	const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
@@ -1283,9 +1420,16 @@ export function renderSvg(resolvedComposition, context = {}) {
 		...context,
 		layoutMetrics,
 		depthEffect,
+		globalControllerSources: resolveGlobalControllerSources(),
 		globalDepthEnabled: !elementDepthOwnerEnabled && depthEffect.enabled && depthEffect.intensity > 0,
 		composition,
 		layerMaskRegistry: {},
+		silhouetteSurfaceCacheByLayer: context && typeof context === "object" && context.silhouetteSurfaceCacheByLayer && typeof context.silhouetteSurfaceCacheByLayer === "object"
+			? context.silhouetteSurfaceCacheByLayer
+			: {},
+		renderSurfaceSourcesByLayer: {},
+		renderSurfaceSourcesByName: {},
+		renderSurfaceSourceDebugByLayer: {},
 		previousElementName: "",
 		allocId(prefix = "id") {
 			uid += 1;
@@ -1306,6 +1450,15 @@ export function renderSvg(resolvedComposition, context = {}) {
 	const globalDepthDef = renderContext.globalDepthEnabled
 		? buildLayerFilterDef(globalDepthId, { enabled: false, contrast: 1, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0, color: null }, depthEffect)
 		: "";
+	if (context && typeof context === "object") {
+		context.silhouetteSurfaceCacheByLayer = renderContext.silhouetteSurfaceCacheByLayer;
+		context.renderSurfaceSourcesByLayer = renderContext.renderSurfaceSourcesByLayer;
+		context.renderSurfaceSourcesByName = renderContext.renderSurfaceSourcesByName;
+		context.renderSurfaceSourceDebugByLayer = renderContext.renderSurfaceSourceDebugByLayer;
+		context.renderPipelineSourceDebug = {
+			globalControllerSources: renderContext.globalControllerSources,
+		};
+	}
 	const content = `${baseLayer}${body}`;
 	if (globalDepthDef.length > 0) {
 		return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layoutMetrics.width} ${layoutMetrics.height}"><defs>${globalDepthDef}</defs><g filter="url(#${globalDepthId})">${content}</g></svg>`;

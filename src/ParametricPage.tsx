@@ -19,7 +19,7 @@ import {
   redoHistory,
   undoHistory,
   type HistoryCommand,
-} from '@/lib/history/commandHistory';
+} from '@/lib/history/commandHistory.ts';
 
 type StyleKey = 'gold_dark' | 'steel_night';
 type ColorMode = 'off' | 'warning' | 'enforce';
@@ -7152,7 +7152,7 @@ export default function ParametricPage() {
                         className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                       >
                         {getSelectedTextureLayers().length === 0 ? <option value={0}>No layer</option> : null}
-                        {getSelectedTextureLayers().map((_layer, index) => (
+                        {getSelectedTextureLayers().map((_layer: Record<string, unknown>, index: number) => (
                           <option key={`texture-layer-${index}`} value={index}>Layer {index + 1}</option>
                         ))}
                       </select>
@@ -7816,7 +7816,7 @@ export default function ParametricPage() {
                         className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                       >
                         {getSelectedGradientLayers().length === 0 ? <option value={0}>No layer</option> : null}
-                        {getSelectedGradientLayers().map((_layer, index) => (
+                        {getSelectedGradientLayers().map((_layer: Record<string, unknown>, index: number) => (
                           <option key={`gradient-layer-${index}`} value={index}>Layer {index + 1}</option>
                         ))}
                       </select>
@@ -8240,7 +8240,7 @@ export default function ParametricPage() {
                         className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                       >
                         {getSelectedMaterialLayers().length === 0 ? <option value={0}>No layer</option> : null}
-                        {getSelectedMaterialLayers().map((_layer, index) => (
+                        {getSelectedMaterialLayers().map((_layer: Record<string, unknown>, index: number) => (
                           <option key={`material-layer-${index}`} value={index}>Layer {index + 1}</option>
                         ))}
                       </select>
