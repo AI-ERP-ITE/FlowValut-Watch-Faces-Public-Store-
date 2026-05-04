@@ -1211,8 +1211,12 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"${layerMaterial.color}\" opacity=\"${layerMaterial.opacity.toFixed(3)}\" mask=\"url(#${materialMaskId})\" style=\"mix-blend-mode:${layerMaterial.blendMode};\" />`;
 		})
 		.join("");
+	const overlayMarkup = `${textureOverlay}${gradientOverlay}${materialOverlay}`;
+	const visibleOverlayMarkup = elementMaskDef.active && overlayMarkup.length > 0
+		? `<g mask=\"url(#${elementMaskId})\">${overlayMarkup}</g>`
+		: overlayMarkup;
 
-	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${textureOverlay}${gradientOverlay}${materialOverlay}</g>`;
+	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${visibleOverlayMarkup}</g>`;
 }
 
 function renderLayoutBase(composition, context) {
