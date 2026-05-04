@@ -47,6 +47,7 @@ export function buildGeometry(template) {
 			materialLayers: cloneEffectLayers(safeElement.materialLayers),
 			textureLayers: cloneEffectLayers(safeElement.textureLayers),
 			gradientLayers: cloneEffectLayers(safeElement.gradientLayers),
+			mask: safeElement.mask,
 			dropShadow: safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? { ...safeElement.dropShadow } : null,
 			styleAdjust: safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? { ...safeElement.styleAdjust } : null,
 			effect3d: safeElement.effect3d && typeof safeElement.effect3d === "object" ? { ...safeElement.effect3d } : null,

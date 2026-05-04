@@ -67,6 +67,7 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			materialLayers: cloneEffectLayers(element.materialLayers),
 			textureLayers: cloneEffectLayers(element.textureLayers),
 			gradientLayers: cloneEffectLayers(element.gradientLayers),
+			mask: element.mask,
 			dropShadow: element.dropShadow && typeof element.dropShadow === "object" ? { ...element.dropShadow } : null,
 			styleAdjust: element.styleAdjust && typeof element.styleAdjust === "object" ? { ...element.styleAdjust } : null,
 			effect3d: element.effect3d && typeof element.effect3d === "object" ? { ...element.effect3d } : null,
