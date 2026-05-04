@@ -1749,7 +1749,9 @@ export default function ParametricPage() {
     const copy = ensureElement(deepClone(source));
     copy.id = makeId('layer');
     copy.visible = true;
-    delete copy.mask;
+    copy.mask = source.mask && typeof source.mask === 'object'
+      ? deepClone(source.mask)
+      : undefined;
 
     updateTemplateElements((elements) => {
       const withUniqueName = {

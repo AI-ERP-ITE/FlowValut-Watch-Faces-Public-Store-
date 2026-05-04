@@ -14,6 +14,48 @@ function cloneEffectLayers(value) {
 		.map((entry) => ({ ...entry }));
 }
 
+function cloneDeep(value) {
+	try {
+		return JSON.parse(JSON.stringify(value));
+	} catch (_error) {
+		return null;
+	}
+}
+
+function parseMaskEnabled(value) {
+	if (value === true || value === 1) return true;
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		return normalized === "true" || normalized === "1" || normalized === "yes";
+	}
+	return false;
+}
+
+function normalizeMask(mask) {
+	if (!mask || typeof mask !== "object") return null;
+	if (!parseMaskEnabled(mask.enabled)) return null;
+
+	const cloned = cloneDeep(mask);
+	if (!cloned || typeof cloned !== "object") return null;
+
+	return {
+		...cloned,
+		enabled: true,
+	};
+}
+
+function validateMask(mask) {
+	if (!mask || typeof mask !== "object") return { valid: false, reason: "missing" };
+	if (!parseMaskEnabled(mask.enabled)) return { valid: false, reason: "disabled" };
+
+	const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
+	if (strokes.length === 0) {
+		return { valid: false, reason: "no_strokes" };
+	}
+
+	return { valid: true };
+}
+
 function resolveMaterialKey(element, styleMap) {
 	if (typeof element.materialRef === "string" && element.materialRef.trim().length > 0) {
 		return element.materialRef;
@@ -39,6 +81,10 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 
 	const sourceElements = Array.isArray(geometryObj.elements) ? geometryObj.elements : [];
 	const elements = sourceElements.map((element, index) => {
+		const maskCheck = validateMask(element.mask);
+		if (element.mask !== undefined && element.mask !== null && !maskCheck.valid) {
+			console.warn("Mask invalid:", maskCheck.reason, element.id);
+		}
 		const materialKey = resolveMaterialKey(element, styleMap || {});
 		const material = materialKey ? materialsObj[materialKey] : null;
 		if (materialKey && !material) {
@@ -67,7 +113,7 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			materialLayers: cloneEffectLayers(element.materialLayers),
 			textureLayers: cloneEffectLayers(element.textureLayers),
 			gradientLayers: cloneEffectLayers(element.gradientLayers),
-			mask: element.mask,
+			mask: normalizeMask(element.mask),
 			dropShadow: element.dropShadow && typeof element.dropShadow === "object" ? { ...element.dropShadow } : null,
 			styleAdjust: element.styleAdjust && typeof element.styleAdjust === "object" ? { ...element.styleAdjust } : null,
 			effect3d: element.effect3d && typeof element.effect3d === "object" ? { ...element.effect3d } : null,

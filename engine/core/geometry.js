@@ -14,6 +14,48 @@ function cloneEffectLayers(value) {
 		.map((entry) => ({ ...entry }));
 }
 
+function cloneDeep(value) {
+	try {
+		return JSON.parse(JSON.stringify(value));
+	} catch (_error) {
+		return null;
+	}
+}
+
+function parseMaskEnabled(value) {
+	if (value === true || value === 1) return true;
+	if (typeof value === "string") {
+		const normalized = value.trim().toLowerCase();
+		return normalized === "true" || normalized === "1" || normalized === "yes";
+	}
+	return false;
+}
+
+function normalizeMask(mask) {
+	if (!mask || typeof mask !== "object") return null;
+	if (!parseMaskEnabled(mask.enabled)) return null;
+
+	const cloned = cloneDeep(mask);
+	if (!cloned || typeof cloned !== "object") return null;
+
+	return {
+		...cloned,
+		enabled: true,
+	};
+}
+
+function validateMask(mask) {
+	if (!mask || typeof mask !== "object") return { valid: false, reason: "missing" };
+	if (!parseMaskEnabled(mask.enabled)) return { valid: false, reason: "disabled" };
+
+	const strokes = Array.isArray(mask.strokes) ? mask.strokes : [];
+	if (strokes.length === 0) {
+		return { valid: false, reason: "no_strokes" };
+	}
+
+	return { valid: true };
+}
+
 export function buildGeometry(template) {
 	const templateObj = asObject(template, "template");
 	const sourceElements = Array.isArray(templateObj.elements) ? templateObj.elements : [];
@@ -27,6 +69,10 @@ export function buildGeometry(template) {
 
 	const elements = sourceElements.map((element, index) => {
 		const safeElement = asObject(element, `template.elements[${index}]`);
+		const maskCheck = validateMask(safeElement.mask);
+		if (safeElement.mask !== undefined && safeElement.mask !== null && !maskCheck.valid) {
+			console.warn("Mask invalid:", maskCheck.reason, safeElement.id);
+		}
 		const placement = safeElement.placement && typeof safeElement.placement === "object"
 			? { ...safeElement.placement, config: { ...(safeElement.placement.config || {}) } }
 			: { mode: "center", config: { offset: [0, 0], rotation: 0 } };
@@ -47,7 +93,7 @@ export function buildGeometry(template) {
 			materialLayers: cloneEffectLayers(safeElement.materialLayers),
 			textureLayers: cloneEffectLayers(safeElement.textureLayers),
 			gradientLayers: cloneEffectLayers(safeElement.gradientLayers),
-			mask: safeElement.mask,
+			mask: normalizeMask(safeElement.mask),
 			dropShadow: safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? { ...safeElement.dropShadow } : null,
 			styleAdjust: safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? { ...safeElement.styleAdjust } : null,
 			effect3d: safeElement.effect3d && typeof safeElement.effect3d === "object" ? { ...safeElement.effect3d } : null,
