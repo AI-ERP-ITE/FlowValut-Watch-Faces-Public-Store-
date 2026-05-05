@@ -4402,13 +4402,37 @@ export default function ParametricPage() {
     if (stroke.tool !== 'selection') return null;
     const shape = typeof stroke.shape === 'string' ? stroke.shape : 'rect';
 
+    // Spec 075 T3: mirror in CANVAS space so element rotation is honoured.
+    // Legacy mirrored in mask-LOCAL space (e.g. x -> 100-x), which only matched
+    // canvas axes when rotation === 0. For rotated elements (e.g. 90deg) local-X
+    // aligns with canvas-Y, so 'mirror horizontal' flipped the wrong visual axis.
+    // Fix: local -> canvas (rotation-aware) -> mirror in canvas -> canvas -> local.
+    // Rect/circle/oval are symmetric about both local axes, so mirroring the
+    // centre point is sufficient (width/height preserved).
+    const mirrorCanvas = (point: { x: number; y: number }) => ({
+      x: mirrorHorizontal ? 100 - point.x : point.x,
+      y: mirrorVertical ? 100 - point.y : point.y,
+    });
+    const mirrorLocal = (localPoint: { x: number; y: number }) => {
+      const canvas = selectedMaskLocalToCanvasPoint(localPoint);
+      const flipped = mirrorCanvas(canvas);
+      return canvasToSelectedMaskLocalPoint(flipped);
+    };
+
     if (shape === 'free') {
       const points = Array.isArray(stroke.points) ? stroke.points as Array<{ x: number; y: number }> : [];
       if (points.length < 3) return null;
-      const mirrored = points.map((point) => ({
-        x: mirrorHorizontal ? 100 - Math.max(0, Math.min(100, Number(point.x) || 0)) : Math.max(0, Math.min(100, Number(point.x) || 0)),
-        y: mirrorVertical ? 100 - Math.max(0, Math.min(100, Number(point.y) || 0)) : Math.max(0, Math.min(100, Number(point.y) || 0)),
-      }));
+      const mirrored = points.map((point) => {
+        const local = {
+          x: Math.max(0, Math.min(100, Number(point.x) || 0)),
+          y: Math.max(0, Math.min(100, Number(point.y) || 0)),
+        };
+        const back = mirrorLocal(local);
+        return {
+          x: Math.max(0, Math.min(100, back.x)),
+          y: Math.max(0, Math.min(100, back.y)),
+        };
+      });
       return { ...deepClone(stroke), points: mirrored };
     }
 
@@ -4416,8 +4440,10 @@ export default function ParametricPage() {
     const y = Math.max(0, Math.min(100, Number(stroke.y) || 0));
     const width = Math.max(0, Math.min(100, Number(stroke.width) || 0));
     const height = Math.max(0, Math.min(100, Number(stroke.height) || 0));
-    const mirroredX = mirrorHorizontal ? Math.max(0, Math.min(100, 100 - (x + width))) : x;
-    const mirroredY = mirrorVertical ? Math.max(0, Math.min(100, 100 - (y + height))) : y;
+    const centerLocal = { x: x + width / 2, y: y + height / 2 };
+    const newCenterLocal = mirrorLocal(centerLocal);
+    const mirroredX = Math.max(0, Math.min(100, newCenterLocal.x - width / 2));
+    const mirroredY = Math.max(0, Math.min(100, newCenterLocal.y - height / 2));
 
     return {
       ...deepClone(stroke),
