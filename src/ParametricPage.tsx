@@ -76,6 +76,8 @@ const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
 const PARAMETRIC_LIBRARY_STORAGE_KEY = 'parametric-element-library-v1';
 const PARAMETRIC_THEME_STORAGE_KEY = 'parametric-theme-library-v1';
 const PARAMETRIC_HISTORY_STORAGE_KEY = 'parametric-template-history-v1';
+const PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID = '__parametric-progress-snapshot__';
+const PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME = '__progress_snapshot__';
 
 const DEFAULT_COLOR_CONTROL = {
   colorControl: {
@@ -786,6 +788,10 @@ function normalizeThemeEntries(parsed: Array<unknown>): Array<ThemeEntry> {
     });
 }
 
+function isProgressSnapshotTheme(theme: ThemeEntry): boolean {
+  return theme.id === PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID || theme.name === PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME;
+}
+
 function isLikelyRawLayoutObject(value: Record<string, unknown>): boolean {
   const keys = Object.keys(value);
   if (keys.length === 0) return false;
@@ -1011,6 +1017,16 @@ export default function ParametricPage() {
     });
   }, [library]);
 
+  const visibleThemes = useMemo<Array<ThemeEntry>>(
+    () => themes.filter((theme) => !isProgressSnapshotTheme(theme)),
+    [themes],
+  );
+
+  const progressSnapshotTheme = useMemo<ThemeEntry | null>(
+    () => themes.find((theme) => isProgressSnapshotTheme(theme)) ?? null,
+    [themes],
+  );
+
   const setAllDrawerSectionsCollapsed = (collapsed: boolean) => {
     setDrawerCollapsedByCategory(
       Object.fromEntries(groupedLibrary.map(({ category }) => [category, collapsed])) as Record<string, boolean>,
@@ -1214,6 +1230,49 @@ export default function ParametricPage() {
     };
 
     persistThemes((prev) => [...prev, nextTheme], 'Theme saved locally.');
+  };
+
+  const saveCurrentProgressSnapshot = () => {
+    if (!workingTemplate) {
+      setDrawerNotice('Save progress failed: nothing on canvas yet.');
+      return;
+    }
+
+    const snapshotTheme: ThemeEntry = {
+      id: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID,
+      name: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME,
+      template: deepClone(workingTemplate),
+    };
+
+    persistThemes(
+      (prev) => {
+        const withoutSnapshot = prev.filter((entry) => !isProgressSnapshotTheme(entry));
+        return [...withoutSnapshot, snapshotTheme];
+      },
+      authConfigured && getCurrentAuthUser()
+        ? 'Progress snapshot saved. Recoverable even if browser cache is cleared.'
+        : 'Progress snapshot saved locally. Sign in to mirror snapshot to Firebase.',
+    );
+  };
+
+  const loadProgressSnapshot = () => {
+    if (!progressSnapshotTheme) {
+      setDrawerNotice('No saved progress snapshot found yet.');
+      return;
+    }
+
+    const template = {
+      ...deepClone(progressSnapshotTheme.template),
+      elements: (progressSnapshotTheme.template.elements ?? []).map((element, index) => ensureElement(element, index)),
+    } as TemplateModel;
+
+    setWorkingTemplate(template);
+    clearCommandHistory();
+    saveTemplate(template);
+    setSelectedElementId(template.elements[0]?.id ?? null);
+    setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
+    setDrawerNotice('Progress snapshot loaded to canvas.');
+    void renderPreview(template);
   };
 
   const applyThemeById = (themeId: string) => {
@@ -5232,6 +5291,28 @@ export default function ParametricPage() {
               <p className="text-[11px] uppercase tracking-wide text-zinc-400">Themes Library</p>
               <p className="mt-1 text-[11px] text-zinc-500">Save all current layers as one theme pack, then load later.</p>
 
+              <div className="mt-2 rounded border border-zinc-800 bg-zinc-950/40 p-2">
+                <p className="text-[11px] text-zinc-400">Work Progress Snapshot (separate from drawer/themes)</p>
+                <p className="mt-1 text-[11px] text-zinc-500">Use this while building. It does not add reusable theme entries.</p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={saveCurrentProgressSnapshot}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Save Progress
+                  </button>
+                  <button
+                    type="button"
+                    onClick={loadProgressSnapshot}
+                    disabled={!progressSnapshotTheme}
+                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+                  >
+                    Load Progress
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-2 flex gap-2">
                 <input
                   value={themeNameDraft}
@@ -5249,7 +5330,7 @@ export default function ParametricPage() {
               </div>
 
               <div className="mt-2 max-h-36 overflow-auto space-y-2">
-                {themes.map((theme) => (
+                {visibleThemes.map((theme) => (
                   <div key={theme.id} className="rounded border border-zinc-800 bg-zinc-900 p-2">
                     <p className="text-xs font-medium text-zinc-200">{theme.name}</p>
                     <p className="text-[11px] text-zinc-500">{(theme.template.elements ?? []).length} layers</p>
@@ -5285,7 +5366,7 @@ export default function ParametricPage() {
                     </div>
                   </div>
                 ))}
-                {themes.length === 0 ? <p className="text-[11px] text-zinc-500">No saved themes yet.</p> : null}
+                {visibleThemes.length === 0 ? <p className="text-[11px] text-zinc-500">No saved themes yet.</p> : null}
               </div>
             </div>
 
