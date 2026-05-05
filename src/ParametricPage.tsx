@@ -5915,8 +5915,21 @@ export default function ParametricPage() {
                                 );
                               }
                               if (points.length === 0) return null;
-                              const pointsString = points.map((point) => `${point.x},${point.y}`).join(' ');
                               const strokeWidth = Math.max(0.2, Number(stroke.size) / 5.2);
+                              // Spec 075: single-point strokes render as <circle> to avoid degenerate <polyline> rendering.
+                              if (points.length === 1) {
+                                return (
+                                  <circle
+                                    key={`mask-stroke-${index}`}
+                                    cx={points[0].x}
+                                    cy={points[0].y}
+                                    r={strokeWidth / 2}
+                                    fill={strokeColor}
+                                    fillOpacity={opacity}
+                                  />
+                                );
+                              }
+                              const pointsString = points.map((point) => `${point.x},${point.y}`).join(' ');
                               return (
                                 <polyline
                                   key={`mask-stroke-${index}`}
@@ -5930,20 +5943,34 @@ export default function ParametricPage() {
                                 />
                               );
                             })}
-                            {activeMaskStroke && activeMaskStroke.points.length > 0 ? (
-                              <polyline
-                                points={activeMaskStroke.points.map((point) => {
-                                  const canvasPoint = selectedMaskLocalToCanvasPoint(point);
-                                  return `${canvasPoint.x},${canvasPoint.y}`;
-                                }).join(' ')}
-                                fill="none"
-                                stroke={activeMaskStroke.action === 'reveal' ? '#4ade80' : '#f87171'}
-                                strokeOpacity={0.95}
-                                strokeWidth={Math.max(0.2, activeMaskStroke.size / 5.2)}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            ) : null}
+                            {activeMaskStroke && activeMaskStroke.points.length > 0 ? (() => {
+                              const canvasPoints = activeMaskStroke.points.map((point) => selectedMaskLocalToCanvasPoint(point));
+                              const strokeColor = activeMaskStroke.action === 'reveal' ? '#4ade80' : '#f87171';
+                              const strokeWidth = Math.max(0.2, activeMaskStroke.size / 5.2);
+                              // Spec 075: single-point active stroke rendered as <circle>.
+                              if (canvasPoints.length === 1) {
+                                return (
+                                  <circle
+                                    cx={canvasPoints[0].x}
+                                    cy={canvasPoints[0].y}
+                                    r={strokeWidth / 2}
+                                    fill={strokeColor}
+                                    fillOpacity={0.95}
+                                  />
+                                );
+                              }
+                              return (
+                                <polyline
+                                  points={canvasPoints.map((p) => `${p.x},${p.y}`).join(' ')}
+                                  fill="none"
+                                  stroke={strokeColor}
+                                  strokeOpacity={0.95}
+                                  strokeWidth={strokeWidth}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              );
+                            })() : null}
                             {activeMaskSelectionShape ? (
                               (() => {
                                 const previewColor = activeMaskSelectionShape.action === 'reveal' ? '#22c55e' : '#ef4444';

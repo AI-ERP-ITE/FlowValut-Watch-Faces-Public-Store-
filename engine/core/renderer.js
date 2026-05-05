@@ -1033,15 +1033,23 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 				console.warn(`[mask] stroke has ${rawPoints.length} points (warn cap ${POINT_WARN_CAP}); will truncate at ${POINT_HARD_CAP}.`);
 			}
 			const limited = rawPoints.length > POINT_HARD_CAP ? rawPoints.slice(0, POINT_HARD_CAP) : rawPoints;
-			const mapped = limited
-				.map((point) => {
-					const m = mapPoint(point.x, point.y);
-					return m === null ? null : `${m.px},${m.py}`;
-				})
+			const mappedPairs = limited
+				.map((point) => mapPoint(point.x, point.y))
 				.filter((entry) => entry !== null);
-			if (mapped.length > 0) {
+			if (mappedPairs.length > 0) {
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
-				return `<polyline points="${mapped.join(" ")}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
+				// Spec 075: single-point strokes (a click without drag) render as
+				// a degenerate <polyline points="x,y" /> which browsers handle
+				// inconsistently — Chrome paints nothing, others may fall back
+				// to filling the entire mask region (causing the "whole element
+				// masked" symptom). Emit an explicit <circle> instead so a click
+				// always produces a visible round dab matching stroke-linecap.
+				if (mappedPairs.length === 1) {
+					const { px, py } = mappedPairs[0];
+					return `<circle cx="${px}" cy="${py}" r="${size / 2}" fill="${tone}" fill-opacity="${opacity}" />`;
+				}
+				const points = mappedPairs.map(({ px, py }) => `${px},${py}`).join(" ");
+				return `<polyline points="${points}" fill="none" stroke="${tone}" stroke-opacity="${opacity}" stroke-width="${size}" stroke-linecap="round" stroke-linejoin="round" />`;
 			}
 
 			return "";
