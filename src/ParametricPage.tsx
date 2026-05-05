@@ -1405,6 +1405,8 @@ export default function ParametricPage() {
           return clone;
         });
 
+      const previewColorMode: ColorMode = colorMode === 'enforce' ? 'off' : colorMode;
+
       const renderWithElements = (elements: TemplateElement[]) =>
         engineModule.runEngine({
           activeStyle: FIXED_RENDER_STYLE,
@@ -1417,7 +1419,7 @@ export default function ParametricPage() {
             ...DEFAULT_COLOR_CONTROL,
             colorControl: {
               ...DEFAULT_COLOR_CONTROL.colorControl,
-              mode: colorMode,
+              mode: previewColorMode,
             },
           },
         });
