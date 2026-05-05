@@ -7190,13 +7190,13 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Contrast {getSelectedStyleAdjustNumber('contrast', 1).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Contrast {getSelectedStyleAdjustNumber('contrast', 0).toFixed(2)}</span>
                     <input
                       type="range"
-                      min={0}
-                      max={3}
+                      min={-1}
+                      max={1}
                       step={0.01}
-                      value={getSelectedStyleAdjustNumber('contrast', 1)}
+                      value={getSelectedStyleAdjustNumber('contrast', 0)}
                       onChange={(e) => setSelectedStyleAdjustNumber('contrast', Number(e.target.value))}
                       className="w-full"
                     />

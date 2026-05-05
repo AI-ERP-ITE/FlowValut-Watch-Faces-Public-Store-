@@ -270,7 +270,10 @@ function normalizeStyleAdjust(source = {}, fallback = {}) {
 		enabled: src.enabled !== false,
 		highlight: clamp(src.highlight, -1, 1, fallback.highlight ?? 0),
 		shadows: clamp(src.shadows, -1, 1, fallback.shadows ?? 0),
-		contrast: clamp(src.contrast, 0, 3, fallback.contrast ?? 1),
+		// Spec 075 T1: contrast remapped to -1..+1 with 0=neutral (matches
+		// highlight/shadows/sharpness convention). Renderer converts to slope
+		// via slope = 1 + contrast. Old saves with contrast=0 are now harmless.
+		contrast: clamp(src.contrast, -1, 1, fallback.contrast ?? 0),
 		sharpness: clamp(src.sharpness, 0, 1, fallback.sharpness ?? 0),
 		hue: clamp(src.hue, -180, 180, fallback.hue ?? 0),
 		color: typeof src.color === "string" ? src.color : (typeof fallback.color === "string" ? fallback.color : null),
@@ -520,6 +523,9 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 
 	// Keep tone and sharpening responsive but avoid tiny slider movement causing heavy clipping.
 	const toneShift = (styleAdjust.highlight - styleAdjust.shadows) * 0.12;
+	// Spec 075 T1: contrast stored as -1..+1 (0=neutral). Convert to SVG
+	// slope. -1 = mute (slope 0), 0 = identity (slope 1), +1 = double (slope 2).
+	const contrastSlope = 1 + clamp(styleAdjust.contrast, -1, 1, 0);
 	const sharp = clamp(styleAdjust.sharpness, 0, 1, 0);
 	const sharpenStrength = Math.pow(sharp, 1.35) * 0.45;
 	const sharpenKernel = [
@@ -539,9 +545,9 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		`<filter id=\"${filterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
 		`<feColorMatrix in=\"SourceGraphic\" type=\"hueRotate\" values=\"${styleAdjust.hue.toFixed(3)}\" result=\"hue\" />`,
 		`<feComponentTransfer in=\"hue\" result=\"tone\">`,
-		`<feFuncR type=\"linear\" slope=\"${styleAdjust.contrast.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
-		`<feFuncG type=\"linear\" slope=\"${styleAdjust.contrast.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
-		`<feFuncB type=\"linear\" slope=\"${styleAdjust.contrast.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
+		`<feFuncR type=\"linear\" slope=\"${contrastSlope.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
+		`<feFuncG type=\"linear\" slope=\"${contrastSlope.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
+		`<feFuncB type=\"linear\" slope=\"${contrastSlope.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
 		"</feComponentTransfer>",
 	];
 
