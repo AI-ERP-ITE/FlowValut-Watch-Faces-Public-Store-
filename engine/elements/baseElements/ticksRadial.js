@@ -235,16 +235,16 @@ export function renderTicksRadial(params = {}, position = {}, context = {}) {
 			} else if (tickShape === "triangle") {
 				if (shapeAlign === "screen") {
 					const points = [
-						`${center.x} ${center.y - tickLength / 2}`,
-						`${center.x + width / 2} ${center.y + tickLength / 2}`,
-						`${center.x - width / 2} ${center.y + tickLength / 2}`,
+						`${center.x} ${center.y + tickLength / 2}`,
+						`${center.x + width / 2} ${center.y - tickLength / 2}`,
+						`${center.x - width / 2} ${center.y - tickLength / 2}`,
 					].join(" ");
 					svg += `<polygon points="${points}" fill="${escapeXml(p.stroke)}" />`;
 				} else {
 					const points = [
-						`0 ${-tickLength / 2}`,
-						`${width / 2} ${tickLength / 2}`,
-						`${-width / 2} ${tickLength / 2}`,
+						`0 ${tickLength / 2}`,
+						`${width / 2} ${-tickLength / 2}`,
+						`${-width / 2} ${-tickLength / 2}`,
 					].join(" ");
 					svg += `<polygon points="${points}" fill="${escapeXml(p.stroke)}" transform="translate(${center.x} ${center.y}) rotate(${angle + 90})" />`;
 				}
