@@ -134,7 +134,7 @@ const SAMPLE_LIBRARY: Array<LibraryEntry> = [
         majorEvery: 5,
         majorLength: 0.035,
         tickShape: 'rect',
-        rectAlign: 'screen',
+        rectAlign: 'radial',
         token: {
           mode: 'line',
           every: 5,
@@ -6903,12 +6903,12 @@ export default function ParametricPage() {
                       <label className="block space-y-1">
                         <span className="text-[11px] text-zinc-500">Shape Align</span>
                         <select
-                          value={getStringParam('rectAlign', 'screen')}
+                          value={getStringParam('rectAlign', 'radial')}
                           onChange={(e) => setStringParam('rectAlign', e.target.value === 'radial' ? 'radial' : 'screen')}
                           className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                         >
-                          <option value="screen">Screen Lock (non-diamond)</option>
-                          <option value="radial">Radial Rotate</option>
+                          <option value="radial">Radial (follow center)</option>
+                          <option value="screen">Screen Lock (upright)</option>
                         </select>
                       </label>
                     ) : null}
@@ -6918,13 +6918,29 @@ export default function ParametricPage() {
                       <input type="range" min={0} max={1} step={0.005} value={getNumericParam('radius', 0.42)} onChange={(e) => setNumericParam('radius', Number(e.target.value))} className="w-full" />
                     </label>
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Length {getNumericParam('length', 0.02).toFixed(3)}</span>
+                      <span className="text-[11px] text-zinc-500">Minor Length {getNumericParam('length', 0.02).toFixed(3)}</span>
                       <input type="range" min={0.001} max={0.2} step={0.001} value={getNumericParam('length', 0.02)} onChange={(e) => setNumericParam('length', Number(e.target.value))} className="w-full" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Major Length {getNumericParam('majorLength', 0.035).toFixed(3)}</span>
+                      <input type="range" min={0.001} max={0.2} step={0.001} value={getNumericParam('majorLength', 0.035)} onChange={(e) => setNumericParam('majorLength', Number(e.target.value))} className="w-full" />
+                    </label>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Major Every (N ticks)</span>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={Math.max(1, Math.round(getNumericParam('majorEvery', 5)))}
+                        onChange={(e) => setNumericParam('majorEvery', Math.max(1, Number(e.target.value)))}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      />
                     </label>
                     <label className="block space-y-1">
                       <span className="text-[11px] text-zinc-500">Width {getNumericParam('width', 0.003).toFixed(3)}</span>
                       <input type="range" min={0.001} max={0.1} step={0.001} value={getNumericParam('width', 0.003)} onChange={(e) => setNumericParam('width', Number(e.target.value))} className="w-full" />
                     </label>
+                    <p className="text-[10px] text-zinc-500">Minor and major lengths are independent. Set equal for same size, or make either one larger/smaller.</p>
 
                     <div className="rounded border border-zinc-800 bg-zinc-900/35 p-2 space-y-2">
                       <p className="text-[11px] uppercase tracking-wide text-zinc-400">Tick Token Mode</p>
