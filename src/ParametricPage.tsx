@@ -133,6 +133,8 @@ const SAMPLE_LIBRARY: Array<LibraryEntry> = [
         width: 0.003,
         majorEvery: 5,
         majorLength: 0.035,
+        tickShape: 'rect',
+        rectAlign: 'screen',
         token: {
           mode: 'line',
           every: 5,
@@ -6879,6 +6881,38 @@ export default function ParametricPage() {
                 {selectedElement.type === 'ticks_radial' ? (
                   <div className="space-y-2 rounded border border-zinc-800 p-2">
                     <p className="text-[11px] uppercase tracking-wide text-zinc-400">Ticks Controls</p>
+                    <label className="block space-y-1">
+                      <span className="text-[11px] text-zinc-500">Tick Shape</span>
+                      <select
+                        value={getStringParam('tickShape', 'line')}
+                        onChange={(e) => {
+                          const value = (e.target.value || 'line').toLowerCase();
+                          const nextShape = value === 'rect' || value === 'triangle' || value === 'round' ? value : 'line';
+                          setStringParam('tickShape', nextShape);
+                        }}
+                        className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                      >
+                        <option value="line">Line (legacy)</option>
+                        <option value="rect">Rectangle</option>
+                        <option value="triangle">Triangle</option>
+                        <option value="round">Round</option>
+                      </select>
+                    </label>
+
+                    {getStringParam('tickShape', 'line') !== 'line' ? (
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-500">Shape Align</span>
+                        <select
+                          value={getStringParam('rectAlign', 'screen')}
+                          onChange={(e) => setStringParam('rectAlign', e.target.value === 'radial' ? 'radial' : 'screen')}
+                          className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
+                        >
+                          <option value="screen">Screen Lock (non-diamond)</option>
+                          <option value="radial">Radial Rotate</option>
+                        </select>
+                      </label>
+                    ) : null}
+
                     <label className="block space-y-1">
                       <span className="text-[11px] text-zinc-500">Radius {getNumericParam('radius', 0.42).toFixed(3)}</span>
                       <input type="range" min={0} max={1} step={0.005} value={getNumericParam('radius', 0.42)} onChange={(e) => setNumericParam('radius', Number(e.target.value))} className="w-full" />

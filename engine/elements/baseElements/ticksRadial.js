@@ -9,6 +9,8 @@ const DEFAULTS = {
 	majorLength: 0.035,
 	rotation: 0,
 	stroke: "#ffffff",
+	tickShape: "line",
+	rectAlign: "screen",
 };
 
 const TOKEN_DEFAULTS = {
@@ -192,6 +194,12 @@ export function renderTicksRadial(params = {}, position = {}, context = {}) {
 	const width = Math.max(0.1, clamp01(p.width, DEFAULTS.width) * baseRadius * scale);
 	const majorEvery = Math.max(1, Math.floor(Number.isFinite(Number(p.majorEvery)) ? Number(p.majorEvery) : DEFAULTS.majorEvery));
 	const rotation = Number.isFinite(Number(p.rotation)) ? Number(p.rotation) : DEFAULTS.rotation;
+	const rawTickShape = typeof p.tickShape === "string" ? p.tickShape.toLowerCase().trim() : "line";
+	const tickShape = ["line", "rect", "triangle", "round"].includes(rawTickShape) ? rawTickShape : "line";
+	const rawAlign = typeof p.shapeAlign === "string"
+		? p.shapeAlign.toLowerCase().trim()
+		: (typeof p.rectAlign === "string" ? p.rectAlign.toLowerCase().trim() : "screen");
+	const shapeAlign = rawAlign === "radial" ? "radial" : "screen";
 	const token = resolveTokenConfig(p.token, majorEvery);
 	const tokenCount = Math.max(1, Math.floor(count / token.every));
 	const useClassicClockWrap = token.mode === "number"
@@ -213,10 +221,53 @@ export function renderTicksRadial(params = {}, position = {}, context = {}) {
 			if (i % token.every !== 0) {
 				continue;
 			}
-			// In line mode, keep the visible tick length controlled by the Length slider.
-			const start = polarToCartesian(0, 0, Math.max(0, radius - lengthMinor), angle);
-			const end = polarToCartesian(0, 0, radius, angle);
-			svg += `<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="${p.stroke}" stroke-width="${width}" stroke-linecap="round" />`;
+			if (tickShape === "rect") {
+				const center = polarToCartesian(0, 0, Math.max(0, radius - lengthMinor / 2), angle);
+				if (shapeAlign === "screen") {
+					const x = center.x - width / 2;
+					const y = center.y - lengthMinor / 2;
+					svg += `<rect x="${x}" y="${y}" width="${width}" height="${lengthMinor}" fill="${escapeXml(p.stroke)}" />`;
+				} else {
+					const x = -width / 2;
+					const y = -lengthMinor / 2;
+					svg += `<rect x="${x}" y="${y}" width="${width}" height="${lengthMinor}" fill="${escapeXml(p.stroke)}" transform="translate(${center.x} ${center.y}) rotate(${angle + 90})" />`;
+				}
+			} else if (tickShape === "triangle") {
+				const center = polarToCartesian(0, 0, Math.max(0, radius - lengthMinor / 2), angle);
+				if (shapeAlign === "screen") {
+					const points = [
+						`${center.x} ${center.y - lengthMinor / 2}`,
+						`${center.x + width / 2} ${center.y + lengthMinor / 2}`,
+						`${center.x - width / 2} ${center.y + lengthMinor / 2}`,
+					].join(" ");
+					svg += `<polygon points="${points}" fill="${escapeXml(p.stroke)}" />`;
+				} else {
+					const points = [
+						`0 ${-lengthMinor / 2}`,
+						`${width / 2} ${lengthMinor / 2}`,
+						`${-width / 2} ${lengthMinor / 2}`,
+					].join(" ");
+					svg += `<polygon points="${points}" fill="${escapeXml(p.stroke)}" transform="translate(${center.x} ${center.y}) rotate(${angle + 90})" />`;
+				}
+			} else if (tickShape === "round") {
+				const center = polarToCartesian(0, 0, Math.max(0, radius - lengthMinor / 2), angle);
+				if (shapeAlign === "screen") {
+					const x = center.x - width / 2;
+					const y = center.y - lengthMinor / 2;
+					const corner = Math.min(width, lengthMinor) / 2;
+					svg += `<rect x="${x}" y="${y}" width="${width}" height="${lengthMinor}" rx="${corner}" ry="${corner}" fill="${escapeXml(p.stroke)}" />`;
+				} else {
+					const x = -width / 2;
+					const y = -lengthMinor / 2;
+					const corner = Math.min(width, lengthMinor) / 2;
+					svg += `<rect x="${x}" y="${y}" width="${width}" height="${lengthMinor}" rx="${corner}" ry="${corner}" fill="${escapeXml(p.stroke)}" transform="translate(${center.x} ${center.y}) rotate(${angle + 90})" />`;
+				}
+			} else {
+				// In line mode, keep the visible tick length controlled by the Length slider.
+				const start = polarToCartesian(0, 0, Math.max(0, radius - lengthMinor), angle);
+				const end = polarToCartesian(0, 0, radius, angle);
+				svg += `<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="${escapeXml(p.stroke)}" stroke-width="${width}" stroke-linecap="round" />`;
+			}
 			continue;
 		}
 
