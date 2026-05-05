@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getCurrentAuthUser, isFirebaseAuthConfigured, subscribeAuthState } from '@/lib/firebaseAuthClient';
-import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase } from '@/lib/studioFirebasePublishApi';
+import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase, fetchParametricThemesFromFirebase, saveParametricThemesToFirebase } from '@/lib/studioFirebasePublishApi';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import {
   normalizeLegacyGradientLayers,
@@ -920,6 +920,12 @@ export default function ParametricPage() {
     await saveParametricLibraryToFirebase({ entries: payload });
   }, [authConfigured]);
 
+  const saveThemesToFirebaseOnAction = useCallback(async (items: Array<ThemeEntry>) => {
+    if (!authConfigured || !getCurrentAuthUser()) return;
+    const payload = items.map((entry) => JSON.parse(JSON.stringify(entry)) as Record<string, unknown>);
+    await saveParametricThemesToFirebase({ entries: payload });
+  }, [authConfigured]);
+
   const loadStoredTemplate = (): TemplateModel | null => {
     try {
       const raw = window.localStorage.getItem(PARAMETRIC_TEMPLATE_STORAGE_KEY);
@@ -982,6 +988,27 @@ export default function ParametricPage() {
     }
   }, [authConfigured]);
 
+  const syncThemesFromFirebase = useCallback(async () => {
+    if (!authConfigured || !getCurrentAuthUser()) return;
+
+    try {
+      const remoteRaw = await fetchParametricThemesFromFirebase();
+      const remote = normalizeThemeEntries(remoteRaw as Array<unknown>);
+
+      if (remote.length > 0) {
+        setThemes(remote);
+        try {
+          window.localStorage.setItem(PARAMETRIC_THEME_STORAGE_KEY, JSON.stringify(remote));
+        } catch {
+          // Ignore localStorage failures.
+        }
+        setDrawerNotice('Themes synced from Firebase.');
+      }
+    } catch {
+      // Silent: keep local themes if Firebase unavailable.
+    }
+  }, [authConfigured]);
+
   const persistLibraryFromAction = (updater: (prev: Array<LibraryEntry>) => Array<LibraryEntry>, successNotice: string) => {
     let pushed = false;
     setLibrary((prev) => {
@@ -1023,11 +1050,18 @@ export default function ParametricPage() {
   };
 
   const persistThemes = (updater: (prev: Array<ThemeEntry>) => Array<ThemeEntry>, successNotice: string) => {
+    let pushed: Array<ThemeEntry> | null = null;
     setThemes((prev) => {
       const next = updater(prev);
       saveThemesLocal(next);
+      pushed = next;
       return next;
     });
+    if (pushed) {
+      void saveThemesToFirebaseOnAction(pushed).catch(() => {
+        // Firebase push errors are non-fatal; local cache already saved.
+      });
+    }
     setDrawerNotice(successNotice);
   };
 
@@ -3834,6 +3868,7 @@ export default function ParametricPage() {
     if (storedThemes) {
       setThemes(storedThemes);
     }
+    void syncThemesFromFirebase();
     void renderPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restoreCommandHistoryForTemplate]);
@@ -3843,13 +3878,15 @@ export default function ParametricPage() {
 
     if (getCurrentAuthUser()) {
       void syncLibraryFromFirebase();
+      void syncThemesFromFirebase();
     }
 
     return subscribeAuthState((user) => {
       if (!user) return;
       void syncLibraryFromFirebase();
+      void syncThemesFromFirebase();
     });
-  }, [authConfigured, syncLibraryFromFirebase]);
+  }, [authConfigured, syncLibraryFromFirebase, syncThemesFromFirebase]);
 
   useEffect(() => {
     if (!selectedElement) return;
