@@ -369,6 +369,137 @@ function namespaceSvgIds(svgMarkup: string, namespaceSeed: string): string {
   return nextMarkup;
 }
 
+const FORBIDDEN_RGB_MIN = 1;
+const FORBIDDEN_RGB_MAX = 46;
+const SAFE_RGB_FLOOR = 47;
+
+function resolveTemplatePixelSize(template: TemplateModel | null | undefined): { width: number; height: number } {
+  const fallback = { width: 480, height: 480 };
+  const layout = template?.layout;
+  if (!layout || typeof layout !== 'object') return fallback;
+  const width = Number((layout as Record<string, unknown>).width);
+  const height = Number((layout as Record<string, unknown>).height);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return fallback;
+  return {
+    width: Math.max(1, Math.min(2048, Math.round(width))),
+    height: Math.max(1, Math.min(2048, Math.round(height))),
+  };
+}
+
+function isPixelInForbiddenBand(r: number, g: number, b: number): boolean {
+  return (
+    (r >= FORBIDDEN_RGB_MIN && r <= FORBIDDEN_RGB_MAX) ||
+    (g >= FORBIDDEN_RGB_MIN && g <= FORBIDDEN_RGB_MAX) ||
+    (b >= FORBIDDEN_RGB_MIN && b <= FORBIDDEN_RGB_MAX)
+  );
+}
+
+function remapChannelToNearestAllowed(value: number): number {
+  if (value < FORBIDDEN_RGB_MIN || value > FORBIDDEN_RGB_MAX) return value;
+  const distanceToBlack = value;
+  const distanceToSafeFloor = Math.abs(SAFE_RGB_FLOOR - value);
+  return distanceToBlack <= distanceToSafeFloor ? 0 : SAFE_RGB_FLOOR;
+}
+
+function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to decode preview SVG for pixel processing.'));
+    img.src = url;
+  });
+}
+
+async function buildPixelColorPassAssets(
+  svgMarkup: string,
+  size: { width: number; height: number },
+  mode: ColorMode,
+): Promise<{ warningOverlayDataUrl: string | null; enforcedDataUrl: string | null; violationCount: number }> {
+  if (!svgMarkup || (mode !== 'warning' && mode !== 'enforce')) {
+    return { warningOverlayDataUrl: null, enforcedDataUrl: null, violationCount: 0 };
+  }
+
+  const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+  const objectUrl = URL.createObjectURL(blob);
+
+  try {
+    const image = await loadImageFromUrl(objectUrl);
+    const baseCanvas = document.createElement('canvas');
+    baseCanvas.width = size.width;
+    baseCanvas.height = size.height;
+    const baseCtx = baseCanvas.getContext('2d', { willReadFrequently: true });
+    if (!baseCtx) throw new Error('Could not acquire preview canvas context.');
+
+    baseCtx.clearRect(0, 0, size.width, size.height);
+    baseCtx.drawImage(image, 0, 0, size.width, size.height);
+    const imageData = baseCtx.getImageData(0, 0, size.width, size.height);
+    const src = imageData.data;
+
+    let violationCount = 0;
+    let warningOverlayDataUrl: string | null = null;
+    let enforcedDataUrl: string | null = null;
+
+    if (mode === 'warning') {
+      const warningCanvas = document.createElement('canvas');
+      warningCanvas.width = size.width;
+      warningCanvas.height = size.height;
+      const warningCtx = warningCanvas.getContext('2d');
+      if (!warningCtx) throw new Error('Could not acquire warning overlay context.');
+      const warningData = warningCtx.createImageData(size.width, size.height);
+      const out = warningData.data;
+
+      for (let i = 0; i < src.length; i += 4) {
+        const alpha = src[i + 3];
+        if (alpha === 0) continue;
+        const r = src[i];
+        const g = src[i + 1];
+        const b = src[i + 2];
+        const violates = isPixelInForbiddenBand(r, g, b);
+        if (!violates) continue;
+        violationCount += 1;
+        out[i] = 255;
+        out[i + 1] = 138;
+        out[i + 2] = 0;
+        out[i + 3] = 190;
+      }
+
+      warningCtx.putImageData(warningData, 0, 0);
+      warningOverlayDataUrl = warningCanvas.toDataURL('image/png');
+      return { warningOverlayDataUrl, enforcedDataUrl, violationCount };
+    }
+
+    const enforcedData = baseCtx.createImageData(size.width, size.height);
+    const enforcedPixels = enforcedData.data;
+    for (let i = 0; i < src.length; i += 4) {
+      const alpha = src[i + 3];
+      const r = src[i];
+      const g = src[i + 1];
+      const b = src[i + 2];
+      enforcedPixels[i + 3] = alpha;
+
+      const violates = alpha > 0 && isPixelInForbiddenBand(r, g, b);
+      if (!violates) {
+        enforcedPixels[i] = r;
+        enforcedPixels[i + 1] = g;
+        enforcedPixels[i + 2] = b;
+        continue;
+      }
+
+      violationCount += 1;
+      enforcedPixels[i] = remapChannelToNearestAllowed(r);
+      enforcedPixels[i + 1] = remapChannelToNearestAllowed(g);
+      enforcedPixels[i + 2] = remapChannelToNearestAllowed(b);
+    }
+
+    baseCtx.putImageData(enforcedData, 0, 0);
+    enforcedDataUrl = baseCanvas.toDataURL('image/png');
+    return { warningOverlayDataUrl, enforcedDataUrl, violationCount };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 const DEFAULT_DRAWER_CATEGORY_ORDER = ['Base', 'Bezel', 'Ticks', 'Outline', 'Free Objects', 'Texture', 'General'] as const;
 
 const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
@@ -751,6 +882,8 @@ export default function ParametricPage() {
   const [svgOverlayLayers, setSvgOverlayLayers] = useState<string[]>([]);
   const [svgOverlayMarkup, setSvgOverlayMarkup] = useState<string | null>(null);
   const [svgTopOverlayMarkup, setSvgTopOverlayMarkup] = useState<string | null>(null);
+  const [pixelWarningOverlayDataUrl, setPixelWarningOverlayDataUrl] = useState<string | null>(null);
+  const [pixelEnforcedDataUrl, setPixelEnforcedDataUrl] = useState<string | null>(null);
   const [debugExportText, setDebugExportText] = useState<string | null>(null);
   const [debugExportCopied, setDebugExportCopied] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
@@ -1216,6 +1349,8 @@ export default function ParametricPage() {
   const renderPreview = useCallback(async (templateOverride?: TemplateModel) => {
     setIsRendering(true);
     setError(null);
+    setPixelWarningOverlayDataUrl(null);
+    setPixelEnforcedDataUrl(null);
     try {
       // @ts-expect-error runtime import has no TS metadata in this path.
       const engineModule = (await import('../engine/index.js')) as {
@@ -1290,6 +1425,11 @@ export default function ParametricPage() {
       previewRenderSerialRef.current += 1;
       const renderSerial = previewRenderSerialRef.current;
       const namespaceForPass = (pass: string) => `pv-${renderSerial}-${pass}`;
+      const pixelPassElements = isSoloMode && selectedVisibleElement
+        ? [selectedVisibleElement]
+        : visibleElements;
+      const pixelPassSvg = namespaceSvgIds(renderWithElements(pixelPassElements), namespaceForPass('pixel-pass'));
+      const pixelPassSize = resolveTemplatePixelSize(template);
 
       if (!isSoloMode) {
         const stackedLayers = visibleElements.map((element, index) => {
@@ -1322,6 +1462,24 @@ export default function ParametricPage() {
         }
         setSvgTopOverlayMarkup(null);
       }
+
+      if (colorMode === 'warning' || colorMode === 'enforce') {
+        try {
+          const pixelPass = await buildPixelColorPassAssets(pixelPassSvg, pixelPassSize, colorMode);
+          setPixelWarningOverlayDataUrl(pixelPass.warningOverlayDataUrl);
+          setPixelEnforcedDataUrl(pixelPass.enforcedDataUrl);
+
+          if (colorMode === 'warning' && pixelPass.violationCount > 0) {
+            setEditorNotice(`Color warning: ${pixelPass.violationCount} violating pixel(s) highlighted in orange.`);
+          }
+          if (colorMode === 'enforce' && pixelPass.violationCount > 0) {
+            setEditorNotice(`Color enforce: ${pixelPass.violationCount} violating pixel(s) remapped to nearest allowed values.`);
+          }
+        } catch (pixelError) {
+          const message = pixelError instanceof Error ? pixelError.message : 'Pixel color pass failed.';
+          setEditorNotice(`Color pixel pass skipped: ${message}`);
+        }
+      }
       } finally {
         window.removeEventListener('engine-color-warning', warningHandler as EventListener);
       }
@@ -1336,6 +1494,8 @@ export default function ParametricPage() {
       setSvgOverlayLayers([]);
       setSvgOverlayMarkup(null);
       setSvgTopOverlayMarkup(null);
+      setPixelWarningOverlayDataUrl(null);
+      setPixelEnforcedDataUrl(null);
     } finally {
       setIsRendering(false);
     }
@@ -5033,7 +5193,7 @@ export default function ParametricPage() {
 
         <div className={`mt-4 grid gap-4 ${isFocusMode ? 'grid-cols-1' : 'xl:grid-cols-[240px_minmax(0,1fr)_320px]'}`}>
           {!isFocusMode ? (
-          <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 space-y-4 xl:max-h-[calc(100vh-300px)] xl:overflow-auto">
+          <aside className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 space-y-4 xl:max-h-[calc(100vh-190px)] xl:min-h-[calc(100vh-190px)] xl:overflow-auto">
             <h2 className="text-sm font-semibold text-zinc-100">Element Drawer</h2>
             <p className="text-xs text-zinc-400">Pick from categories, then Add to Canvas. Saved items persist in this browser local storage.</p>
             {drawerNotice ? <p className="text-xs text-emerald-400">{drawerNotice}</p> : null}
@@ -5366,6 +5526,20 @@ export default function ParametricPage() {
                         className="pointer-events-none absolute inset-0"
                         style={isolatedPreviewLayerStyle}
                         dangerouslySetInnerHTML={{ __html: svgTopOverlayMarkup }}
+                      />
+                    ) : null}
+                    {pixelEnforcedDataUrl ? (
+                      <img
+                        src={pixelEnforcedDataUrl}
+                        alt="Enforced pixel preview"
+                        className="pointer-events-none absolute inset-0 h-full w-full"
+                      />
+                    ) : null}
+                    {pixelWarningOverlayDataUrl ? (
+                      <img
+                        src={pixelWarningOverlayDataUrl}
+                        alt="Warning pixel overlay"
+                        className="pointer-events-none absolute inset-0 h-full w-full"
                       />
                     ) : null}
 
