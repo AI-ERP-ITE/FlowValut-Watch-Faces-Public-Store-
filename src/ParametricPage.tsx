@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getCurrentAuthUser, isFirebaseAuthConfigured, subscribeAuthState } from '@/lib/firebaseAuthClient';
 import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase, fetchParametricThemesFromFirebase, saveParametricThemesToFirebase } from '@/lib/studioFirebasePublishApi';
@@ -816,6 +816,8 @@ export default function ParametricPage() {
   const [activeTextureLayerIndex, setActiveTextureLayerIndex] = useState(0);
   const [activeGradientLayerIndex, setActiveGradientLayerIndex] = useState(0);
   const [activeMaterialLayerIndex, setActiveMaterialLayerIndex] = useState(0);
+  const [draggingLayerId, setDraggingLayerId] = useState<string | null>(null);
+  const [dragOverLayerId, setDragOverLayerId] = useState<string | null>(null);
   const [draggingGradientHandle, setDraggingGradientHandle] = useState<null | 'from' | 'to' | 'center' | 'focal' | 'radius' | 'angle'>(null);
   const [draggingTextureHandle, setDraggingTextureHandle] = useState<null | 'direction' | 'imageOffset' | 'imageScale' | 'imageRotation'>(null);
   const [draggingOffsetHandle, setDraggingOffsetHandle] = useState(false);
@@ -1854,7 +1856,7 @@ export default function ParametricPage() {
 
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.textContent = 'âœ“';
+        chip.textContent = 'R';
         chip.setAttribute('data-reset-chip', 'true');
         chip.className = 'ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-800';
         chip.title = 'Reset this control';
@@ -2073,6 +2075,21 @@ export default function ParametricPage() {
       next.splice(target, 0, picked);
       return next;
     });
+  };
+
+  const moveElementToIndex = (id: string, toIndex: number) => {
+    updateTemplateElements((elements) => {
+      const fromIndex = elements.findIndex((element) => element.id === id);
+      if (fromIndex < 0) return elements;
+
+      const safeTarget = Math.max(0, Math.min(toIndex, elements.length - 1));
+      if (fromIndex === safeTarget) return elements;
+
+      const next = [...elements];
+      const [picked] = next.splice(fromIndex, 1);
+      next.splice(safeTarget, 0, picked);
+      return next;
+    }, 'Reorder layer');
   };
 
   const removeElement = (id: string) => {
@@ -6656,7 +6673,37 @@ export default function ParametricPage() {
                   return (
                     <div
                       key={element.id ?? `${element.type}-${index}`}
-                      className={`flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2 text-xs ${isSelected ? 'bg-zinc-800/60' : ''}`}
+                      className={`flex items-center justify-between gap-2 border-b border-zinc-800 px-3 py-2 text-xs ${isSelected ? 'bg-zinc-800/60' : ''} ${dragOverLayerId === element.id ? 'ring-1 ring-amber-400/80' : ''}`}
+                      draggable={typeof element.id === 'string' && element.id.length > 0}
+                      onDragStart={(event) => {
+                        if (!element.id) return;
+                        setDraggingLayerId(element.id);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', element.id);
+                      }}
+                      onDragOver={(event) => {
+                        if (!draggingLayerId || !element.id || draggingLayerId === element.id) return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                        setDragOverLayerId(element.id);
+                      }}
+                      onDrop={(event) => {
+                        if (!element.id) return;
+                        event.preventDefault();
+                        const sourceId = draggingLayerId || event.dataTransfer.getData('text/plain');
+                        if (!sourceId || sourceId === element.id) {
+                          setDraggingLayerId(null);
+                          setDragOverLayerId(null);
+                          return;
+                        }
+                        moveElementToIndex(sourceId, index);
+                        setDraggingLayerId(null);
+                        setDragOverLayerId(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingLayerId(null);
+                        setDragOverLayerId(null);
+                      }}
                     >
                       <button
                         type="button"
@@ -6667,7 +6714,7 @@ export default function ParametricPage() {
                         className="min-w-0 flex-1 text-left"
                       >
                         <p className="truncate font-medium text-zinc-200">{element.name ?? `layer-${index + 1}`}</p>
-                        <p className="truncate text-zinc-500">{element.type} Â· {element.role}</p>
+                        <p className="truncate text-zinc-500">{element.type} - {element.role}</p>
                       </button>
 
                       <div className="flex items-center gap-1">
@@ -6683,15 +6730,17 @@ export default function ParametricPage() {
                           type="button"
                           onClick={() => moveElement(element.id ?? '', 'up')}
                           className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
+                          title="Move layer up"
                         >
-                          â†‘
+                          <ArrowUp className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => moveElement(element.id ?? '', 'down')}
                           className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800"
+                          title="Move layer down"
                         >
-                          â†“
+                          <ArrowDown className="h-3.5 w-3.5" />
                         </button>
                         <button
                           type="button"
