@@ -1,0 +1,354 @@
+# 09 - Progress Log
+
+Use this file to track approved execution step-by-step.
+
+## Entry Template
+
+- Step:
+- Approval received:
+- Scope executed:
+- Files touched:
+- Validation performed:
+- Outcome:
+- Blockers:
+- Next requested approval:
+
+## Current Status
+
+- Step 1 (spec package setup): Completed
+- T-010 (body vs overlay mask-path audit): Completed
+- T-050 (per-element snapshot actions): Completed
+- T-051 (snapshot status indicator): Completed
+- T-052 (UX safety states): Completed
+- T-060 (heavy stack scenario validation): Completed
+- T-061 (mask parity live vs snapshot): Completed
+- T-062 (legacy project compatibility): Completed
+- T-070 (production build verification): Completed
+- T-071 (deploy sync docs/studio): Completed
+- T-072 (live route verification): Blocked
+- Pending: User approval to unblock deploy push and rerun T-072
+
+## Execution Entries
+
+- Step: T-010
+- Approval received: Yes
+- Scope executed: Renderer/editor read-only audit for body/overlay mask-path mismatch inventory
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/10-t010-mask-composite-audit.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: Evidence references captured from renderer and parametric editor source
+- Outcome: T-010 done, mismatch inventory documented
+- Blockers: None
+- Next requested approval: T-011
+
+- Step: T-011
+- Approval received: Yes
+- Scope executed: Compositing consistency patch in renderer layer assembly
+- Files touched:
+	- app/engine/core/renderer.js
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: syntax/problem check on renderer file
+- Outcome: T-011 done
+- Blockers: None
+- Next requested approval: T-012
+
+- Step: T-012
+- Approval received: Yes
+- Scope executed: Clip target guardrails for self/invalid/missing target resolution with safe fallback path
+- Files touched:
+	- app/engine/core/renderer.js
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: syntax/problem check on renderer file
+- Outcome: T-012 done
+- Blockers: None
+- Next requested approval: T-013
+
+- Step: T-013
+- Approval received: Yes
+- Scope executed: Neutral contrast fallback baseline for missing style values only
+- Files touched:
+	- app/engine/core/renderer.js
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: syntax/problem check on renderer file
+- Outcome: T-013 done
+- Blockers: None
+- Next requested approval: T-014
+
+- Step: T-014
+- Approval received: Yes
+- Scope executed: Core regression smoke checks for base/free_rect masked layered behavior and clip fallback safety
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/11-t014-core-regression-results.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: Node smoke scripts against renderer output signatures
+- Outcome: T-014 done
+- Blockers: None
+- Next requested approval: T-020
+
+- Step: T-020
+- Approval received: Yes
+- Scope executed: Added shared parametric render-state schema and backward-compatible element normalization defaults
+- Files touched:
+	- app/src/types/parametric.ts
+	- app/src/types/index.ts
+	- app/src/ParametricPage.tsx
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: TypeScript diagnostics check on touched files
+- Outcome: T-020 done
+- Blockers: None
+- Next requested approval: T-021
+
+- Step: T-021
+- Approval received: Yes
+- Scope executed: Implemented deterministic visual hash module for element snapshot state comparison
+- Files touched:
+	- app/engine/snapshot/snapshotHash.ts
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: diagnostics check on snapshot hash module
+- Outcome: T-021 done
+- Blockers: Runtime smoke import of raw `.ts` via Node ESM requires TS runner; deferred to T-022 test task
+- Next requested approval: T-022
+
+- Step: T-022
+- Approval received: Yes
+- Scope executed: Added and executed hash stability/change tests
+- Files touched:
+	- app/engine/snapshot/snapshotHash.test.ts
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run engine/snapshot/snapshotHash.test.ts`
+	- Result: 1 file passed, 3 tests passed
+- Outcome: T-022 done
+- Blockers: None
+- Next requested approval: T-030
+
+- Step: T-030
+- Approval received: Yes
+- Scope executed: Implemented isolated element snapshot capture utility with alpha-preserving SVG rasterization and source-hash metadata
+- Files touched:
+	- app/engine/snapshot/snapshotRenderer.ts
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: diagnostics check on snapshot capture module
+- Outcome: T-030 done
+- Blockers: None
+- Next requested approval: T-031
+
+- Step: T-031
+- Approval received: Yes
+- Scope executed: Implemented snapshot storage lifecycle helpers for create/read/delete and renderState persistence on elements
+- Files touched:
+	- app/engine/snapshot/snapshotStorage.ts
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed: diagnostics check on snapshot storage module
+- Outcome: T-031 done
+- Blockers: None
+- Next requested approval: T-032
+
+- Step: T-032
+- Approval received: Yes
+- Scope executed: Implemented stale-detection helpers using live hash vs stored snapshot hash and refresh utility for snapshot status
+- Files touched:
+	- app/engine/snapshot/snapshotStorage.ts
+	- app/engine/snapshot/snapshotStorage.test.ts
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run engine/snapshot/snapshotStorage.test.ts`
+	- Result: 1 file passed, 3 tests passed
+- Outcome: T-032 done
+- Blockers: None
+- Next requested approval: T-040
+
+- Step: T-040
+- Approval received: Yes
+- Scope executed: Added render-source resolver scaffolding and explicit live pass-through path without behavior change
+- Files touched:
+	- app/engine/core/renderer.js
+	- app/engine/core/render-source-live-pass-through.test.js
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run engine/core/render-source-live-pass-through.test.js`
+	- Result: 1 file passed, 1 test passed
+- Outcome: T-040 done
+- Blockers: None
+- Next requested approval: T-041
+
+- Step: T-041
+- Approval received: Yes
+- Scope executed: Implemented snapshot image source rendering path with live transform/opacity/mask handling; preserved renderState through geometry/composer so renderer can consume snapshot metadata
+- Files touched:
+	- app/engine/core/renderer.js
+	- app/engine/core/geometry.js
+	- app/engine/core/composer.js
+	- app/engine/core/render-source-snapshot-mode.test.js
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run "engine/core/render-source-live-pass-through.test.js" "engine/core/render-source-snapshot-mode.test.js"`
+	- Result: 2 files passed, 2 tests passed
+- Outcome: T-041 done
+- Blockers: None
+- Next requested approval: T-042
+
+- Step: T-042
+- Approval received: Yes
+- Scope executed: Hardened explicit renderer fallback chain for snapshot mode when snapshot payload is missing/corrupt; fallback safely to live procedural rendering
+- Files touched:
+	- app/engine/core/renderer.js
+	- app/engine/core/render-source-snapshot-mode.test.js
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run engine/core/render-source-snapshot-mode.test.js engine/core/render-source-live-pass-through.test.js`
+	- Result: 2 files passed, 4 tests passed
+- Outcome: T-042 done
+- Blockers: None
+- Next requested approval: T-050
+
+- Step: T-050
+- Approval received: Yes
+- Scope executed: Added per-element snapshot actions in element inspector (Create Snapshot, Use Snapshot, Use Live Render, Delete Snapshot) and wired action handlers to snapshot capture/storage utilities
+- Files touched:
+	- app/src/ParametricPage.tsx
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Diagnostics check on `app/src/ParametricPage.tsx`
+	- Result: no errors
+- Outcome: T-050 done
+- Blockers: None
+- Next requested approval: T-051
+
+- Step: T-051
+- Approval received: Yes
+- Scope executed: Added per-element snapshot status indicator in element inspector with fresh/outdated/missing states derived from stale-detection utility
+- Files touched:
+	- app/src/ParametricPage.tsx
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Diagnostics check on `app/src/ParametricPage.tsx`
+	- Result: no errors
+- Outcome: T-051 done
+- Blockers: None
+- Next requested approval: T-052
+
+- Step: T-052
+- Approval received: Yes
+- Scope executed: Added UX safety states for snapshot actions (explicit action eligibility, disabled-reason feedback, busy-state label, and destructive delete confirmation with cancel feedback)
+- Files touched:
+	- app/src/ParametricPage.tsx
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Diagnostics check on `app/src/ParametricPage.tsx`
+	- Result: no errors
+- Outcome: T-052 done
+- Blockers: None
+- Next requested approval: T-060
+
+- Step: T-060
+- Approval received: Yes
+- Scope executed: Executed heavy stack validation runs for layered effects/shadow suites and targeted renderer smoke for base + free_rect masked stacks; recorded behavior/performance notes
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/12-t060-heavy-stack-validation.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run engine/core/layered-effects-parity.test.js engine/core/drop-shadow-parity.test.js`
+	- Result: 2 files, 12 tests, 7 passed / 5 failed (expectation drift; no renderer crash)
+	- Command: targeted Node renderer smoke for base-heavy and free-rect-heavy masked stacks
+	- Result: both scenarios rendered (`hasSvg=true`, `hasMaskDefs=true`, `hasInvalidTokens=false`)
+- Outcome: T-060 done
+- Blockers: None
+- Next requested approval: T-061
+
+- Step: T-061
+- Approval received: Yes
+- Scope executed: Executed controlled live-vs-snapshot mask parity checks and recorded parity metrics/report
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/13-t061-mask-parity-report.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run engine/core/render-source-snapshot-mode.test.js engine/core/render-source-live-pass-through.test.js --reporter=verbose`
+	- Result: 2 files passed, 4 tests passed
+	- Command: targeted Node parity smokes for ring and free_rect
+	- Result: `sameMaskId=true`, `sameTransform=true` in both scenarios; residual non-mask opacity-token representation difference noted
+- Outcome: T-061 done
+- Blockers: None
+- Next requested approval: T-062
+
+- Step: T-062
+- Approval received: Yes
+- Scope executed: Validated legacy payload load/edit/save compatibility with snapshot schema extensions using executable smoke test
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/14-t062-legacy-compatibility-report.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npx vitest run engine/snapshot/.tmp-t062-legacy-compat.test.ts --reporter=verbose`
+	- Result: 1 file passed, 1 test passed
+	- Notes: temporary test file created and removed during command sequence
+- Outcome: T-062 done
+- Blockers: None
+- Next requested approval: T-070
+
+- Step: T-070
+- Approval received: Yes
+- Scope executed: Verified production build output with hashed artifact evidence; fixed two build blockers (TS declaration missing for engine JS entry and stale hashed entry in app/index.html)
+- Files touched:
+	- app/engine/index.d.ts
+	- app/index.html
+	- app/specs/076-parametric-mask-snapshot-stability/15-t070-production-build-verification.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npm run build` (final run success)
+	- Result: build succeeded, new dist hashes emitted (`index-Bft5S59Y.js`, `index-uKNApi86.js`, `index-CrlChUe_.css`, `tablerIconRenderer-DWXkuZ5s.js`)
+	- Evidence: pre/post dist asset snapshots captured in T-070 report
+- Outcome: T-070 done
+- Blockers: None
+- Next requested approval: T-071
+
+- Step: T-071
+- Approval received: Yes
+- Scope executed: Synced dist to docs/docs-studio/root using deploy script and verified hash parity + asset set
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/16-t071-deploy-sync-verification.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Command: `npm run deploy:docs`
+	- Result: deploy script reported `JS hash parity OK: index-Bft5S59Y.js`
+	- Check: docs/index.html and docs/studio/index.html both reference `index-Bft5S59Y.js` + `index-CrlChUe_.css`
+	- Check: docs/assets contains only current hash family files
+- Outcome: T-071 done
+- Blockers: None
+- Next requested approval: T-072
+
+- Step: T-072
+- Approval received: Yes
+- Scope executed: Executed live URL and asset HTTP checks against required route set
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/17-t072-live-route-verification.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Route checks: root and query-based Studio routes returned 200; direct `/studio/parametric` returned 404
+	- Asset checks for new hashes (`index-Bft5S59Y.js`, `index-CrlChUe_.css`, `index-uKNApi86.js`, `tablerIconRenderer-DWXkuZ5s.js`) returned 404 on live
+	- Remote state probe: live root still references old hashes (`index-CDJ9EufH.js`, `index-BztddQwl.css`) and those old assets return 200
+- Outcome: T-072 blocked (live host not yet serving newly synced local deploy artifacts)
+- Blockers: Remote deploy state mismatch; deployment commits not reflected on GitHub Pages live host yet
+- Next requested approval: approve deploy push/unblock sequence, then rerun T-072

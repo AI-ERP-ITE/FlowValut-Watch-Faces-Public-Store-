@@ -15,6 +15,9 @@ import {
 } from '@/lib/effects/legacyEffectNormalization';
 import { normalizeDepthEffectRecord, normalizeDropShadowForBake } from '@/lib/effectNormalization';
 import { mapCanvasPointToLocal as mapCanvasPointToLocalShared, mapLocalPointToCanvas as mapLocalPointToCanvasShared } from '@/lib/maskFrame';
+import type { ParametricElementRenderState, ParametricSnapshotStatus } from '@/types';
+import { createElementSnapshot } from '../engine/snapshot/snapshotRenderer';
+import { deleteElementSnapshot, refreshElementSnapshotStatus, resolveElementSnapshotStatus, setElementRenderSourceMode, setElementSnapshot } from '../engine/snapshot/snapshotStorage';
 import {
   pushHistoryCommand,
   redoHistory,
@@ -36,6 +39,7 @@ type TemplateElement = Record<string, unknown> & {
   mask?: Record<string, unknown>;
   gradient?: Record<string, unknown>;
   params?: Record<string, unknown>;
+  renderState?: ParametricElementRenderState;
   placement?: { mode?: string; config?: Record<string, unknown> };
   symmetry?: { mode?: string; config?: Record<string, unknown> };
 };
@@ -672,6 +676,15 @@ function ensureElement(element: TemplateElement, fallbackIndex = 0): TemplateEle
   const type = typeof element.type === 'string' ? element.type : 'element';
   const role = typeof element.role === 'string' ? element.role : type;
   const name = typeof element.name === 'string' && element.name.trim().length > 0 ? element.name.trim() : `${type}-${fallbackIndex + 1}`;
+  const rawRenderState = element.renderState && typeof element.renderState === 'object'
+    ? element.renderState as ParametricElementRenderState
+    : {};
+  const sourceMode = rawRenderState.sourceMode === 'snapshot' ? 'snapshot' : 'live';
+  const snapshotStatusRaw = rawRenderState.snapshotStatus;
+  const snapshotStatus: ParametricSnapshotStatus =
+    snapshotStatusRaw === 'fresh' || snapshotStatusRaw === 'outdated' || snapshotStatusRaw === 'missing'
+      ? snapshotStatusRaw
+      : 'missing';
   return {
     ...element,
     id: typeof element.id === 'string' ? element.id : makeId('el'),
@@ -679,6 +692,14 @@ function ensureElement(element: TemplateElement, fallbackIndex = 0): TemplateEle
     role,
     name,
     visible: element.visible !== false,
+    renderState: {
+      ...rawRenderState,
+      sourceMode,
+      snapshotStatus,
+      snapshot: rawRenderState.snapshot && typeof rawRenderState.snapshot === 'object'
+        ? { ...rawRenderState.snapshot }
+        : null,
+    },
     params: element.params && typeof element.params === 'object' ? { ...element.params } : {},
     placement:
       element.placement && typeof element.placement === 'object'
@@ -865,6 +886,7 @@ export default function ParametricPage() {
   const [freeObjectShapeType, setFreeObjectShapeType] = useState<string>('free_rect');
   const [quickNewCategory, setQuickNewCategory] = useState<string>('General');
   const [libraryNameDrafts, setLibraryNameDrafts] = useState<Record<string, string>>({});
+  const [isSnapshotActionRunning, setIsSnapshotActionRunning] = useState(false);
 
   const [draftJson, setDraftJson] = useState(
     JSON.stringify(
@@ -978,6 +1000,32 @@ export default function ParametricPage() {
   }, [workingTemplate, selectedElementId]);
 
   const selectedElement = selectedIndex >= 0 && workingTemplate ? workingTemplate.elements[selectedIndex] : null;
+  const selectedRenderSourceMode = selectedElement?.renderState?.sourceMode === 'snapshot' ? 'snapshot' : 'live';
+  const selectedSnapshotStatus: ParametricSnapshotStatus = selectedElement
+    ? resolveElementSnapshotStatus(selectedElement as Record<string, unknown>) as ParametricSnapshotStatus
+    : 'missing';
+  const selectedHasSnapshot = !!(
+    selectedElement
+    && selectedElement.renderState
+    && typeof selectedElement.renderState === 'object'
+    && selectedElement.renderState.snapshot
+    && typeof selectedElement.renderState.snapshot === 'object'
+    && typeof selectedElement.renderState.snapshot.imageDataUrl === 'string'
+    && selectedElement.renderState.snapshot.imageDataUrl.trim().length > 0
+  );
+  const canCreateSnapshot = !isSnapshotActionRunning && !!selectedElement?.id;
+  const canUseSnapshot = !isSnapshotActionRunning && selectedHasSnapshot && selectedRenderSourceMode !== 'snapshot';
+  const canUseLiveRender = !isSnapshotActionRunning && !!selectedElement?.id && selectedRenderSourceMode !== 'live';
+  const canDeleteSnapshot = !isSnapshotActionRunning && selectedHasSnapshot;
+  const snapshotActionHint = isSnapshotActionRunning
+    ? 'Snapshot action running. Wait until it finishes.'
+    : !selectedElement?.id
+      ? 'Select a valid element to use snapshot actions.'
+      : !selectedHasSnapshot
+        ? 'Create Snapshot first, then Use Snapshot or Delete Snapshot.'
+        : selectedRenderSourceMode === 'snapshot'
+          ? 'Snapshot mode active. Switch to live render if needed.'
+          : 'Snapshot ready. You can switch source mode or delete snapshot.';
 
   const getPreviousElementName = () => {
     if (!workingTemplate || selectedIndex <= 0) return '';
@@ -2205,6 +2253,100 @@ export default function ParametricPage() {
     setSelectedElementId(mirrorXY.id ?? null);
     setSelectedPanelTarget('element');
     setEditorNotice('Quadrant duplicates created: MX, MY, MXY.');
+  };
+
+  const createSnapshotForSelectedElement = async () => {
+    if (!workingTemplate || !selectedElement || typeof selectedElement.id !== 'string') return;
+    const elementId = selectedElement.id;
+    setIsSnapshotActionRunning(true);
+    try {
+      const snapshot = await createElementSnapshot({
+        template: deepClone(workingTemplate),
+        elementId,
+        activeStyle: FIXED_RENDER_STYLE,
+        colorControl: {
+          ...DEFAULT_COLOR_CONTROL,
+          colorControl: {
+            ...DEFAULT_COLOR_CONTROL.colorControl,
+            mode: 'off',
+          },
+        },
+      });
+
+      updateTemplateElements((elements) =>
+        elements.map((element) => {
+          if (element.id !== elementId) return element;
+          const withSnapshot = setElementSnapshot(element as Record<string, unknown>, snapshot);
+          const withFreshness = refreshElementSnapshotStatus(withSnapshot as Record<string, unknown>, snapshot.sourceHash);
+          return withFreshness as TemplateElement;
+        }),
+      'Create element snapshot');
+      setEditorNotice('Snapshot created for selected element.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Snapshot creation failed.';
+      setEditorNotice(`Snapshot create failed: ${message}`);
+    } finally {
+      setIsSnapshotActionRunning(false);
+    }
+  };
+
+  const useSnapshotForSelectedElement = () => {
+    if (!selectedElement || typeof selectedElement.id !== 'string') return;
+    if (!selectedHasSnapshot) {
+      setEditorNotice('Use Snapshot failed: no snapshot exists for selected element.');
+      return;
+    }
+    const elementId = selectedElement.id;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== elementId) return element;
+        const withMode = setElementRenderSourceMode(element as Record<string, unknown>, 'snapshot');
+        const withFreshness = refreshElementSnapshotStatus(withMode as Record<string, unknown>);
+        return withFreshness as TemplateElement;
+      }),
+    'Use element snapshot render source');
+    setEditorNotice('Selected element switched to snapshot render source.');
+  };
+
+  const useLiveRenderForSelectedElement = () => {
+    if (!selectedElement || typeof selectedElement.id !== 'string') return;
+    const elementId = selectedElement.id;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== elementId) return element;
+        const withMode = setElementRenderSourceMode(element as Record<string, unknown>, 'live');
+        const withFreshness = refreshElementSnapshotStatus(withMode as Record<string, unknown>);
+        return withFreshness as TemplateElement;
+      }),
+    'Use element live render source');
+    setEditorNotice('Selected element switched to live render source.');
+  };
+
+  const deleteSnapshotForSelectedElement = () => {
+    if (!selectedElement || typeof selectedElement.id !== 'string') return;
+    if (!selectedHasSnapshot) {
+      setEditorNotice('Delete Snapshot skipped: selected element has no snapshot.');
+      return;
+    }
+    const elementLabel = typeof selectedElement.name === 'string' && selectedElement.name.trim().length > 0
+      ? selectedElement.name.trim()
+      : selectedElement.id;
+    const confirmed = window.confirm(
+      `Delete snapshot for "${elementLabel}"? This removes baked image data and switches source mode to live.`,
+    );
+    if (!confirmed) {
+      setEditorNotice('Delete Snapshot cancelled.');
+      return;
+    }
+    const elementId = selectedElement.id;
+    updateTemplateElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== elementId) return element;
+        const next = deleteElementSnapshot(element as Record<string, unknown>);
+        return next as TemplateElement;
+      }),
+    'Delete element snapshot');
+    setEditorNotice('Snapshot deleted for selected element.');
   };
 
   const saveDraftToLibrary = () => {
@@ -6960,6 +7102,64 @@ export default function ParametricPage() {
                   >
                     Collapse All Effects
                   </button>
+                </div>
+
+                <div className="space-y-2 rounded border border-zinc-800 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-zinc-400">Snapshot Render Source</p>
+                  <p className="text-[11px] text-zinc-500">
+                    Current mode: {selectedRenderSourceMode}. Snapshot status: {selectedSnapshotStatus}.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-zinc-400">Status</span>
+                    <span
+                      className={`rounded border px-2 py-0.5 text-[10px] uppercase tracking-wide ${selectedSnapshotStatus === 'fresh'
+                        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300'
+                        : selectedSnapshotStatus === 'outdated'
+                          ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                          : 'border-zinc-600 bg-zinc-800/80 text-zinc-300'}`}
+                    >
+                      {selectedSnapshotStatus}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500">{snapshotActionHint}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { void createSnapshotForSelectedElement(); }}
+                      disabled={!canCreateSnapshot}
+                      title={!canCreateSnapshot ? snapshotActionHint : 'Capture a new baked snapshot for this element'}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSnapshotActionRunning ? 'Creating...' : 'Create Snapshot'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={useSnapshotForSelectedElement}
+                      disabled={!canUseSnapshot}
+                      title={!canUseSnapshot ? snapshotActionHint : 'Render this element from stored snapshot'}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Use Snapshot
+                    </button>
+                    <button
+                      type="button"
+                      onClick={useLiveRenderForSelectedElement}
+                      disabled={!canUseLiveRender}
+                      title={!canUseLiveRender ? snapshotActionHint : 'Render this element from live procedural pipeline'}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Use Live Render
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deleteSnapshotForSelectedElement}
+                      disabled={!canDeleteSnapshot}
+                      title={!canDeleteSnapshot ? snapshotActionHint : 'Delete stored snapshot (confirmation required)'}
+                      className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Delete Snapshot
+                    </button>
+                  </div>
                 </div>
 
                 <label className="block space-y-1">

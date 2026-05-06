@@ -922,20 +922,22 @@ function buildGradientOverlayDefs(localId, gradient) {
 function resolveClipMaskBody(clipConfig, context, fallbackBody, currentElementName = "") {
 	if (!clipConfig || clipConfig.enabled !== true) return fallbackBody;
 
+	const registry = context.layerMaskRegistry && typeof context.layerMaskRegistry === "object" ? context.layerMaskRegistry : {};
+	const currentName = typeof currentElementName === "string" ? currentElementName.trim() : "";
 	const explicitTarget = typeof clipConfig.targetName === "string" ? clipConfig.targetName.trim() : "";
 	const inheritedTarget = clipConfig.inheritPrevious === true && typeof context.previousElementName === "string"
 		? context.previousElementName.trim()
 		: "";
-	const resolvedTarget = explicitTarget || inheritedTarget;
-	if (!resolvedTarget) return fallbackBody;
-	if (typeof currentElementName === "string" && currentElementName.trim().length > 0 && resolvedTarget === currentElementName.trim()) {
-		return fallbackBody;
-	}
+	const candidates = [];
+	if (explicitTarget.length > 0) candidates.push(explicitTarget);
+	if (inheritedTarget.length > 0 && inheritedTarget !== explicitTarget) candidates.push(inheritedTarget);
 
-	const registry = context.layerMaskRegistry && typeof context.layerMaskRegistry === "object" ? context.layerMaskRegistry : {};
-	const targetBody = registry[resolvedTarget];
-	if (typeof targetBody === "string" && targetBody.length > 0) {
-		return targetBody;
+	for (const candidate of candidates) {
+		if (currentName.length > 0 && candidate === currentName) continue;
+		const targetBody = registry[candidate];
+		if (typeof targetBody === "string" && targetBody.length > 0) {
+			return targetBody;
+		}
 	}
 
 	return fallbackBody;
@@ -1275,13 +1277,18 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			maskBody: resolveClipMaskBody(layerMaterial.clip, context, localUvInputBody, currentElementName),
 		}))
 		: [];
+	const maskRegionX = -layoutMetrics.width;
+	const maskRegionY = -layoutMetrics.height;
+	const maskRegionWidth = layoutMetrics.width * 2;
+	const maskRegionHeight = layoutMetrics.height * 2;
 	const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
-	const textureMasksMarkup = textureDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
+	const textureMasksMarkup = textureDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskUnits=\"userSpaceOnUse\" maskContentUnits=\"userSpaceOnUse\" x=\"${maskRegionX}\" y=\"${maskRegionY}\" width=\"${maskRegionWidth}\" height=\"${maskRegionHeight}\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
 	const gradientDefsMarkup = gradientDefs.map((entry) => entry.def.defs).join("");
-	const gradientMasksMarkup = gradientDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
-	const materialMasksMarkup = materialDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskContentUnits=\"userSpaceOnUse\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
+	const gradientMasksMarkup = gradientDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskUnits=\"userSpaceOnUse\" maskContentUnits=\"userSpaceOnUse\" x=\"${maskRegionX}\" y=\"${maskRegionY}\" width=\"${maskRegionWidth}\" height=\"${maskRegionHeight}\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
+	const materialMasksMarkup = materialDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskUnits=\"userSpaceOnUse\" maskContentUnits=\"userSpaceOnUse\" x=\"${maskRegionX}\" y=\"${maskRegionY}\" width=\"${maskRegionWidth}\" height=\"${maskRegionHeight}\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
 	const defs = `<defs>${filterDef}${elementMaskDef.defs}${textureDefsMarkup}${gradientDefsMarkup}${textureMasksMarkup}${gradientMasksMarkup}${materialMasksMarkup}</defs>`;
 	const filterAttr = filterDef.length > 0 ? ` filter=\"url(#${filterId})\"` : "";
+	const elementMaskAttr = elementMaskDef.active ? ` mask=\"url(#${elementMaskId})\"` : "";
 
 	const textureOverlay = textureDefs
 		.map((entry) => {
@@ -1325,7 +1332,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		? `<g mask=\"url(#${elementMaskId})\">${overlayMarkup}</g>`
 		: overlayMarkup;
 
-	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${visibleOverlayMarkup}</g>`;
+	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}${elementMaskAttr}>${filterInputBody}</g>${visibleOverlayMarkup}</g>`;
 }
 
 function renderLayoutBase(composition, context) {
@@ -1393,6 +1400,74 @@ function applyColorControlToParams(params, context, path = "") {
 	return out;
 }
 
+function resolveElementRenderSourceMode(element = {}) {
+	if (!element || typeof element !== "object") return "live";
+	const renderState = element.renderState && typeof element.renderState === "object" ? element.renderState : {};
+	return renderState.sourceMode === "snapshot" ? "snapshot" : "live";
+}
+
+function escapeAttribute(value) {
+	return String(value)
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
+function resolveSnapshotRenderSource(element = {}, layoutMetrics = {}) {
+	if (!element || typeof element !== "object") return null;
+	const renderState = element.renderState && typeof element.renderState === "object" ? element.renderState : {};
+	const snapshot = renderState.snapshot && typeof renderState.snapshot === "object" ? renderState.snapshot : null;
+	if (!snapshot) return null;
+
+	const imageDataUrl = typeof snapshot.imageDataUrl === "string" ? snapshot.imageDataUrl.trim() : "";
+	if (!imageDataUrl) return null;
+
+	const fallbackWidth = Number(layoutMetrics?.width) || 100;
+	const fallbackHeight = Number(layoutMetrics?.height) || 100;
+	const width = Math.max(1, Number(snapshot.width) || fallbackWidth);
+	const height = Math.max(1, Number(snapshot.height) || fallbackHeight);
+	const opacity = clamp(
+		element.opacity,
+		0,
+		1,
+		clamp(element?.params?.opacity, 0, 1, 1),
+	);
+
+	return {
+		imageDataUrl,
+		width,
+		height,
+		opacity,
+	};
+}
+
+function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
+	const requestedMode = resolveElementRenderSourceMode(element);
+	if (requestedMode !== "snapshot") {
+		return {
+			requestedMode,
+			effectiveMode: "live",
+			snapshotSource: null,
+		};
+	}
+
+	const snapshotSource = resolveSnapshotRenderSource(element, layoutMetrics);
+	if (!snapshotSource) {
+		return {
+			requestedMode,
+			effectiveMode: "live-fallback",
+			snapshotSource: null,
+		};
+	}
+
+	return {
+		requestedMode,
+		effectiveMode: "snapshot",
+		snapshotSource,
+	};
+}
+
 export function renderElement(element, context = {}, elementIndex = 0) {
 	const safeElement = requireObject(element, "element");
 	if (typeof safeElement.type !== "string" || safeElement.type.trim().length === 0) {
@@ -1409,15 +1484,22 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 		...(safeElement.params || {}),
 	};
 	const renderParams = applyColorControlToParams(mergedParams, context);
+	const requestedRenderSourceMode = resolveElementRenderSourceMode(safeElement);
 
 	return positions
 		.map((position, positionIndex) => {
+			if (safeElement.visible === false) return "";
 			const width = Number(context?.layoutMetrics?.width) || 100;
 			const height = Number(context?.layoutMetrics?.height) || 100;
 			const x = (Number(position.x) / 100) * width;
 			const y = (Number(position.y) / 100) * height;
 			const rotation = Number.isFinite(Number(position.rotation)) ? Number(position.rotation) : 0;
-			const bodyRaw = definition.render(renderParams, position, context);
+			const renderSourceDecision = resolveElementRenderSourceDecision(safeElement, context.layoutMetrics);
+			const snapshotSource = renderSourceDecision.snapshotSource;
+			const useSnapshotSource = renderSourceDecision.effectiveMode === "snapshot" && snapshotSource !== null;
+			const bodyRaw = useSnapshotSource
+				? `<image x="${-snapshotSource.width / 2}" y="${-snapshotSource.height / 2}" width="${snapshotSource.width}" height="${snapshotSource.height}" preserveAspectRatio="none" href="${escapeAttribute(snapshotSource.imageDataUrl)}" opacity="${snapshotSource.opacity.toFixed(3)}" />`
+				: definition.render(renderParams, position, context);
 			const reshape = resolveRectLayoutReshape(safeElement, context);
 			const body = reshape.enabled
 				? `<g transform=\"scale(${reshape.sx.toFixed(6)} ${reshape.sy.toFixed(6)})\">${bodyRaw}</g>`
@@ -1427,12 +1509,14 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				context.layerMaskRegistry[safeElement.name.trim()] = worldBody;
 			}
 
-			const styleAdjust = normalizeStyleAdjust(
+			const styleAdjust = useSnapshotSource
+				? normalizeStyleAdjust({ enabled: false, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 }, { enabled: false, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 })
+				: normalizeStyleAdjust(
 				{
 					...(safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? safeElement.styleAdjust : {}),
 					...(renderParams.styleAdjust && typeof renderParams.styleAdjust === "object" ? renderParams.styleAdjust : {}),
 				},
-				{ enabled: true, contrast: 1, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 },
+				{ enabled: true, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 },
 			);
 			const textureLayersFromElement = Array.isArray(safeElement.textureLayers)
 				? safeElement.textureLayers.filter((entry) => entry && typeof entry === "object")
@@ -1446,9 +1530,11 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.texture && typeof safeElement.texture === "object" ? safeElement.texture : {}),
 					...(renderParams.texture && typeof renderParams.texture === "object" ? renderParams.texture : {}),
 				}];
-			const textureLayers = textureLayerSources.map((entry) =>
-				normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
-			);
+			const textureLayers = useSnapshotSource
+				? []
+				: textureLayerSources.map((entry) =>
+					normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
+				);
 			const gradientLayersFromElement = Array.isArray(safeElement.gradientLayers)
 				? safeElement.gradientLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1461,9 +1547,11 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.gradient && typeof safeElement.gradient === "object" ? safeElement.gradient : {}),
 					...(renderParams.gradientOverlay && typeof renderParams.gradientOverlay === "object" ? renderParams.gradientOverlay : {}),
 				}];
-			const gradientLayers = gradientLayerSources.map((entry) =>
-				normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
-			);
+			const gradientLayers = useSnapshotSource
+				? []
+				: gradientLayerSources.map((entry) =>
+					normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
+				);
 			const materialLayersFromElement = Array.isArray(safeElement.materialLayers)
 				? safeElement.materialLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1476,10 +1564,14 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.material && typeof safeElement.material === "object" ? safeElement.material : {}),
 					...(renderParams.material && typeof renderParams.material === "object" ? renderParams.material : {}),
 				}];
-			const materialLayers = materialLayerSources.map((entry) =>
-				normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
-			);
-			const depth = context.globalDepthEnabled
+			const materialLayers = useSnapshotSource
+				? []
+				: materialLayerSources.map((entry) =>
+					normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
+				);
+			const depth = useSnapshotSource
+				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
+				: context.globalDepthEnabled
 				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
 				: normalizeDepthEffect(
 					{
@@ -1488,13 +1580,25 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					},
 					null,
 				);
-			const dropShadow = normalizeDropShadowEffect(
+			const dropShadow = useSnapshotSource
+				? normalizeDropShadowEffect({ enabled: false, opacity: 0, blur: 0, offsetX: 0, offsetY: 0, color: "#000000" })
+				: normalizeDropShadowEffect(
 				{
 					...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
 					...(renderParams.dropShadow && typeof renderParams.dropShadow === "object" ? renderParams.dropShadow : {}),
 				},
 			);
 			const localId = `el-${elementIndex}-${positionIndex}`;
+			if (context && typeof context === "object") {
+				if (!context.renderSourceModeByLayer || typeof context.renderSourceModeByLayer !== "object") {
+					context.renderSourceModeByLayer = {};
+				}
+				context.renderSourceModeByLayer[localId] = renderSourceDecision.effectiveMode;
+				if (!context.renderSourceRequestedModeByLayer || typeof context.renderSourceRequestedModeByLayer !== "object") {
+					context.renderSourceRequestedModeByLayer = {};
+				}
+				context.renderSourceRequestedModeByLayer[localId] = requestedRenderSourceMode;
+			}
 			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
 			const elementMask = safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null;
 			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask);
@@ -1540,7 +1644,7 @@ export function renderSvg(resolvedComposition, context = {}) {
 		.join("");
 	const globalDepthId = "globalDepthFx";
 	const globalDepthDef = renderContext.globalDepthEnabled
-		? buildLayerFilterDef(globalDepthId, { enabled: false, contrast: 1, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0, color: null }, depthEffect)
+		? buildLayerFilterDef(globalDepthId, { enabled: false, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0, color: null }, depthEffect)
 		: "";
 	if (context && typeof context === "object") {
 		context.silhouetteSurfaceCacheByLayer = renderContext.silhouetteSurfaceCacheByLayer;

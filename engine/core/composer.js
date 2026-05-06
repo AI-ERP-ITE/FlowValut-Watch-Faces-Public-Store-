@@ -101,6 +101,7 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			type: element.type,
 			role: element.role,
 			visible: element.visible,
+			opacity: element.opacity,
 			materialRef: materialKey,
 			params: {
 				...(material || {}),
@@ -117,6 +118,7 @@ export function compose(geometry, styleName, styles, materials, paramOverrides =
 			dropShadow: element.dropShadow && typeof element.dropShadow === "object" ? { ...element.dropShadow } : null,
 			styleAdjust: element.styleAdjust && typeof element.styleAdjust === "object" ? { ...element.styleAdjust } : null,
 			effect3d: element.effect3d && typeof element.effect3d === "object" ? { ...element.effect3d } : null,
+			renderState: element.renderState && typeof element.renderState === "object" ? cloneDeep(element.renderState) : null,
 			placement: element.placement ? { ...element.placement, config: { ...(element.placement.config || {}) } } : null,
 			symmetry: element.symmetry ? { ...element.symmetry, config: { ...(element.symmetry.config || {}) } } : { mode: "none", config: {} },
 		};

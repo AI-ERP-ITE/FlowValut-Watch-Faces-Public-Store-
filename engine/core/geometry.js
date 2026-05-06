@@ -85,6 +85,7 @@ export function buildGeometry(template) {
 			type: safeElement.type,
 			role: safeElement.role,
 			visible: safeElement.visible,
+			opacity: safeElement.opacity,
 			materialRef: safeElement.materialRef,
 			params: { ...safeElement.params },
 			material: safeElement.material && typeof safeElement.material === "object" ? { ...safeElement.material } : null,
@@ -97,6 +98,7 @@ export function buildGeometry(template) {
 			dropShadow: safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? { ...safeElement.dropShadow } : null,
 			styleAdjust: safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? { ...safeElement.styleAdjust } : null,
 			effect3d: safeElement.effect3d && typeof safeElement.effect3d === "object" ? { ...safeElement.effect3d } : null,
+			renderState: safeElement.renderState && typeof safeElement.renderState === "object" ? cloneDeep(safeElement.renderState) : null,
 			placement,
 			symmetry,
 		};

@@ -225,6 +225,13 @@ export interface KimiResponse {
   };
 }
 
+export type {
+  ParametricElementRenderState,
+  ParametricElementSnapshot,
+  ParametricRenderSourceMode,
+  ParametricSnapshotStatus,
+} from './parametric';
+
 export interface ElementImage {
   name: string;
   dataUrl: string;
