@@ -25,8 +25,10 @@ Use this file to track approved execution step-by-step.
 - T-062 (legacy project compatibility): Completed
 - T-070 (production build verification): Completed
 - T-071 (deploy sync docs/studio): Completed
-- T-072 (live route verification): Blocked
-- Pending: User approval to unblock deploy push and rerun T-072
+- T-072 (live route verification): Completed
+- T-073 (deployment evidence capture): Completed
+- T-080 (final review pass): Completed
+- Pending: None
 
 ## Execution Entries
 
@@ -352,3 +354,83 @@ Use this file to track approved execution step-by-step.
 - Outcome: T-072 blocked (live host not yet serving newly synced local deploy artifacts)
 - Blockers: Remote deploy state mismatch; deployment commits not reflected on GitHub Pages live host yet
 - Next requested approval: approve deploy push/unblock sequence, then rerun T-072
+
+- Step: T-072 (post-push recheck)
+- Approval received: Yes
+- Scope executed: Pushed approved deploy commit and reran live route/asset checks
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/17-t072-live-route-verification.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Push: `git push origin main` -> commit `e64295f`
+	- Live root still references old hashes (`index-CDJ9EufH.js`, `index-BztddQwl.css`)
+	- New hash assets still 404 on live host
+	- Direct route `/Watch-Faces/studio/parametric` still 404
+- Outcome: T-072 remains blocked pending GitHub Pages publish propagation
+- Blockers: Remote live site not yet updated after push
+- Next requested approval: rerun T-072 once Pages publish completes
+
+- Step: T-072 (post-push recheck #2)
+- Approval received: Yes
+- Scope executed: Added direct-route deploy artifact path (`docs/studio/parametric/index.html`) and reran full live route/asset checks
+- Files touched:
+	- app/scripts/deployDistToDocs.mjs
+	- app/docs/studio/parametric/index.html
+	- app/specs/076-parametric-mask-snapshot-stability/17-t072-live-route-verification.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Push: `git push origin main` -> commit `1864561`
+	- Assets: all expected new hashes now return 200 on live host
+	- Routes: root and query-based Studio routes 200; direct `/Watch-Faces/studio/parametric` remains 404
+	- Additional probes for `/studio/index.html` and `/studio/parametric/index.html` also 404
+- Outcome: T-072 remains blocked (direct studio path family unresolved on live host)
+- Blockers: Host-level direct path routing behavior still rejects `/studio/*` despite deployed query-path SPA success
+- Next requested approval: investigate host route mapping policy or accept query-route verification as completion criterion
+
+- Step: T-072 (final recheck resolved)
+- Approval received: Yes
+- Scope executed: Completed additional deploy mirror fix for root studio routes, pushed updates, and reran final live route/asset checks
+- Files touched:
+	- app/scripts/deployDistToDocs.mjs
+	- app/studio/index.html
+	- app/studio/parametric/index.html
+	- app/specs/076-parametric-mask-snapshot-stability/17-t072-live-route-verification.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Pushes: `eac483f` (root studio route mirror) and prior deploy commits available on `origin/main`
+	- Final route checks: required routes all resolve 200 (direct `/studio/parametric` resolves via canonical redirect)
+	- Final asset checks: expected deployed hash assets all return 200
+- Outcome: T-072 done
+- Blockers: None
+- Next requested approval: T-073
+
+- Step: T-073
+- Approval received: Yes
+- Scope executed: Captured deployment evidence (commit hashes, remote head, live bundle hash, final route/asset evidence)
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/18-t073-deployment-evidence.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- `git rev-parse HEAD` and `git log --oneline -n 5`
+	- Live root hash extraction from `https://ai-erp-ite.github.io/Watch-Faces/`
+	- Cross-check with final T-072 200 route/asset checks
+- Outcome: T-073 done
+- Blockers: None
+- Next requested approval: T-080
+
+- Step: T-080
+- Approval received: Yes
+- Scope executed: Performed final consolidated review across all gate artifacts, mapped validation matrix coverage (V-001..V-010), and documented residual risk acceptance
+- Files touched:
+	- app/specs/076-parametric-mask-snapshot-stability/19-t080-final-review-pass.md
+	- app/specs/076-parametric-mask-snapshot-stability/04-tasks.md
+	- app/specs/076-parametric-mask-snapshot-stability/09-progress-log.md
+- Validation performed:
+	- Cross-review of final gate reports (`11` through `18`)
+	- Checklist reconciliation against `06-review-checklist.md`
+	- Residual risk reconciliation against `08-risk-rollback.md`
+- Outcome: T-080 done
+- Blockers: None
+- Next requested approval: None

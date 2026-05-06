@@ -70,3 +70,87 @@ Done criteria not met yet because all required target routes/assets are not HTTP
 1. Push deployment commits to remote branch used by GitHub Pages.
 2. Wait for Pages publish.
 3. Re-run T-072 URL and asset checks.
+
+## Post-Push Recheck
+
+Push executed:
+
+1. Branch: `main`
+2. Remote: `origin`
+3. Commit: `e64295f`
+
+Recheck result immediately after push:
+
+```json
+{"live_js":"index-CDJ9EufH.js","live_css":"index-BztddQwl.css","status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/studio/parametric","Status":"ERROR","Message":"The remote server returned an error: (404) Not Found."}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/index-Bft5S59Y.js","Status":"ERROR","Message":"The remote server returned an error: (404) Not Found."}
+```
+
+Interpretation:
+
+1. Live host still serves previous bundle set after push.
+2. GitHub Pages publish propagation is still pending.
+3. T-072 remains blocked until live host switches to new hash family.
+
+## Post-Push Recheck #2 (Direct Route Fix Commit)
+
+Additional push executed:
+
+1. Branch: `main`
+2. Remote: `origin`
+3. Commit: `1864561`
+4. Change intent: publish `docs/studio/parametric/index.html` via deploy script and committed artifact.
+
+Observed after push #2:
+
+```json
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/?p=/Studio","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/?p=/Studio/parametric","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/studio/parametric","Status":"ERROR","Message":"The remote server returned an error: (404) Not Found."}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/index-Bft5S59Y.js","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/index-CrlChUe_.css","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/index-uKNApi86.js","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/tablerIconRenderer-DWXkuZ5s.js","Status":200}
+```
+
+Additional URL probes:
+
+```json
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/studio/parametric/","Status":"ERROR","Message":"The remote server returned an error: (404) Not Found."}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/studio/parametric/index.html","Status":"ERROR","Message":"The remote server returned an error: (404) Not Found."}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/studio/index.html","Status":"ERROR","Message":"The remote server returned an error: (404) Not Found."}
+```
+
+Interpretation:
+
+1. New asset family is now live and healthy (all expected assets 200).
+2. Query-path SPA routes are healthy.
+3. Direct studio path family remains 404 on host and still fails T-072 done criteria.
+
+## Final Recheck (Resolved)
+
+After latest publish propagation and route mirror updates, direct route now resolves via canonical trailing-slash redirect.
+
+Observed:
+
+```json
+{"Status":200,"Final":"https://ai-erp-ite.github.io/Watch-Faces/studio/parametric/","Len":3722}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/?p=/Studio","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/?p=/Studio/parametric","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/studio/parametric","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/index-Bft5S59Y.js","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/index-CrlChUe_.css","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/index-uKNApi86.js","Status":200}
+{"Url":"https://ai-erp-ite.github.io/Watch-Faces/assets/tablerIconRenderer-DWXkuZ5s.js","Status":200}
+```
+
+## T-072 Conclusion (Final)
+
+T-072 acceptance met.
+
+1. All required target routes resolve.
+2. Deployed asset URLs return 200.
+3. Live site now serves expected hash family.

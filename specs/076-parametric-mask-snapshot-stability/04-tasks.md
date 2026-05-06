@@ -198,14 +198,14 @@ Status: Done
 Inputs: deployed URLs
 Output: verification report for root, SPA deep link, and parametric route
 Done criteria: all target routes load and asset URLs return 200
-Status: Blocked
+Status: Done
 
 ### T-073 Deployment evidence capture
 
 Inputs: git history and asset hash
 Output: commit hashes + bundle hash report
 Done criteria: evidence documented in deployment report
-Status: Not Started
+Status: Done
 
 ## Gate 9 - Final Review
 
@@ -214,4 +214,4 @@ Status: Not Started
 Inputs: all previous outputs
 Output: consolidated completion report
 Done criteria: residual risks documented and accepted
-Status: Not Started
+Status: Done
