@@ -58,6 +58,13 @@ function sanitizeElementForEngine(source: TemplateElement): TemplateElement {
   const next = deepClone(source);
   delete next.id;
   delete next.visible;
+  // Always bake from procedural live source to include current effect stack.
+  if (next.renderState && typeof next.renderState === 'object') {
+    next.renderState = {
+      ...(next.renderState as Record<string, unknown>),
+      sourceMode: 'live',
+    };
+  }
   return next;
 }
 
