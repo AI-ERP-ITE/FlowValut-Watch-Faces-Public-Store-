@@ -17,11 +17,26 @@ interface FirebaseWebConfig {
   appId: string;
 }
 
+const FALLBACK_FIREBASE_CONFIG: FirebaseWebConfig = {
+  apiKey: 'AIzaSyCz6av7Wqu4yEE_ATEgN3ObFrPtnPj65Zk',
+  authDomain: 'zeppfaceloader-b0b106e9.firebaseapp.com',
+  projectId: 'zeppfaceloader-b0b106e9',
+  appId: '1:63546256310:web:ba4ae563ed321776e9ef17',
+};
+
 function getFirebaseConfig(): FirebaseWebConfig | null {
-  const apiKey = (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined)?.trim();
-  const authDomain = (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined)?.trim();
-  const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined)?.trim();
-  const appId = (import.meta.env.VITE_FIREBASE_APP_ID as string | undefined)?.trim();
+  const apiKey =
+    (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined)?.trim() ||
+    FALLBACK_FIREBASE_CONFIG.apiKey;
+  const authDomain =
+    (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined)?.trim() ||
+    FALLBACK_FIREBASE_CONFIG.authDomain;
+  const projectId =
+    (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined)?.trim() ||
+    FALLBACK_FIREBASE_CONFIG.projectId;
+  const appId =
+    (import.meta.env.VITE_FIREBASE_APP_ID as string | undefined)?.trim() ||
+    FALLBACK_FIREBASE_CONFIG.appId;
 
   if (!apiKey || !authDomain || !projectId || !appId) {
     return null;
