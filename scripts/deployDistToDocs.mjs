@@ -77,6 +77,7 @@ async function main() {
   const docsAssets = path.join(docsDir, 'assets');
   const docsIndex = path.join(docsDir, 'index.html');
   const docsStudioIndex = path.join(docsDir, 'studio', 'index.html');
+  const docsStudioParametricIndex = path.join(docsDir, 'studio', 'parametric', 'index.html');
   const distIndex = path.join(distDir, 'index.html');
 
   const distHtml = await readText(distIndex);
@@ -92,15 +93,24 @@ async function main() {
 
   await writeText(docsIndex, distHtml);
   await writeText(docsStudioIndex, distHtml);
+  await writeText(docsStudioParametricIndex, distHtml);
 
-  const [docsHtml, studioHtml] = await Promise.all([readText(docsIndex), readText(docsStudioIndex)]);
+  const [docsHtml, studioHtml, studioParametricHtml] = await Promise.all([
+    readText(docsIndex),
+    readText(docsStudioIndex),
+    readText(docsStudioParametricIndex),
+  ]);
   assertNoSourceEntry(docsHtml, 'docs/index.html');
   assertNoSourceEntry(studioHtml, 'docs/studio/index.html');
+  assertNoSourceEntry(studioParametricHtml, 'docs/studio/parametric/index.html');
 
   const docsJsHash = extractJsHash(docsHtml);
   const studioJsHash = extractJsHash(studioHtml);
-  if (!docsJsHash || !studioJsHash || docsJsHash !== studioJsHash) {
-    throw new Error(`Hash parity check failed: docs=${docsJsHash || 'none'} studio=${studioJsHash || 'none'}`);
+  const studioParametricJsHash = extractJsHash(studioParametricHtml);
+  if (!docsJsHash || !studioJsHash || !studioParametricJsHash || docsJsHash !== studioJsHash || docsJsHash !== studioParametricJsHash) {
+    throw new Error(
+      `Hash parity check failed: docs=${docsJsHash || 'none'} studio=${studioJsHash || 'none'} studioParametric=${studioParametricJsHash || 'none'}`,
+    );
   }
 
   if (mirrorRoot) {
@@ -113,7 +123,9 @@ async function main() {
 
   console.log(`Deploy sync complete for target=${target}`);
   console.log(`JS hash parity OK: ${docsJsHash}`);
-  console.log(`docs updated: ${path.relative(appRoot, docsIndex)} and ${path.relative(appRoot, docsStudioIndex)}`);
+  console.log(
+    `docs updated: ${path.relative(appRoot, docsIndex)}, ${path.relative(appRoot, docsStudioIndex)}, ${path.relative(appRoot, docsStudioParametricIndex)}`,
+  );
   if (mirrorRoot) {
     console.log('Root mirror enabled: index.html + assets synced from dist.');
   }
