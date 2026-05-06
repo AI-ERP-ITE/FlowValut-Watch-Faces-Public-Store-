@@ -116,9 +116,13 @@ async function main() {
   if (mirrorRoot) {
     const rootAssets = path.join(appRoot, 'assets');
     const rootIndex = path.join(appRoot, 'index.html');
+    const rootStudioIndex = path.join(appRoot, 'studio', 'index.html');
+    const rootStudioParametricIndex = path.join(appRoot, 'studio', 'parametric', 'index.html');
     await copyDirContents(distAssets, rootAssets);
     await removeStaleFiles(rootAssets, distAssets);
     await writeText(rootIndex, distHtml);
+    await writeText(rootStudioIndex, distHtml);
+    await writeText(rootStudioParametricIndex, distHtml);
   }
 
   console.log(`Deploy sync complete for target=${target}`);
@@ -127,7 +131,7 @@ async function main() {
     `docs updated: ${path.relative(appRoot, docsIndex)}, ${path.relative(appRoot, docsStudioIndex)}, ${path.relative(appRoot, docsStudioParametricIndex)}`,
   );
   if (mirrorRoot) {
-    console.log('Root mirror enabled: index.html + assets synced from dist.');
+    console.log('Root mirror enabled: index.html + studio entries + assets synced from dist.');
   }
 }
 
