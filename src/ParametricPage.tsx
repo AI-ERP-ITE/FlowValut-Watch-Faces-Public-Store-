@@ -1240,6 +1240,9 @@ export default function ParametricPage() {
       return;
     }
 
+    const now = new Date();
+    const savedAt = `${now.toLocaleTimeString('en-US', { hour12: false })}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+
     const snapshotTheme: ThemeEntry = {
       id: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID,
       name: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME,
@@ -1252,8 +1255,8 @@ export default function ParametricPage() {
         return [...withoutSnapshot, snapshotTheme];
       },
       authConfigured && getCurrentAuthUser()
-        ? 'Progress snapshot saved. Recoverable even if browser cache is cleared.'
-        : 'Progress snapshot saved locally. Sign in to mirror snapshot to Firebase.',
+        ? `Progress snapshot saved at ${savedAt}. Recoverable even if browser cache is cleared.`
+        : `Progress snapshot saved locally at ${savedAt}. Sign in to mirror snapshot to Firebase.`,
     );
   };
 
