@@ -1509,7 +1509,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				context.layerMaskRegistry[safeElement.name.trim()] = worldBody;
 			}
 
-			const styleAdjust = normalizeStyleAdjust(
+			const styleAdjust = useSnapshotSource
+				? normalizeStyleAdjust({ enabled: false, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 }, { enabled: false, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 })
+				: normalizeStyleAdjust(
 				{
 					...(safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? safeElement.styleAdjust : {}),
 					...(renderParams.styleAdjust && typeof renderParams.styleAdjust === "object" ? renderParams.styleAdjust : {}),
@@ -1528,7 +1530,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.texture && typeof safeElement.texture === "object" ? safeElement.texture : {}),
 					...(renderParams.texture && typeof renderParams.texture === "object" ? renderParams.texture : {}),
 				}];
-			const textureLayers = textureLayerSources.map((entry) =>
+			const textureLayers = useSnapshotSource
+				? []
+				: textureLayerSources.map((entry) =>
 					normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
 				);
 			const gradientLayersFromElement = Array.isArray(safeElement.gradientLayers)
@@ -1543,7 +1547,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.gradient && typeof safeElement.gradient === "object" ? safeElement.gradient : {}),
 					...(renderParams.gradientOverlay && typeof renderParams.gradientOverlay === "object" ? renderParams.gradientOverlay : {}),
 				}];
-			const gradientLayers = gradientLayerSources.map((entry) =>
+			const gradientLayers = useSnapshotSource
+				? []
+				: gradientLayerSources.map((entry) =>
 					normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
 				);
 			const materialLayersFromElement = Array.isArray(safeElement.materialLayers)
@@ -1558,10 +1564,14 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.material && typeof safeElement.material === "object" ? safeElement.material : {}),
 					...(renderParams.material && typeof renderParams.material === "object" ? renderParams.material : {}),
 				}];
-			const materialLayers = materialLayerSources.map((entry) =>
+			const materialLayers = useSnapshotSource
+				? []
+				: materialLayerSources.map((entry) =>
 					normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
 				);
-			const depth = context.globalDepthEnabled
+			const depth = useSnapshotSource
+				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
+				: context.globalDepthEnabled
 				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
 				: normalizeDepthEffect(
 					{
@@ -1570,7 +1580,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					},
 					null,
 				);
-			const dropShadow = normalizeDropShadowEffect(
+			const dropShadow = useSnapshotSource
+				? normalizeDropShadowEffect({})
+				: normalizeDropShadowEffect(
 				{
 					...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
 					...(renderParams.dropShadow && typeof renderParams.dropShadow === "object" ? renderParams.dropShadow : {}),
@@ -1588,7 +1600,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				context.renderSourceRequestedModeByLayer[localId] = requestedRenderSourceMode;
 			}
 			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
-			const elementMask = safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null;
+			const elementMask = useSnapshotSource
+				? null
+				: (safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null);
 			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask);
 		})
 		.join("");

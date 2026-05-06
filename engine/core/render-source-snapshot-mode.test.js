@@ -7,11 +7,35 @@ function createSnapshotTemplate() {
     elements: [
       {
         id: 'snap-1',
-        name: 'Snapshot Layer',
-        type: 'ring',
-        role: 'ring',
-        params: { radius: 30, width: 2, fill: '#ffffff' },
+        name: 'Metal Rect Snapshot Layer',
+        type: 'free_rect',
+        role: 'shape',
+        params: {
+          width: 0.36,
+          height: 0.22,
+          cornerRadius: 0.06,
+          fill: '#9aa3b1',
+          stroke: '#e9edf5',
+          thickness: 0.016,
+        },
         opacity: 0.65,
+        materialLayers: [
+          {
+            enabled: true,
+            color: '#9bc0ff',
+            opacity: 0.28,
+            blendMode: 'multiply',
+          },
+        ],
+        dropShadow: {
+          enabled: true,
+          mode: 'outer',
+          color: '#000000',
+          opacity: 0.52,
+          blur: 12,
+          offsetX: 5,
+          offsetY: 4,
+        },
         placement: { mode: 'center', config: { offset: [12, -8], rotation: 33 } },
         symmetry: { mode: 'none', config: {} },
         mask: {
@@ -56,13 +80,15 @@ function createLiveBaselineTemplate() {
 }
 
 describe('render source snapshot mode', () => {
-  it('renders snapshot image source with transform and mask gates', () => {
+  it('renders snapshot image source with transform and no runtime remask/re-filter gates', () => {
     const svg = runEngine({ templateInput: createSnapshotTemplate() });
 
     expect(svg.includes('href="data:image/png;base64,AAAA"')).toBe(true);
     expect(svg.includes('opacity="0.650"')).toBe(true);
     expect(svg.includes('transform="translate(198.4 134.4) rotate(33)"')).toBe(true);
-    expect(svg.includes('mask="url(#layerMask-el-0-0-mask-1-element)"')).toBe(true);
+    expect(svg.includes('mask="url(#layerMask-el-0-0-mask-1-element)"')).toBe(false);
+    expect(svg.includes('filter="url(#layerFx-el-0-0)"')).toBe(false);
+    expect(svg.includes('<filter id="layerFx-el-0-0"')).toBe(false);
   });
 
   it('falls back safely to live rendering when snapshot payload is missing', () => {
