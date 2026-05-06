@@ -3717,6 +3717,23 @@ function StudioApp() {
     }
   }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId]);
 
+  const handleGenerateClick = useCallback(() => {
+    if (state.currentStep === 'generating') {
+      toast.error('Deploy already running. Please wait for completion.');
+      return;
+    }
+
+    if (pointerParityRunning) {
+      toast.error('Pointer parity check is running. Wait for it to finish, then deploy.');
+      return;
+    }
+
+    const now = new Date();
+    const stamp = `${now.toLocaleTimeString('en-US', { hour12: false })}.${String(now.getMilliseconds()).padStart(3, '0')}`;
+    toast.success(`Deploy started at ${stamp}`);
+    void handleGenerate();
+  }, [handleGenerate, pointerParityRunning, state.currentStep]);
+
   // Handle reset
   const handleReset = useCallback(() => {
     dispatch(actions.reset());
@@ -4585,7 +4602,7 @@ function StudioApp() {
             </div>
             <div className="flex flex-wrap gap-3 pt-4 xl:sticky xl:bottom-0 xl:z-20 xl:bg-[#1A1A1A]/95 xl:backdrop-blur xl:pb-2">
               <Button
-                onClick={handleGenerate}
+                onClick={handleGenerateClick}
                 className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"
               >
                 <Sparkles className="h-5 w-5 mr-2" />
