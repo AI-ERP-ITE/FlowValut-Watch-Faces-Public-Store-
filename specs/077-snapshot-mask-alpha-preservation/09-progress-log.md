@@ -142,3 +142,17 @@ Notes:
 4. New deployed bundle hash from T-040 (`index-C0jqmnpy.js`) returned 404 on live asset URL.
 5. Private auth gate renders on live routes, so editor-level behavioral verification cannot be completed without matching bundle deployment.
 6. Updated T-041 status to Blocked pending live hash propagation/source correction.
+
+## P12 - Multi-Clip Alignment Hotfix Deployed, Live Still Pending
+
+Date: 2026-05-07
+Status: Blocked
+Notes:
+1. Implemented renderer fix so texture/gradient/material overlay mask regions use resolved snapshot mask frame metrics, matching silhouette frame alignment.
+2. Added regression coverage for multi-clip stale-fallback transitions.
+3. Focused validation passed: 3 files, 19 tests.
+4. Pushed implementation commit `472b4b3` and deploy commit `7b222df`.
+5. Deploy output reported new JS hash parity: `index-BrvlPMpO.js`.
+6. Immediate live checks (root, `?p=/studio`, `/studio/parametric`) still served prior JS hash `index-C0jqmnpy.js`.
+7. New JS assets returned 404 on live URL at check time, indicating propagation lag/source publish delay.
+8. T-041 remains Blocked until live hash switches to `index-BrvlPMpO.js` (or newer documented hash) and behavior is re-verified.
