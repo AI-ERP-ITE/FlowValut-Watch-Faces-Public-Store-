@@ -15,6 +15,7 @@ import {
 } from '@/lib/effects/legacyEffectNormalization';
 import { normalizeDepthEffectRecord, normalizeDropShadowForBake } from '@/lib/effectNormalization';
 import { mapCanvasPointToLocal as mapCanvasPointToLocalShared, mapLocalPointToCanvas as mapLocalPointToCanvasShared } from '@/lib/maskFrame';
+import { applyMaskValueU8, maskStrength } from '@/lib/maskFieldKernel';
 import type { ParametricElementRenderState, ParametricSnapshotStatus } from '@/types';
 import { createElementSnapshot } from '../engine/snapshot/snapshotRenderer';
 import { deleteElementSnapshot, refreshElementSnapshotStatus, resolveElementSnapshotStatus, setElementRenderSourceMode, setElementSnapshot } from '../engine/snapshot/snapshotStorage';
@@ -3605,7 +3606,7 @@ export default function ParametricPage() {
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
         const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
-        return { ...element, mask: { ...mask, strokes: [] } };
+        return { ...element, mask: resetMaskField({ ...mask, strokes: [] }, element) };
       }),
     );
   };
@@ -3618,13 +3619,14 @@ export default function ParametricPage() {
         const mask = element.mask && typeof element.mask === 'object' ? deepClone(element.mask) as Record<string, unknown> : {};
         const strokes = Array.isArray(mask.strokes) ? [...mask.strokes] : [];
         strokes.push(stroke);
+        const withStroke = {
+          ...mask,
+          coordinateSpace: 'local',
+          strokes,
+        };
         return {
           ...element,
-          mask: {
-            ...mask,
-            coordinateSpace: 'local',
-            strokes,
-          },
+          mask: updateMaskFieldForStroke(withStroke, stroke, element),
         };
       }),
     );
@@ -4627,6 +4629,262 @@ export default function ParametricPage() {
       }
     }
     return next;
+  };
+
+  const clamp01 = (value: number) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+
+  const resolveMaskFieldFrameForElement = (element: TemplateElement | null | undefined) => {
+    const transform = resolveMaskTransformForElement(element);
+    const renderState = element?.renderState && typeof element.renderState === 'object'
+      ? element.renderState as Record<string, unknown>
+      : {};
+    const snapshot = renderState.snapshot && typeof renderState.snapshot === 'object'
+      ? renderState.snapshot as Record<string, unknown>
+      : null;
+    const width = Number(snapshot?.width);
+    const height = Number(snapshot?.height);
+    const resolvedWidth = Number.isFinite(width) && width > 0 ? width : transform.width;
+    const resolvedHeight = Number.isFinite(height) && height > 0 ? height : transform.height;
+    return {
+      width: Math.max(16, Math.min(2048, Math.round(resolvedWidth))),
+      height: Math.max(16, Math.min(2048, Math.round(resolvedHeight))),
+    };
+  };
+
+  const buildMaskFieldDataUrl = (values: Uint8ClampedArray, width: number, height: number) => {
+    if (typeof document === 'undefined') return '';
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    const imageData = ctx.createImageData(width, height);
+    const data = imageData.data;
+    for (let i = 0; i < values.length; i += 1) {
+      const offset = i * 4;
+      data[offset] = 255;
+      data[offset + 1] = 255;
+      data[offset + 2] = 255;
+      data[offset + 3] = values[i];
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL('image/png');
+  };
+
+  const decodeMaskFieldValues = (field: Record<string, unknown> | null, width: number, height: number, initialValue: number) => {
+    const total = width * height;
+    const out = new Uint8ClampedArray(total);
+    out.fill(initialValue);
+    if (!field) return out;
+    const values = Array.isArray(field.values) ? field.values : [];
+    if (values.length !== total) return out;
+    for (let i = 0; i < total; i += 1) {
+      const n = Number(values[i]);
+      out[i] = Number.isFinite(n) ? Math.max(0, Math.min(255, Math.round(n))) : initialValue;
+    }
+    return out;
+  };
+
+  const applyMaskDeltaU8 = (values: Uint8ClampedArray, width: number, height: number, x: number, y: number, action: MaskBrushAction, strength: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const idx = y * width + x;
+    values[idx] = applyMaskValueU8(values[idx], action, strength);
+  };
+
+  const pointInPolygon = (x: number, y: number, polygon: Array<{ x: number; y: number }>) => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+      const xi = polygon[i].x;
+      const yi = polygon[i].y;
+      const xj = polygon[j].x;
+      const yj = polygon[j].y;
+      const intersects = ((yi > y) !== (yj > y))
+        && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 0.000001) + xi);
+      if (intersects) inside = !inside;
+    }
+    return inside;
+  };
+
+  const applySelectionStrokeToField = (
+    values: Uint8ClampedArray,
+    width: number,
+    height: number,
+    stroke: Record<string, unknown>,
+  ) => {
+    const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
+    const opacity = clamp01(Number(stroke.opacity));
+    const shape = typeof stroke.shape === 'string' ? stroke.shape : 'rect';
+
+    if (shape === 'free') {
+      const points = Array.isArray(stroke.points)
+        ? stroke.points
+            .filter((p) => p && typeof p === 'object')
+            .map((p) => ({
+              x: (Math.max(0, Math.min(100, Number((p as Record<string, unknown>).x) || 0)) / 100) * width,
+              y: (Math.max(0, Math.min(100, Number((p as Record<string, unknown>).y) || 0)) / 100) * height,
+            }))
+        : [];
+      if (points.length < 3) return;
+      const minX = Math.max(0, Math.floor(Math.min(...points.map((p) => p.x))));
+      const maxX = Math.min(width - 1, Math.ceil(Math.max(...points.map((p) => p.x))));
+      const minY = Math.max(0, Math.floor(Math.min(...points.map((p) => p.y))));
+      const maxY = Math.min(height - 1, Math.ceil(Math.max(...points.map((p) => p.y))));
+      for (let py = minY; py <= maxY; py += 1) {
+        for (let px = minX; px <= maxX; px += 1) {
+          if (!pointInPolygon(px + 0.5, py + 0.5, points)) continue;
+          applyMaskDeltaU8(values, width, height, px, py, action, opacity);
+        }
+      }
+      return;
+    }
+
+    const x = Math.max(0, Math.min(100, Number(stroke.x) || 0));
+    const y = Math.max(0, Math.min(100, Number(stroke.y) || 0));
+    const w = Math.max(0, Math.min(100, Number(stroke.width) || 0));
+    const h = Math.max(0, Math.min(100, Number(stroke.height) || 0));
+    const px0 = (x / 100) * width;
+    const py0 = (y / 100) * height;
+    const px1 = ((x + w) / 100) * width;
+    const py1 = ((y + h) / 100) * height;
+    const minX = Math.max(0, Math.floor(Math.min(px0, px1)));
+    const maxX = Math.min(width - 1, Math.ceil(Math.max(px0, px1)));
+    const minY = Math.max(0, Math.floor(Math.min(py0, py1)));
+    const maxY = Math.min(height - 1, Math.ceil(Math.max(py0, py1)));
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const rx = Math.max(0.001, (maxX - minX) / 2);
+    const ry = Math.max(0.001, (maxY - minY) / 2);
+    const rr = Math.max(0.001, Math.min(rx, ry));
+
+    for (let py = minY; py <= maxY; py += 1) {
+      for (let px = minX; px <= maxX; px += 1) {
+        let covered = true;
+        if (shape === 'circle') {
+          const dx = px + 0.5 - cx;
+          const dy = py + 0.5 - cy;
+          covered = (dx * dx + dy * dy) <= rr * rr;
+        } else if (shape === 'oval') {
+          const dx = (px + 0.5 - cx) / rx;
+          const dy = (py + 0.5 - cy) / ry;
+          covered = (dx * dx + dy * dy) <= 1;
+        }
+        if (!covered) continue;
+        applyMaskDeltaU8(values, width, height, px, py, action, opacity);
+      }
+    }
+  };
+
+  const applyBrushStrokeToField = (
+    values: Uint8ClampedArray,
+    width: number,
+    height: number,
+    stroke: Record<string, unknown>,
+  ) => {
+    const points = Array.isArray(stroke.points)
+      ? stroke.points
+          .filter((p) => p && typeof p === 'object')
+          .map((p) => ({
+            x: (Math.max(0, Math.min(100, Number((p as Record<string, unknown>).x) || 0)) / 100) * width,
+            y: (Math.max(0, Math.min(100, Number((p as Record<string, unknown>).y) || 0)) / 100) * height,
+          }))
+      : [];
+    if (points.length === 0) return;
+
+    const action = stroke.action === 'reveal' ? 'reveal' : 'hide';
+    const baseOpacity = clamp01(Number(stroke.opacity));
+    const hardness = clamp01(Number(stroke.hardness));
+    const scale = Math.max(0.0001, Math.min(width, height) / 100);
+    const strokeWidth = Math.max(0.2, (Math.max(1, Number(stroke.size) || 16) / 5.2)) * scale;
+    const radius = Math.max(0.5, strokeWidth / 2);
+
+    const stamp = (sx: number, sy: number) => {
+      const minX = Math.max(0, Math.floor(sx - radius - 1));
+      const maxX = Math.min(width - 1, Math.ceil(sx + radius + 1));
+      const minY = Math.max(0, Math.floor(sy - radius - 1));
+      const maxY = Math.min(height - 1, Math.ceil(sy + radius + 1));
+      for (let py = minY; py <= maxY; py += 1) {
+        for (let px = minX; px <= maxX; px += 1) {
+          const dx = px + 0.5 - sx;
+          const dy = py + 0.5 - sy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > radius) continue;
+          const t = dist / radius;
+          const falloff = t <= hardness
+            ? 1
+            : Math.max(0, 1 - ((t - hardness) / Math.max(0.0001, 1 - hardness)));
+          const strength = maskStrength(baseOpacity, falloff, 1);
+          if (strength <= 0) continue;
+          applyMaskDeltaU8(values, width, height, px, py, action, strength);
+        }
+      }
+    };
+
+    for (let i = 0; i < points.length; i += 1) {
+      const current = points[i];
+      stamp(current.x, current.y);
+      if (i === 0) continue;
+      const prev = points[i - 1];
+      const dx = current.x - prev.x;
+      const dy = current.y - prev.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const step = Math.max(0.5, radius * 0.5);
+      const steps = Math.max(1, Math.ceil(dist / step));
+      for (let s = 1; s < steps; s += 1) {
+        const t = s / steps;
+        stamp(prev.x + dx * t, prev.y + dy * t);
+      }
+    }
+  };
+
+  const updateMaskFieldForStroke = (
+    mask: Record<string, unknown>,
+    stroke: Record<string, unknown>,
+    element: TemplateElement,
+  ) => {
+    const frame = resolveMaskFieldFrameForElement(element);
+    const field = mask.field && typeof mask.field === 'object' ? mask.field as Record<string, unknown> : null;
+    const initialValue = mask.invert === true ? 0 : 255;
+    const values = decodeMaskFieldValues(field, frame.width, frame.height, initialValue);
+    if (stroke.tool === 'selection') {
+      applySelectionStrokeToField(values, frame.width, frame.height, stroke);
+    } else {
+      applyBrushStrokeToField(values, frame.width, frame.height, stroke);
+    }
+    const imageDataUrl = buildMaskFieldDataUrl(values, frame.width, frame.height);
+    return {
+      ...mask,
+      field: {
+        version: 'v1',
+        source: 'editable-buffer',
+        valuesEncoding: 'u8',
+        width: frame.width,
+        height: frame.height,
+        values: Array.from(values),
+        imageDataUrl,
+        updatedAt: Date.now(),
+      },
+    };
+  };
+
+  const resetMaskField = (mask: Record<string, unknown>, element: TemplateElement) => {
+    const frame = resolveMaskFieldFrameForElement(element);
+    const initialValue = mask.invert === true ? 0 : 255;
+    const values = new Uint8ClampedArray(frame.width * frame.height);
+    values.fill(initialValue);
+    const imageDataUrl = buildMaskFieldDataUrl(values, frame.width, frame.height);
+    return {
+      ...mask,
+      field: {
+        version: 'v1',
+        source: 'editable-buffer',
+        valuesEncoding: 'u8',
+        width: frame.width,
+        height: frame.height,
+        values: Array.from(values),
+        imageDataUrl,
+        updatedAt: Date.now(),
+      },
+    };
   };
 
   const ensureSelectedMaskLocalCoordinateSpace = () => {

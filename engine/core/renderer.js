@@ -1066,6 +1066,24 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
+	const field = mask.field && typeof mask.field === "object" ? mask.field : null;
+	const fieldImageDataUrl = typeof field?.imageDataUrl === "string" ? field.imageDataUrl.trim() : "";
+	const fieldWidth = Math.max(1, Number(field?.width) || width);
+	const fieldHeight = Math.max(1, Number(field?.height) || height);
+	const fieldIsUsable = mask.invert !== true && fieldImageDataUrl.length > 0;
+	if (fieldIsUsable) {
+		const regionX = -fieldWidth / 2;
+		const regionY = -fieldHeight / 2;
+		const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" style="mask-type:alpha"><image x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" preserveAspectRatio="none" href="${escapeAttribute(fieldImageDataUrl)}" /></mask>`;
+		return {
+			defs,
+			active: true,
+			primitives: "",
+			region: { x: regionX, y: regionY, width: fieldWidth, height: fieldHeight },
+			coordinateSpace: "local",
+			source: "field",
+		};
+	}
 	const baseFill = mask.invert === true ? "black" : "white";
 	const primitives = buildElementMaskPrimitives(mask, layoutMetrics);
 	const hasPrimitives = typeof primitives === "string" && primitives.trim().length > 0;
