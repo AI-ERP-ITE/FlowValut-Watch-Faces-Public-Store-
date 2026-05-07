@@ -142,11 +142,11 @@ describe('render source snapshot mode', () => {
       },
     };
 
-    const liveSvg = runEngine({ templateInput: createLiveBaselineTemplate() });
     const fallbackSvg = runEngine({ templateInput: outdatedTemplate });
 
-    expect(fallbackSvg).toBe(liveSvg);
     expect(fallbackSvg.includes('href="data:image/png;base64,AAAA"')).toBe(false);
+    expect(fallbackSvg.includes('transform="translate(198.4 134.4) rotate(33)"')).toBe(true);
+    expect(fallbackSvg).toMatch(/<mask id="layerMask-el-0-0-mask-1-texture-0"[^>]*x="-160" y="-160" width="320" height="320"/);
   });
 
   it('keeps stale-fallback mask frame aligned to snapshot dimensions when snapshot metadata exists', () => {
@@ -174,6 +174,68 @@ describe('render source snapshot mode', () => {
 
     expect(fallbackSvg.includes('href="data:image/png;base64,AAAA"')).toBe(false);
     expect(fallbackSvg).toMatch(/<mask id="layerMask-el-0-0-mask-1-element"[^>]*width="160" height="120"/);
+  });
+
+  it('aligns multi-clip overlay mask regions to snapshot frame during live-fallback transitions', () => {
+    const fallbackTemplate = createLiveBaselineTemplate();
+    fallbackTemplate.elements[0].mask = {
+      enabled: true,
+      coordinateSpace: 'local',
+      strokes: [
+        { tool: 'selection', shape: 'rect', action: 'reveal', opacity: 1, x: 15, y: 15, width: 60, height: 60 },
+      ],
+    };
+    fallbackTemplate.elements[0].textureLayers = [
+      {
+        enabled: true,
+        kind: 'noise',
+        opacity: 0.7,
+        blendMode: 'overlay',
+        clip: { enabled: true },
+      },
+    ];
+    fallbackTemplate.elements[0].gradientLayers = [
+      {
+        enabled: true,
+        kind: 'radial',
+        opacity: 0.65,
+        blendMode: 'overlay',
+        center: [50, 50],
+        focal: [50, 50],
+        radius: 50,
+        stops: [
+          { offset: 0, color: '#ffffff', opacity: 0.3 },
+          { offset: 1, color: '#000000', opacity: 0.15 },
+        ],
+        clip: { enabled: true },
+      },
+    ];
+    fallbackTemplate.elements[0].materialLayers = [
+      {
+        enabled: true,
+        color: '#88aaff',
+        opacity: 0.25,
+        blendMode: 'multiply',
+        clip: { enabled: true },
+      },
+    ];
+    fallbackTemplate.elements[0].renderState = {
+      sourceMode: 'snapshot',
+      snapshotStatus: 'outdated',
+      snapshot: {
+        id: 'snap-1',
+        imageDataUrl: 'data:image/png;base64,AAAA',
+        sourceHash: 'v1:holdstale',
+        width: 160,
+        height: 120,
+      },
+    };
+
+    const fallbackSvg = runEngine({ templateInput: fallbackTemplate });
+
+    expect(fallbackSvg).toMatch(/<mask id="layerMask-el-0-0-mask-1-texture-0"[^>]*x="-160" y="-120" width="320" height="240"/);
+    expect(fallbackSvg).toMatch(/<mask id="layerMask-el-0-0-mask-1-gradient-0"[^>]*x="-160" y="-120" width="320" height="240"/);
+    expect(fallbackSvg).toMatch(/<mask id="layerMask-el-0-0-mask-1-material-0"[^>]*x="-160" y="-120" width="320" height="240"/);
   });
 
   it('keeps delete-transition live rendering mask frame aligned via lastSnapshotFrame cache', () => {

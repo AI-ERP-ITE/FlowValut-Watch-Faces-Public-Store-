@@ -1278,10 +1278,12 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			maskBody: resolveClipMaskBody(layerMaterial.clip, context, localUvInputBody, currentElementName),
 		}))
 		: [];
-	const maskRegionX = -layoutMetrics.width;
-	const maskRegionY = -layoutMetrics.height;
-	const maskRegionWidth = layoutMetrics.width * 2;
-	const maskRegionHeight = layoutMetrics.height * 2;
+	const maskFrameWidth = Math.max(1, Number(resolvedMaskFrame?.width) || Number(layoutMetrics?.width) || 100);
+	const maskFrameHeight = Math.max(1, Number(resolvedMaskFrame?.height) || Number(layoutMetrics?.height) || 100);
+	const maskRegionX = -maskFrameWidth;
+	const maskRegionY = -maskFrameHeight;
+	const maskRegionWidth = maskFrameWidth * 2;
+	const maskRegionHeight = maskFrameHeight * 2;
 	const textureDefsMarkup = textureDefs.map((entry) => entry.def.defs).join("");
 	const textureMasksMarkup = textureDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskUnits=\"userSpaceOnUse\" maskContentUnits=\"userSpaceOnUse\" x=\"${maskRegionX}\" y=\"${maskRegionY}\" width=\"${maskRegionWidth}\" height=\"${maskRegionHeight}\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
 	const gradientDefsMarkup = gradientDefs.map((entry) => entry.def.defs).join("");
@@ -1295,10 +1297,10 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			const { layerTexture, def, maskId: textureMaskId } = entry;
 			if (!def.gradientId || !layerTexture.enabled || layerTexture.opacity <= 0) return "";
 			const textureFilterAttr = def.filterId ? ` filter=\"url(#${def.filterId})\"` : "";
-			const tx = -layoutMetrics.width;
-			const ty = -layoutMetrics.height;
-			const tw = layoutMetrics.width * 2;
-			const th = layoutMetrics.height * 2;
+			const tx = -maskFrameWidth;
+			const ty = -maskFrameHeight;
+			const tw = maskFrameWidth * 2;
+			const th = maskFrameHeight * 2;
 			return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${def.gradientId})\" opacity=\"${layerTexture.opacity.toFixed(3)}\" mask=\"url(#${textureMaskId})\" style=\"mix-blend-mode:${layerTexture.blendMode};\"${textureFilterAttr} />`;
 		})
 		.join("");
@@ -1308,10 +1310,10 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			const { layerGradient, def, maskId: gradientMaskId } = entry;
 			if (!def.gradientId || !layerGradient.enabled || layerGradient.opacity <= 0) return "";
 			const gradientFilterAttr = def.filterId ? ` filter=\"url(#${def.filterId})\"` : "";
-			const tx = -layoutMetrics.width;
-			const ty = -layoutMetrics.height;
-			const tw = layoutMetrics.width * 2;
-			const th = layoutMetrics.height * 2;
+			const tx = -maskFrameWidth;
+			const ty = -maskFrameHeight;
+			const tw = maskFrameWidth * 2;
+			const th = maskFrameHeight * 2;
 			return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"url(#${def.gradientId})\" opacity=\"${layerGradient.opacity.toFixed(3)}\" mask=\"url(#${gradientMaskId})\" style=\"mix-blend-mode:${layerGradient.blendMode};\"${gradientFilterAttr} />`;
 		})
 		.join("");
@@ -1320,10 +1322,10 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		.map((entry) => {
 			const { layerMaterial, maskId: materialMaskId } = entry;
 			if (!layerMaterial.enabled || layerMaterial.opacity <= 0) return "";
-			const tx = -layoutMetrics.width;
-			const ty = -layoutMetrics.height;
-			const tw = layoutMetrics.width * 2;
-			const th = layoutMetrics.height * 2;
+			const tx = -maskFrameWidth;
+			const ty = -maskFrameHeight;
+			const tw = maskFrameWidth * 2;
+			const th = maskFrameHeight * 2;
 			return `<rect x=\"${tx}\" y=\"${ty}\" width=\"${tw}\" height=\"${th}\" fill=\"${layerMaterial.color}\" opacity=\"${layerMaterial.opacity.toFixed(3)}\" mask=\"url(#${materialMaskId})\" style=\"mix-blend-mode:${layerMaterial.blendMode};\" />`;
 		})
 		.join("");
