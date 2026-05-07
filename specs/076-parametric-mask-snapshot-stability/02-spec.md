@@ -56,6 +56,22 @@ Capture final visual output (alpha preserved), store snapshot, and persist metad
 
 Element in snapshot mode uses snapshot image source while still honoring current visibility, transform, opacity, and masking.
 
+Snapshot mode must not re-run procedural style/effect overlays that were already baked.
+
+### FR-10 Snapshot and Mask Order Flexibility
+
+All authoring orders are valid and must be preserved:
+
+1. Live procedural -> snapshot -> mask.
+2. Live procedural -> mask (no snapshot).
+3. Live procedural -> mask -> snapshot.
+
+Mask edits made after snapshot must apply to the baked snapshot layer and must not force automatic fallback to procedural rendering.
+
+### FR-11 Procedural Preservation Restore
+
+Deleting a snapshot must restore live procedural rendering path for that element without destroying authored procedural settings.
+
 ### FR-8 UI Lifecycle Controls
 
 Per-element controls:
@@ -83,3 +99,5 @@ If live visual hash differs from stored hash, snapshot is marked outdated withou
 3. Snapshot toggling preserves visual parity within agreed tolerance.
 4. Old project load/save remains valid.
 5. Parametric route works after deploy verification.
+6. Snapshot -> mask keeps element in snapshot mode and masks baked layer directly.
+7. Delete snapshot restores procedural preservation behavior for the same element.

@@ -1288,7 +1288,6 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const materialMasksMarkup = materialDefs.map((entry) => `<mask id=\"${entry.maskId}\" maskUnits=\"userSpaceOnUse\" maskContentUnits=\"userSpaceOnUse\" x=\"${maskRegionX}\" y=\"${maskRegionY}\" width=\"${maskRegionWidth}\" height=\"${maskRegionHeight}\" style=\"mask-type:alpha\">${entry.maskBody}</mask>`).join("");
 	const defs = `<defs>${filterDef}${elementMaskDef.defs}${textureDefsMarkup}${gradientDefsMarkup}${textureMasksMarkup}${gradientMasksMarkup}${materialMasksMarkup}</defs>`;
 	const filterAttr = filterDef.length > 0 ? ` filter=\"url(#${filterId})\"` : "";
-	const elementMaskAttr = elementMaskDef.active ? ` mask=\"url(#${elementMaskId})\"` : "";
 
 	const textureOverlay = textureDefs
 		.map((entry) => {
@@ -1332,7 +1331,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 		? `<g mask=\"url(#${elementMaskId})\">${overlayMarkup}</g>`
 		: overlayMarkup;
 
-	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}${elementMaskAttr}>${filterInputBody}</g>${visibleOverlayMarkup}</g>`;
+	return `<g transform=\"translate(${x} ${y}) rotate(${rotation})\">${defs}<g${filterAttr}>${filterInputBody}</g>${visibleOverlayMarkup}</g>`;
 }
 
 function renderLayoutBase(composition, context) {
@@ -1612,9 +1611,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				context.renderSourceRequestedModeByLayer[localId] = requestedRenderSourceMode;
 			}
 			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
-			const elementMask = useSnapshotSource
-				? null
-				: (safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null);
+			const elementMask = safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null;
 			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask);
 		})
 		.join("");

@@ -215,3 +215,40 @@ Inputs: all previous outputs
 Output: consolidated completion report
 Done criteria: residual risks documented and accepted
 Status: Done
+
+## Gate 10 - Snapshot/Mask Order Completion
+
+### T-090 Define snapshot-after-mask and mask-after-snapshot semantics
+
+Inputs: FR-10
+Output: explicit behavior rules for all authoring orders
+Done criteria: specification documents all three supported flows without ambiguity
+Status: Done
+
+### T-091 Keep snapshot fresh on mask-only edits
+
+Inputs: stale detection hash rules
+Output: mask edits do not mark snapshot outdated
+Done criteria: snapshot status remains fresh after mask-only edit
+Status: Done
+
+### T-092 Allow runtime masking on baked snapshot layer
+
+Inputs: renderer snapshot branch
+Output: element mask can clip baked snapshot image source
+Done criteria: snapshot mode supports post-snapshot mask edits without procedural fallback
+Status: Done
+
+### T-093 Remove duplicate layer mask application path
+
+Inputs: renderer layer assembly
+Output: single effective mask application on base layer path
+Done criteria: no base disappear regression from duplicate mask compounding
+Status: Done
+
+### T-094 Regression tests for order flexibility and stale behavior
+
+Inputs: T-091 to T-093
+Output: tests covering snapshot maskability and mask-only freshness
+Done criteria: focused tests pass and cover required flows
+Status: Done

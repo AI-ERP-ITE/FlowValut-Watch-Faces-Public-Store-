@@ -68,4 +68,45 @@ describe('snapshotStorage stale detection', () => {
     const refreshed = refreshElementSnapshotStatus(edited);
     expect((refreshed.renderState as Record<string, unknown>).snapshotStatus).toBe('outdated');
   });
+
+  it('keeps snapshot fresh when only mask data changes', () => {
+    const base = {
+      id: 'el-4',
+      type: 'free_rect',
+      params: { width: 0.4, height: 0.2, fill: '#999' },
+      mask: {
+        enabled: true,
+        coordinateSpace: 'local',
+        strokes: [
+          { tool: 'selection', shape: 'rect', action: 'reveal', opacity: 1, x: 10, y: 10, width: 40, height: 40 },
+        ],
+      },
+    } as Record<string, unknown>;
+    const sourceHash = generateElementRenderHash(base);
+    const withSnapshot = setElementSnapshot(base, {
+      id: 'el-4',
+      imageDataUrl: 'data:image/png;base64,AAA',
+      sourceHash,
+      createdAt: 1,
+      updatedAt: 1,
+      width: 480,
+      height: 480,
+      mimeType: 'image/png',
+    });
+
+    const maskEdited = {
+      ...withSnapshot,
+      mask: {
+        enabled: true,
+        coordinateSpace: 'local',
+        strokes: [
+          { tool: 'selection', shape: 'rect', action: 'reveal', opacity: 1, x: 18, y: 15, width: 40, height: 40 },
+        ],
+      },
+    } as Record<string, unknown>;
+
+    expect(resolveElementSnapshotStatus(maskEdited)).toBe('fresh');
+    const refreshed = refreshElementSnapshotStatus(maskEdited);
+    expect((refreshed.renderState as Record<string, unknown>).snapshotStatus).toBe('fresh');
+  });
 });

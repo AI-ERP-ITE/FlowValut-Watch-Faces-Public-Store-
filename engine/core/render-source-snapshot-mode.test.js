@@ -80,13 +80,14 @@ function createLiveBaselineTemplate() {
 }
 
 describe('render source snapshot mode', () => {
-  it('renders snapshot image source with transform and no runtime remask/re-filter gates', () => {
+  it('renders snapshot image source with transform, keeps masking, and does not re-run effect stack', () => {
     const svg = runEngine({ templateInput: createSnapshotTemplate() });
+    const maskRefs = (svg.match(/mask="url\(#layerMask-el-0-0-mask-1-element\)"/g) || []).length;
 
     expect(svg.includes('href="data:image/png;base64,AAAA"')).toBe(true);
     expect(svg.includes('opacity="0.650"')).toBe(true);
     expect(svg.includes('transform="translate(198.4 134.4) rotate(33)"')).toBe(true);
-    expect(svg.includes('mask="url(#layerMask-el-0-0-mask-1-element)"')).toBe(false);
+    expect(maskRefs).toBe(1);
     expect(svg.includes('filter="url(#layerFx-el-0-0)"')).toBe(false);
     expect(svg.includes('<filter id="layerFx-el-0-0"')).toBe(false);
   });

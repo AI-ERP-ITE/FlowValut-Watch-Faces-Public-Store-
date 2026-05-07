@@ -26,6 +26,8 @@ const NON_VISUAL_KEYS = new Set([
   'snapshotImageDataUrl',
   'snapshotStatus',
   'sourceHash',
+  // Mask must stay editable in snapshot mode without forcing stale fallback.
+  'mask',
   'debug',
   'debugInfo',
   'viewport',
