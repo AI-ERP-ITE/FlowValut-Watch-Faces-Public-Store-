@@ -10,6 +10,10 @@ export type SnapshotState = {
   sourceMode: SnapshotRenderSourceMode;
   sourceHash?: string;
   snapshotStatus: SnapshotFreshness;
+  lastSnapshotFrame?: {
+    width: number;
+    height: number;
+  } | null;
   snapshot: ElementSnapshotCaptureResult | null;
 };
 
@@ -26,6 +30,20 @@ function normalizeRenderState(source: unknown): SnapshotState {
       ? snapshotStatusRaw
       : 'missing';
   const sourceHash = typeof safe.sourceHash === 'string' ? safe.sourceHash : undefined;
+  const lastSnapshotFrameRaw = safe.lastSnapshotFrame;
+  const lastSnapshotFrame = lastSnapshotFrameRaw && typeof lastSnapshotFrameRaw === 'object'
+    ? {
+        width: Number((lastSnapshotFrameRaw as Record<string, unknown>).width),
+        height: Number((lastSnapshotFrameRaw as Record<string, unknown>).height),
+      }
+    : null;
+  const normalizedLastSnapshotFrame = lastSnapshotFrame
+    && Number.isFinite(lastSnapshotFrame.width)
+    && lastSnapshotFrame.width > 0
+    && Number.isFinite(lastSnapshotFrame.height)
+    && lastSnapshotFrame.height > 0
+      ? { width: Math.max(1, lastSnapshotFrame.width), height: Math.max(1, lastSnapshotFrame.height) }
+      : null;
   const snapshotRaw = safe.snapshot;
   const snapshot = snapshotRaw && typeof snapshotRaw === 'object'
     ? deepClone(snapshotRaw as ElementSnapshotCaptureResult)
@@ -35,6 +53,7 @@ function normalizeRenderState(source: unknown): SnapshotState {
     sourceMode,
     sourceHash,
     snapshotStatus,
+    lastSnapshotFrame: normalizedLastSnapshotFrame,
     snapshot,
   };
 }
@@ -49,11 +68,15 @@ export function getElementSnapshot(element: TemplateElement): ElementSnapshotCap
 
 export function setElementRenderSourceMode(element: TemplateElement, mode: SnapshotRenderSourceMode): TemplateElement {
   const state = getElementRenderState(element);
+  const snapshotStatus = mode === 'snapshot'
+    ? resolveElementSnapshotStatus(element)
+    : state.snapshotStatus;
   const next: TemplateElement = {
     ...element,
     renderState: {
       ...state,
       sourceMode: mode,
+      snapshotStatus,
     },
   };
   return next;
@@ -69,6 +92,10 @@ export function setElementSnapshot(element: TemplateElement, snapshot: ElementSn
       sourceMode: 'snapshot',
       sourceHash: nextSnapshot.sourceHash,
       snapshotStatus: 'fresh',
+      lastSnapshotFrame: {
+        width: Math.max(1, Number(nextSnapshot.width) || 1),
+        height: Math.max(1, Number(nextSnapshot.height) || 1),
+      },
       snapshot: nextSnapshot,
     },
   };
@@ -77,12 +104,21 @@ export function setElementSnapshot(element: TemplateElement, snapshot: ElementSn
 
 export function deleteElementSnapshot(element: TemplateElement): TemplateElement {
   const state = getElementRenderState(element);
+  const liveHash = generateElementRenderHash(element);
+  const snapshotFrame = state.snapshot && typeof state.snapshot === 'object'
+    ? {
+        width: Math.max(1, Number(state.snapshot.width) || 1),
+        height: Math.max(1, Number(state.snapshot.height) || 1),
+      }
+    : state.lastSnapshotFrame ?? null;
   const next: TemplateElement = {
     ...element,
     renderState: {
       ...state,
       sourceMode: 'live',
+      sourceHash: liveHash,
       snapshotStatus: 'missing',
+      lastSnapshotFrame: snapshotFrame,
       snapshot: null,
     },
   };

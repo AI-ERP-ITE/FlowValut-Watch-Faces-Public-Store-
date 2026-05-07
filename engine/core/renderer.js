@@ -1192,12 +1192,13 @@ function resolveGlobalControllerSources() {
 	};
 }
 
-function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null) {
+function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null, maskFrameMetrics = null) {
 	const filterId = `layerFx-${localId}`;
 	const maskId = buildLayerMaskBaseId(localId, context);
 	const elementMaskId = `${maskId}-element`;
 	const elementTransform = `translate(${x} ${y}) rotate(${rotation})`;
-	const localSilhouette = computeLocalSilhouetteSources(localId, body, elementMaskId, elementMask, layoutMetrics, context);
+	const resolvedMaskFrame = maskFrameMetrics && typeof maskFrameMetrics === "object" ? maskFrameMetrics : layoutMetrics;
+	const localSilhouette = computeLocalSilhouetteSources(localId, body, elementMaskId, elementMask, resolvedMaskFrame, context);
 	const layerControllerSources = resolveLayerControllerSources(localSilhouette);
 	const filterInputBody = typeof layerControllerSources.globalLight?.body === "string" && layerControllerSources.globalLight.body.length > 0
 		? layerControllerSources.globalLight.body
@@ -1441,13 +1442,61 @@ function resolveSnapshotRenderSource(element = {}, layoutMetrics = {}) {
 	};
 }
 
+function resolveSnapshotMaskFrameMetrics(element = {}, layoutMetrics = {}) {
+	if (!element || typeof element !== "object") return null;
+	const renderState = element.renderState && typeof element.renderState === "object" ? element.renderState : {};
+	const snapshot = renderState.snapshot && typeof renderState.snapshot === "object" ? renderState.snapshot : null;
+	const lastSnapshotFrame = renderState.lastSnapshotFrame && typeof renderState.lastSnapshotFrame === "object"
+		? renderState.lastSnapshotFrame
+		: null;
+	const width = Number(snapshot?.width ?? lastSnapshotFrame?.width);
+	const height = Number(snapshot?.height ?? lastSnapshotFrame?.height);
+	if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+		return null;
+	}
+
+	return {
+		...layoutMetrics,
+		width: Math.max(1, width),
+		height: Math.max(1, height),
+	};
+}
+
+function resolveElementMaskFrameMetrics(element = {}, layoutMetrics = {}) {
+	const fallbackWidth = Math.max(1, Number(layoutMetrics?.width) || 100);
+	const fallbackHeight = Math.max(1, Number(layoutMetrics?.height) || 100);
+	const renderState = element && typeof element === "object" && element.renderState && typeof element.renderState === "object"
+		? element.renderState
+		: {};
+	const snapshot = renderState.snapshot && typeof renderState.snapshot === "object" ? renderState.snapshot : null;
+	const snapshotWidth = Number(snapshot?.width);
+	const snapshotHeight = Number(snapshot?.height);
+	const hasSnapshotFrame = Number.isFinite(snapshotWidth) && snapshotWidth > 0 && Number.isFinite(snapshotHeight) && snapshotHeight > 0;
+
+	if (hasSnapshotFrame) {
+		return {
+			...layoutMetrics,
+			width: Math.max(1, snapshotWidth),
+			height: Math.max(1, snapshotHeight),
+		};
+	}
+
+	return {
+		...layoutMetrics,
+		width: fallbackWidth,
+		height: fallbackHeight,
+	};
+}
+
 function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 	const requestedMode = resolveElementRenderSourceMode(element);
+	const fallbackMaskFrameMetrics = resolveSnapshotMaskFrameMetrics(element, layoutMetrics);
 	if (requestedMode !== "snapshot") {
 		return {
 			requestedMode,
 			effectiveMode: "live",
 			snapshotSource: null,
+			maskFrameMetrics: fallbackMaskFrameMetrics,
 		};
 	}
 
@@ -1460,6 +1509,7 @@ function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 			requestedMode,
 			effectiveMode: "live-fallback",
 			snapshotSource: null,
+			maskFrameMetrics: fallbackMaskFrameMetrics,
 		};
 	}
 
@@ -1469,6 +1519,7 @@ function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 			requestedMode,
 			effectiveMode: "live-fallback",
 			snapshotSource: null,
+			maskFrameMetrics: fallbackMaskFrameMetrics,
 		};
 	}
 
@@ -1476,6 +1527,7 @@ function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 		requestedMode,
 		effectiveMode: "snapshot",
 		snapshotSource,
+		maskFrameMetrics: fallbackMaskFrameMetrics,
 	};
 }
 
@@ -1612,7 +1664,10 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			}
 			const currentElementName = typeof safeElement.name === "string" ? safeElement.name.trim() : "";
 			const elementMask = safeElement.mask && typeof safeElement.mask === "object" ? safeElement.mask : null;
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask);
+			const maskFrameMetrics = renderSourceDecision.maskFrameMetrics && typeof renderSourceDecision.maskFrameMetrics === "object"
+				? renderSourceDecision.maskFrameMetrics
+				: resolveElementMaskFrameMetrics(safeElement, context.layoutMetrics);
+			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask, maskFrameMetrics);
 		})
 		.join("");
 }
