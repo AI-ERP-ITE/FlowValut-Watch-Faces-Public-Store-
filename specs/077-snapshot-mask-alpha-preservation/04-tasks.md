@@ -88,7 +88,7 @@ Status: Done
 Inputs: validated code
 Output: deployed bundle with new hash
 Done criteria: deploy script success and commit evidence logged
-Status: Not Started
+Status: Done
 
 ### T-041 Live verification on parametric route
 

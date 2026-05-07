@@ -116,3 +116,17 @@ Notes:
 5. Validation passed: 3 files, 18 tests.
 6. Updated task status for T-031 to Done.
 7. Stopped for user approval before T-040.
+
+## P10 - T-040 Private Bundle Deployed
+
+Date: 2026-05-07
+Status: Done
+Notes:
+1. Initial deploy attempt failed because root `app/index.html` referenced stale hashed assets that Vite could not resolve at build time.
+2. Restored temporary build-compatible source entry (`/src/main.tsx`) in root entry, then re-ran deploy command.
+3. Ran `npm run deploy:docs:private` successfully, including `build:private` and docs/root mirror sync.
+4. Verified hash parity from deploy output: `index-C0jqmnpy.js`.
+5. Created deploy artifact commit `6953d21` and pushed to `origin/main`.
+6. Recorded implementation commit `2ac0587` and prior spec evidence commit `cfe9a2c` for traceability.
+7. Updated task status for T-040 to Done.
+8. Stopped for user approval before T-041.
