@@ -130,3 +130,15 @@ Notes:
 6. Recorded implementation commit `2ac0587` and prior spec evidence commit `cfe9a2c` for traceability.
 7. Updated task status for T-040 to Done.
 8. Stopped for user approval before T-041.
+
+## P11 - T-041 Live Verification Attempted (Blocked)
+
+Date: 2026-05-07
+Status: Blocked
+Notes:
+1. Ran live route checks for root, SPA redirect route, and parametric route.
+2. All routes returned status 200 but served old bundle hash `index-JlXHYMHy.js` and old CSS hash `index-CrlChUe_.css`.
+3. Cache-bypass verification with query param still served old hash.
+4. New deployed bundle hash from T-040 (`index-C0jqmnpy.js`) returned 404 on live asset URL.
+5. Private auth gate renders on live routes, so editor-level behavioral verification cannot be completed without matching bundle deployment.
+6. Updated T-041 status to Blocked pending live hash propagation/source correction.

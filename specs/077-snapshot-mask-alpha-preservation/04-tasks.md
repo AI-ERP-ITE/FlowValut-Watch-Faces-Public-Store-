@@ -95,4 +95,4 @@ Status: Done
 Inputs: deployed URL
 Output: route and bundle verification notes
 Done criteria: live hash matches deployment and issue no longer reproducible
-Status: Not Started
+Status: Blocked
