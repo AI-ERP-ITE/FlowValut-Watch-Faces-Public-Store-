@@ -126,4 +126,25 @@ describe('render source snapshot mode', () => {
     expect(fallbackSvg).toBe(liveSvg);
     expect(fallbackSvg.includes('href="data:image/png;base64')).toBe(false);
   });
+
+  it('falls back to live rendering when snapshot status is outdated', () => {
+    const outdatedTemplate = createLiveBaselineTemplate();
+    outdatedTemplate.elements[0].renderState = {
+      sourceMode: 'snapshot',
+      snapshotStatus: 'outdated',
+      snapshot: {
+        id: 'snap-1',
+        imageDataUrl: 'data:image/png;base64,AAAA',
+        sourceHash: 'v1:holdstale',
+        width: 160,
+        height: 160,
+      },
+    };
+
+    const liveSvg = runEngine({ templateInput: createLiveBaselineTemplate() });
+    const fallbackSvg = runEngine({ templateInput: outdatedTemplate });
+
+    expect(fallbackSvg).toBe(liveSvg);
+    expect(fallbackSvg.includes('href="data:image/png;base64,AAAA"')).toBe(false);
+  });
 });

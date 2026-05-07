@@ -1452,6 +1452,18 @@ function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 		};
 	}
 
+	const renderState = element && typeof element === "object" && element.renderState && typeof element.renderState === "object"
+		? element.renderState
+		: {};
+	const snapshotStatus = renderState.snapshotStatus;
+	if (snapshotStatus !== "fresh") {
+		return {
+			requestedMode,
+			effectiveMode: "live-fallback",
+			snapshotSource: null,
+		};
+	}
+
 	const snapshotSource = resolveSnapshotRenderSource(element, layoutMetrics);
 	if (!snapshotSource) {
 		return {

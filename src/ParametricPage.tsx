@@ -1949,7 +1949,9 @@ export default function ParametricPage() {
   const updateTemplateElements = (updater: (elements: Array<TemplateElement>) => Array<TemplateElement>, label = 'Update elements') => {
     applyTemplateCommand(label, (prev) => ({
       ...prev,
-      elements: updater(prev.elements),
+      elements: updater(prev.elements).map((element) => (
+        refreshElementSnapshotStatus(element as Record<string, unknown>) as TemplateElement
+      )),
     }));
   };
 
