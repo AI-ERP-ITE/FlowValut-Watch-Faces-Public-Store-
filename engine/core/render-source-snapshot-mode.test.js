@@ -321,4 +321,79 @@ describe('render source snapshot mode', () => {
     expect(snapshotSvg.includes('filter="url(#layerFx-el-0-0)"')).toBe(false);
     expect(editedSvg.includes('filter="url(#layerFx-el-0-0)"')).toBe(false);
   });
+
+  it('keeps single-pass mask application through stroke edits and repeated snapshot re-capture', () => {
+    const base = createLiveBaselineTemplate();
+    base.elements[0].mask = {
+      enabled: true,
+      coordinateSpace: 'local',
+      strokes: [
+        { tool: 'selection', shape: 'rect', action: 'reveal', opacity: 1, x: 16, y: 16, width: 52, height: 52 },
+      ],
+    };
+
+    const snapshotA = JSON.parse(JSON.stringify(base));
+    snapshotA.elements[0].renderState = {
+      sourceMode: 'snapshot',
+      snapshotStatus: 'fresh',
+      snapshot: {
+        id: 'snap-1',
+        imageDataUrl: 'data:image/png;base64,AAAA',
+        sourceHash: 'v1:h00000000',
+        width: 160,
+        height: 160,
+      },
+    };
+
+    const strokeEdited = JSON.parse(JSON.stringify(snapshotA));
+    strokeEdited.elements[0].mask.strokes = [
+      { tool: 'selection', shape: 'rect', action: 'reveal', opacity: 1, x: 24, y: 18, width: 44, height: 56 },
+      { tool: 'selection', shape: 'ellipse', action: 'hide', opacity: 0.5, x: 58, y: 44, width: 22, height: 18 },
+    ];
+
+    const snapshotB = JSON.parse(JSON.stringify(strokeEdited));
+    snapshotB.elements[0].renderState.snapshot = {
+      id: 'snap-1',
+      imageDataUrl: 'data:image/png;base64,BBBB',
+      sourceHash: 'v1:h11111111',
+      width: 160,
+      height: 160,
+    };
+
+    const secondStrokeEdit = JSON.parse(JSON.stringify(snapshotB));
+    secondStrokeEdit.elements[0].mask.strokes = [
+      { tool: 'selection', shape: 'rect', action: 'reveal', opacity: 1, x: 20, y: 20, width: 50, height: 50 },
+      { tool: 'selection', shape: 'ellipse', action: 'hide', opacity: 0.6, x: 56, y: 42, width: 24, height: 20 },
+      { tool: 'selection', shape: 'rect', action: 'reveal', opacity: 0.35, x: 32, y: 60, width: 18, height: 16 },
+    ];
+
+    const snapshotC = JSON.parse(JSON.stringify(secondStrokeEdit));
+    snapshotC.elements[0].renderState.snapshot = {
+      id: 'snap-1',
+      imageDataUrl: 'data:image/png;base64,CCCC',
+      sourceHash: 'v1:h22222222',
+      width: 160,
+      height: 160,
+    };
+
+    const svgA = runEngine({ templateInput: snapshotA });
+    const svgStroke1 = runEngine({ templateInput: strokeEdited });
+    const svgB = runEngine({ templateInput: snapshotB });
+    const svgStroke2 = runEngine({ templateInput: secondStrokeEdit });
+    const svgC = runEngine({ templateInput: snapshotC });
+
+    const collectMaskRefs = (svg) => (svg.match(/mask="url\(#layerMask-el-0-0-mask-1-element\)"/g) || []).length;
+
+    expect(svgA.includes('href="data:image/png;base64,AAAA"')).toBe(true);
+    expect(svgB.includes('href="data:image/png;base64,BBBB"')).toBe(true);
+    expect(svgC.includes('href="data:image/png;base64,CCCC"')).toBe(true);
+    expect(collectMaskRefs(svgA)).toBe(1);
+    expect(collectMaskRefs(svgStroke1)).toBe(1);
+    expect(collectMaskRefs(svgB)).toBe(1);
+    expect(collectMaskRefs(svgStroke2)).toBe(1);
+    expect(collectMaskRefs(svgC)).toBe(1);
+    expect(svgA.includes('filter="url(#layerFx-el-0-0)"')).toBe(false);
+    expect(svgB.includes('filter="url(#layerFx-el-0-0)"')).toBe(false);
+    expect(svgC.includes('filter="url(#layerFx-el-0-0)"')).toBe(false);
+  });
 });

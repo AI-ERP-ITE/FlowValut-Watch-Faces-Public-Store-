@@ -58,6 +58,9 @@ function sanitizeElementForEngine(source: TemplateElement): TemplateElement {
   const next = deepClone(source);
   delete next.id;
   delete next.visible;
+  // Never bake current mask into snapshot pixels; runtime mask must remain editable
+  // and applied exactly once after snapshot capture.
+  delete next.mask;
   // Always bake from procedural live source to include current effect stack.
   if (next.renderState && typeof next.renderState === 'object') {
     next.renderState = {
@@ -174,3 +177,8 @@ export async function createElementSnapshot(input: ElementSnapshotCaptureInput):
     mimeType,
   };
 }
+
+// Test-only export for regression coverage of snapshot sanitization invariants.
+export const __snapshotRendererInternalsForTest = {
+  sanitizeElementForEngine,
+};
