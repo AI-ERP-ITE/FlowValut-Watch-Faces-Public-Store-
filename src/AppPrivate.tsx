@@ -17,11 +17,26 @@ function PrivateRouteGuard({ children }: { children: ReactNode }) {
   const authConfigured = isFirebaseAuthConfigured();
   const location = useLocation();
   const [hasUser, setHasUser] = useState(() => !!getCurrentAuthUser());
+  const [authReady, setAuthReady] = useState(() => !authConfigured);
 
   useEffect(() => {
     if (!authConfigured) return;
-    return subscribeAuthState((user) => setHasUser(!!user));
+    return subscribeAuthState((user) => {
+      setHasUser(!!user);
+      setAuthReady(true);
+    });
   }, [authConfigured]);
+
+  if (authConfigured && !authReady) {
+    return (
+      <main className="min-h-screen grid place-items-center bg-black text-white p-6">
+        <section className="w-full max-w-xl rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+          <h1 className="text-lg font-semibold">Checking session...</h1>
+          <p className="mt-2 text-zinc-300">Restoring Firebase sign-in state.</p>
+        </section>
+      </main>
+    );
+  }
 
   if (!authConfigured || !hasUser) {
     const next = encodeURIComponent(`${location.pathname}${location.search}${location.hash}`);
@@ -36,6 +51,7 @@ function PrivateLoginPage() {
   const location = useLocation();
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const [hasUser, setHasUser] = useState(() => !!getCurrentAuthUser());
+  const [authReady, setAuthReady] = useState(() => !authConfigured);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
@@ -45,7 +61,10 @@ function PrivateLoginPage() {
 
   useEffect(() => {
     if (!authConfigured) return;
-    return subscribeAuthState((user) => setHasUser(!!user));
+    return subscribeAuthState((user) => {
+      setHasUser(!!user);
+      setAuthReady(true);
+    });
   }, [authConfigured]);
 
   useEffect(() => {
@@ -68,6 +87,21 @@ function PrivateLoginPage() {
       active = false;
     };
   }, [authConfigured]);
+
+  if (authConfigured && !authReady) {
+    return (
+      <main className="min-h-screen grid place-items-center bg-black text-white p-6">
+        <section className="w-full max-w-xl rounded-lg border border-zinc-800 bg-zinc-950 p-6">
+          <div className="mb-4 flex items-center gap-3">
+            <img src={logoSrc} alt="Flowvault logo" className="h-10 w-auto" />
+            <span className="text-sm uppercase tracking-widest text-zinc-400">Flowvault Private</span>
+          </div>
+          <h1 className="text-xl font-semibold">Finishing sign-in...</h1>
+          <p className="mt-3 text-zinc-300">Checking Firebase session before opening Studio.</p>
+        </section>
+      </main>
+    );
+  }
 
   if (hasUser) {
     return <Navigate to={nextPath} replace />;
