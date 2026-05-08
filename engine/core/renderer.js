@@ -1,4 +1,4 @@
-ï»¿"use strict";
+"use strict";
 
 import { getElement } from "../elements/elementRegistry.js";
 import { validateElementModel } from "../elements/elementRegistry.js";
@@ -953,8 +953,8 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
 	const coordinateSpace = resolveMaskCoordinateSpace(mask);
-	// Spec 074 T3 / E.06â€“E.08 / L.04: NaN-safe mapping. Returns null when the
-	// input coord is non-finite OR null/undefined â€” caller MUST drop the
+	// Spec 074 T3 / E.06–E.08 / L.04: NaN-safe mapping. Returns null when the
+	// input coord is non-finite OR null/undefined — caller MUST drop the
 	// primitive (do not silently coerce to 0/50, that produces phantom marks
 	// at the origin). Note: Number(null) === 0, so the explicit null check is
 	// required even though isFinite(0) is true.
@@ -1042,7 +1042,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
 				// Spec 075: single-point strokes (a click without drag) render as
 				// a degenerate <polyline points="x,y" /> which browsers handle
-				// inconsistently â€” Chrome paints nothing, others may fall back
+				// inconsistently — Chrome paints nothing, others may fall back
 				// to filling the entire mask region (causing the "whole element
 				// masked" symptom). Emit an explicit <circle> instead so a click
 				// always produces a visible round dab matching stroke-linecap.
@@ -1610,9 +1610,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				context.layerMaskRegistry[safeElement.name.trim()] = worldBody;
 			}
 
-			const styleAdjust = useSnapshotSource
-				? normalizeStyleAdjust({ enabled: false, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 }, { enabled: false, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 })
-				: normalizeStyleAdjust(
+			const styleAdjust = normalizeStyleAdjust(
 				{
 					...(safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? safeElement.styleAdjust : {}),
 					...(renderParams.styleAdjust && typeof renderParams.styleAdjust === "object" ? renderParams.styleAdjust : {}),
@@ -1631,11 +1629,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.texture && typeof safeElement.texture === "object" ? safeElement.texture : {}),
 					...(renderParams.texture && typeof renderParams.texture === "object" ? renderParams.texture : {}),
 				}];
-			const textureLayers = useSnapshotSource
-				? []
-				: textureLayerSources.map((entry) =>
-					normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
-				);
+			const textureLayers = textureLayerSources.map((entry) =>
+				normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
+			);
 			const gradientLayersFromElement = Array.isArray(safeElement.gradientLayers)
 				? safeElement.gradientLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1648,11 +1644,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.gradient && typeof safeElement.gradient === "object" ? safeElement.gradient : {}),
 					...(renderParams.gradientOverlay && typeof renderParams.gradientOverlay === "object" ? renderParams.gradientOverlay : {}),
 				}];
-			const gradientLayers = useSnapshotSource
-				? []
-				: gradientLayerSources.map((entry) =>
-					normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
-				);
+			const gradientLayers = gradientLayerSources.map((entry) =>
+				normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
+			);
 			const materialLayersFromElement = Array.isArray(safeElement.materialLayers)
 				? safeElement.materialLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1665,14 +1659,10 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.material && typeof safeElement.material === "object" ? safeElement.material : {}),
 					...(renderParams.material && typeof renderParams.material === "object" ? renderParams.material : {}),
 				}];
-			const materialLayers = useSnapshotSource
-				? []
-				: materialLayerSources.map((entry) =>
-					normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
-				);
-			const depth = useSnapshotSource
-				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
-				: context.globalDepthEnabled
+			const materialLayers = materialLayerSources.map((entry) =>
+				normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
+			);
+			const depth = context.globalDepthEnabled
 				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
 				: normalizeDepthEffect(
 					{
@@ -1681,9 +1671,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					},
 					null,
 				);
-			const dropShadow = useSnapshotSource
-				? normalizeDropShadowEffect({})
-				: normalizeDropShadowEffect(
+			const dropShadow = normalizeDropShadowEffect(
 				{
 					...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
 					...(renderParams.dropShadow && typeof renderParams.dropShadow === "object" ? renderParams.dropShadow : {}),
