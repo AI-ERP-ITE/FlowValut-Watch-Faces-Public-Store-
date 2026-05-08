@@ -2268,6 +2268,7 @@ export default function ParametricPage() {
       const snapshot = await createElementSnapshot({
         template: deepClone(workingTemplate),
         elementId,
+        preserveRenderSourceMode: selectedRenderSourceMode === 'snapshot',
         activeStyle: FIXED_RENDER_STYLE,
         colorControl: {
           ...DEFAULT_COLOR_CONTROL,
@@ -2304,6 +2305,7 @@ export default function ParametricPage() {
         template: deepClone(workingTemplate),
         elementId,
         bakeMaskIntoSnapshot: true,
+        preserveRenderSourceMode: true,
         activeStyle: FIXED_RENDER_STYLE,
         colorControl: {
           ...DEFAULT_COLOR_CONTROL,
@@ -10149,3 +10151,4 @@ export default function ParametricPage() {
     </main>
   );
 }
+

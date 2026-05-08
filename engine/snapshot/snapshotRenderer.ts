@@ -23,6 +23,7 @@ export type ElementSnapshotCaptureInput = {
   elementId?: string;
   element?: TemplateElement;
   bakeMaskIntoSnapshot?: boolean;
+  preserveRenderSourceMode?: boolean;
   activeStyle?: string;
   mimeType?: 'image/png' | 'image/webp';
   quality?: number;
@@ -55,8 +56,12 @@ function resolveTemplatePixelSize(template: TemplateModel): { width: number; hei
   };
 }
 
-function sanitizeElementForEngine(source: TemplateElement, options?: { bakeMaskIntoSnapshot?: boolean }): TemplateElement {
+function sanitizeElementForEngine(
+  source: TemplateElement,
+  options?: { bakeMaskIntoSnapshot?: boolean; preserveRenderSourceMode?: boolean },
+): TemplateElement {
   const bakeMaskIntoSnapshot = options?.bakeMaskIntoSnapshot === true;
+  const preserveRenderSourceMode = options?.preserveRenderSourceMode === true;
   const next = deepClone(source);
   delete next.id;
   delete next.visible;
@@ -65,11 +70,14 @@ function sanitizeElementForEngine(source: TemplateElement, options?: { bakeMaskI
   if (!bakeMaskIntoSnapshot) {
     delete next.mask;
   }
-  // Always bake from procedural live source to include current effect stack.
+  // Default capture uses live source. Optional preserve mode keeps
+  // current source mode for snapshot-chain raster workflows.
   if (next.renderState && typeof next.renderState === 'object') {
     next.renderState = {
       ...(next.renderState as Record<string, unknown>),
-      sourceMode: 'live',
+      sourceMode: preserveRenderSourceMode
+        ? ((next.renderState as Record<string, unknown>).sourceMode === 'snapshot' ? 'snapshot' : 'live')
+        : 'live',
     };
   }
   return next;
@@ -153,6 +161,7 @@ export async function createElementSnapshot(input: ElementSnapshotCaptureInput):
   const size = resolveTemplatePixelSize(input.template);
   const safeElement = sanitizeElementForEngine(element, {
     bakeMaskIntoSnapshot: input.bakeMaskIntoSnapshot === true,
+    preserveRenderSourceMode: input.preserveRenderSourceMode === true,
   });
   const templateInput: TemplateModel = {
     ...deepClone(input.template),
@@ -188,3 +197,4 @@ export async function createElementSnapshot(input: ElementSnapshotCaptureInput):
 export const __snapshotRendererInternalsForTest = {
   sanitizeElementForEngine,
 };
+

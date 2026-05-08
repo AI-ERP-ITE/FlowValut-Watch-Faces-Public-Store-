@@ -54,4 +54,23 @@ describe('snapshotRenderer sanitizeElementForEngine', () => {
     expect(Object.prototype.hasOwnProperty.call(sanitized, 'mask')).toBe(true);
     expect((sanitized.renderState as Record<string, unknown>).sourceMode).toBe('live');
   });
+  it('preserves snapshot source mode when preserveRenderSourceMode is enabled', () => {
+    const source = {
+      id: 'el-3',
+      visible: true,
+      type: 'free_rect',
+      params: { width: 0.5, height: 0.3, fill: '#abc' },
+      renderState: {
+        sourceMode: 'snapshot',
+        snapshotStatus: 'fresh',
+      },
+    } as Record<string, unknown>;
+
+    const sanitized = __snapshotRendererInternalsForTest.sanitizeElementForEngine(source, {
+      preserveRenderSourceMode: true,
+    });
+
+    expect((sanitized.renderState as Record<string, unknown>).sourceMode).toBe('snapshot');
+  });
 });
+
