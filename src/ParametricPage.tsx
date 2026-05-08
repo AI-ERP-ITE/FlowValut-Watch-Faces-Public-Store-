@@ -18,6 +18,7 @@ import { mapCanvasPointToLocal as mapCanvasPointToLocalShared, mapLocalPointToCa
 import { applyMaskValueU8, maskStrength } from '@/lib/maskFieldKernel';
 import type { ParametricElementRenderState, ParametricSnapshotStatus } from '@/types';
 import { createElementSnapshot } from '../engine/snapshot/snapshotRenderer';
+import { generateElementRenderHash } from '../engine/snapshot/snapshotHash';
 import { deleteElementSnapshot, refreshElementSnapshotStatus, resolveElementSnapshotStatus, setElementRenderSourceMode, setElementSnapshot } from '../engine/snapshot/snapshotStorage';
 import {
   pushHistoryCommand,
@@ -1015,6 +1016,7 @@ export default function ParametricPage() {
     && selectedElement.renderState.snapshot.imageDataUrl.trim().length > 0
   );
   const canCreateSnapshot = !isSnapshotActionRunning && !!selectedElement?.id;
+  const canBakeSnapshotToLayer = !isSnapshotActionRunning && !!selectedElement?.id;
   const canUseSnapshot = !isSnapshotActionRunning && selectedHasSnapshot && selectedRenderSourceMode !== 'snapshot';
   const canUseLiveRender = !isSnapshotActionRunning && !!selectedElement?.id && selectedRenderSourceMode !== 'live';
   const canDeleteSnapshot = !isSnapshotActionRunning && selectedHasSnapshot;
@@ -1023,7 +1025,7 @@ export default function ParametricPage() {
     : !selectedElement?.id
       ? 'Select a valid element to use snapshot actions.'
       : !selectedHasSnapshot
-        ? 'Create Snapshot first, then Use Snapshot or Delete Snapshot.'
+        ? 'Create Snapshot first, then Use Snapshot or Delete Snapshot. You can also bake directly to a new layer.'
         : selectedRenderSourceMode === 'snapshot'
           ? 'Snapshot mode active. Switch to live render if needed.'
           : 'Snapshot ready. You can switch source mode or delete snapshot.';
@@ -2288,6 +2290,83 @@ export default function ParametricPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Snapshot creation failed.';
       setEditorNotice(`Snapshot create failed: ${message}`);
+    } finally {
+      setIsSnapshotActionRunning(false);
+    }
+  };
+
+  const createBakedLayerFromSelectedSnapshot = async () => {
+    if (!workingTemplate || !selectedElement || typeof selectedElement.id !== 'string') return;
+    const elementId = selectedElement.id;
+    setIsSnapshotActionRunning(true);
+    try {
+      const snapshot = await createElementSnapshot({
+        template: deepClone(workingTemplate),
+        elementId,
+        bakeMaskIntoSnapshot: true,
+        activeStyle: FIXED_RENDER_STYLE,
+        colorControl: {
+          ...DEFAULT_COLOR_CONTROL,
+          colorControl: {
+            ...DEFAULT_COLOR_CONTROL.colorControl,
+            mode: 'off',
+          },
+        },
+      });
+
+      let bakedLayerId: string | null = null;
+      updateTemplateElements((elements) => {
+        const sourceIndex = elements.findIndex((element) => element.id === elementId);
+        if (sourceIndex < 0) return elements;
+
+        const sourceElement = ensureElement(deepClone(elements[sourceIndex]), sourceIndex);
+        const sourceName = typeof sourceElement.name === 'string' && sourceElement.name.trim().length > 0
+          ? sourceElement.name.trim()
+          : (typeof sourceElement.type === 'string' && sourceElement.type.trim().length > 0 ? sourceElement.type.trim() : 'Layer');
+
+        const bakedLayer = ensureElement({
+          ...sourceElement,
+          id: makeId('layer'),
+          name: buildUniqueElementName(elements, `${sourceName} baked`),
+          visible: true,
+          renderState: {
+            sourceMode: 'live',
+            snapshotStatus: 'missing',
+            snapshot: null,
+          },
+        }, elements.length);
+
+        delete bakedLayer.mask;
+        delete bakedLayer.texture;
+        delete bakedLayer.textureLayers;
+        delete bakedLayer.gradient;
+        delete bakedLayer.gradientLayers;
+        delete bakedLayer.material;
+        delete bakedLayer.materialLayers;
+        delete bakedLayer.styleAdjust;
+        delete bakedLayer.effect3d;
+        delete bakedLayer.dropShadow;
+
+        const bakedSourceHash = generateElementRenderHash(bakedLayer as Record<string, unknown>);
+        const bakedSnapshot = {
+          ...snapshot,
+          sourceHash: bakedSourceHash,
+        };
+        const withSnapshot = setElementSnapshot(bakedLayer as Record<string, unknown>, bakedSnapshot);
+        const withFreshness = refreshElementSnapshotStatus(withSnapshot as Record<string, unknown>, bakedSourceHash) as TemplateElement;
+        bakedLayerId = typeof withFreshness.id === 'string' ? withFreshness.id : null;
+
+        return [...elements, withFreshness];
+      }, 'Create baked snapshot layer');
+
+      if (bakedLayerId) {
+        setSelectedElementId(bakedLayerId);
+      }
+      setSelectedPanelTarget('element');
+      setEditorNotice('Baked layer created from selected snapshot. New layer starts with no mask metadata.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Baked layer creation failed.';
+      setEditorNotice(`Bake to layer failed: ${message}`);
     } finally {
       setIsSnapshotActionRunning(false);
     }
@@ -7418,6 +7497,15 @@ export default function ParametricPage() {
                       className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Delete Snapshot
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { void createBakedLayerFromSelectedSnapshot(); }}
+                      disabled={!canBakeSnapshotToLayer}
+                      title={!canBakeSnapshotToLayer ? snapshotActionHint : 'Create a new baked layer from selected element including current mask result'}
+                      className="col-span-2 rounded border border-amber-700 bg-amber-950/40 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-900/60 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSnapshotActionRunning ? 'Baking...' : 'Snapshot -> New Baked Layer'}
                     </button>
                   </div>
                 </div>

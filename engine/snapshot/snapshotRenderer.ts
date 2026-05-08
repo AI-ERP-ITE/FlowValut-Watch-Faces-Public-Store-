@@ -22,6 +22,7 @@ export type ElementSnapshotCaptureInput = {
   template: TemplateModel;
   elementId?: string;
   element?: TemplateElement;
+  bakeMaskIntoSnapshot?: boolean;
   activeStyle?: string;
   mimeType?: 'image/png' | 'image/webp';
   quality?: number;
@@ -54,13 +55,16 @@ function resolveTemplatePixelSize(template: TemplateModel): { width: number; hei
   };
 }
 
-function sanitizeElementForEngine(source: TemplateElement): TemplateElement {
+function sanitizeElementForEngine(source: TemplateElement, options?: { bakeMaskIntoSnapshot?: boolean }): TemplateElement {
+  const bakeMaskIntoSnapshot = options?.bakeMaskIntoSnapshot === true;
   const next = deepClone(source);
   delete next.id;
   delete next.visible;
-  // Never bake current mask into snapshot pixels; runtime mask must remain editable
-  // and applied exactly once after snapshot capture.
-  delete next.mask;
+  // Default snapshot mode keeps mask external to avoid double-alpha application.
+  // Optional bake mode preserves mask in rasterized pixels for baked-layer workflows.
+  if (!bakeMaskIntoSnapshot) {
+    delete next.mask;
+  }
   // Always bake from procedural live source to include current effect stack.
   if (next.renderState && typeof next.renderState === 'object') {
     next.renderState = {
@@ -147,7 +151,9 @@ export async function createElementSnapshot(input: ElementSnapshotCaptureInput):
   const sourceHash = generateElementRenderHash(element);
   const now = Date.now();
   const size = resolveTemplatePixelSize(input.template);
-  const safeElement = sanitizeElementForEngine(element);
+  const safeElement = sanitizeElementForEngine(element, {
+    bakeMaskIntoSnapshot: input.bakeMaskIntoSnapshot === true,
+  });
   const templateInput: TemplateModel = {
     ...deepClone(input.template),
     elements: [safeElement],

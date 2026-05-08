@@ -27,4 +27,31 @@ describe('snapshotRenderer sanitizeElementForEngine', () => {
     expect((sanitized.renderState as Record<string, unknown>).sourceMode).toBe('live');
     expect((source.renderState as Record<string, unknown>).sourceMode).toBe('snapshot');
   });
+
+  it('keeps element mask when bakeMaskIntoSnapshot mode is enabled', () => {
+    const source = {
+      id: 'el-2',
+      visible: true,
+      type: 'free_rect',
+      params: { width: 0.5, height: 0.3, fill: '#abc' },
+      mask: {
+        enabled: true,
+        coordinateSpace: 'local',
+        strokes: [
+          { tool: 'selection', shape: 'circle', action: 'hide', opacity: 1, x: 24, y: 20, radius: 16 },
+        ],
+      },
+      renderState: {
+        sourceMode: 'snapshot',
+        snapshotStatus: 'fresh',
+      },
+    } as Record<string, unknown>;
+
+    const sanitized = __snapshotRendererInternalsForTest.sanitizeElementForEngine(source, {
+      bakeMaskIntoSnapshot: true,
+    });
+
+    expect(Object.prototype.hasOwnProperty.call(sanitized, 'mask')).toBe(true);
+    expect((sanitized.renderState as Record<string, unknown>).sourceMode).toBe('live');
+  });
 });
