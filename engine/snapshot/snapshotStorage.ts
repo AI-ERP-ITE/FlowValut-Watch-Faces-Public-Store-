@@ -9,6 +9,7 @@ export type SnapshotFreshness = 'missing' | 'fresh' | 'outdated';
 export type SnapshotState = {
   sourceMode: SnapshotRenderSourceMode;
   sourceHash?: string;
+  snapshotRevisionHash?: string;
   snapshotStatus: SnapshotFreshness;
   lastSnapshotFrame?: {
     width: number;
@@ -30,6 +31,7 @@ function normalizeRenderState(source: unknown): SnapshotState {
       ? snapshotStatusRaw
       : 'missing';
   const sourceHash = typeof safe.sourceHash === 'string' ? safe.sourceHash : undefined;
+  const snapshotRevisionHash = typeof safe.snapshotRevisionHash === 'string' ? safe.snapshotRevisionHash : undefined;
   const lastSnapshotFrameRaw = safe.lastSnapshotFrame;
   const lastSnapshotFrame = lastSnapshotFrameRaw && typeof lastSnapshotFrameRaw === 'object'
     ? {
@@ -52,6 +54,7 @@ function normalizeRenderState(source: unknown): SnapshotState {
   return {
     sourceMode,
     sourceHash,
+    snapshotRevisionHash,
     snapshotStatus,
     lastSnapshotFrame: normalizedLastSnapshotFrame,
     snapshot,
@@ -91,6 +94,9 @@ export function setElementSnapshot(element: TemplateElement, snapshot: ElementSn
       ...state,
       sourceMode: 'snapshot',
       sourceHash: nextSnapshot.sourceHash,
+      snapshotRevisionHash: typeof nextSnapshot.snapshotRevisionHash === 'string'
+        ? nextSnapshot.snapshotRevisionHash
+        : state.snapshotRevisionHash,
       snapshotStatus: 'fresh',
       lastSnapshotFrame: {
         width: Math.max(1, Number(nextSnapshot.width) || 1),
@@ -117,6 +123,7 @@ export function deleteElementSnapshot(element: TemplateElement): TemplateElement
       ...state,
       sourceMode: 'live',
       sourceHash: liveHash,
+      snapshotRevisionHash: undefined,
       snapshotStatus: 'missing',
       lastSnapshotFrame: snapshotFrame,
       snapshot: null,
@@ -160,6 +167,9 @@ export function refreshElementSnapshotStatus(
     renderState: {
       ...state,
       sourceHash: liveHash,
+      snapshotRevisionHash: state.snapshot && typeof state.snapshot === 'object' && typeof state.snapshot.snapshotRevisionHash === 'string'
+        ? state.snapshot.snapshotRevisionHash
+        : state.snapshotRevisionHash,
       snapshotStatus,
     },
   };

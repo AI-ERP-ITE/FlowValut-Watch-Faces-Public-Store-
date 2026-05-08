@@ -6,6 +6,7 @@ export type ParametricElementSnapshot = {
   id?: string;
   imageDataUrl?: string;
   sourceHash?: string;
+  snapshotRevisionHash?: string;
   createdAt?: number;
   updatedAt?: number;
   width?: number;

@@ -1533,6 +1533,24 @@ function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 		};
 	}
 
+	const snapshot = renderState.snapshot && typeof renderState.snapshot === "object"
+		? renderState.snapshot
+		: null;
+	const expectedRevisionHash = typeof renderState.snapshotRevisionHash === "string"
+		? renderState.snapshotRevisionHash.trim()
+		: "";
+	const actualRevisionHash = snapshot && typeof snapshot.snapshotRevisionHash === "string"
+		? snapshot.snapshotRevisionHash.trim()
+		: "";
+	if (expectedRevisionHash && (!actualRevisionHash || actualRevisionHash !== expectedRevisionHash)) {
+		return {
+			requestedMode,
+			effectiveMode: "live-fallback",
+			snapshotSource: null,
+			maskFrameMetrics: fallbackMaskFrameMetrics,
+		};
+	}
+
 	const snapshotSource = resolveSnapshotRenderSource(element, layoutMetrics);
 	if (!snapshotSource) {
 		return {

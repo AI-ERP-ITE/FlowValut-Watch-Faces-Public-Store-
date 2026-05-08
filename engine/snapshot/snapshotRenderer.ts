@@ -35,6 +35,7 @@ export type ElementSnapshotCaptureResult = {
   id: string;
   imageDataUrl: string;
   sourceHash: string;
+  snapshotRevisionHash: string;
   createdAt: number;
   updatedAt: number;
   width: number;
@@ -42,8 +43,51 @@ export type ElementSnapshotCaptureResult = {
   mimeType: string;
 };
 
+const SNAPSHOT_REVISION_HASH_VERSION = 'r1';
+let snapshotCaptureSequence = 0;
+
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function fnv1a32(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return 'h' + (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function buildSnapshotRevisionHashPayload(input: {
+  id: string;
+  sourceHash: string;
+  createdAt: number;
+  imageDataUrl: string;
+  captureNonce: number;
+}): string {
+  return JSON.stringify({
+    v: SNAPSHOT_REVISION_HASH_VERSION,
+    id: input.id,
+    sourceHash: input.sourceHash,
+    createdAt: input.createdAt,
+    imageDataUrl: input.imageDataUrl,
+    captureNonce: input.captureNonce,
+  });
+}
+
+function createSnapshotRevisionHash(input: {
+  id: string;
+  sourceHash: string;
+  createdAt: number;
+  imageDataUrl: string;
+}): string {
+  snapshotCaptureSequence += 1;
+  const payload = buildSnapshotRevisionHashPayload({
+    ...input,
+    captureNonce: snapshotCaptureSequence,
+  });
+  return SNAPSHOT_REVISION_HASH_VERSION + ':' + fnv1a32(payload);
 }
 
 function resolveTemplatePixelSize(template: TemplateModel): { width: number; height: number } {
@@ -180,11 +224,18 @@ export async function createElementSnapshot(input: ElementSnapshotCaptureInput):
   const mimeType = input.mimeType === 'image/webp' ? 'image/webp' : 'image/png';
   const quality = Number.isFinite(Number(input.quality)) ? Number(input.quality) : undefined;
   const imageDataUrl = await rasterizeSvg(svgMarkup, size.width, size.height, mimeType, quality);
+  const snapshotRevisionHash = createSnapshotRevisionHash({
+    id,
+    sourceHash,
+    createdAt: now,
+    imageDataUrl,
+  });
 
   return {
     id,
     imageDataUrl,
     sourceHash,
+    snapshotRevisionHash,
     createdAt: now,
     updatedAt: now,
     width: size.width,
@@ -196,5 +247,8 @@ export async function createElementSnapshot(input: ElementSnapshotCaptureInput):
 // Test-only export for regression coverage of snapshot sanitization invariants.
 export const __snapshotRendererInternalsForTest = {
   sanitizeElementForEngine,
+  buildSnapshotRevisionHashPayload,
 };
+
+
 

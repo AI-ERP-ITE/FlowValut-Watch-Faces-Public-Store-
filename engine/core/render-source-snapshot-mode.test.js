@@ -48,10 +48,12 @@ function createSnapshotTemplate() {
         renderState: {
           sourceMode: 'snapshot',
           snapshotStatus: 'fresh',
+          snapshotRevisionHash: 'r1:h11111111',
           snapshot: {
             id: 'snap-1',
             imageDataUrl: 'data:image/png;base64,AAAA',
             sourceHash: 'v1:h00000000',
+            snapshotRevisionHash: 'r1:h11111111',
             width: 160,
             height: 160,
           },
@@ -126,6 +128,27 @@ describe('render source snapshot mode', () => {
 
     expect(fallbackSvg).toBe(liveSvg);
     expect(fallbackSvg.includes('href="data:image/png;base64')).toBe(false);
+  });
+
+  it('falls back to live rendering when snapshot revision hash mismatches renderState', () => {
+    const mismatchTemplate = createLiveBaselineTemplate();
+    mismatchTemplate.elements[0].renderState = {
+      sourceMode: 'snapshot',
+      snapshotStatus: 'fresh',
+      snapshotRevisionHash: 'r1:expected',
+      snapshot: {
+        id: 'snap-1',
+        imageDataUrl: 'data:image/png;base64,AAAA',
+        sourceHash: 'v1:hdeadbeef',
+        snapshotRevisionHash: 'r1:different',
+        width: 160,
+        height: 160,
+      },
+    };
+
+    const fallbackSvg = runEngine({ templateInput: mismatchTemplate });
+
+    expect(fallbackSvg.includes('href="data:image/png;base64,AAAA"')).toBe(false);
   });
 
   it('falls back to live rendering when snapshot status is outdated', () => {
