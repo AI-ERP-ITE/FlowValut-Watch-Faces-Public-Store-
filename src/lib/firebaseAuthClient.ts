@@ -1,12 +1,15 @@
 import { initializeApp, getApps } from 'firebase/app';
 import {
+  browserLocalPersistence,
   GoogleAuthProvider,
   getAuth,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
   signInWithPopup,
   signInWithRedirect,
   signOut,
+  type UserCredential,
   type User,
 } from 'firebase/auth';
 
@@ -89,6 +92,7 @@ function toAuthErrorMessage(error: unknown): string {
 export async function signInAdminWithGoogle(): Promise<{ method: 'popup' | 'redirect' }> {
   const auth = ensureFirebaseApp();
   const provider = new GoogleAuthProvider();
+  await setPersistence(auth, browserLocalPersistence);
 
   try {
     await signInWithPopup(auth, provider);
@@ -111,12 +115,14 @@ export async function signInAdminWithGoogle(): Promise<{ method: 'popup' | 'redi
 export async function startGoogleRedirectSignIn(): Promise<void> {
   const auth = ensureFirebaseApp();
   const provider = new GoogleAuthProvider();
+  await setPersistence(auth, browserLocalPersistence);
   await signInWithRedirect(auth, provider);
 }
 
-export async function completeRedirectSignIn(): Promise<void> {
+export async function completeRedirectSignIn(): Promise<UserCredential | null> {
   const auth = ensureFirebaseApp();
-  await getRedirectResult(auth);
+  await setPersistence(auth, browserLocalPersistence);
+  return getRedirectResult(auth);
 }
 
 export async function signOutAdmin(): Promise<void> {
