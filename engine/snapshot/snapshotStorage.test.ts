@@ -71,6 +71,40 @@ describe('snapshotStorage stale detection', () => {
     expect((refreshed.renderState as Record<string, unknown>).snapshotStatus).toBe('outdated');
   });
 
+  it('keeps snapshot mode fresh when revision hash identity matches', () => {
+    const base = {
+      id: 'el-3b',
+      type: 'free_rect',
+      params: { width: 0.4, height: 0.2, fill: '#999' },
+    } as Record<string, unknown>;
+    const sourceHash = generateElementRenderHash(base);
+    const withSnapshot = setElementSnapshot(base, {
+      id: 'el-3b',
+      imageDataUrl: 'data:image/png;base64,AAA',
+      sourceHash,
+      snapshotRevisionHash: 'r1:habc12345',
+      createdAt: 1,
+      updatedAt: 1,
+      width: 480,
+      height: 480,
+      mimeType: 'image/png',
+    });
+
+    const edited = {
+      ...withSnapshot,
+      params: { width: 0.6, height: 0.2, fill: '#999' },
+      renderState: {
+        ...((withSnapshot.renderState as Record<string, unknown>) ?? {}),
+        sourceMode: 'snapshot',
+        snapshotRevisionHash: 'r1:habc12345',
+      },
+    } as Record<string, unknown>;
+
+    expect(resolveElementSnapshotStatus(edited)).toBe('fresh');
+    const refreshed = refreshElementSnapshotStatus(edited);
+    expect((refreshed.renderState as Record<string, unknown>).snapshotStatus).toBe('fresh');
+  });
+
   it('keeps snapshot fresh when only mask data changes', () => {
     const base = {
       id: 'el-4',

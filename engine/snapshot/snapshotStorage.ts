@@ -141,6 +141,16 @@ export function resolveElementSnapshotStatus(
   if (!snapshot || typeof snapshot !== 'object') return 'missing';
   if (typeof snapshot.imageDataUrl !== 'string' || snapshot.imageDataUrl.trim().length === 0) return 'missing';
 
+  const expectedRevisionHash = typeof state.snapshotRevisionHash === 'string'
+    ? state.snapshotRevisionHash.trim()
+    : '';
+  const actualRevisionHash = typeof snapshot.snapshotRevisionHash === 'string'
+    ? snapshot.snapshotRevisionHash.trim()
+    : '';
+  if (state.sourceMode === 'snapshot' && expectedRevisionHash && actualRevisionHash && expectedRevisionHash === actualRevisionHash) {
+    return 'fresh';
+  }
+
   const storedHash = typeof snapshot.sourceHash === 'string' && snapshot.sourceHash.trim().length > 0
     ? snapshot.sourceHash
     : (typeof state.sourceHash === 'string' ? state.sourceHash : '');
