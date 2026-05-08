@@ -89,4 +89,24 @@ Notes:
 1. Added renderer parity test for field-backed mask output path.
 2. Targeted recurrence + snapshot suites stayed green.
 
-Next task: T-040 Build and deploy private bundle.
+## P10 - T-040 completed
+Date: 2026-05-07
+Task: T-040 Build and deploy private bundle
+Status: Done
+Evidence: see 19-t040-deploy-private-bundle.md
+Notes:
+1. Ran npm run deploy:docs:private after temporary root/studio entry reset to /src/main.tsx.
+2. Deploy sync produced bundle hash index-DTSnu2uU.js and updated docs + root mirrors.
+3. Pushed deploy artifacts to origin/main in commit 13c24fe.
+
+## P11 - T-041 completed
+Date: 2026-05-07
+Task: T-041 Live repro verification
+Status: Done
+Evidence: see 20-t041-live-repro-verification.md
+Notes:
+1. Verified live routes /Watch-Faces/, ?p=/studio, and ?p=/studio/parametric serve index-DTSnu2uU.js.
+2. Verified HEAD 200 for index-DTSnu2uU.js, index-CrlChUe_.css, tablerIconRenderer-DYZseAfo.js.
+3. Initial stale hash read resolved after cache-busted verification, confirming propagation.
+
+Next task: None. Gate E complete.

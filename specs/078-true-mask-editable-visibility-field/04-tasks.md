@@ -78,10 +78,10 @@ Status: Done
 Inputs: validated changes
 Output: deployed bundle hash and commit evidence
 Done criteria: deploy protocol complete
-Status: Not Started
+Status: Done
 
 ### T-041 Live repro verification
 Inputs: T-040
 Output: user repro path passes without alpha collapse
 Done criteria: issue not reproducible in live route
-Status: Not Started
+Status: Done
