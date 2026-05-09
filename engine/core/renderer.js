@@ -1426,6 +1426,12 @@ function resolveElementRenderSourceMode(element = {}) {
 	return renderState.sourceMode === "snapshot" ? "snapshot" : "live";
 }
 
+function resolveSnapshotRenderMode(element = {}) {
+	if (!element || typeof element !== "object") return "frozen";
+	const renderState = element.renderState && typeof element.renderState === "object" ? element.renderState : {};
+	return renderState.snapshotRenderMode === "editable" ? "editable" : "frozen";
+}
+
 function escapeAttribute(value) {
 	return String(value)
 		.replace(/&/g, "&amp;")
@@ -1600,6 +1606,8 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const renderSourceDecision = resolveElementRenderSourceDecision(safeElement, context.layoutMetrics);
 			const snapshotSource = renderSourceDecision.snapshotSource;
 			const useSnapshotSource = renderSourceDecision.effectiveMode === "snapshot" && snapshotSource !== null;
+			const snapshotRenderMode = useSnapshotSource ? resolveSnapshotRenderMode(safeElement) : "editable";
+			const isFrozenSnapshot = useSnapshotSource && snapshotRenderMode === "frozen";
 			const snapshotImageX = -x;
 			const snapshotImageY = -y;
 			const snapshotPlacementMatchesTemplate = !useSnapshotSource
@@ -1628,13 +1636,18 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				context.layerMaskRegistry[safeElement.name.trim()] = worldBody;
 			}
 
-			const styleAdjust = normalizeStyleAdjust(
-				{
-					...(safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? safeElement.styleAdjust : {}),
-					...(renderParams.styleAdjust && typeof renderParams.styleAdjust === "object" ? renderParams.styleAdjust : {}),
-				},
-				{ enabled: true, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 },
-			);
+			const styleAdjust = isFrozenSnapshot
+				? normalizeStyleAdjust(
+					{ enabled: false },
+					{ enabled: true, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 },
+				)
+				: normalizeStyleAdjust(
+					{
+						...(safeElement.styleAdjust && typeof safeElement.styleAdjust === "object" ? safeElement.styleAdjust : {}),
+						...(renderParams.styleAdjust && typeof renderParams.styleAdjust === "object" ? renderParams.styleAdjust : {}),
+					},
+					{ enabled: true, contrast: 0, highlight: 0, shadows: 0, sharpness: 0, hue: 0, colorOpacity: 0 },
+				);
 			const textureLayersFromElement = Array.isArray(safeElement.textureLayers)
 				? safeElement.textureLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1647,9 +1660,11 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.texture && typeof safeElement.texture === "object" ? safeElement.texture : {}),
 					...(renderParams.texture && typeof renderParams.texture === "object" ? renderParams.texture : {}),
 				}];
-			const textureLayers = textureLayerSources.map((entry) =>
-				normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
-			);
+			const textureLayers = isFrozenSnapshot
+				? []
+				: textureLayerSources.map((entry) =>
+					normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
+				);
 			const gradientLayersFromElement = Array.isArray(safeElement.gradientLayers)
 				? safeElement.gradientLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1662,9 +1677,11 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.gradient && typeof safeElement.gradient === "object" ? safeElement.gradient : {}),
 					...(renderParams.gradientOverlay && typeof renderParams.gradientOverlay === "object" ? renderParams.gradientOverlay : {}),
 				}];
-			const gradientLayers = gradientLayerSources.map((entry) =>
-				normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
-			);
+			const gradientLayers = isFrozenSnapshot
+				? []
+				: gradientLayerSources.map((entry) =>
+					normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
+				);
 			const materialLayersFromElement = Array.isArray(safeElement.materialLayers)
 				? safeElement.materialLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1677,30 +1694,40 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					...(safeElement.material && typeof safeElement.material === "object" ? safeElement.material : {}),
 					...(renderParams.material && typeof renderParams.material === "object" ? renderParams.material : {}),
 				}];
-			const materialLayers = materialLayerSources.map((entry) =>
-				normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
-			);
+			const materialLayers = isFrozenSnapshot
+				? []
+				: materialLayerSources.map((entry) =>
+					normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
+				);
 			const depth = context.globalDepthEnabled
 				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
-				: normalizeDepthEffect(
+				: (isFrozenSnapshot
+					? normalizeDepthEffect({ enabled: false }, null)
+					: normalizeDepthEffect(
 					{
 						...(safeElement.effect3d && typeof safeElement.effect3d === "object" ? safeElement.effect3d : {}),
 						...(renderParams.effect3d && typeof renderParams.effect3d === "object" ? renderParams.effect3d : {}),
 					},
 					null,
+				));
+			const dropShadow = isFrozenSnapshot
+				? normalizeDropShadowEffect({ enabled: false })
+				: normalizeDropShadowEffect(
+					{
+						...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
+						...(renderParams.dropShadow && typeof renderParams.dropShadow === "object" ? renderParams.dropShadow : {}),
+					},
 				);
-			const dropShadow = normalizeDropShadowEffect(
-				{
-					...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
-					...(renderParams.dropShadow && typeof renderParams.dropShadow === "object" ? renderParams.dropShadow : {}),
-				},
-			);
 			const localId = `el-${elementIndex}-${positionIndex}`;
 			if (context && typeof context === "object") {
 				if (!context.renderSourceModeByLayer || typeof context.renderSourceModeByLayer !== "object") {
 					context.renderSourceModeByLayer = {};
 				}
 				context.renderSourceModeByLayer[localId] = renderSourceDecision.effectiveMode;
+				if (!context.snapshotRenderModeByLayer || typeof context.snapshotRenderModeByLayer !== "object") {
+					context.snapshotRenderModeByLayer = {};
+				}
+				context.snapshotRenderModeByLayer[localId] = snapshotRenderMode;
 				if (!context.renderSourceRequestedModeByLayer || typeof context.renderSourceRequestedModeByLayer !== "object") {
 					context.renderSourceRequestedModeByLayer = {};
 				}
