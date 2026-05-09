@@ -511,7 +511,7 @@ function normalizeDropShadowEffect(source = {}) {
 		mode: src.mode === "inner" ? "inner" : "outer",
 		color: typeof src.color === "string" ? src.color : "#000000",
 		opacity: clamp(src.opacity, 0, 0.35, 0.14),
-		blur: clamp(src.blur, 0, 6, 1.5),
+		blur: clamp(src.blur, 0, 20, 2),
 		spread: clamp(src.spread, 0, 0.25, 0),
 		offsetX: clamp(src.offsetX, -8, 8, 1),
 		offsetY: clamp(src.offsetY, -8, 8, 1),
@@ -527,6 +527,11 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		&& typeof renderOptions.snapshotImageDataUrl === "string"
 		&& renderOptions.snapshotImageDataUrl.trim().length > 0;
 	const alphaRef = useSnapshotImageSilhouette ? "silhouetteAlpha" : "SourceAlpha";
+	// Snapshot image geometry in filter coordinate space (same coords as the <image> body element).
+	const silhouetteX = Number.isFinite(Number(renderOptions.snapshotSilhouetteX)) ? Number(renderOptions.snapshotSilhouetteX) : 0;
+	const silhouetteY = Number.isFinite(Number(renderOptions.snapshotSilhouetteY)) ? Number(renderOptions.snapshotSilhouetteY) : 0;
+	const silhouetteW = Number.isFinite(Number(renderOptions.snapshotSilhouetteW)) && Number(renderOptions.snapshotSilhouetteW) > 0 ? Number(renderOptions.snapshotSilhouetteW) : null;
+	const silhouetteH = Number.isFinite(Number(renderOptions.snapshotSilhouetteH)) && Number(renderOptions.snapshotSilhouetteH) > 0 ? Number(renderOptions.snapshotSilhouetteH) : null;
 
 	// Keep tone and sharpening responsive but avoid tiny slider movement causing heavy clipping.
 	const toneShift = (styleAdjust.highlight - styleAdjust.shadows) * 0.12;
@@ -551,10 +556,15 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 	const parts = [
 		`<filter id=\"${filterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
 		...(useSnapshotImageSilhouette
-			? [
-				`<feImage href=\"${escapeAttribute(renderOptions.snapshotImageDataUrl.trim())}\" result=\"snapshotSurface\" />`,
-				"<feColorMatrix in=\"snapshotSurface\" type=\"matrix\" values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0\" result=\"silhouetteAlpha\" />",
-			]
+			? (() => {
+				const sizeAttrs = silhouetteW !== null && silhouetteH !== null
+					? ` x="${silhouetteX}" y="${silhouetteY}" width="${silhouetteW}" height="${silhouetteH}" preserveAspectRatio="none"`
+					: "";
+				return [
+					`<feImage href="${escapeAttribute(renderOptions.snapshotImageDataUrl.trim())}"${sizeAttrs} result="snapshotSurface" />`,
+					`<feColorMatrix in="snapshotSurface" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="silhouetteAlpha" />`,
+				];
+			})()
 			: []),
 		`<feColorMatrix in=\"SourceGraphic\" type=\"hueRotate\" values=\"${styleAdjust.hue.toFixed(3)}\" result=\"hue\" />`,
 		`<feComponentTransfer in=\"hue\" result=\"tone\">`,
@@ -629,7 +639,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 
 	if (dropShadowEffect.enabled && dropShadowEffect.opacity > 0) {
 		const mode = dropShadowEffect.mode === "inner" ? "inner" : "outer";
-		const shadowBlur = Math.max(0, Number(dropShadowEffect.blur) / 2);
+		const shadowBlur = Math.max(0, Number(dropShadowEffect.blur));
 		const shadowSpread = clamp(dropShadowEffect.spread, 0, 20, 0);
 		const shadowBaseRef = shadowSpread > 0.001 ? "dsSpreadAlpha" : alphaRef;
 
@@ -1814,6 +1824,10 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					snapshotRenderMode,
 					effectSilhouetteSource: useSnapshotSource ? "snapshot-image-alpha" : "source-alpha",
 					snapshotImageDataUrl: snapshotSource?.imageDataUrl || "",
+					snapshotSilhouetteX: snapshotImageX,
+					snapshotSilhouetteY: snapshotImageY,
+					snapshotSilhouetteW: W,
+					snapshotSilhouetteH: H,
 					snapshotMaskBody,
 				},
 			);
