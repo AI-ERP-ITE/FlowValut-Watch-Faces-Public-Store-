@@ -20,6 +20,11 @@ import type { ParametricElementRenderState, ParametricSnapshotStatus, SnapshotRe
 import { createElementSnapshot } from '../engine/snapshot/snapshotRenderer';
 import { generateElementRenderHash } from '../engine/snapshot/snapshotHash';
 import { deleteElementSnapshot, refreshElementSnapshotStatus, resolveElementSnapshotStatus, setElementRenderSourceMode, setElementSnapshot } from '../engine/snapshot/snapshotStorage';
+import { generateElementRenderHash as generateCachedElementRenderHash } from '../engine/rendering/renderHash';
+import { getCachedRender, getCachedRenderElementIds, removeCachedRender, setCachedRender } from '../engine/rendering/renderCache';
+import { consumeDirtyElementIds, getElementDirtyReason, getDirtyElementIds, markElementDirty, type DirtyReason } from '../engine/rendering/renderInvalidation';
+import { beginRenderInteraction, endRenderInteraction, getRenderQualityMode } from '../engine/rendering/renderInteractionState';
+import { resolveLayerRenderOutputWithInvalidation } from '@/lib/renderCacheScheduler';
 import {
   pushHistoryCommand,
   redoHistory,
@@ -932,6 +937,26 @@ export default function ParametricPage() {
   const dragBatchBeforeRef = useRef<TemplateModel | null>(null);
   const dragBatchLabelRef = useRef('Canvas drag');
   const authConfigured = isFirebaseAuthConfigured();
+  const markDirtyById = useCallback((elementId: string | null | undefined, reason: DirtyReason) => {
+    if (typeof elementId !== 'string' || elementId.trim().length === 0) return;
+    markElementDirty(elementId.trim(), reason);
+  }, []);
+  const markSelectedElementDirty = useCallback((reason: DirtyReason) => {
+    if (!selectedElement || typeof selectedElement.id !== 'string') return;
+    markElementDirty(selectedElement.id.trim(), reason);
+  }, [selectedElement]);
+  const beginCanvasInteraction = useCallback(() => {
+    beginRenderInteraction('canvas-interaction');
+  }, []);
+  const endCanvasInteraction = useCallback(() => {
+    endRenderInteraction('canvas-interaction');
+  }, []);
+  const beginSliderInteraction = useCallback(() => {
+    beginRenderInteraction('slider-interaction');
+  }, []);
+  const endSliderInteraction = useCallback(() => {
+    endRenderInteraction('slider-interaction');
+  }, []);
 
   // Match Studio font availability so font-family changes are visually obvious in parametric preview.
   useEffect(() => {
@@ -942,6 +967,31 @@ export default function ParametricPage() {
       document.head.appendChild(link);
     }
   }, []);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.type !== 'range') return;
+      beginSliderInteraction();
+    };
+
+    const onPointerUp = () => {
+      endSliderInteraction();
+      endCanvasInteraction();
+    };
+
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('mouseup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      window.removeEventListener('mouseup', onPointerUp);
+    };
+  }, [beginSliderInteraction, endCanvasInteraction, endSliderInteraction]);
 
   const getTemplateFingerprint = useCallback((template: TemplateModel | null): string => {
     if (!template) return 'null';
@@ -1478,6 +1528,7 @@ export default function ParametricPage() {
           paramOverrides?: Record<string, Record<string, number>>;
           templateInput?: TemplateModel;
           colorControl?: typeof DEFAULT_COLOR_CONTROL;
+          renderQualityMode?: 'preview' | 'final';
         }) => string;
       };
 
@@ -1523,6 +1574,7 @@ export default function ParametricPage() {
         });
 
       const previewColorMode: ColorMode = colorMode === 'enforce' ? 'off' : colorMode;
+      const renderQualityMode = getRenderQualityMode();
 
       const renderWithElements = (elements: TemplateElement[]) =>
         engineModule.runEngine({
@@ -1539,11 +1591,54 @@ export default function ParametricPage() {
               mode: previewColorMode,
             },
           },
+          renderQualityMode,
         });
 
       previewRenderSerialRef.current += 1;
       const renderSerial = previewRenderSerialRef.current;
       const namespaceForPass = (pass: string) => `pv-${renderSerial}-${pass}`;
+
+      const liveElementIds = new Set(
+        (template.elements ?? [])
+          .map((entry) => (typeof entry?.id === 'string' ? entry.id.trim() : ''))
+          .filter((id) => id.length > 0),
+      );
+      for (const cachedId of getCachedRenderElementIds()) {
+        if (!liveElementIds.has(cachedId)) {
+          removeCachedRender(cachedId);
+        }
+      }
+
+      const pendingDirtyIds = getDirtyElementIds();
+      const dirtyReasonById = new Map<string, string>();
+      for (const dirtyId of pendingDirtyIds) {
+        const reason = getElementDirtyReason(dirtyId);
+        dirtyReasonById.set(dirtyId, typeof reason === 'string' ? reason : 'unknown');
+      }
+      const consumedDirtyIds = consumeDirtyElementIds();
+      const dirtyIds = new Set(consumedDirtyIds);
+      if (dirtyIds.size > 0) {
+        console.debug('[RenderInvalidation]', `DIRTY_COUNT=${dirtyIds.size}`);
+      }
+
+      const renderSingleElementWithCache = (element: TemplateElement, index: number) => {
+        const cacheKey = typeof element.id === 'string' && element.id.trim().length > 0
+          ? element.id.trim()
+          : `__visible_index_${index}`;
+        const nextHash = generateCachedElementRenderHash(element as Record<string, unknown>);
+        return resolveLayerRenderOutputWithInvalidation({
+          cacheKey,
+          nextHash,
+          passSeed: namespaceForPass(`layer-${index}`),
+          getCachedRender,
+          setCachedRender,
+          renderLayerSvg: () => renderWithElements([element]),
+          namespaceSvgIds,
+          dirtyElementIds: dirtyIds,
+          dirtyReasonByElementId: dirtyReasonById,
+        });
+      };
+
       const pixelPassElements = isSoloMode && selectedVisibleElement
         ? [selectedVisibleElement]
         : visibleElements;
@@ -1552,7 +1647,7 @@ export default function ParametricPage() {
 
       if (!isSoloMode) {
         const stackedLayers = visibleElements.map((element, index) => {
-          return namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
+          return renderSingleElementWithCache(element, index);
         });
 
         setSvgMarkup(stackedLayers[0] ?? '');
@@ -2265,6 +2360,7 @@ export default function ParametricPage() {
   const createSnapshotForSelectedElement = async () => {
     if (!workingTemplate || !selectedElement || typeof selectedElement.id !== 'string') return;
     const elementId = selectedElement.id;
+    markDirtyById(elementId, 'snapshot');
     setIsSnapshotActionRunning(true);
     try {
       const snapshot = await createElementSnapshot({
@@ -2300,6 +2396,7 @@ export default function ParametricPage() {
 
   const createBakedLayerFromElement = async (elementId: string) => {
     if (!workingTemplate || typeof elementId !== 'string' || elementId.trim().length === 0) return;
+    markDirtyById(elementId, 'snapshot');
     setIsSnapshotActionRunning(true);
     try {
       const snapshot = await createElementSnapshot({
@@ -2366,6 +2463,7 @@ export default function ParametricPage() {
       }, 'Create baked snapshot layer');
 
       if (bakedLayerId) {
+        markDirtyById(bakedLayerId, 'snapshot');
         setSelectedElementId(bakedLayerId);
       }
       setSelectedPanelTarget('element');
@@ -2390,6 +2488,7 @@ export default function ParametricPage() {
       return;
     }
     const elementId = selectedElement.id;
+    markDirtyById(elementId, 'snapshot');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== elementId) return element;
@@ -2404,6 +2503,7 @@ export default function ParametricPage() {
   const useLiveRenderForSelectedElement = () => {
     if (!selectedElement || typeof selectedElement.id !== 'string') return;
     const elementId = selectedElement.id;
+    markDirtyById(elementId, 'snapshot');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== elementId) return element;
@@ -2432,6 +2532,7 @@ export default function ParametricPage() {
       return;
     }
     const elementId = selectedElement.id;
+    markDirtyById(elementId, 'snapshot');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== elementId) return element;
@@ -2824,6 +2925,7 @@ export default function ParametricPage() {
 
   const setSelectedPlacementOffset = (x: number, y: number) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('transform');
     const clampedX = Math.max(-50, Math.min(50, x));
     const clampedY = Math.max(-50, Math.min(50, y));
     updateTemplateElements((elements) =>
@@ -2853,6 +2955,7 @@ export default function ParametricPage() {
 
   const setSelectedPlacementRotation = (rotation: number) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('transform');
     const clampedRotation = Math.max(-360, Math.min(360, rotation));
     updateTemplateElements((elements) =>
       elements.map((element) => {
@@ -2878,6 +2981,7 @@ export default function ParametricPage() {
 
   const setSelectedSymmetryMode = (mode: 'none' | 'mirrorX' | 'mirrorY') => {
     if (!selectedElement) return;
+    markSelectedElementDirty('transform');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -3038,6 +3142,7 @@ export default function ParametricPage() {
 
   const updateSelectedTextureLayer = (updater: (layer: Record<string, unknown>, allLayers: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('effects');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -3318,6 +3423,7 @@ export default function ParametricPage() {
 
   const updateSelectedGradientLayer = (updater: (layer: Record<string, unknown>, allLayers: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('effects');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -3551,6 +3657,7 @@ export default function ParametricPage() {
 
   const setSelectedMaskEnabled = (enabled: boolean) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('mask');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -3584,6 +3691,7 @@ export default function ParametricPage() {
 
   const setSelectedMaskNumber = (path: string, value: number) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('mask');
     const segments = path.split('.');
     updateTemplateElements((elements) =>
       elements.map((element) => {
@@ -3692,6 +3800,7 @@ export default function ParametricPage() {
 
   const clearSelectedMaskStrokes = () => {
     if (!selectedElement) return;
+    markSelectedElementDirty('mask');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -3703,6 +3812,7 @@ export default function ParametricPage() {
 
   const appendSelectedMaskStroke = (stroke: Record<string, unknown>) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('mask');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -3736,6 +3846,7 @@ export default function ParametricPage() {
 
   const updateSelectedMaterialLayer = (updater: (layer: Record<string, unknown>, allLayers: Array<Record<string, unknown>>) => Array<Record<string, unknown>>) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('effects');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -4979,6 +5090,7 @@ export default function ParametricPage() {
 
   const ensureSelectedMaskLocalCoordinateSpace = () => {
     if (!selectedElement) return;
+    markSelectedElementDirty('mask');
     updateTemplateElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedElement.id) return element;
@@ -6277,6 +6389,7 @@ export default function ParametricPage() {
                           setMaskCursorPoint({ x, y });
                           const maskMode = getSelectedMaskString('mode', 'brush');
                           if (maskMode === 'selection') {
+                            beginCanvasInteraction();
                             const shape = selectedMaskSelectionShape;
                             setActiveMaskSelectionShape({
                               action: maskBrushAction,
@@ -6290,6 +6403,7 @@ export default function ParametricPage() {
                             });
                             return;
                           }
+                          beginCanvasInteraction();
                           setIsMaskPainting(true);
                           setActiveMaskStroke({
                             action: maskBrushAction,
@@ -6391,6 +6505,7 @@ export default function ParametricPage() {
                           setDraggingRadiusHandle(false);
                           finishMaskStroke();
                           finishMaskSelectionShapeDraft();
+                          endCanvasInteraction();
                         }}
                         onMouseLeave={() => {
                           setDraggingGradientHandle(null);
@@ -6400,6 +6515,7 @@ export default function ParametricPage() {
                           finishMaskStroke();
                           finishMaskSelectionShapeDraft();
                           setMaskCursorPoint(null);
+                          endCanvasInteraction();
                         }}
                       >
                         {showLinearGradientCanvasHandles ? (
@@ -6417,7 +6533,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingGradientHandle('from')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingGradientHandle('from'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-emerald-300 text-[10px] font-semibold text-black"
                               style={{ left: `${gradientFromX}%`, top: `${gradientFromY}%` }}
                               title="Drag gradient start handle"
@@ -6427,7 +6543,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingGradientHandle('to')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingGradientHandle('to'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-sky-300 text-[10px] font-semibold text-black"
                               style={{ left: `${gradientToX}%`, top: `${gradientToY}%` }}
                               title="Drag gradient end handle"
@@ -6462,7 +6578,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingGradientHandle('center')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingGradientHandle('center'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-fuchsia-300 text-[10px] font-semibold text-black"
                               style={{ left: `${gradientCenterX}%`, top: `${gradientCenterY}%` }}
                               title="Drag radial center handle"
@@ -6472,7 +6588,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingGradientHandle('radius')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingGradientHandle('radius'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-violet-300 text-[10px] font-semibold text-black"
                               style={{ left: `${gradientRadiusHandleX}%`, top: `${gradientRadiusHandleY}%` }}
                               title="Drag radial radius handle"
@@ -6482,7 +6598,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingGradientHandle('focal')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingGradientHandle('focal'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-pink-300 text-[10px] font-semibold text-black"
                               style={{ left: `${gradientFocalX}%`, top: `${gradientFocalY}%` }}
                               title="Drag radial focal handle"
@@ -6507,7 +6623,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingGradientHandle('center')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingGradientHandle('center'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-orange-300 text-[10px] font-semibold text-black"
                               style={{ left: `${gradientCenterX}%`, top: `${gradientCenterY}%` }}
                               title="Drag conic center handle"
@@ -6517,7 +6633,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingGradientHandle('angle')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingGradientHandle('angle'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-amber-300 text-[10px] font-semibold text-black"
                               style={{ left: `${gradientAngleHandleX}%`, top: `${gradientAngleHandleY}%` }}
                               title="Drag conic angle handle"
@@ -6541,7 +6657,7 @@ export default function ParametricPage() {
                             />
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingTextureHandle('direction')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingTextureHandle('direction'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-cyan-300 text-[10px] font-semibold text-black"
                               style={{ left: `${brushedDirectionHandleX}%`, top: `${brushedDirectionHandleY}%` }}
                               title="Drag texture direction handle"
@@ -6575,7 +6691,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingTextureHandle('imageOffset')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingTextureHandle('imageOffset'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-emerald-300 text-[10px] font-semibold text-black"
                               style={{ left: `${textureImageOffsetHandleX}%`, top: `${textureImageOffsetHandleY}%` }}
                               title="Drag image texture offset handle"
@@ -6585,7 +6701,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingTextureHandle('imageScale')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingTextureHandle('imageScale'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-sky-300 text-[10px] font-semibold text-black"
                               style={{ left: `${textureImageScaleHandleX}%`, top: `${textureImageScaleHandleY}%` }}
                               title="Drag image texture scale handle"
@@ -6595,7 +6711,7 @@ export default function ParametricPage() {
 
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingTextureHandle('imageRotation')}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingTextureHandle('imageRotation'); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-amber-300 text-[10px] font-semibold text-black"
                               style={{ left: `${textureImageRotationHandleX}%`, top: `${textureImageRotationHandleY}%` }}
                               title="Drag image texture rotation handle"
@@ -6620,7 +6736,7 @@ export default function ParametricPage() {
                             />
                             <button
                               type="button"
-                              onMouseDown={() => setDraggingOffsetHandle(true)}
+                              onMouseDown={() => { beginCanvasInteraction(); setDraggingOffsetHandle(true); }}
                               className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-emerald-400 text-[10px] font-semibold text-black"
                               style={{ left: `${offsetHandleX}%`, top: `${offsetHandleY}%` }}
                               title="Drag offset handle"
@@ -6636,7 +6752,7 @@ export default function ParametricPage() {
                                 />
                                 <button
                                   type="button"
-                                  onMouseDown={() => setDraggingRadiusHandle(true)}
+                                  onMouseDown={() => { beginCanvasInteraction(); setDraggingRadiusHandle(true); }}
                                   className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/60 bg-sky-400 text-[10px] font-semibold text-black"
                                   style={{ left: `${radiusHandleX}%`, top: '50%' }}
                                   title="Drag radius handle"
@@ -7172,6 +7288,7 @@ export default function ParametricPage() {
                       draggable={typeof element.id === 'string' && element.id.length > 0}
                       onDragStart={(event) => {
                         if (!element.id) return;
+                        beginRenderInteraction('layer-drag');
                         setDraggingLayerId(element.id);
                         event.dataTransfer.effectAllowed = 'move';
                         event.dataTransfer.setData('text/plain', element.id);
@@ -7189,15 +7306,18 @@ export default function ParametricPage() {
                         if (!sourceId || sourceId === element.id) {
                           setDraggingLayerId(null);
                           setDragOverLayerId(null);
+                          endRenderInteraction('layer-drag');
                           return;
                         }
                         moveElementToIndex(sourceId, index);
                         setDraggingLayerId(null);
                         setDragOverLayerId(null);
+                        endRenderInteraction('layer-drag');
                       }}
                       onDragEnd={() => {
                         setDraggingLayerId(null);
                         setDragOverLayerId(null);
+                        endRenderInteraction('layer-drag');
                       }}
                     >
                       <button
