@@ -74,3 +74,25 @@ describe('snapshotRenderer sanitizeElementForEngine', () => {
   });
 });
 
+describe('snapshotRenderer resolveSnapshotPixelRatio', () => {
+  it('caps DPR to 2x', () => {
+    const originalWindow = (globalThis as { window?: { devicePixelRatio?: number } }).window;
+    (globalThis as { window?: { devicePixelRatio?: number } }).window = { devicePixelRatio: 3 };
+    try {
+      expect(__snapshotRendererInternalsForTest.resolveSnapshotPixelRatio()).toBe(2);
+    } finally {
+      (globalThis as { window?: { devicePixelRatio?: number } }).window = originalWindow;
+    }
+  });
+
+  it('falls back to 1x for invalid DPR', () => {
+    const originalWindow = (globalThis as { window?: { devicePixelRatio?: number } }).window;
+    (globalThis as { window?: { devicePixelRatio?: number } }).window = { devicePixelRatio: 0 };
+    try {
+      expect(__snapshotRendererInternalsForTest.resolveSnapshotPixelRatio()).toBe(1);
+    } finally {
+      (globalThis as { window?: { devicePixelRatio?: number } }).window = originalWindow;
+    }
+  });
+});
+

@@ -173,18 +173,28 @@ function loadImageFromObjectUrl(url: string): Promise<HTMLImageElement> {
   });
 }
 
+function resolveSnapshotPixelRatio(): number {
+  const dpr = Number((globalThis as { window?: { devicePixelRatio?: number } }).window?.devicePixelRatio ?? 1);
+  if (!Number.isFinite(dpr) || dpr <= 0) return 1;
+  return Math.min(2, dpr);
+}
+
 async function rasterizeSvg(svgMarkup: string, width: number, height: number, mimeType: string, quality?: number): Promise<string> {
   const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
   const objectUrl = URL.createObjectURL(blob);
   try {
     const image = await loadImageFromObjectUrl(objectUrl);
+    const pixelRatio = resolveSnapshotPixelRatio();
+    const rasterWidth = Math.max(1, Math.round(width * pixelRatio));
+    const rasterHeight = Math.max(1, Math.round(height * pixelRatio));
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = rasterWidth;
+    canvas.height = rasterHeight;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) {
       throw new Error('Snapshot capture failed: canvas context unavailable.');
     }
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(image, 0, 0, width, height);
     return canvas.toDataURL(mimeType, quality);
@@ -248,6 +258,7 @@ export async function createElementSnapshot(input: ElementSnapshotCaptureInput):
 export const __snapshotRendererInternalsForTest = {
   sanitizeElementForEngine,
   buildSnapshotRevisionHashPayload,
+  resolveSnapshotPixelRatio,
 };
 
 
