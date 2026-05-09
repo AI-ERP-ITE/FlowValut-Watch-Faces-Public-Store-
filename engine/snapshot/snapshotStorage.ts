@@ -4,10 +4,12 @@ import { generateElementRenderHash } from './snapshotHash';
 type TemplateElement = Record<string, unknown>;
 
 export type SnapshotRenderSourceMode = 'live' | 'snapshot';
+export type SnapshotRenderMode = 'frozen' | 'editable';
 export type SnapshotFreshness = 'missing' | 'fresh' | 'outdated';
 
 export type SnapshotState = {
   sourceMode: SnapshotRenderSourceMode;
+  snapshotRenderMode: SnapshotRenderMode;
   sourceHash?: string;
   snapshotRevisionHash?: string;
   snapshotStatus: SnapshotFreshness;
@@ -25,6 +27,7 @@ function deepClone<T>(value: T): T {
 function normalizeRenderState(source: unknown): SnapshotState {
   const safe = source && typeof source === 'object' ? source as Record<string, unknown> : {};
   const sourceMode = safe.sourceMode === 'snapshot' ? 'snapshot' : 'live';
+  const snapshotRenderMode: SnapshotRenderMode = safe.snapshotRenderMode === 'editable' ? 'editable' : 'frozen';
   const snapshotStatusRaw = safe.snapshotStatus;
   const snapshotStatus: SnapshotFreshness =
     snapshotStatusRaw === 'fresh' || snapshotStatusRaw === 'outdated' || snapshotStatusRaw === 'missing'
@@ -53,6 +56,7 @@ function normalizeRenderState(source: unknown): SnapshotState {
 
   return {
     sourceMode,
+    snapshotRenderMode,
     sourceHash,
     snapshotRevisionHash,
     snapshotStatus,
@@ -93,6 +97,7 @@ export function setElementSnapshot(element: TemplateElement, snapshot: ElementSn
     renderState: {
       ...state,
       sourceMode: 'snapshot',
+      snapshotRenderMode: state.snapshotRenderMode,
       sourceHash: nextSnapshot.sourceHash,
       snapshotRevisionHash: typeof nextSnapshot.snapshotRevisionHash === 'string'
         ? nextSnapshot.snapshotRevisionHash

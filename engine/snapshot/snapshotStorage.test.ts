@@ -9,6 +9,58 @@ import {
 } from './snapshotStorage';
 
 describe('snapshotStorage stale detection', () => {
+  it('defaults snapshotRenderMode to frozen for legacy render state', () => {
+    const element = {
+      id: 'el-mode-1',
+      type: 'free_rect',
+      params: { width: 0.4, height: 0.2, fill: '#999' },
+      renderState: {
+        sourceMode: 'snapshot',
+        snapshotStatus: 'fresh',
+        snapshot: {
+          id: 'el-mode-1',
+          imageDataUrl: 'data:image/png;base64,AAA',
+          sourceHash: 'v1:habc',
+          createdAt: 1,
+          updatedAt: 1,
+          width: 480,
+          height: 480,
+          mimeType: 'image/png',
+        },
+      },
+    } as Record<string, unknown>;
+
+    const refreshed = refreshElementSnapshotStatus(element);
+    const renderState = refreshed.renderState as Record<string, unknown>;
+    expect(renderState.snapshotRenderMode).toBe('frozen');
+  });
+
+  it('preserves editable snapshotRenderMode when writing snapshot', () => {
+    const base = {
+      id: 'el-mode-2',
+      type: 'free_rect',
+      params: { width: 0.4, height: 0.2, fill: '#999' },
+      renderState: {
+        sourceMode: 'live',
+        snapshotRenderMode: 'editable',
+        snapshotStatus: 'missing',
+      },
+    } as Record<string, unknown>;
+    const sourceHash = generateElementRenderHash(base);
+    const withSnapshot = setElementSnapshot(base, {
+      id: 'el-mode-2',
+      imageDataUrl: 'data:image/png;base64,AAA',
+      sourceHash,
+      createdAt: 1,
+      updatedAt: 1,
+      width: 480,
+      height: 480,
+      mimeType: 'image/png',
+    });
+
+    expect((withSnapshot.renderState as Record<string, unknown>).snapshotRenderMode).toBe('editable');
+  });
+
   it('returns missing when no snapshot exists', () => {
     const element = {
       id: 'el-1',

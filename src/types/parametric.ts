@@ -1,5 +1,7 @@
 export type ParametricRenderSourceMode = 'live' | 'snapshot';
 
+export type SnapshotRenderMode = 'frozen' | 'editable';
+
 export type ParametricSnapshotStatus = 'missing' | 'fresh' | 'outdated';
 
 export type ParametricElementSnapshot = {
@@ -16,6 +18,7 @@ export type ParametricElementSnapshot = {
 
 export type ParametricElementRenderState = {
   sourceMode?: ParametricRenderSourceMode;
+  snapshotRenderMode?: SnapshotRenderMode;
   sourceHash?: string;
   snapshotStatus?: ParametricSnapshotStatus;
   snapshot?: ParametricElementSnapshot | null;

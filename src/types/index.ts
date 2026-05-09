@@ -229,6 +229,7 @@ export type {
   ParametricElementRenderState,
   ParametricElementSnapshot,
   ParametricRenderSourceMode,
+  SnapshotRenderMode,
   ParametricSnapshotStatus,
 } from './parametric';
 

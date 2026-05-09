@@ -16,7 +16,7 @@ import {
 import { normalizeDepthEffectRecord, normalizeDropShadowForBake } from '@/lib/effectNormalization';
 import { mapCanvasPointToLocal as mapCanvasPointToLocalShared, mapLocalPointToCanvas as mapLocalPointToCanvasShared } from '@/lib/maskFrame';
 import { applyMaskValueU8, maskStrength } from '@/lib/maskFieldKernel';
-import type { ParametricElementRenderState, ParametricSnapshotStatus } from '@/types';
+import type { ParametricElementRenderState, ParametricSnapshotStatus, SnapshotRenderMode } from '@/types';
 import { createElementSnapshot } from '../engine/snapshot/snapshotRenderer';
 import { generateElementRenderHash } from '../engine/snapshot/snapshotHash';
 import { deleteElementSnapshot, refreshElementSnapshotStatus, resolveElementSnapshotStatus, setElementRenderSourceMode, setElementSnapshot } from '../engine/snapshot/snapshotStorage';
@@ -682,6 +682,7 @@ function ensureElement(element: TemplateElement, fallbackIndex = 0): TemplateEle
     ? element.renderState as ParametricElementRenderState
     : {};
   const sourceMode = rawRenderState.sourceMode === 'snapshot' ? 'snapshot' : 'live';
+  const snapshotRenderMode: SnapshotRenderMode = rawRenderState.snapshotRenderMode === 'editable' ? 'editable' : 'frozen';
   const snapshotStatusRaw = rawRenderState.snapshotStatus;
   const snapshotStatus: ParametricSnapshotStatus =
     snapshotStatusRaw === 'fresh' || snapshotStatusRaw === 'outdated' || snapshotStatusRaw === 'missing'
@@ -697,6 +698,7 @@ function ensureElement(element: TemplateElement, fallbackIndex = 0): TemplateEle
     renderState: {
       ...rawRenderState,
       sourceMode,
+      snapshotRenderMode,
       snapshotStatus,
       snapshot: rawRenderState.snapshot && typeof rawRenderState.snapshot === 'object'
         ? { ...rawRenderState.snapshot }
@@ -2333,6 +2335,7 @@ export default function ParametricPage() {
           visible: true,
           renderState: {
             sourceMode: 'live',
+            snapshotRenderMode: 'editable',
             snapshotStatus: 'missing',
             snapshot: null,
           },
