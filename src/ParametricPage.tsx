@@ -797,6 +797,33 @@ function normalizeLibraryEntries(parsed: Array<unknown>): Array<LibraryEntry> {
     });
 }
 
+function makeLibraryEntrySignature(entry: LibraryEntry): string {
+  const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+  if (id.length > 0) return `id:${id}`;
+  const name = typeof entry.name === 'string' ? entry.name.trim().toLowerCase() : '';
+  const type = typeof entry.element?.type === 'string' ? entry.element.type.trim().toLowerCase() : '';
+  return `shape:${name}|${type}`;
+}
+
+function mergeLibraryEntries(local: Array<LibraryEntry>, remote: Array<LibraryEntry>): Array<LibraryEntry> {
+  const next: Array<LibraryEntry> = [];
+  const seen = new Set<string>();
+
+  const appendUnique = (items: Array<LibraryEntry>) => {
+    for (const entry of items) {
+      const signature = makeLibraryEntrySignature(entry);
+      if (!signature || seen.has(signature)) continue;
+      seen.add(signature);
+      next.push(entry);
+    }
+  };
+
+  // Keep server order authoritative, then append any local-only unsynced items.
+  appendUnique(remote);
+  appendUnique(local);
+  return next;
+}
+
 function normalizeThemeEntries(parsed: Array<unknown>): Array<ThemeEntry> {
   return parsed
     .filter((entry) => entry && typeof entry === 'object')
@@ -1227,14 +1254,24 @@ export default function ParametricPage() {
     try {
       const remoteRaw = await fetchParametricLibraryFromFirebase();
       const remote = normalizeLibraryEntries(remoteRaw as Array<unknown>);
+      const local = loadStoredLibrary() ?? [];
+      const merged = mergeLibraryEntries(local, remote);
 
-      if (remote.length > 0) {
-        setLibrary(remote);
+      if (merged.length > 0) {
+        setLibrary(merged);
         try {
-          window.localStorage.setItem(PARAMETRIC_LIBRARY_STORAGE_KEY, JSON.stringify(remote));
+          window.localStorage.setItem(PARAMETRIC_LIBRARY_STORAGE_KEY, JSON.stringify(merged));
         } catch {
           // Ignore localStorage failures.
         }
+
+        // Self-heal cloud state if local had unsynced entries.
+        if (merged.length > remote.length) {
+          void saveLibraryToFirebaseOnAction(merged).catch(() => {
+            // Non-fatal; merged local cache is already retained.
+          });
+        }
+
         setDrawerNotice('Library synced from Firebase.');
         return;
       }
