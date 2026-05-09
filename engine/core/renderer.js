@@ -510,22 +510,23 @@ function normalizeDropShadowEffect(source = {}) {
 		enabled: true,
 		mode: src.mode === "inner" ? "inner" : "outer",
 		color: typeof src.color === "string" ? src.color : "#000000",
-		opacity: clamp(src.opacity, 0, 1, 0.45),
-		blur: clamp(src.blur, 0, 40, 8),
-		spread: clamp(src.spread, 0, 20, 0),
-		offsetX: clamp(src.offsetX, -30, 30, 2),
-		offsetY: clamp(src.offsetY, -30, 30, 2),
+		opacity: clamp(src.opacity, 0, 0.35, 0.14),
+		blur: clamp(src.blur, 0, 6, 1.5),
+		spread: clamp(src.spread, 0, 0.25, 0),
+		offsetX: clamp(src.offsetX, -8, 8, 1),
+		offsetY: clamp(src.offsetY, -8, 8, 1),
 	};
 }
 
 function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffect = { enabled: false, mode: "outer", opacity: 0 }, renderOptions = {}) {
 	if (!styleAdjust.enabled && !depthEffect.enabled && !dropShadowEffect.enabled) return "";
-	const useEditableSnapshotSilhouette = renderOptions
-		&& renderOptions.useSnapshotSource === true
-		&& renderOptions.snapshotRenderMode === "editable"
+	const effectSilhouetteSource = typeof renderOptions?.effectSilhouetteSource === "string"
+		? renderOptions.effectSilhouetteSource
+		: "source-alpha";
+	const useSnapshotImageSilhouette = effectSilhouetteSource === "snapshot-image-alpha"
 		&& typeof renderOptions.snapshotImageDataUrl === "string"
 		&& renderOptions.snapshotImageDataUrl.trim().length > 0;
-	const alphaRef = useEditableSnapshotSilhouette ? "silhouetteAlpha" : "SourceAlpha";
+	const alphaRef = useSnapshotImageSilhouette ? "silhouetteAlpha" : "SourceAlpha";
 
 	// Keep tone and sharpening responsive but avoid tiny slider movement causing heavy clipping.
 	const toneShift = (styleAdjust.highlight - styleAdjust.shadows) * 0.12;
@@ -549,7 +550,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 	let chain = "tone";
 	const parts = [
 		`<filter id=\"${filterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
-		...(useEditableSnapshotSilhouette
+		...(useSnapshotImageSilhouette
 			? [
 				`<feImage href=\"${escapeAttribute(renderOptions.snapshotImageDataUrl.trim())}\" result=\"snapshotSurface\" />`,
 				"<feColorMatrix in=\"snapshotSurface\" type=\"matrix\" values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0\" result=\"silhouetteAlpha\" />",
@@ -1811,6 +1812,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				{
 					useSnapshotSource,
 					snapshotRenderMode,
+					effectSilhouetteSource: useSnapshotSource ? "snapshot-image-alpha" : "source-alpha",
 					snapshotImageDataUrl: snapshotSource?.imageDataUrl || "",
 					snapshotMaskBody,
 				},
