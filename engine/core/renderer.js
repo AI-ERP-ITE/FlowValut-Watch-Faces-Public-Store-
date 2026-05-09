@@ -511,7 +511,7 @@ function normalizeDropShadowEffect(source = {}) {
 		mode: src.mode === "inner" ? "inner" : "outer",
 		color: typeof src.color === "string" ? src.color : "#000000",
 		opacity: clamp(src.opacity, 0, 0.35, 0.14),
-		blur: clamp(src.blur, 0, 20, 2),
+		blur: clamp(src.blur, 0, 8, 1.5),
 		spread: clamp(src.spread, 0, 0.25, 0),
 		offsetX: clamp(src.offsetX, -8, 8, 1),
 		offsetY: clamp(src.offsetY, -8, 8, 1),
@@ -556,15 +556,10 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 	const parts = [
 		`<filter id=\"${filterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
 		...(useSnapshotImageSilhouette
-			? (() => {
-				const sizeAttrs = silhouetteW !== null && silhouetteH !== null
-					? ` x="${silhouetteX}" y="${silhouetteY}" width="${silhouetteW}" height="${silhouetteH}" preserveAspectRatio="none"`
-					: "";
-				return [
-					`<feImage href="${escapeAttribute(renderOptions.snapshotImageDataUrl.trim())}"${sizeAttrs} result="snapshotSurface" />`,
-					`<feColorMatrix in="snapshotSurface" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="silhouetteAlpha" />`,
-				];
-			})()
+			? [
+				`<feImage href="${escapeAttribute(renderOptions.snapshotImageDataUrl.trim())}"${silhouetteW !== null && silhouetteH !== null ? ` x="${silhouetteX}" y="${silhouetteY}" width="${silhouetteW}" height="${silhouetteH}" preserveAspectRatio="none"` : ""} result="snapshotSurface" />`,
+				`<feColorMatrix in="snapshotSurface" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="silhouetteAlpha" />`,
+			]
 			: []),
 		`<feColorMatrix in=\"SourceGraphic\" type=\"hueRotate\" values=\"${styleAdjust.hue.toFixed(3)}\" result=\"hue\" />`,
 		`<feComponentTransfer in=\"hue\" result=\"tone\">`,

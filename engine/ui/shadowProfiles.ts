@@ -41,7 +41,7 @@ export const PARAMETER_PROFILE_REGISTRY: Record<
     uiMin: 0,
     uiMax: 100,
     renderMin: 0,
-    renderMax: 20,
+    renderMax: 8,
     curve: 'exponential',
     precision: 3,
     debounceMs: 16,
