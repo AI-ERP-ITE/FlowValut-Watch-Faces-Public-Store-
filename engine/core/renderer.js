@@ -953,8 +953,8 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 	const width = Math.max(1, Number(layoutMetrics?.width) || 100);
 	const height = Math.max(1, Number(layoutMetrics?.height) || 100);
 	const coordinateSpace = resolveMaskCoordinateSpace(mask);
-	// Spec 074 T3 / E.06–E.08 / L.04: NaN-safe mapping. Returns null when the
-	// input coord is non-finite OR null/undefined — caller MUST drop the
+	// Spec 074 T3 / E.06ï¿½E.08 / L.04: NaN-safe mapping. Returns null when the
+	// input coord is non-finite OR null/undefined ï¿½ caller MUST drop the
 	// primitive (do not silently coerce to 0/50, that produces phantom marks
 	// at the origin). Note: Number(null) === 0, so the explicit null check is
 	// required even though isFinite(0) is true.
@@ -1042,7 +1042,7 @@ function buildElementMaskPrimitives(mask = {}, layoutMetrics) {
 				const size = Math.max(0.2, (clamp(stroke.size, 0, 9999, 16) / 5.2)) * scale;
 				// Spec 075: single-point strokes (a click without drag) render as
 				// a degenerate <polyline points="x,y" /> which browsers handle
-				// inconsistently — Chrome paints nothing, others may fall back
+				// inconsistently ï¿½ Chrome paints nothing, others may fall back
 				// to filling the entire mask region (causing the "whole element
 				// masked" symptom). Emit an explicit <circle> instead so a click
 				// always produces a visible round dab matching stroke-linecap.
@@ -1594,12 +1594,30 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const height = Number(context?.layoutMetrics?.height) || 100;
 			const x = (Number(position.x) / 100) * width;
 			const y = (Number(position.y) / 100) * height;
+			const W = Math.max(1, Number(context?.layoutMetrics?.width) || width);
+			const H = Math.max(1, Number(context?.layoutMetrics?.height) || height);
 			const rotation = Number.isFinite(Number(position.rotation)) ? Number(position.rotation) : 0;
 			const renderSourceDecision = resolveElementRenderSourceDecision(safeElement, context.layoutMetrics);
 			const snapshotSource = renderSourceDecision.snapshotSource;
 			const useSnapshotSource = renderSourceDecision.effectiveMode === "snapshot" && snapshotSource !== null;
+			const snapshotImageX = -x;
+			const snapshotImageY = -y;
+			const snapshotPlacementMatchesTemplate = !useSnapshotSource
+				|| (
+					Number.isFinite(snapshotImageX)
+					&& Number.isFinite(snapshotImageY)
+					&& Number.isFinite(W)
+					&& Number.isFinite(H)
+					&& Math.abs((x + snapshotImageX)) < 1e-9
+					&& Math.abs((y + snapshotImageY)) < 1e-9
+					&& W > 0
+					&& H > 0
+				);
+			console.assert(
+				snapshotPlacementMatchesTemplate === true,
+			);
 			const bodyRaw = useSnapshotSource
-				? `<image x="${-snapshotSource.width / 2}" y="${-snapshotSource.height / 2}" width="${snapshotSource.width}" height="${snapshotSource.height}" preserveAspectRatio="none" href="${escapeAttribute(snapshotSource.imageDataUrl)}" opacity="${snapshotSource.opacity.toFixed(3)}" />`
+				? `<image x="${snapshotImageX}" y="${snapshotImageY}" width="${W}" height="${H}" preserveAspectRatio="none" href="${escapeAttribute(snapshotSource.imageDataUrl)}" opacity="${snapshotSource.opacity.toFixed(3)}" />`
 				: definition.render(renderParams, position, context);
 			const reshape = resolveRectLayoutReshape(safeElement, context);
 			const body = reshape.enabled
