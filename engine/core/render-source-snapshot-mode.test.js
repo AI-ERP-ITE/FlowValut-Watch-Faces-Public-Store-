@@ -82,6 +82,22 @@ function createLiveBaselineTemplate() {
 }
 
 describe('render source snapshot mode', () => {
+  it('derives silhouette alpha for editable snapshot effects and uses snapshot silhouette for overlay mask bodies', () => {
+    const editableTemplate = createSnapshotTemplate();
+    editableTemplate.elements[0].renderState.snapshotRenderMode = 'editable';
+
+    const svg = runEngine({ templateInput: editableTemplate });
+    const textureMaskBlock = (svg.match(/<mask id="layerMask-el-0-0-mask-1-texture-0"[\s\S]*?<\/mask>/) || [''])[0];
+
+    expect(svg.includes('filter="url(#layerFx-el-0-0)"')).toBe(true);
+    expect(svg.includes('<feImage href="data:image/png;base64,AAAA" result="snapshotSurface" />')).toBe(true);
+    expect(svg.includes('result="silhouetteAlpha"')).toBe(true);
+    expect(svg.includes('in="silhouetteAlpha"')).toBe(true);
+    expect(svg.includes('feGaussianBlur in="silhouetteAlpha" stdDeviation="6.000" result="dsOuterBlur"')).toBe(true);
+    expect(textureMaskBlock.includes('href="data:image/png;base64,AAAA"')).toBe(true);
+    expect(textureMaskBlock.includes('opacity=')).toBe(false);
+  });
+
   it('renders snapshot image source with transform, keeps masking, and does not re-run effect stack', () => {
     const svg = runEngine({ templateInput: createSnapshotTemplate() });
     const maskRefs = (svg.match(/mask="url\(#layerMask-el-0-0-mask-1-element\)"/g) || []).length;

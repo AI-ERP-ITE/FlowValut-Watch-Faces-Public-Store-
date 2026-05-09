@@ -518,8 +518,14 @@ function normalizeDropShadowEffect(source = {}) {
 	};
 }
 
-function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffect = { enabled: false, mode: "outer", opacity: 0 }) {
+function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffect = { enabled: false, mode: "outer", opacity: 0 }, renderOptions = {}) {
 	if (!styleAdjust.enabled && !depthEffect.enabled && !dropShadowEffect.enabled) return "";
+	const useEditableSnapshotSilhouette = renderOptions
+		&& renderOptions.useSnapshotSource === true
+		&& renderOptions.snapshotRenderMode === "editable"
+		&& typeof renderOptions.snapshotImageDataUrl === "string"
+		&& renderOptions.snapshotImageDataUrl.trim().length > 0;
+	const alphaRef = useEditableSnapshotSilhouette ? "silhouetteAlpha" : "SourceAlpha";
 
 	// Keep tone and sharpening responsive but avoid tiny slider movement causing heavy clipping.
 	const toneShift = (styleAdjust.highlight - styleAdjust.shadows) * 0.12;
@@ -543,6 +549,12 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 	let chain = "tone";
 	const parts = [
 		`<filter id=\"${filterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
+		...(useEditableSnapshotSilhouette
+			? [
+				`<feImage href=\"${escapeAttribute(renderOptions.snapshotImageDataUrl.trim())}\" result=\"snapshotSurface\" />`,
+				"<feColorMatrix in=\"snapshotSurface\" type=\"matrix\" values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0\" result=\"silhouetteAlpha\" />",
+			]
+			: []),
 		`<feColorMatrix in=\"SourceGraphic\" type=\"hueRotate\" values=\"${styleAdjust.hue.toFixed(3)}\" result=\"hue\" />`,
 		`<feComponentTransfer in=\"hue\" result=\"tone\">`,
 		`<feFuncR type=\"linear\" slope=\"${contrastSlope.toFixed(4)}\" intercept=\"${toneShift.toFixed(4)}\" />`,
@@ -584,23 +596,23 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 			const frontOpacity = clamp(0.46 * depthCurve * baseOpacity * Math.min(2, falloff), 0, 1, 0.4).toFixed(3);
 			const frontBlur = Math.max(0.08, (0.4 + depthCurve * 0.7) / falloff).toFixed(3);
 			const frontRadius = (Math.max(0.1, spread * 2.25 + (Math.hypot(depthEffect.dx, depthEffect.dy) * 0.35))).toFixed(3);
-			parts.push(`<feMorphology in="SourceAlpha" operator="dilate" radius="${frontRadius}" result="frontAlpha" />`);
+			parts.push(`<feMorphology in="${alphaRef}" operator="dilate" radius="${frontRadius}" result="frontAlpha" />`);
 			parts.push(`<feGaussianBlur in="frontAlpha" stdDeviation="${frontBlur}" result="frontBlur" />`);
-			parts.push('<feComposite in="frontBlur" in2="SourceAlpha" operator="out" result="frontRim" />');
+			parts.push(`<feComposite in="frontBlur" in2="${alphaRef}" operator="out" result="frontRim" />`);
 			parts.push(`<feFlood flood-color="${lightColor}" flood-opacity="${frontOpacity}" result="frontFlood" />`);
 			parts.push('<feComposite in="frontFlood" in2="frontRim" operator="in" result="frontGlow" />');
 			parts.push(`<feBlend in="${chain}" in2="frontGlow" mode="screen" result="depthFront" />`);
 			chain = "depthFront";
 		} else if (mode === "inner") {
-			parts.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${blur}" result="depthInnerBlurA" />`);
+			parts.push(`<feGaussianBlur in="${alphaRef}" stdDeviation="${blur}" result="depthInnerBlurA" />`);
 			parts.push(`<feOffset in="depthInnerBlurA" dx="${depthEffect.dx.toFixed(3)}" dy="${depthEffect.dy.toFixed(3)}" result="depthInnerOffsetA" />`);
-			parts.push('<feComposite in="depthInnerOffsetA" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskA" />');
+			parts.push(`<feComposite in="depthInnerOffsetA" in2="${alphaRef}" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskA" />`);
 			parts.push(`<feFlood flood-color="${shadowColor}" flood-opacity="${shadowOpacity}" result="depthInnerFloodA" />`);
 			parts.push('<feComposite in="depthInnerFloodA" in2="depthInnerMaskA" operator="in" result="depthInnerShadeA" />');
 
-			parts.push(`<feGaussianBlur in="SourceAlpha" stdDeviation="${blur}" result="depthInnerBlurB" />`);
+			parts.push(`<feGaussianBlur in="${alphaRef}" stdDeviation="${blur}" result="depthInnerBlurB" />`);
 			parts.push(`<feOffset in="depthInnerBlurB" dx="${(-depthEffect.dx).toFixed(3)}" dy="${(-depthEffect.dy).toFixed(3)}" result="depthInnerOffsetB" />`);
-			parts.push('<feComposite in="depthInnerOffsetB" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskB" />');
+			parts.push(`<feComposite in="depthInnerOffsetB" in2="${alphaRef}" operator="arithmetic" k2="-1" k3="1" result="depthInnerMaskB" />`);
 			parts.push(`<feFlood flood-color="${lightColor}" flood-opacity="${lightOpacity}" result="depthInnerFloodB" />`);
 			parts.push('<feComposite in="depthInnerFloodB" in2="depthInnerMaskB" operator="in" result="depthInnerShadeB" />');
 
@@ -618,16 +630,16 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		const mode = dropShadowEffect.mode === "inner" ? "inner" : "outer";
 		const shadowBlur = Math.max(0, Number(dropShadowEffect.blur) / 2);
 		const shadowSpread = clamp(dropShadowEffect.spread, 0, 20, 0);
-		const shadowBaseRef = shadowSpread > 0.001 ? "dsSpreadAlpha" : "SourceAlpha";
+		const shadowBaseRef = shadowSpread > 0.001 ? "dsSpreadAlpha" : alphaRef;
 
 		if (shadowSpread > 0.001) {
-			parts.push(`<feMorphology in="SourceAlpha" operator="dilate" radius="${shadowSpread.toFixed(3)}" result="dsSpreadAlpha" />`);
+			parts.push(`<feMorphology in="${alphaRef}" operator="dilate" radius="${shadowSpread.toFixed(3)}" result="dsSpreadAlpha" />`);
 		}
 
 		if (mode === "inner") {
 			parts.push(`<feGaussianBlur in="${shadowBaseRef}" stdDeviation="${shadowBlur.toFixed(3)}" result="dsInnerBlur" />`);
 			parts.push(`<feOffset in="dsInnerBlur" dx="${Number(dropShadowEffect.offsetX).toFixed(3)}" dy="${Number(dropShadowEffect.offsetY).toFixed(3)}" result="dsInnerOffset" />`);
-			parts.push('<feComposite in="dsInnerOffset" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="dsInnerMask" />');
+			parts.push(`<feComposite in="dsInnerOffset" in2="${alphaRef}" operator="arithmetic" k2="-1" k3="1" result="dsInnerMask" />`);
 			parts.push(`<feFlood flood-color="${dropShadowEffect.color}" flood-opacity="${Number(dropShadowEffect.opacity).toFixed(3)}" result="dsInnerFlood" />`);
 			parts.push('<feComposite in="dsInnerFlood" in2="dsInnerMask" operator="in" result="dsInnerShade" />');
 			parts.push(`<feBlend in="${chain}" in2="dsInnerShade" mode="multiply" result="dropShadow" />`);
@@ -656,7 +668,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 		// Preserve outer shadow pixels. SourceAlpha clipping removes visible depth/drop shadows.
 		parts.push(`<feMerge><feMergeNode in=\"${chain}\" /></feMerge>`);
 	} else {
-		parts.push(`<feComposite in=\"${chain}\" in2=\"SourceAlpha\" operator=\"in\" result=\"final\" />`);
+		parts.push(`<feComposite in=\"${chain}\" in2=\"${alphaRef}\" operator=\"in\" result=\"final\" />`);
 		parts.push("<feMerge><feMergeNode in=\"final\" /></feMerge>");
 	}
 	parts.push("</filter>");
@@ -1210,7 +1222,7 @@ function resolveGlobalControllerSources() {
 	};
 }
 
-function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null, maskFrameMetrics = null) {
+function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null, maskFrameMetrics = null, renderOptions = {}) {
 	const filterId = `layerFx-${localId}`;
 	const maskId = buildLayerMaskBaseId(localId, context);
 	const elementMaskId = `${maskId}-element`;
@@ -1226,7 +1238,7 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 	const localUvInputBody = typeof layerControllerSources.uvLocal?.body === "string" && layerControllerSources.uvLocal.body.length > 0
 		? layerControllerSources.uvLocal.body
 		: filterInputBody;
-	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect);
+	const filterDef = buildLayerFilterDef(filterId, layerStyle, depthEffect, dropShadowEffect, renderOptions);
 	const elementMaskDef = localSilhouette.elementMaskDef;
 	if (context && context.maskDebug === true && elementMaskDef.active) {
 		console.log({
@@ -1273,12 +1285,20 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			context.renderSurfaceSourcesByName[currentElementName.trim()] = surfaceSources;
 		};
 	}
+	const overlayMaskFallbackBody = renderOptions
+		&& renderOptions.useSnapshotSource === true
+		&& renderOptions.snapshotRenderMode === "editable"
+		&& typeof renderOptions.snapshotMaskBody === "string"
+		&& renderOptions.snapshotMaskBody.length > 0
+		? renderOptions.snapshotMaskBody
+		: localUvInputBody;
+
 	const textureDefs = Array.isArray(layerTextures)
 		? layerTextures.map((layerTexture, index) => ({
 			layerTexture,
 			def: buildTextureDefs(`${localId}-texture-${index}`, layerTexture, layoutMetrics),
 			maskId: `${maskId}-texture-${index}`,
-			maskBody: resolveClipMaskBody(layerTexture.clip, context, localUvInputBody, currentElementName),
+			maskBody: resolveClipMaskBody(layerTexture.clip, context, overlayMaskFallbackBody, currentElementName),
 		}))
 		: [];
 	const gradientDefs = Array.isArray(layerGradients)
@@ -1286,14 +1306,14 @@ function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, l
 			layerGradient,
 			def: buildGradientOverlayDefs(`${localId}-gradient-${index}`, layerGradient),
 			maskId: `${maskId}-gradient-${index}`,
-			maskBody: resolveClipMaskBody(layerGradient.clip, context, localUvInputBody, currentElementName),
+			maskBody: resolveClipMaskBody(layerGradient.clip, context, overlayMaskFallbackBody, currentElementName),
 		}))
 		: [];
 	const materialDefs = Array.isArray(layerMaterials)
 		? layerMaterials.map((layerMaterial, index) => ({
 			layerMaterial,
 			maskId: `${maskId}-material-${index}`,
-			maskBody: resolveClipMaskBody(layerMaterial.clip, context, localUvInputBody, currentElementName),
+			maskBody: resolveClipMaskBody(layerMaterial.clip, context, overlayMaskFallbackBody, currentElementName),
 		}))
 		: [];
 	const maskFrameWidth = Math.max(1, Number(resolvedMaskFrame?.width) || Number(layoutMetrics?.width) || 100);
@@ -1627,6 +1647,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const bodyRaw = useSnapshotSource
 				? `<image x="${snapshotImageX}" y="${snapshotImageY}" width="${W}" height="${H}" preserveAspectRatio="none" href="${escapeAttribute(snapshotSource.imageDataUrl)}" opacity="${snapshotSource.opacity.toFixed(3)}" />`
 				: definition.render(renderParams, position, context);
+			const snapshotMaskBody = useSnapshotSource
+				? `<image x="${snapshotImageX}" y="${snapshotImageY}" width="${W}" height="${H}" preserveAspectRatio="none" href="${escapeAttribute(snapshotSource.imageDataUrl)}" />`
+				: "";
 			const reshape = resolveRectLayoutReshape(safeElement, context);
 			const body = reshape.enabled
 				? `<g transform=\"scale(${reshape.sx.toFixed(6)} ${reshape.sy.toFixed(6)})\">${bodyRaw}</g>`
@@ -1738,7 +1761,30 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 			const maskFrameMetrics = renderSourceDecision.maskFrameMetrics && typeof renderSourceDecision.maskFrameMetrics === "object"
 				? renderSourceDecision.maskFrameMetrics
 				: resolveElementMaskFrameMetrics(safeElement, context.layoutMetrics);
-			return renderLayer(localId, body, x, y, rotation, styleAdjust, textureLayers, gradientLayers, materialLayers, depth, dropShadow, context.layoutMetrics, context, currentElementName, elementMask, maskFrameMetrics);
+			return renderLayer(
+				localId,
+				body,
+				x,
+				y,
+				rotation,
+				styleAdjust,
+				textureLayers,
+				gradientLayers,
+				materialLayers,
+				depth,
+				dropShadow,
+				context.layoutMetrics,
+				context,
+				currentElementName,
+				elementMask,
+				maskFrameMetrics,
+				{
+					useSnapshotSource,
+					snapshotRenderMode,
+					snapshotImageDataUrl: snapshotSource?.imageDataUrl || "",
+					snapshotMaskBody,
+				},
+			);
 		})
 		.join("");
 }
