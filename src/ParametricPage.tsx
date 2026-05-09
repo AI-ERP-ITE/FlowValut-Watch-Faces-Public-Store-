@@ -9001,7 +9001,7 @@ export default function ParametricPage() {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Shadow Opacity {Math.round(getSelectedDropShadowUiNumber('opacity', 0.12))}%</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">Shadow Opacity {Math.round(getSelectedDropShadowUiNumber('opacity', 0.12))}%<button type="button" data-reset-chip="true" onClick={() => setSelectedDropShadowUiNumber('opacity', 0)} className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-700" title="Reset opacity to 0">R</button></span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.opacity.min}
@@ -9022,7 +9022,7 @@ export default function ParametricPage() {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Shadow Blur {Math.round(getSelectedDropShadowUiNumber('blur', 1.2))}%</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">Shadow Blur {Math.round(getSelectedDropShadowUiNumber('blur', 1.2))}%<button type="button" data-reset-chip="true" onClick={() => setSelectedDropShadowUiNumber('blur', 0)} className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-700" title="Reset blur to 0">R</button></span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.blur.min}
@@ -9043,7 +9043,7 @@ export default function ParametricPage() {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Shadow Spread {Math.round(getSelectedDropShadowUiNumber('spread', 0))}%</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">Shadow Spread {Math.round(getSelectedDropShadowUiNumber('spread', 0))}%<button type="button" data-reset-chip="true" onClick={() => setSelectedDropShadowUiNumber('spread', 0)} className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-700" title="Reset spread to 0">R</button></span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.spread.min}
@@ -9064,7 +9064,7 @@ export default function ParametricPage() {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Offset X {Math.round(getSelectedDropShadowUiNumber('offsetX', 1))}% ({getSelectedDropShadowNumber('offsetX', 1).toFixed(1)}px)</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">Offset X {Math.round(getSelectedDropShadowUiNumber('offsetX', 1))}% ({getSelectedDropShadowNumber('offsetX', 1).toFixed(1)}px)<button type="button" data-reset-chip="true" onClick={() => setSelectedDropShadowUiNumber('offsetX', 0)} className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-700" title="Reset offset X to 0">R</button></span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.offset.min}
@@ -9085,7 +9085,7 @@ export default function ParametricPage() {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Offset Y {Math.round(getSelectedDropShadowUiNumber('offsetY', 1))}% ({getSelectedDropShadowNumber('offsetY', 1).toFixed(1)}px)</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500">Offset Y {Math.round(getSelectedDropShadowUiNumber('offsetY', 1))}% ({getSelectedDropShadowNumber('offsetY', 1).toFixed(1)}px)<button type="button" data-reset-chip="true" onClick={() => setSelectedDropShadowUiNumber('offsetY', 0)} className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded border border-zinc-600 bg-zinc-900 text-[10px] leading-none text-zinc-300 hover:bg-zinc-700" title="Reset offset Y to 0">R</button></span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.offset.min}

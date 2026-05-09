@@ -1544,21 +1544,36 @@ function renderStrokeRectWithShadowToPng(el: WatchFaceElement): { dataUrl: strin
   return { dataUrl: canvas.toDataURL('image/png'), pad };
 }
 
-/** Bake a CIRCLE with its drop shadow. */
+/** Bake a CIRCLE (or shape variant) with its drop shadow, honouring el.shapeType. */
 function renderCircleWithShadowToPng(el: WatchFaceElement): { dataUrl: string; pad: number } {
   const ds = el.dropShadow!;
   const pad = shadowPadding(ds);
-  const r = el.radius ?? Math.min(el.bounds.width, el.bounds.height) / 2;
-  const size = r * 2;
+  const { width: w, height: h } = el.bounds;
+  const stype = el.shapeType ?? 'circle';
   const canvas = document.createElement('canvas');
-  canvas.width = size + pad * 2;
-  canvas.height = size + pad * 2;
+  canvas.width = w + pad * 2;
+  canvas.height = h + pad * 2;
   const ctx = canvas.getContext('2d')!;
   applyShadowToCtx(ctx, ds);
   ctx.fillStyle = el.color ? el.color.replace(/^0x/, '#') : '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(pad + r, pad + r, r, 0, Math.PI * 2);
-  ctx.fill();
+  if (stype === 'fill_rect') {
+    ctx.fillRect(pad, pad, w, h);
+  } else if (stype === 'stroke_rect') {
+    ctx.strokeStyle = el.color ? el.color.replace(/^0x/, '#') : '#FFFFFF';
+    ctx.lineWidth = el.lineWidth ?? 2;
+    ctx.strokeRect(pad, pad, w, h);
+  } else if (stype === 'rounded_rect') {
+    const cr = el.shapeCornerRadius ?? 12;
+    ctx.beginPath();
+    ctx.roundRect(pad, pad, w, h, cr);
+    ctx.fill();
+  } else {
+    // Default: circle (original behaviour)
+    const r = el.radius ?? Math.min(w, h) / 2;
+    ctx.beginPath();
+    ctx.arc(pad + w / 2, pad + h / 2, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
   return { dataUrl: canvas.toDataURL('image/png'), pad };
 }
 
