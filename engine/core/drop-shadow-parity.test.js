@@ -53,8 +53,26 @@ function extractDepthAOpacity(svg) {
 }
 
 function extractDropShadowStdDeviation(svg) {
-  const match = svg.match(/stdDeviation="([0-9.]+)"[^>]*result="dropShadow"/);
+  const match = svg.match(/stdDeviation="([0-9.]+)"[^>]*result="dsOuterBlur"/);
   return match ? Number(match[1]) : null;
+}
+
+function createSnapshotTemplateWithDropShadow(snapshotRenderMode = 'frozen') {
+  const template = createTemplateWithDropShadow(true);
+  const element = template.elements[0];
+  element.renderState = {
+    sourceMode: 'snapshot',
+    snapshotStatus: 'fresh',
+    snapshotRenderMode,
+    snapshotRevisionHash: 'rev-1',
+    snapshot: {
+      imageDataUrl: 'data:image/png;base64,AAAA',
+      width: 454,
+      height: 454,
+      snapshotRevisionHash: 'rev-1',
+    },
+  };
+  return template;
 }
 
 describe('drop shadow pipeline parity', () => {
@@ -86,7 +104,7 @@ describe('drop shadow pipeline parity', () => {
     });
 
     expect(shadowSvg).not.toBe(baseSvg);
-    expect(shadowSvg).toContain('feDropShadow');
+    expect(shadowSvg).toContain('result="dsOuterBlur"');
     expect(shadowSvg).toContain('result="dropShadow"');
   });
 
@@ -237,7 +255,7 @@ describe('drop shadow pipeline parity', () => {
     const outerSvg = runEngine({ activeStyle: 'gold_dark', templateInput: outer });
     const innerSvg = runEngine({ activeStyle: 'gold_dark', templateInput: inner });
 
-    expect(outerSvg).toContain('feDropShadow');
+    expect(outerSvg).toContain('result="dsOuterBlur"');
     expect(innerSvg).toContain('dsInnerMask');
     expect(innerSvg).not.toBe(outerSvg);
   });
@@ -279,5 +297,25 @@ describe('drop shadow pipeline parity', () => {
     expect(subtleBlur).not.toBeNull();
     expect(aggressiveBlur).not.toBeNull();
     expect(aggressiveBlur).toBeGreaterThan(subtleBlur);
+  });
+
+  it('routes frozen snapshot drop-shadow alpha through visible snapshot silhouette', () => {
+    const svg = runEngine({
+      activeStyle: 'gold_dark',
+      templateInput: createSnapshotTemplateWithDropShadow('frozen'),
+    });
+
+    expect(svg).toContain('result="silhouetteAlpha"');
+    expect(svg).toContain('in="silhouetteAlpha"');
+  });
+
+  it('routes editable snapshot drop-shadow alpha through visible snapshot silhouette', () => {
+    const svg = runEngine({
+      activeStyle: 'gold_dark',
+      templateInput: createSnapshotTemplateWithDropShadow('editable'),
+    });
+
+    expect(svg).toContain('result="silhouetteAlpha"');
+    expect(svg).toContain('in="silhouetteAlpha"');
   });
 });
