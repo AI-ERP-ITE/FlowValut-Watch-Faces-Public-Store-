@@ -79,6 +79,7 @@ type ThemeEntry = {
   id: string;
   name: string;
   template: TemplateModel;
+  updatedAt?: number;
 };
 
 type GroupedLibrarySection = {
@@ -856,6 +857,7 @@ function normalizeThemeEntries(parsed: Array<unknown>): Array<ThemeEntry> {
       return {
         id: typeof safe.id === 'string' ? safe.id : makeId('theme'),
         name: typeof safe.name === 'string' && safe.name.trim().length > 0 ? safe.name : `Theme-${index + 1}`,
+        updatedAt: Number.isFinite(Number(safe.updatedAt)) ? Number(safe.updatedAt) : undefined,
         template: {
           ...rawTemplate,
           elements,
@@ -865,6 +867,10 @@ function normalizeThemeEntries(parsed: Array<unknown>): Array<ThemeEntry> {
 }
 
 function makeThemeEntrySignature(entry: ThemeEntry): string {
+  if (isProgressSnapshotTheme(entry)) {
+    // Keep progress snapshot as a dedicated singleton channel.
+    return `progress:${PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID}`;
+  }
   const id = typeof entry.id === 'string' ? entry.id.trim() : '';
   if (id.length > 0) return `id:${id}`;
   const name = typeof entry.name === 'string' ? entry.name.trim().toLowerCase() : '';
@@ -875,6 +881,8 @@ function makeThemeEntrySignature(entry: ThemeEntry): string {
 function mergeThemeEntries(local: Array<ThemeEntry>, remote: Array<ThemeEntry>): Array<ThemeEntry> {
   const next: Array<ThemeEntry> = [];
   const seen = new Set<string>();
+  const localProgressSnapshot = local.find((entry) => isProgressSnapshotTheme(entry)) ?? null;
+  const remoteProgressSnapshot = remote.find((entry) => isProgressSnapshotTheme(entry)) ?? null;
 
   const appendUnique = (items: Array<ThemeEntry>) => {
     for (const entry of items) {
@@ -886,8 +894,14 @@ function mergeThemeEntries(local: Array<ThemeEntry>, remote: Array<ThemeEntry>):
   };
 
   // Keep server order authoritative, then append local-only unsynced themes.
-  appendUnique(remote);
-  appendUnique(local);
+  appendUnique(remote.filter((entry) => !isProgressSnapshotTheme(entry)));
+  appendUnique(local.filter((entry) => !isProgressSnapshotTheme(entry)));
+
+  // Progress snapshot must prefer latest local state to avoid stale cloud fallback.
+  const progressSnapshot = localProgressSnapshot ?? remoteProgressSnapshot;
+  if (progressSnapshot) {
+    next.push(progressSnapshot);
+  }
   return next;
 }
 
@@ -1478,6 +1492,7 @@ export default function ParametricPage() {
     const snapshotTheme: ThemeEntry = {
       id: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID,
       name: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME,
+      updatedAt: Date.now(),
       template: deepClone(workingTemplate),
     };
 
@@ -2014,6 +2029,18 @@ export default function ParametricPage() {
         if (contextTab !== 'element' || !selectedMaskEnabled) return;
         event.preventDefault();
         setMaskBrushAction((prev) => (prev === 'hide' ? 'reveal' : 'hide'));
+        return;
+      }
+
+      if (key === 's') {
+        event.preventDefault();
+        saveCurrentProgressSnapshot();
+        return;
+      }
+
+      if (key === 'l') {
+        event.preventDefault();
+        loadProgressSnapshot();
       }
     };
 
@@ -2021,7 +2048,14 @@ export default function ParametricPage() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [contextTab, runRedoCommand, runUndoCommand, selectedElement]);
+  }, [
+    contextTab,
+    loadProgressSnapshot,
+    runRedoCommand,
+    runUndoCommand,
+    saveCurrentProgressSnapshot,
+    selectedElement,
+  ]);
 
   useEffect(() => {
     const root = contextInspectorRef.current;
