@@ -846,14 +846,12 @@ function stripElementSnapshotForLibrary(element: TemplateElement): TemplateEleme
     };
   }
 
-  // Strip mask.field.values (large pixel array) — imageDataUrl is sufficient for rendering.
+  // Strip mask.field entirely — pixel buffer (values + imageDataUrl) is too large for
+  // Firebase/localStorage entries. Mask config (enabled, invert, mode) is preserved.
   const mask = result.mask && typeof result.mask === 'object' ? result.mask as Record<string, unknown> : null;
-  if (mask) {
-    const field = mask.field && typeof mask.field === 'object' ? mask.field as Record<string, unknown> : null;
-    if (field && Array.isArray(field.values)) {
-      const { values: _v, ...fieldWithoutValues } = field;
-      result = { ...result, mask: { ...mask, field: fieldWithoutValues } };
-    }
+  if (mask && mask.field) {
+    const { field: _f, ...maskWithoutField } = mask;
+    result = { ...result, mask: maskWithoutField };
   }
 
   return result;
@@ -869,14 +867,13 @@ function stripElementForProgressFirebase(element: TemplateElement): TemplateElem
     cloned.renderState = { ...rs, snapshot: null };
   }
 
-  // Strip mask.field.values (large pixel array) — imageDataUrl preserved for rendering.
+  // Strip mask.field entirely (compiled pixel buffer — both values[] and imageDataUrl are
+  // too large for Firestore's 1MB document limit). Mask config (enabled, invert, mode) is
+  // kept so the user can re-paint after loading. The pixel buffer lives only in localStorage.
   const mask = cloned.mask && typeof cloned.mask === 'object' ? cloned.mask as Record<string, unknown> : null;
-  if (mask) {
-    const field = mask.field && typeof mask.field === 'object' ? mask.field as Record<string, unknown> : null;
-    if (field && Array.isArray(field.values)) {
-      const { values: _v, ...fieldWithoutValues } = field;
-      cloned.mask = { ...mask, field: fieldWithoutValues };
-    }
+  if (mask && mask.field) {
+    const { field: _f, ...maskWithoutField } = mask;
+    cloned.mask = maskWithoutField;
   }
 
   return cloned;
