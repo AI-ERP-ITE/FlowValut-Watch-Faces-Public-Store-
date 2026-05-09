@@ -1764,7 +1764,7 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					},
 					null,
 				)));
-			const dropShadow = isPreviewQuality || isFrozenSnapshot
+			const dropShadow = isPreviewQuality
 				? normalizeDropShadowEffect({ enabled: false })
 				: normalizeDropShadowEffect(
 					{
