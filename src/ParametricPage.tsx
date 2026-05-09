@@ -27,6 +27,7 @@ import { beginRenderInteraction, endRenderInteraction, getRenderQualityMode } fr
 import { resolveLayerRenderOutputWithInvalidation } from '@/lib/renderCacheScheduler';
 import { resolveAdaptiveRenderStep } from '../engine/ui/adaptiveSteps';
 import { getParameterProfile } from '../engine/ui/parameterProfiles';
+import type { ParameterCurve } from '../engine/ui/parameterProfiles';
 import { normalizeMappedParameterValue } from '../engine/ui/parameterPrecision';
 import { mapRenderValueToUiValue, mapUiValueToRenderValue } from '../engine/ui/parameterMapping';
 import { normalizeSliderDebounceMs, shouldApplySliderUpdate } from '../engine/ui/sliderThrottle';
@@ -4515,29 +4516,38 @@ export default function ParametricPage() {
     const spreadProfile = getParameterProfile('shadowSpread');
     const offsetProfile = getParameterProfile('shadowOffset');
 
+    type ShadowInspectorRow = {
+      label: string;
+      uiValue: number;
+      mappedRenderValue: number;
+      curve: ParameterCurve;
+    };
+
+    const rows: ShadowInspectorRow[] = [];
+
     const makeRow = (
       label: string,
       renderValue: number,
       profile: ReturnType<typeof getParameterProfile>,
     ) => {
-      if (!profile) return null;
+      if (!profile) return;
       const uiValue = mapRenderValueToUiValue(renderValue, profile);
       const mappedRenderValue = mapUiValueToRenderValue(uiValue, profile);
-      return {
+      rows.push({
         label,
         uiValue,
         mappedRenderValue,
         curve: profile.curve,
-      };
+      });
     };
 
-    return [
-      makeRow('Shadow Opacity', getSelectedDropShadowNumber('opacity', 0.45), opacityProfile),
-      makeRow('Shadow Blur', getSelectedDropShadowNumber('blur', 8), blurProfile),
-      makeRow('Shadow Spread', getSelectedDropShadowNumber('spread', 0), spreadProfile),
-      makeRow('Offset X (abs)', Math.abs(getSelectedDropShadowNumber('offsetX', 2)), offsetProfile),
-      makeRow('Offset Y (abs)', Math.abs(getSelectedDropShadowNumber('offsetY', 2)), offsetProfile),
-    ].filter((row): row is { label: string; uiValue: number; mappedRenderValue: number; curve: string } => !!row);
+    makeRow('Shadow Opacity', getSelectedDropShadowNumber('opacity', 0.45), opacityProfile);
+    makeRow('Shadow Blur', getSelectedDropShadowNumber('blur', 8), blurProfile);
+    makeRow('Shadow Spread', getSelectedDropShadowNumber('spread', 0), spreadProfile);
+    makeRow('Offset X (abs)', Math.abs(getSelectedDropShadowNumber('offsetX', 2)), offsetProfile);
+    makeRow('Offset Y (abs)', Math.abs(getSelectedDropShadowNumber('offsetY', 2)), offsetProfile);
+
+    return rows;
   };
 
   const applySelectedDepthPreset = (presetKey: string) => {
