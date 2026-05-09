@@ -830,20 +830,56 @@ function stripElementSnapshotForLibrary(element: TemplateElement): TemplateEleme
     ? { ...(normalized.renderState as ParametricElementRenderState) }
     : null;
 
-  if (!renderState) return normalized;
-  if (!renderState.snapshot) return normalized;
+  let result: TemplateElement = normalized;
 
-  // Drawer library should keep reusable live element params, not heavy baked bitmap snapshots.
-  return {
-    ...normalized,
-    renderState: {
-      ...renderState,
-      sourceMode: 'live',
-      snapshotRenderMode: 'editable',
-      snapshotStatus: 'missing',
-      snapshot: null,
-    },
-  };
+  if (renderState && renderState.snapshot) {
+    // Drawer library keeps reusable live element params, not heavy baked bitmap snapshots.
+    result = {
+      ...result,
+      renderState: {
+        ...renderState,
+        sourceMode: 'live',
+        snapshotRenderMode: 'editable',
+        snapshotStatus: 'missing',
+        snapshot: null,
+      },
+    };
+  }
+
+  // Strip mask.field.values (large pixel array) — imageDataUrl is sufficient for rendering.
+  const mask = result.mask && typeof result.mask === 'object' ? result.mask as Record<string, unknown> : null;
+  if (mask) {
+    const field = mask.field && typeof mask.field === 'object' ? mask.field as Record<string, unknown> : null;
+    if (field && Array.isArray(field.values)) {
+      const { values: _v, ...fieldWithoutValues } = field;
+      result = { ...result, mask: { ...mask, field: fieldWithoutValues } };
+    }
+  }
+
+  return result;
+}
+
+/** Strips heavy runtime-only data before sending a progress snapshot to Firebase. */
+function stripElementForProgressFirebase(element: TemplateElement): TemplateElement {
+  const cloned = deepClone(element);
+
+  // Strip renderState snapshot images (large base64 renders; re-rendered on load).
+  if (cloned.renderState && typeof cloned.renderState === 'object') {
+    const rs = cloned.renderState as ParametricElementRenderState;
+    cloned.renderState = { ...rs, snapshot: null };
+  }
+
+  // Strip mask.field.values (large pixel array) — imageDataUrl preserved for rendering.
+  const mask = cloned.mask && typeof cloned.mask === 'object' ? cloned.mask as Record<string, unknown> : null;
+  if (mask) {
+    const field = mask.field && typeof mask.field === 'object' ? mask.field as Record<string, unknown> : null;
+    if (field && Array.isArray(field.values)) {
+      const { values: _v, ...fieldWithoutValues } = field;
+      cloned.mask = { ...mask, field: fieldWithoutValues };
+    }
+  }
+
+  return cloned;
 }
 
 function sanitizeLibraryEntryForPersistence(entry: LibraryEntry): LibraryEntry {
@@ -1597,7 +1633,14 @@ export default function ParametricPage() {
 
     if (authConfigured && getCurrentAuthUser()) {
       setDrawerNotice('Saving progress...');
-      void saveParametricProgressToFirebase({ snapshot: snapshotEntry })
+      const firebaseSnapshot: ProgressSnapshotEntry = {
+        updatedAt: snapshotEntry.updatedAt,
+        template: {
+          ...snapshotEntry.template,
+          elements: snapshotEntry.template.elements.map(stripElementForProgressFirebase),
+        },
+      };
+      void saveParametricProgressToFirebase({ snapshot: firebaseSnapshot })
         .then(() => {
           setDrawerNotice(`Progress saved at ${savedAt}. Synced to Firebase.`);
         })
