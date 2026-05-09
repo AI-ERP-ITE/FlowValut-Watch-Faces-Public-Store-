@@ -1551,9 +1551,12 @@ export default function ParametricPage() {
       const pixelPassSize = resolveTemplatePixelSize(template);
 
       if (!isSoloMode) {
-        const baseSvg = namespaceSvgIds(renderWithElements(visibleElements), namespaceForPass('base-all'));
-        setSvgMarkup(baseSvg);
-        setSvgOverlayLayers([]);
+        const stackedLayers = visibleElements.map((element, index) => {
+          return namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
+        });
+
+        setSvgMarkup(stackedLayers[0] ?? '');
+        setSvgOverlayLayers(stackedLayers.slice(1));
 
         if (isDimMode && selectedVisibleElement) {
           const overlaySvg = namespaceSvgIds(renderWithElements([selectedVisibleElement]), namespaceForPass('dim'));
