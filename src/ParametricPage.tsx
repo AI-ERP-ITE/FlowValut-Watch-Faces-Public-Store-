@@ -1551,12 +1551,9 @@ export default function ParametricPage() {
       const pixelPassSize = resolveTemplatePixelSize(template);
 
       if (!isSoloMode) {
-        const stackedLayers = visibleElements.map((element, index) => {
-          return namespaceSvgIds(renderWithElements([element]), namespaceForPass(`layer-${index}`));
-        });
-
-        setSvgMarkup(stackedLayers[0] ?? '');
-        setSvgOverlayLayers(stackedLayers.slice(1));
+        const baseSvg = namespaceSvgIds(renderWithElements(visibleElements), namespaceForPass('base-all'));
+        setSvgMarkup(baseSvg);
+        setSvgOverlayLayers([]);
 
         if (isDimMode && selectedVisibleElement) {
           const overlaySvg = namespaceSvgIds(renderWithElements([selectedVisibleElement]), namespaceForPass('dim'));
@@ -2298,9 +2295,8 @@ export default function ParametricPage() {
     }
   };
 
-  const createBakedLayerFromSelectedSnapshot = async () => {
-    if (!workingTemplate || !selectedElement || typeof selectedElement.id !== 'string') return;
-    const elementId = selectedElement.id;
+  const createBakedLayerFromElement = async (elementId: string) => {
+    if (!workingTemplate || typeof elementId !== 'string' || elementId.trim().length === 0) return;
     setIsSnapshotActionRunning(true);
     try {
       const snapshot = await createElementSnapshot({
@@ -2361,7 +2357,9 @@ export default function ParametricPage() {
         const withFreshness = refreshElementSnapshotStatus(withSnapshot as Record<string, unknown>, bakedSourceHash) as TemplateElement;
         bakedLayerId = typeof withFreshness.id === 'string' ? withFreshness.id : null;
 
-        return [...elements, withFreshness];
+        const next = [...elements];
+        next.splice(sourceIndex + 1, 0, withFreshness);
+        return next;
       }, 'Create baked snapshot layer');
 
       if (bakedLayerId) {
@@ -2375,6 +2373,11 @@ export default function ParametricPage() {
     } finally {
       setIsSnapshotActionRunning(false);
     }
+  };
+
+  const createBakedLayerFromSelectedSnapshot = async () => {
+    if (!selectedElement || typeof selectedElement.id !== 'string') return;
+    await createBakedLayerFromElement(selectedElement.id);
   };
 
   const useSnapshotForSelectedElement = () => {
@@ -7238,6 +7241,15 @@ export default function ParametricPage() {
                           title="Duplicate layer"
                         >
                           dup
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void createBakedLayerFromElement(element.id ?? '')}
+                          disabled={isSnapshotActionRunning || !element.id}
+                          className="rounded border border-zinc-700 px-1.5 py-0.5 text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Bake this layer to a new layer"
+                        >
+                          bake
                         </button>
                         <button
                           type="button"
