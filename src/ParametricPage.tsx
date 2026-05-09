@@ -82,6 +82,11 @@ type ThemeEntry = {
   updatedAt?: number;
 };
 
+type ProgressSnapshotEntry = {
+  updatedAt: number;
+  template: TemplateModel;
+};
+
 type GroupedLibrarySection = {
   category: string;
   entries: Array<LibraryEntry>;
@@ -93,6 +98,7 @@ type TemplateCommand = HistoryCommand<TemplateModel>;
 const PARAMETRIC_TEMPLATE_STORAGE_KEY = 'parametric-template-elements-v1';
 const PARAMETRIC_LIBRARY_STORAGE_KEY = 'parametric-element-library-v1';
 const PARAMETRIC_THEME_STORAGE_KEY = 'parametric-theme-library-v1';
+const PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY = 'parametric-progress-snapshot-v1';
 const PARAMETRIC_HISTORY_STORAGE_KEY = 'parametric-template-history-v1';
 const PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID = '__parametric-progress-snapshot__';
 const PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME = '__progress_snapshot__';
@@ -967,6 +973,7 @@ export default function ParametricPage() {
   const [workingTemplate, setWorkingTemplate] = useState<TemplateModel | null>(null);
   const [library, setLibrary] = useState<Array<LibraryEntry>>(SAMPLE_LIBRARY);
   const [themes, setThemes] = useState<Array<ThemeEntry>>([]);
+  const [progressSnapshot, setProgressSnapshot] = useState<ProgressSnapshotEntry | null>(null);
   const [themeNameDraft, setThemeNameDraft] = useState('');
   const [themeNameDrafts, setThemeNameDrafts] = useState<Record<string, string>>({});
 
@@ -1250,11 +1257,6 @@ export default function ParametricPage() {
     [themes],
   );
 
-  const progressSnapshotTheme = useMemo<ThemeEntry | null>(
-    () => themes.find((theme) => isProgressSnapshotTheme(theme)) ?? null,
-    [themes],
-  );
-
   const setAllDrawerSectionsCollapsed = (collapsed: boolean) => {
     setDrawerCollapsedByCategory(
       Object.fromEntries(groupedLibrary.map(({ category }) => [category, collapsed])) as Record<string, boolean>,
@@ -1288,6 +1290,18 @@ export default function ParametricPage() {
   const saveThemesLocal = (items: Array<ThemeEntry>) => {
     try {
       window.localStorage.setItem(PARAMETRIC_THEME_STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      // Ignore localStorage failures.
+    }
+  };
+
+  const saveProgressSnapshotLocal = (entry: ProgressSnapshotEntry | null) => {
+    try {
+      if (!entry) {
+        window.localStorage.removeItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY);
+        return;
+      }
+      window.localStorage.setItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY, JSON.stringify(entry));
     } catch {
       // Ignore localStorage failures.
     }
@@ -1339,6 +1353,31 @@ export default function ParametricPage() {
       const parsed = JSON.parse(raw) as Array<unknown>;
       if (!Array.isArray(parsed)) return null;
       return normalizeThemeEntries(parsed);
+    } catch {
+      return null;
+    }
+  };
+
+  const loadProgressSnapshotLocal = (): ProgressSnapshotEntry | null => {
+    try {
+      const raw = window.localStorage.getItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { updatedAt?: unknown; template?: unknown };
+      if (!parsed || typeof parsed !== 'object' || !parsed.template || typeof parsed.template !== 'object') {
+        return null;
+      }
+      const template = parsed.template as TemplateModel;
+      const elements = Array.isArray(template.elements)
+        ? template.elements.map((element, index) => ensureElement(element, index))
+        : [];
+      const updatedAt = Number(parsed.updatedAt);
+      return {
+        updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+        template: {
+          ...template,
+          elements,
+        },
+      };
     } catch {
       return null;
     }
@@ -1489,33 +1528,24 @@ export default function ParametricPage() {
     const now = new Date();
     const savedAt = `${now.toLocaleTimeString('en-US', { hour12: false })}.${String(now.getMilliseconds()).padStart(3, '0')}`;
 
-    const snapshotTheme: ThemeEntry = {
-      id: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID,
-      name: PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME,
+    const snapshotEntry: ProgressSnapshotEntry = {
       updatedAt: Date.now(),
       template: deepClone(workingTemplate),
     };
-
-    persistThemes(
-      (prev) => {
-        const withoutSnapshot = prev.filter((entry) => !isProgressSnapshotTheme(entry));
-        return [...withoutSnapshot, snapshotTheme];
-      },
-      authConfigured && getCurrentAuthUser()
-        ? `Progress snapshot saved at ${savedAt}. Recoverable even if browser cache is cleared.`
-        : `Progress snapshot saved locally at ${savedAt}. Sign in to mirror snapshot to Firebase.`,
-    );
+    setProgressSnapshot(snapshotEntry);
+    saveProgressSnapshotLocal(snapshotEntry);
+    setDrawerNotice(`Progress snapshot saved locally at ${savedAt}.`);
   };
 
   const loadProgressSnapshot = () => {
-    if (!progressSnapshotTheme) {
+    if (!progressSnapshot) {
       setDrawerNotice('No saved progress snapshot found yet.');
       return;
     }
 
     const template = {
-      ...deepClone(progressSnapshotTheme.template),
-      elements: (progressSnapshotTheme.template.elements ?? []).map((element, index) => ensureElement(element, index)),
+      ...deepClone(progressSnapshot.template),
+      elements: (progressSnapshot.template.elements ?? []).map((element, index) => ensureElement(element, index)),
     } as TemplateModel;
 
     setWorkingTemplate(template);
@@ -4691,6 +4721,7 @@ export default function ParametricPage() {
     const storedTemplate = loadStoredTemplate();
     const storedLibrary = loadStoredLibrary();
     const storedThemes = loadStoredThemes();
+    const storedProgressSnapshot = loadProgressSnapshotLocal();
     const initialTemplate = storedTemplate ?? deepClone(DEFAULT_EMPTY_TEMPLATE);
 
     setWorkingTemplate(initialTemplate);
@@ -4714,6 +4745,22 @@ export default function ParametricPage() {
     }
     if (storedThemes) {
       setThemes(storedThemes);
+    }
+    if (storedProgressSnapshot) {
+      setProgressSnapshot(storedProgressSnapshot);
+    } else if (storedThemes) {
+      // Legacy migration path from old progress-in-themes storage.
+      const legacyThemeSnapshot = storedThemes.find((theme) => isProgressSnapshotTheme(theme));
+      if (legacyThemeSnapshot) {
+        const migrated: ProgressSnapshotEntry = {
+          updatedAt: Number.isFinite(Number(legacyThemeSnapshot.updatedAt))
+            ? Number(legacyThemeSnapshot.updatedAt)
+            : Date.now(),
+          template: deepClone(legacyThemeSnapshot.template),
+        };
+        setProgressSnapshot(migrated);
+        saveProgressSnapshotLocal(migrated);
+      }
     }
     void syncThemesFromFirebase();
     void renderPreview();
@@ -6186,7 +6233,7 @@ export default function ParametricPage() {
                   <button
                     type="button"
                     onClick={loadProgressSnapshot}
-                    disabled={!progressSnapshotTheme}
+                    disabled={!progressSnapshot}
                     className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
                   >
                     Load Progress
