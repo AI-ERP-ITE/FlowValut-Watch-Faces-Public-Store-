@@ -942,9 +942,9 @@ export default function ParametricPage() {
     markElementDirty(elementId.trim(), reason);
   }, []);
   const markSelectedElementDirty = useCallback((reason: DirtyReason) => {
-    if (!selectedElement || typeof selectedElement.id !== 'string') return;
-    markElementDirty(selectedElement.id.trim(), reason);
-  }, [selectedElement]);
+    if (typeof selectedElementId !== 'string' || selectedElementId.trim().length === 0) return;
+    markElementDirty(selectedElementId.trim(), reason);
+  }, [selectedElementId]);
   const beginCanvasInteraction = useCallback(() => {
     beginRenderInteraction('canvas-interaction');
   }, []);
