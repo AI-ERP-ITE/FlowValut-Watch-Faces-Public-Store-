@@ -25,6 +25,11 @@ import { getCachedRender, getCachedRenderElementIds, removeCachedRender, setCach
 import { consumeDirtyElementIds, getElementDirtyReason, getDirtyElementIds, markElementDirty, type DirtyReason } from '../engine/rendering/renderInvalidation';
 import { beginRenderInteraction, endRenderInteraction, getRenderQualityMode } from '../engine/rendering/renderInteractionState';
 import { resolveLayerRenderOutputWithInvalidation } from '@/lib/renderCacheScheduler';
+import { resolveAdaptiveRenderStep } from '../engine/ui/adaptiveSteps';
+import { getParameterProfile } from '../engine/ui/parameterProfiles';
+import { normalizeMappedParameterValue } from '../engine/ui/parameterPrecision';
+import { mapRenderValueToUiValue, mapUiValueToRenderValue } from '../engine/ui/parameterMapping';
+import { normalizeSliderDebounceMs, shouldApplySliderUpdate } from '../engine/ui/sliderThrottle';
 import {
   pushHistoryCommand,
   redoHistory,
@@ -675,6 +680,19 @@ const DEPTH_PRESET_OPTIONS = [
 ] as const;
 const DEPTH_PRESET_CUSTOM_KEY = 'custom';
 const DEFAULT_DEPTH_LIGHT_VECTOR = { x: 0, y: 0, z: 1 };
+
+function formatPercent(value: number, digits = 0): string {
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+function formatSignedPercent(value: number, digits = 0): string {
+  return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%`;
+}
+
+function formatUnit(value: number, unit: string, digits = 0): string {
+  return `${value.toFixed(digits)}${unit}`;
+}
+
 function makeId(prefix = 'el'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -845,6 +863,33 @@ function normalizeThemeEntries(parsed: Array<unknown>): Array<ThemeEntry> {
     });
 }
 
+function makeThemeEntrySignature(entry: ThemeEntry): string {
+  const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+  if (id.length > 0) return `id:${id}`;
+  const name = typeof entry.name === 'string' ? entry.name.trim().toLowerCase() : '';
+  const payload = JSON.stringify(entry.template ?? {});
+  return `shape:${name}|${payload}`;
+}
+
+function mergeThemeEntries(local: Array<ThemeEntry>, remote: Array<ThemeEntry>): Array<ThemeEntry> {
+  const next: Array<ThemeEntry> = [];
+  const seen = new Set<string>();
+
+  const appendUnique = (items: Array<ThemeEntry>) => {
+    for (const entry of items) {
+      const signature = makeThemeEntrySignature(entry);
+      if (!signature || seen.has(signature)) continue;
+      seen.add(signature);
+      next.push(entry);
+    }
+  };
+
+  // Keep server order authoritative, then append local-only unsynced themes.
+  appendUnique(remote);
+  appendUnique(local);
+  return next;
+}
+
 function isProgressSnapshotTheme(theme: ThemeEntry): boolean {
   return theme.id === PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID || theme.name === PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME;
 }
@@ -923,6 +968,7 @@ export default function ParametricPage() {
   const [quickNewCategory, setQuickNewCategory] = useState<string>('General');
   const [libraryNameDrafts, setLibraryNameDrafts] = useState<Record<string, string>>({});
   const [isSnapshotActionRunning, setIsSnapshotActionRunning] = useState(false);
+  const [showParameterInspector, setShowParameterInspector] = useState(false);
 
   const [draftJson, setDraftJson] = useState(
     JSON.stringify(
@@ -963,6 +1009,9 @@ export default function ParametricPage() {
   const isDragHistoryBatchRef = useRef(false);
   const dragBatchBeforeRef = useRef<TemplateModel | null>(null);
   const dragBatchLabelRef = useRef('Canvas drag');
+  const sliderThrottleFrameRef = useRef<number | null>(null);
+  const sliderThrottleLastAppliedRef = useRef(0);
+  const sliderThrottlePendingRef = useRef<null | { apply: () => void; debounceMs: number }>(null);
   const authConfigured = isFirebaseAuthConfigured();
   const markDirtyById = useCallback((elementId: string | null | undefined, reason: DirtyReason) => {
     if (typeof elementId !== 'string' || elementId.trim().length === 0) return;
@@ -983,6 +1032,30 @@ export default function ParametricPage() {
   }, []);
   const endSliderInteraction = useCallback(() => {
     endRenderInteraction('slider-interaction');
+  }, []);
+
+  const queueThrottledSliderUpdate = useCallback((apply: () => void, debounceMs = 16) => {
+    const schedule = () => {
+      if (sliderThrottleFrameRef.current !== null) return;
+      sliderThrottleFrameRef.current = window.requestAnimationFrame((timestamp) => {
+        sliderThrottleFrameRef.current = null;
+        const pending = sliderThrottlePendingRef.current;
+        if (!pending) return;
+        if (!shouldApplySliderUpdate(timestamp, sliderThrottleLastAppliedRef.current, pending.debounceMs)) {
+          schedule();
+          return;
+        }
+        sliderThrottlePendingRef.current = null;
+        pending.apply();
+        sliderThrottleLastAppliedRef.current = timestamp;
+      });
+    };
+
+    sliderThrottlePendingRef.current = {
+      apply,
+      debounceMs: normalizeSliderDebounceMs(debounceMs),
+    };
+    schedule();
   }, []);
 
   // Match Studio font availability so font-family changes are visually obvious in parametric preview.
@@ -1019,6 +1092,14 @@ export default function ParametricPage() {
       window.removeEventListener('mouseup', onPointerUp);
     };
   }, [beginSliderInteraction, endCanvasInteraction, endSliderInteraction]);
+
+  useEffect(() => () => {
+    if (sliderThrottleFrameRef.current !== null) {
+      window.cancelAnimationFrame(sliderThrottleFrameRef.current);
+      sliderThrottleFrameRef.current = null;
+    }
+    sliderThrottlePendingRef.current = null;
+  }, []);
 
   const getTemplateFingerprint = useCallback((template: TemplateModel | null): string => {
     if (!template) return 'null';
@@ -1279,7 +1360,7 @@ export default function ParametricPage() {
     } catch {
       setDrawerNotice('Firebase sync unavailable. Using local drawer library.');
     }
-  }, [authConfigured]);
+  }, [authConfigured, saveLibraryToFirebaseOnAction]);
 
   const syncThemesFromFirebase = useCallback(async () => {
     if (!authConfigured || !getCurrentAuthUser()) return;
@@ -1287,20 +1368,30 @@ export default function ParametricPage() {
     try {
       const remoteRaw = await fetchParametricThemesFromFirebase();
       const remote = normalizeThemeEntries(remoteRaw as Array<unknown>);
+      const local = loadStoredThemes() ?? [];
+      const merged = mergeThemeEntries(local, remote);
 
-      if (remote.length > 0) {
-        setThemes(remote);
+      if (merged.length > 0) {
+        setThemes(merged);
         try {
-          window.localStorage.setItem(PARAMETRIC_THEME_STORAGE_KEY, JSON.stringify(remote));
+          window.localStorage.setItem(PARAMETRIC_THEME_STORAGE_KEY, JSON.stringify(merged));
         } catch {
           // Ignore localStorage failures.
         }
+
+        // Self-heal cloud state if local had unsynced theme entries.
+        if (merged.length > remote.length) {
+          void saveThemesToFirebaseOnAction(merged).catch(() => {
+            // Non-fatal; merged local cache is already retained.
+          });
+        }
+
         setDrawerNotice('Themes synced from Firebase.');
       }
     } catch {
       // Silent: keep local themes if Firebase unavailable.
     }
-  }, [authConfigured]);
+  }, [authConfigured, saveThemesToFirebaseOnAction]);
 
   const persistLibraryFromAction = (updater: (prev: Array<LibraryEntry>) => Array<LibraryEntry>, successNotice: string) => {
     let pushed = false;
@@ -4327,6 +4418,22 @@ export default function ParametricPage() {
 
   const setSelectedDropShadowNumber = (key: 'opacity' | 'blur' | 'spread' | 'offsetX' | 'offsetY', value: number) => {
     if (!selectedElement) return;
+    const profileKey = key === 'opacity'
+      ? 'shadowOpacity'
+      : key === 'blur'
+        ? 'shadowBlur'
+        : key === 'spread'
+          ? 'shadowSpread'
+          : 'shadowOffset';
+    const profile = getParameterProfile(profileKey);
+    const limits = key === 'opacity'
+      ? DROP_SHADOW_CONTROL_LIMITS.opacity
+      : key === 'blur'
+        ? DROP_SHADOW_CONTROL_LIMITS.blur
+        : key === 'spread'
+          ? DROP_SHADOW_CONTROL_LIMITS.spread
+          : DROP_SHADOW_CONTROL_LIMITS.offset;
+    const normalizedValue = normalizeMappedParameterValue(value, profile, limits.min, limits.max);
     updateTemplateElements(
       (elements) =>
         elements.map((element) => {
@@ -4335,7 +4442,7 @@ export default function ParametricPage() {
             ? (element.dropShadow as Record<string, unknown>)
             : undefined;
           const next = normalizeDropShadowRecord(current);
-          next[key] = value;
+          next[key] = normalizedValue;
           return {
             ...element,
             dropShadow: normalizeDropShadowRecord(next),
@@ -4400,6 +4507,37 @@ export default function ParametricPage() {
     const shadow = getSelectedDropShadowRecord();
     const raw = shadow[key];
     return typeof raw === 'string' ? raw : fallback;
+  };
+
+  const getShadowParameterInspectorRows = () => {
+    const opacityProfile = getParameterProfile('shadowOpacity');
+    const blurProfile = getParameterProfile('shadowBlur');
+    const spreadProfile = getParameterProfile('shadowSpread');
+    const offsetProfile = getParameterProfile('shadowOffset');
+
+    const makeRow = (
+      label: string,
+      renderValue: number,
+      profile: ReturnType<typeof getParameterProfile>,
+    ) => {
+      if (!profile) return null;
+      const uiValue = mapRenderValueToUiValue(renderValue, profile);
+      const mappedRenderValue = mapUiValueToRenderValue(uiValue, profile);
+      return {
+        label,
+        uiValue,
+        mappedRenderValue,
+        curve: profile.curve,
+      };
+    };
+
+    return [
+      makeRow('Shadow Opacity', getSelectedDropShadowNumber('opacity', 0.45), opacityProfile),
+      makeRow('Shadow Blur', getSelectedDropShadowNumber('blur', 8), blurProfile),
+      makeRow('Shadow Spread', getSelectedDropShadowNumber('spread', 0), spreadProfile),
+      makeRow('Offset X (abs)', Math.abs(getSelectedDropShadowNumber('offsetX', 2)), offsetProfile),
+      makeRow('Offset Y (abs)', Math.abs(getSelectedDropShadowNumber('offsetY', 2)), offsetProfile),
+    ].filter((row): row is { label: string; uiValue: number; mappedRenderValue: number; curve: string } => !!row);
   };
 
   const applySelectedDepthPreset = (presetKey: string) => {
@@ -5774,7 +5912,7 @@ export default function ParametricPage() {
               {isGlobal3DLightingMode ? (
                 <>
                   <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                    <span className="text-[11px] text-zinc-500">Light X {getTemplateEffectPathNumber('light.x', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Light X {formatSignedPercent(getTemplateEffectPathNumber('light.x', 0))}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.lightAxis.min}
@@ -5793,7 +5931,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                    <span className="text-[11px] text-zinc-500">Light Y {getTemplateEffectPathNumber('light.y', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Light Y {formatSignedPercent(getTemplateEffectPathNumber('light.y', 0))}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.lightAxis.min}
@@ -5812,7 +5950,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                    <span className="text-[11px] text-zinc-500">Light Z {getTemplateEffectPathNumber('light.z', 1).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Light Z {formatSignedPercent(getTemplateEffectPathNumber('light.z', 1))}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.lightAxisZ.min}
@@ -5833,7 +5971,7 @@ export default function ParametricPage() {
               ) : null}
 
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                <span className="text-[11px] text-zinc-500">Intensity {getTemplateEffectNumber('intensity', 0.46).toFixed(2)}</span>
+                <span className="text-[11px] text-zinc-500">Intensity {formatPercent(getTemplateEffectNumber('intensity', 0.46))}</span>
                 <input
                   type="range"
                   min={DEPTH_CONTROL_LIMITS.intensity.min}
@@ -5846,7 +5984,7 @@ export default function ParametricPage() {
               </label>
 
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                <span className="text-[11px] text-zinc-500">Opacity {getTemplateEffectNumber('opacity', 0.8).toFixed(2)}</span>
+                <span className="text-[11px] text-zinc-500">Opacity {formatPercent(getTemplateEffectNumber('opacity', 0.8))}</span>
                 <input
                   type="range"
                   min={DEPTH_CONTROL_LIMITS.opacity.min}
@@ -5859,7 +5997,7 @@ export default function ParametricPage() {
               </label>
 
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                <span className="text-[11px] text-zinc-500">Distance {getTemplateEffectNumber('distance', 1.2).toFixed(2)}</span>
+                <span className="text-[11px] text-zinc-500">Distance {formatUnit(getTemplateEffectNumber('distance', 1.2), 'x', 1)}</span>
                 <input
                   type="range"
                   min={DEPTH_CONTROL_LIMITS.distance.min}
@@ -5872,7 +6010,7 @@ export default function ParametricPage() {
               </label>
 
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                <span className="text-[11px] text-zinc-500">Falloff {getTemplateEffectNumber('falloff', 1).toFixed(2)}</span>
+                <span className="text-[11px] text-zinc-500">Falloff {formatUnit(getTemplateEffectNumber('falloff', 1), 'x', 2)}</span>
                 <input
                   type="range"
                   min={DEPTH_CONTROL_LIMITS.falloff.min}
@@ -5885,7 +6023,7 @@ export default function ParametricPage() {
               </label>
 
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                <span className="text-[11px] text-zinc-500">White Balance {getTemplateEffectNumber('whiteBalance', 0).toFixed(2)}</span>
+                <span className="text-[11px] text-zinc-500">White Balance {formatSignedPercent(getTemplateEffectNumber('whiteBalance', 0))}</span>
                 <input
                   type="range"
                   min={DEPTH_CONTROL_LIMITS.whiteBalance.min}
@@ -5898,7 +6036,7 @@ export default function ParametricPage() {
               </label>
 
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
-                <span className="text-[11px] text-zinc-500">Spreading {getTemplateEffectNumber('spread', 0).toFixed(2)}</span>
+                <span className="text-[11px] text-zinc-500">Spreading {formatPercent(getTemplateEffectNumber('spread', 0))}</span>
                 <input
                   type="range"
                   min={DEPTH_CONTROL_LIMITS.spread.min}
@@ -8312,7 +8450,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Highlight {getSelectedStyleAdjustNumber('highlight', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Highlight {formatSignedPercent(getSelectedStyleAdjustNumber('highlight', 0))}</span>
                     <input
                       type="range"
                       min={-1}
@@ -8325,7 +8463,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Shadows {getSelectedStyleAdjustNumber('shadows', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Shadows {formatSignedPercent(getSelectedStyleAdjustNumber('shadows', 0))}</span>
                     <input
                       type="range"
                       min={-1}
@@ -8338,7 +8476,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Contrast {getSelectedStyleAdjustNumber('contrast', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Contrast {formatSignedPercent(getSelectedStyleAdjustNumber('contrast', 0))}</span>
                     <input
                       type="range"
                       min={-1}
@@ -8351,7 +8489,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Sharpness {getSelectedStyleAdjustNumber('sharpness', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Sharpness {formatPercent(getSelectedStyleAdjustNumber('sharpness', 0))}</span>
                     <input
                       type="range"
                       min={0}
@@ -8411,7 +8549,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Tint Opacity {getSelectedStyleAdjustNumber('colorOpacity', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Tint Opacity {formatPercent(getSelectedStyleAdjustNumber('colorOpacity', 0))}</span>
                     <input
                       type="range"
                       min={0}
@@ -8503,7 +8641,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Intensity {getSelectedEffect3dNumber('intensity', 0.46).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Intensity {formatPercent(getSelectedEffect3dNumber('intensity', 0.46))}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.intensity.min}
@@ -8516,7 +8654,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Opacity {getSelectedEffect3dNumber('opacity', 0.8).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Opacity {formatPercent(getSelectedEffect3dNumber('opacity', 0.8))}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.opacity.min}
@@ -8532,7 +8670,7 @@ export default function ParametricPage() {
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Manual 3D Light Vector</p>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Light X {getSelectedEffect3dNumber('light.x', 0).toFixed(2)}</span>
+                      <span className="text-[11px] text-zinc-500">Light X {formatSignedPercent(getSelectedEffect3dNumber('light.x', 0))}</span>
                       <input
                         type="range"
                         min={DEPTH_CONTROL_LIMITS.lightAxis.min}
@@ -8545,7 +8683,7 @@ export default function ParametricPage() {
                     </label>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Light Y {getSelectedEffect3dNumber('light.y', 0).toFixed(2)}</span>
+                      <span className="text-[11px] text-zinc-500">Light Y {formatSignedPercent(getSelectedEffect3dNumber('light.y', 0))}</span>
                       <input
                         type="range"
                         min={DEPTH_CONTROL_LIMITS.lightAxis.min}
@@ -8558,7 +8696,7 @@ export default function ParametricPage() {
                     </label>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Light Z {getSelectedEffect3dNumber('light.z', 1).toFixed(2)}</span>
+                      <span className="text-[11px] text-zinc-500">Light Z {formatSignedPercent(getSelectedEffect3dNumber('light.z', 1))}</span>
                       <input
                         type="range"
                         min={DEPTH_CONTROL_LIMITS.lightAxisZ.min}
@@ -8572,7 +8710,7 @@ export default function ParametricPage() {
                   </div>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Distance {getSelectedEffect3dNumber('distance', 1.2).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Distance {formatUnit(getSelectedEffect3dNumber('distance', 1.2), 'x', 1)}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.distance.min}
@@ -8585,7 +8723,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Falloff {getSelectedEffect3dNumber('falloff', 1).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Falloff {formatUnit(getSelectedEffect3dNumber('falloff', 1), 'x', 2)}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.falloff.min}
@@ -8598,7 +8736,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth White Balance {getSelectedEffect3dNumber('whiteBalance', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth White Balance {formatSignedPercent(getSelectedEffect3dNumber('whiteBalance', 0))}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.whiteBalance.min}
@@ -8611,7 +8749,7 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Spread {getSelectedEffect3dNumber('spread', 0).toFixed(2)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Spread {formatPercent(getSelectedEffect3dNumber('spread', 0))}</span>
                     <input
                       type="range"
                       min={DEPTH_CONTROL_LIMITS.spread.min}
@@ -8692,14 +8830,22 @@ export default function ParametricPage() {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Shadow Opacity {getSelectedDropShadowNumber('opacity', 0.45).toFixed(2)}</span>
+                        <span className="text-[11px] text-zinc-500">Shadow Opacity {formatPercent(getSelectedDropShadowNumber('opacity', 0.45))}</span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.opacity.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.opacity.max}
-                          step={DROP_SHADOW_CONTROL_LIMITS.opacity.step}
+                          step={resolveAdaptiveRenderStep(
+                            getParameterProfile('shadowOpacity'),
+                            getSelectedDropShadowNumber('opacity', 0.45),
+                            DROP_SHADOW_CONTROL_LIMITS.opacity.step,
+                          )}
                           value={getSelectedDropShadowNumber('opacity', 0.45)}
-                          onChange={(e) => setSelectedDropShadowNumber('opacity', Number(e.target.value))}
+                          onChange={(e) => {
+                            const nextValue = Number(e.target.value);
+                            const debounceMs = getParameterProfile('shadowOpacity')?.debounceMs ?? 16;
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('opacity', nextValue), debounceMs);
+                          }}
                           className="w-full"
                         />
                       </label>
@@ -8710,9 +8856,17 @@ export default function ParametricPage() {
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.blur.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.blur.max}
-                          step={DROP_SHADOW_CONTROL_LIMITS.blur.step}
+                          step={resolveAdaptiveRenderStep(
+                            getParameterProfile('shadowBlur'),
+                            getSelectedDropShadowNumber('blur', 8),
+                            DROP_SHADOW_CONTROL_LIMITS.blur.step,
+                          )}
                           value={getSelectedDropShadowNumber('blur', 8)}
-                          onChange={(e) => setSelectedDropShadowNumber('blur', Number(e.target.value))}
+                          onChange={(e) => {
+                            const nextValue = Number(e.target.value);
+                            const debounceMs = getParameterProfile('shadowBlur')?.debounceMs ?? 16;
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('blur', nextValue), debounceMs);
+                          }}
                           className="w-full"
                         />
                       </label>
@@ -8723,9 +8877,17 @@ export default function ParametricPage() {
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.spread.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.spread.max}
-                          step={DROP_SHADOW_CONTROL_LIMITS.spread.step}
+                          step={resolveAdaptiveRenderStep(
+                            getParameterProfile('shadowSpread'),
+                            getSelectedDropShadowNumber('spread', 0),
+                            DROP_SHADOW_CONTROL_LIMITS.spread.step,
+                          )}
                           value={getSelectedDropShadowNumber('spread', 0)}
-                          onChange={(e) => setSelectedDropShadowNumber('spread', Number(e.target.value))}
+                          onChange={(e) => {
+                            const nextValue = Number(e.target.value);
+                            const debounceMs = getParameterProfile('shadowSpread')?.debounceMs ?? 16;
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('spread', nextValue), debounceMs);
+                          }}
                           className="w-full"
                         />
                       </label>
@@ -8736,9 +8898,17 @@ export default function ParametricPage() {
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.offset.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.offset.max}
-                          step={DROP_SHADOW_CONTROL_LIMITS.offset.step}
+                          step={resolveAdaptiveRenderStep(
+                            getParameterProfile('shadowOffset'),
+                            Math.abs(getSelectedDropShadowNumber('offsetX', 2)),
+                            DROP_SHADOW_CONTROL_LIMITS.offset.step,
+                          )}
                           value={getSelectedDropShadowNumber('offsetX', 2)}
-                          onChange={(e) => setSelectedDropShadowNumber('offsetX', Number(e.target.value))}
+                          onChange={(e) => {
+                            const nextValue = Number(e.target.value);
+                            const debounceMs = getParameterProfile('shadowOffset')?.debounceMs ?? 16;
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('offsetX', nextValue), debounceMs);
+                          }}
                           className="w-full"
                         />
                       </label>
@@ -8749,12 +8919,47 @@ export default function ParametricPage() {
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.offset.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.offset.max}
-                          step={DROP_SHADOW_CONTROL_LIMITS.offset.step}
+                          step={resolveAdaptiveRenderStep(
+                            getParameterProfile('shadowOffset'),
+                            Math.abs(getSelectedDropShadowNumber('offsetY', 2)),
+                            DROP_SHADOW_CONTROL_LIMITS.offset.step,
+                          )}
                           value={getSelectedDropShadowNumber('offsetY', 2)}
-                          onChange={(e) => setSelectedDropShadowNumber('offsetY', Number(e.target.value))}
+                          onChange={(e) => {
+                            const nextValue = Number(e.target.value);
+                            const debounceMs = getParameterProfile('shadowOffset')?.debounceMs ?? 16;
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('offsetY', nextValue), debounceMs);
+                          }}
                           className="w-full"
                         />
                       </label>
+
+                      {import.meta.env.DEV ? (
+                        <div className="space-y-2 rounded border border-zinc-800 bg-zinc-950/60 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Parameter Inspector (Dev)</p>
+                            <button
+                              type="button"
+                              onClick={() => setShowParameterInspector((prev) => !prev)}
+                              className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                            >
+                              {showParameterInspector ? 'Hide' : 'Show'}
+                            </button>
+                          </div>
+                          {showParameterInspector ? (
+                            <div className="space-y-1">
+                              {getShadowParameterInspectorRows().map((row) => (
+                                <div key={`shadow-inspector-${row.label}`} className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 text-[11px] text-zinc-400">
+                                  <span className="text-zinc-300">{row.label}</span>
+                                  <span>ui: {row.uiValue.toFixed(2)}</span>
+                                  <span>render: {row.mappedRenderValue.toFixed(3)}</span>
+                                  <span className="uppercase text-zinc-500">{row.curve}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </>
                   ) : null}
                 </div>
