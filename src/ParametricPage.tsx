@@ -30,6 +30,7 @@ import { getParameterProfile } from '../engine/ui/shadowProfiles';
 import type { ParameterCurve } from '../engine/ui/shadowProfiles';
 import { normalizeMappedParameterValue } from '../engine/ui/parameterPrecision';
 import { mapRenderValueToUiValue, mapUiValueToRenderValue } from '../engine/ui/parameterMapping';
+import { mapEffectUiToRender, mapEffectRenderToUi, getEffectParameterProfile } from '../engine/ui/effectMapping';
 import { normalizeSliderDebounceMs, shouldApplySliderUpdate } from '../engine/ui/sliderThrottle';
 import {
   pushHistoryCommand,
@@ -8675,66 +8676,81 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Highlight {formatSignedPercent(getSelectedStyleAdjustNumber('highlight', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Highlight {Math.round(mapEffectRenderToUi('highlight', getSelectedStyleAdjustNumber('highlight', 0)))}%</span>
                     <input
                       type="range"
-                      min={-1}
-                      max={1}
-                      step={0.01}
-                      value={getSelectedStyleAdjustNumber('highlight', 0)}
-                      onChange={(e) => setSelectedStyleAdjustNumber('highlight', Number(e.target.value))}
+                      min={-100}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('highlight'), mapEffectRenderToUi('highlight', getSelectedStyleAdjustNumber('highlight', 0)), 1)}
+                      value={mapEffectRenderToUi('highlight', getSelectedStyleAdjustNumber('highlight', 0))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('highlight', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedStyleAdjustNumber('highlight', render), getEffectParameterProfile('highlight').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Shadows {formatSignedPercent(getSelectedStyleAdjustNumber('shadows', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Shadows {Math.round(mapEffectRenderToUi('shadows', getSelectedStyleAdjustNumber('shadows', 0)))}%</span>
                     <input
                       type="range"
-                      min={-1}
-                      max={1}
-                      step={0.01}
-                      value={getSelectedStyleAdjustNumber('shadows', 0)}
-                      onChange={(e) => setSelectedStyleAdjustNumber('shadows', Number(e.target.value))}
+                      min={-100}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('shadows'), mapEffectRenderToUi('shadows', getSelectedStyleAdjustNumber('shadows', 0)), 1)}
+                      value={mapEffectRenderToUi('shadows', getSelectedStyleAdjustNumber('shadows', 0))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('shadows', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedStyleAdjustNumber('shadows', render), getEffectParameterProfile('shadows').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Contrast {formatSignedPercent(getSelectedStyleAdjustNumber('contrast', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Contrast {Math.round(mapEffectRenderToUi('contrast', getSelectedStyleAdjustNumber('contrast', 0)))}%</span>
                     <input
                       type="range"
-                      min={-1}
-                      max={1}
-                      step={0.01}
-                      value={getSelectedStyleAdjustNumber('contrast', 0)}
-                      onChange={(e) => setSelectedStyleAdjustNumber('contrast', Number(e.target.value))}
+                      min={-100}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('contrast'), mapEffectRenderToUi('contrast', getSelectedStyleAdjustNumber('contrast', 0)), 1)}
+                      value={mapEffectRenderToUi('contrast', getSelectedStyleAdjustNumber('contrast', 0))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('contrast', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedStyleAdjustNumber('contrast', render), getEffectParameterProfile('contrast').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Sharpness {formatPercent(getSelectedStyleAdjustNumber('sharpness', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Sharpness {Math.round(mapEffectRenderToUi('sharpness', getSelectedStyleAdjustNumber('sharpness', 0)))}%</span>
                     <input
                       type="range"
                       min={0}
-                      max={1}
-                      step={0.01}
-                      value={getSelectedStyleAdjustNumber('sharpness', 0)}
-                      onChange={(e) => setSelectedStyleAdjustNumber('sharpness', Number(e.target.value))}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('sharpness'), mapEffectRenderToUi('sharpness', getSelectedStyleAdjustNumber('sharpness', 0)), 1)}
+                      value={mapEffectRenderToUi('sharpness', getSelectedStyleAdjustNumber('sharpness', 0))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('sharpness', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedStyleAdjustNumber('sharpness', render), getEffectParameterProfile('sharpness').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Hue {Math.round(getSelectedStyleAdjustNumber('hue', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Hue {Math.round(getSelectedStyleAdjustNumber('hue', 0))}°</span>
                     <input
                       type="range"
                       min={-180}
                       max={180}
                       step={1}
                       value={getSelectedStyleAdjustNumber('hue', 0)}
-                      onChange={(e) => setSelectedStyleAdjustNumber('hue', Number(e.target.value))}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        queueThrottledSliderUpdate(() => setSelectedStyleAdjustNumber('hue', v), 16);
+                      }}
                       className="w-full"
                     />
                   </label>
@@ -8774,14 +8790,17 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Tint Opacity {formatPercent(getSelectedStyleAdjustNumber('colorOpacity', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Tint Opacity {Math.round(mapEffectRenderToUi('colorOpacity', getSelectedStyleAdjustNumber('colorOpacity', 0)))}%</span>
                     <input
                       type="range"
                       min={0}
-                      max={1}
-                      step={0.01}
-                      value={getSelectedStyleAdjustNumber('colorOpacity', 0)}
-                      onChange={(e) => setSelectedStyleAdjustNumber('colorOpacity', Number(e.target.value))}
+                      max={100}
+                      step={1}
+                      value={mapEffectRenderToUi('colorOpacity', getSelectedStyleAdjustNumber('colorOpacity', 0))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('colorOpacity', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedStyleAdjustNumber('colorOpacity', render), getEffectParameterProfile('colorOpacity').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
@@ -8866,27 +8885,33 @@ export default function ParametricPage() {
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Intensity {formatPercent(getSelectedEffect3dNumber('intensity', 0.46))}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Intensity {Math.round(mapEffectRenderToUi('depthIntensity', getSelectedEffect3dNumber('intensity', 0.22)))}%</span>
                     <input
                       type="range"
-                      min={DEPTH_CONTROL_LIMITS.intensity.min}
-                      max={DEPTH_CONTROL_LIMITS.intensity.max}
-                      step={DEPTH_CONTROL_LIMITS.intensity.step}
-                      value={getSelectedEffect3dNumber('intensity', 0.46)}
-                      onChange={(e) => setSelectedEffect3dNumber('intensity', Number(e.target.value))}
+                      min={0}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('depthIntensity'), mapEffectRenderToUi('depthIntensity', getSelectedEffect3dNumber('intensity', 0.22)), 1)}
+                      value={mapEffectRenderToUi('depthIntensity', getSelectedEffect3dNumber('intensity', 0.22))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('depthIntensity', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('intensity', render), getEffectParameterProfile('depthIntensity').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Opacity {formatPercent(getSelectedEffect3dNumber('opacity', 0.8))}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Opacity {Math.round(mapEffectRenderToUi('depthOpacity', getSelectedEffect3dNumber('opacity', 0.44)))}%</span>
                     <input
                       type="range"
-                      min={DEPTH_CONTROL_LIMITS.opacity.min}
-                      max={DEPTH_CONTROL_LIMITS.opacity.max}
-                      step={DEPTH_CONTROL_LIMITS.opacity.step}
-                      value={getSelectedEffect3dNumber('opacity', 0.8)}
-                      onChange={(e) => setSelectedEffect3dNumber('opacity', Number(e.target.value))}
+                      min={0}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('depthOpacity'), mapEffectRenderToUi('depthOpacity', getSelectedEffect3dNumber('opacity', 0.44)), 1)}
+                      value={mapEffectRenderToUi('depthOpacity', getSelectedEffect3dNumber('opacity', 0.44))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('depthOpacity', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('opacity', render), getEffectParameterProfile('depthOpacity').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
@@ -8895,93 +8920,114 @@ export default function ParametricPage() {
                     <p className="text-[11px] uppercase tracking-wide text-zinc-500">Manual 3D Light Vector</p>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Light X {formatSignedPercent(getSelectedEffect3dNumber('light.x', 0))}</span>
+                      <span className="text-[11px] text-zinc-500">Light X {Math.round(mapEffectRenderToUi('lightX', getSelectedEffect3dNumber('light.x', 0)))}%</span>
                       <input
                         type="range"
-                        min={DEPTH_CONTROL_LIMITS.lightAxis.min}
-                        max={DEPTH_CONTROL_LIMITS.lightAxis.max}
-                        step={DEPTH_CONTROL_LIMITS.lightAxis.step}
-                        value={getSelectedEffect3dNumber('light.x', 0)}
-                        onChange={(e) => setSelectedEffect3dNumber('light.x', Number(e.target.value))}
+                        min={-100}
+                        max={100}
+                        step={resolveAdaptiveRenderStep(getEffectParameterProfile('lightX'), mapEffectRenderToUi('lightX', getSelectedEffect3dNumber('light.x', 0)), 1)}
+                        value={mapEffectRenderToUi('lightX', getSelectedEffect3dNumber('light.x', 0))}
+                        onChange={(e) => {
+                          const render = mapEffectUiToRender('lightX', Number(e.target.value));
+                          queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('light.x', render), getEffectParameterProfile('lightX').debounceMs ?? 16);
+                        }}
                         className="w-full"
                       />
                     </label>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Light Y {formatSignedPercent(getSelectedEffect3dNumber('light.y', 0))}</span>
+                      <span className="text-[11px] text-zinc-500">Light Y {Math.round(mapEffectRenderToUi('lightY', getSelectedEffect3dNumber('light.y', 0)))}%</span>
                       <input
                         type="range"
-                        min={DEPTH_CONTROL_LIMITS.lightAxis.min}
-                        max={DEPTH_CONTROL_LIMITS.lightAxis.max}
-                        step={DEPTH_CONTROL_LIMITS.lightAxis.step}
-                        value={getSelectedEffect3dNumber('light.y', 0)}
-                        onChange={(e) => setSelectedEffect3dNumber('light.y', Number(e.target.value))}
+                        min={-100}
+                        max={100}
+                        step={resolveAdaptiveRenderStep(getEffectParameterProfile('lightY'), mapEffectRenderToUi('lightY', getSelectedEffect3dNumber('light.y', 0)), 1)}
+                        value={mapEffectRenderToUi('lightY', getSelectedEffect3dNumber('light.y', 0))}
+                        onChange={(e) => {
+                          const render = mapEffectUiToRender('lightY', Number(e.target.value));
+                          queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('light.y', render), getEffectParameterProfile('lightY').debounceMs ?? 16);
+                        }}
                         className="w-full"
                       />
                     </label>
 
                     <label className="block space-y-1">
-                      <span className="text-[11px] text-zinc-500">Light Z {formatSignedPercent(getSelectedEffect3dNumber('light.z', 1))}</span>
+                      <span className="text-[11px] text-zinc-500">Light Z {Math.round(mapEffectRenderToUi('lightZ', getSelectedEffect3dNumber('light.z', 1)))}%</span>
                       <input
                         type="range"
-                        min={DEPTH_CONTROL_LIMITS.lightAxisZ.min}
-                        max={DEPTH_CONTROL_LIMITS.lightAxisZ.max}
-                        step={DEPTH_CONTROL_LIMITS.lightAxisZ.step}
-                        value={getSelectedEffect3dNumber('light.z', 1)}
-                        onChange={(e) => setSelectedEffect3dNumber('light.z', Number(e.target.value))}
+                        min={0}
+                        max={100}
+                        step={resolveAdaptiveRenderStep(getEffectParameterProfile('lightZ'), mapEffectRenderToUi('lightZ', getSelectedEffect3dNumber('light.z', 1)), 1)}
+                        value={mapEffectRenderToUi('lightZ', getSelectedEffect3dNumber('light.z', 1))}
+                        onChange={(e) => {
+                          const render = mapEffectUiToRender('lightZ', Number(e.target.value));
+                          queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('light.z', render), getEffectParameterProfile('lightZ').debounceMs ?? 16);
+                        }}
                         className="w-full"
                       />
                     </label>
                   </div>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Distance {formatUnit(getSelectedEffect3dNumber('distance', 1.2), 'x', 1)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Distance {Math.round(mapEffectRenderToUi('depthDistance', getSelectedEffect3dNumber('distance', 1.2)))}%</span>
                     <input
                       type="range"
-                      min={DEPTH_CONTROL_LIMITS.distance.min}
-                      max={DEPTH_CONTROL_LIMITS.distance.max}
-                      step={DEPTH_CONTROL_LIMITS.distance.step}
-                      value={getSelectedEffect3dNumber('distance', 1.2)}
-                      onChange={(e) => setSelectedEffect3dNumber('distance', Number(e.target.value))}
+                      min={0}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('depthDistance'), mapEffectRenderToUi('depthDistance', getSelectedEffect3dNumber('distance', 1.2)), 1)}
+                      value={mapEffectRenderToUi('depthDistance', getSelectedEffect3dNumber('distance', 1.2))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('depthDistance', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('distance', render), getEffectParameterProfile('depthDistance').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Falloff {formatUnit(getSelectedEffect3dNumber('falloff', 1), 'x', 2)}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Falloff {Math.round(mapEffectRenderToUi('depthFalloff', getSelectedEffect3dNumber('falloff', 1)))}%</span>
                     <input
                       type="range"
-                      min={DEPTH_CONTROL_LIMITS.falloff.min}
-                      max={DEPTH_CONTROL_LIMITS.falloff.max}
-                      step={DEPTH_CONTROL_LIMITS.falloff.step}
-                      value={getSelectedEffect3dNumber('falloff', 1)}
-                      onChange={(e) => setSelectedEffect3dNumber('falloff', Number(e.target.value))}
+                      min={0}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('depthFalloff'), mapEffectRenderToUi('depthFalloff', getSelectedEffect3dNumber('falloff', 1)), 1)}
+                      value={mapEffectRenderToUi('depthFalloff', getSelectedEffect3dNumber('falloff', 1))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('depthFalloff', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('falloff', render), getEffectParameterProfile('depthFalloff').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth White Balance {formatSignedPercent(getSelectedEffect3dNumber('whiteBalance', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Depth White Balance {Math.round(mapEffectRenderToUi('depthWhiteBalance', getSelectedEffect3dNumber('whiteBalance', 0)))}%</span>
                     <input
                       type="range"
-                      min={DEPTH_CONTROL_LIMITS.whiteBalance.min}
-                      max={DEPTH_CONTROL_LIMITS.whiteBalance.max}
-                      step={DEPTH_CONTROL_LIMITS.whiteBalance.step}
-                      value={getSelectedEffect3dNumber('whiteBalance', 0)}
-                      onChange={(e) => setSelectedEffect3dNumber('whiteBalance', Number(e.target.value))}
+                      min={-100}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('depthWhiteBalance'), mapEffectRenderToUi('depthWhiteBalance', getSelectedEffect3dNumber('whiteBalance', 0)), 1)}
+                      value={mapEffectRenderToUi('depthWhiteBalance', getSelectedEffect3dNumber('whiteBalance', 0))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('depthWhiteBalance', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('whiteBalance', render), getEffectParameterProfile('depthWhiteBalance').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
 
                   <label className="block space-y-1">
-                    <span className="text-[11px] text-zinc-500">Depth Spread {formatPercent(getSelectedEffect3dNumber('spread', 0))}</span>
+                    <span className="text-[11px] text-zinc-500">Depth Spread {Math.round(mapEffectRenderToUi('depthSpread', getSelectedEffect3dNumber('spread', 0)))}%</span>
                     <input
                       type="range"
-                      min={DEPTH_CONTROL_LIMITS.spread.min}
-                      max={DEPTH_CONTROL_LIMITS.spread.max}
-                      step={DEPTH_CONTROL_LIMITS.spread.step}
-                      value={getSelectedEffect3dNumber('spread', 0)}
-                      onChange={(e) => setSelectedEffect3dNumber('spread', Number(e.target.value))}
+                      min={0}
+                      max={100}
+                      step={resolveAdaptiveRenderStep(getEffectParameterProfile('depthSpread'), mapEffectRenderToUi('depthSpread', getSelectedEffect3dNumber('spread', 0)), 1)}
+                      value={mapEffectRenderToUi('depthSpread', getSelectedEffect3dNumber('spread', 0))}
+                      onChange={(e) => {
+                        const render = mapEffectUiToRender('depthSpread', Number(e.target.value));
+                        queueThrottledSliderUpdate(() => setSelectedEffect3dNumber('spread', render), getEffectParameterProfile('depthSpread').debounceMs ?? 16);
+                      }}
                       className="w-full"
                     />
                   </label>
