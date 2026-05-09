@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getCurrentAuthUser, isFirebaseAuthConfigured, subscribeAuthState } from '@/lib/firebaseAuthClient';
-import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase, fetchParametricThemesFromFirebase, saveParametricThemesToFirebase } from '@/lib/studioFirebasePublishApi';
+import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase, fetchParametricThemesFromFirebase, saveParametricThemesToFirebase, fetchParametricProgressFromFirebase, saveParametricProgressToFirebase } from '@/lib/studioFirebasePublishApi';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import {
   normalizeLegacyGradientLayers,
@@ -1063,6 +1063,7 @@ export default function ParametricPage() {
   const sliderThrottleFrameRef = useRef<number | null>(null);
   const sliderThrottleLastAppliedRef = useRef(0);
   const sliderThrottlePendingRef = useRef<null | { apply: () => void; debounceMs: number }>(null);
+  const pendingLibraryFirebaseSyncRef = useRef<Array<LibraryEntry> | null>(null);
   const authConfigured = isFirebaseAuthConfigured();
   const markDirtyById = useCallback((elementId: string | null | undefined, reason: DirtyReason) => {
     if (typeof elementId !== 'string' || elementId.trim().length === 0) return;
@@ -1481,13 +1482,13 @@ export default function ParametricPage() {
   }, [authConfigured, saveThemesToFirebaseOnAction]);
 
   const persistLibraryFromAction = (updater: (prev: Array<LibraryEntry>) => Array<LibraryEntry>, successNotice: string) => {
-    let pushed = false;
-    setLibrary((prev) => {
-      const next = updater(prev).map((entry) => sanitizeLibraryEntryForPersistence(entry));
-      const localSaved = saveLibraryLocal(next);
-      void saveLibraryToFirebaseOnAction(next)
+    const next = updater(library).map((entry) => sanitizeLibraryEntryForPersistence(entry));
+    setLibrary(next);
+    const localSaved = saveLibraryLocal(next);
+
+    const pushToFirebase = (items: Array<LibraryEntry>) => {
+      return saveLibraryToFirebaseOnAction(items)
         .then(() => {
-          pushed = true;
           if (authConfigured && getCurrentAuthUser()) {
             setDrawerNotice(`${successNotice} Saved to Firebase.`);
           } else {
@@ -1500,10 +1501,28 @@ export default function ParametricPage() {
             ? `${successNotice} Saved locally. Firebase sync failed: ${reason}`
             : `${successNotice} Save failed: local storage full and Firebase sync failed: ${reason}`);
         });
-      return next;
-    });
-    if (!pushed) {
-      setEditorNotice(successNotice);
+    };
+
+    if (authConfigured && getCurrentAuthUser()) {
+      void pushToFirebase(next);
+    } else {
+      setDrawerNotice(localSaved
+        ? `${successNotice} Saved locally. Will sync to Firebase when authenticated.`
+        : `${successNotice} Local save failed. Will retry Firebase when authenticated.`);
+      pendingLibraryFirebaseSyncRef.current = next;
+      const unsub = subscribeAuthState((user) => {
+        if (user && pendingLibraryFirebaseSyncRef.current) {
+          const pending = pendingLibraryFirebaseSyncRef.current;
+          pendingLibraryFirebaseSyncRef.current = null;
+          unsub();
+          void saveLibraryToFirebaseOnAction(pending)
+            .then(() => setDrawerNotice('Library synced to Firebase.'))
+            .catch((err) => {
+              const reason = err instanceof Error && err.message ? err.message : 'Firebase unavailable';
+              setDrawerNotice(`Library Firebase sync failed: ${reason}`);
+            });
+        }
+      });
     }
   };
 
@@ -1573,30 +1592,78 @@ export default function ParametricPage() {
       template: deepClone(workingTemplate),
     };
     setProgressSnapshot(snapshotEntry);
-    const saved = saveProgressSnapshotLocal(snapshotEntry);
-    setDrawerNotice(saved
-      ? `Progress snapshot saved locally at ${savedAt}.`
-      : `Progress snapshot save failed at ${savedAt} (storage full).`);
+    const localSaved = saveProgressSnapshotLocal(snapshotEntry);
+
+    if (authConfigured && getCurrentAuthUser()) {
+      setDrawerNotice('Saving progress...');
+      void saveParametricProgressToFirebase({ snapshot: snapshotEntry })
+        .then(() => {
+          setDrawerNotice(`Progress saved at ${savedAt}. Synced to Firebase.`);
+        })
+        .catch((err) => {
+          const reason = err instanceof Error && err.message ? err.message : 'Firebase unavailable';
+          setDrawerNotice(localSaved
+            ? `Progress saved locally at ${savedAt}. Firebase sync failed: ${reason}`
+            : `Progress save failed at ${savedAt}: local storage full and Firebase sync failed: ${reason}`);
+        });
+    } else {
+      setDrawerNotice(localSaved
+        ? `Progress saved locally at ${savedAt}.`
+        : `Progress save failed at ${savedAt} (storage full).`);
+    }
   };
 
   const loadProgressSnapshot = () => {
-    if (!progressSnapshot) {
-      setDrawerNotice('No saved progress snapshot found yet.');
-      return;
+    setDrawerNotice('Loading progress...');
+
+    const applySnapshot = (snap: ProgressSnapshotEntry) => {
+      const template = {
+        ...deepClone(snap.template),
+        elements: (snap.template.elements ?? []).map((element, index) => ensureElement(element, index)),
+      } as TemplateModel;
+      setWorkingTemplate(template);
+      clearCommandHistory();
+      saveTemplate(template);
+      setSelectedElementId(template.elements[0]?.id ?? null);
+      setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
+      void renderPreview(template);
+    };
+
+    const fallback = () => {
+      if (!progressSnapshot) {
+        setDrawerNotice('No saved progress found.');
+        return;
+      }
+      applySnapshot(progressSnapshot);
+      setDrawerNotice('Progress loaded from local cache.');
+    };
+
+    if (authConfigured && getCurrentAuthUser()) {
+      void fetchParametricProgressFromFirebase()
+        .then((remote) => {
+          if (remote && Number.isFinite(remote.updatedAt)) {
+            const remoteSnap: ProgressSnapshotEntry = {
+              updatedAt: remote.updatedAt,
+              template: remote.template as unknown as TemplateModel,
+            };
+            if (!progressSnapshot || remote.updatedAt >= progressSnapshot.updatedAt) {
+              setProgressSnapshot(remoteSnap);
+              saveProgressSnapshotLocal(remoteSnap);
+              applySnapshot(remoteSnap);
+              setDrawerNotice('Progress loaded from Firebase.');
+            } else {
+              applySnapshot(progressSnapshot);
+              setDrawerNotice('Progress loaded (local is newer than cloud).');
+              void saveParametricProgressToFirebase({ snapshot: progressSnapshot }).catch(() => { /* non-fatal */ });
+            }
+          } else {
+            fallback();
+          }
+        })
+        .catch(() => fallback());
+    } else {
+      fallback();
     }
-
-    const template = {
-      ...deepClone(progressSnapshot.template),
-      elements: (progressSnapshot.template.elements ?? []).map((element, index) => ensureElement(element, index)),
-    } as TemplateModel;
-
-    setWorkingTemplate(template);
-    clearCommandHistory();
-    saveTemplate(template);
-    setSelectedElementId(template.elements[0]?.id ?? null);
-    setSelectedPanelTarget(template.elements.length > 0 ? 'element' : 'layout');
-    setDrawerNotice('Progress snapshot loaded to canvas.');
-    void renderPreview(template);
   };
 
   const applyThemeById = (themeId: string) => {
@@ -4790,19 +4857,6 @@ export default function ParametricPage() {
     }
     if (storedProgressSnapshot) {
       setProgressSnapshot(storedProgressSnapshot);
-    } else if (storedThemes) {
-      // Legacy migration path from old progress-in-themes storage.
-      const legacyThemeSnapshot = storedThemes.find((theme) => isProgressSnapshotTheme(theme));
-      if (legacyThemeSnapshot) {
-        const migrated: ProgressSnapshotEntry = {
-          updatedAt: Number.isFinite(Number(legacyThemeSnapshot.updatedAt))
-            ? Number(legacyThemeSnapshot.updatedAt)
-            : Date.now(),
-          template: deepClone(legacyThemeSnapshot.template),
-        };
-        setProgressSnapshot(migrated);
-        saveProgressSnapshotLocal(migrated);
-      }
     }
     void syncThemesFromFirebase();
     void renderPreview();

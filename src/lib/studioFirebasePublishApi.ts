@@ -241,3 +241,29 @@ export async function saveParametricThemesToFirebase(input: {
     body: JSON.stringify(input),
   });
 }
+
+export async function fetchParametricProgressFromFirebase(): Promise<{
+  updatedAt: number;
+  template: Record<string, unknown>;
+} | null> {
+  const payload = await adminFetch<{
+    ok: boolean;
+    snapshot: { updatedAt: unknown; template: unknown } | null;
+  }>('userProgressGet', { method: 'GET' });
+
+  const snap = payload.snapshot;
+  if (!snap || typeof snap !== 'object') return null;
+  const updatedAt = Number(snap.updatedAt);
+  if (!Number.isFinite(updatedAt)) return null;
+  if (!snap.template || typeof snap.template !== 'object') return null;
+  return { updatedAt, template: snap.template as Record<string, unknown> };
+}
+
+export async function saveParametricProgressToFirebase(input: {
+  snapshot: { updatedAt: number; template: Record<string, unknown> };
+}): Promise<{ ok: boolean }> {
+  return adminFetch<{ ok: boolean }>('userProgressSet', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
