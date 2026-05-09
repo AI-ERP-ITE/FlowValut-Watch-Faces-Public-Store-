@@ -1,5 +1,4 @@
-import type { ParameterProfile } from './parameterProfiles';
-import { mapRenderValueToUiValue } from './parameterMapping';
+import type { ParameterProfile } from './shadowProfiles';
 
 const EPSILON = 1e-9;
 
@@ -21,7 +20,7 @@ function roundToPrecision(value: number, precision: number): number {
 
 export function resolveAdaptiveRenderStep(
   profile: ParameterProfile | undefined,
-  currentRenderValue: number,
+  currentUiValue: number,
   baseStep: number,
 ): number {
   const safeBase = Number.isFinite(baseStep) && baseStep > 0 ? baseStep : 0.01;
@@ -34,18 +33,23 @@ export function resolveAdaptiveRenderStep(
     return safeBase;
   }
 
-  const uiValue = mapRenderValueToUiValue(currentRenderValue, profile);
-  const uiRatio = clamp01((uiValue - profile.uiMin) / uiRange);
+  const signedRange = profile.uiMin < 0 && profile.uiMax > 0;
+  const ratioSource = signedRange
+    ? Math.abs(currentUiValue) / Math.max(Math.abs(profile.uiMin), Math.abs(profile.uiMax))
+    : (currentUiValue - profile.uiMin) / uiRange;
+  const uiRatio = clamp01(ratioSource);
 
   let multiplier = 1;
-  if (uiRatio < 0.2) {
-    multiplier = 0.35;
-  } else if (uiRatio < 0.5) {
-    multiplier = 0.65;
+  if (uiRatio < 0.12) {
+    multiplier = 0.2;
+  } else if (uiRatio < 0.3) {
+    multiplier = 0.45;
+  } else if (uiRatio < 0.55) {
+    multiplier = 0.75;
   } else if (uiRatio < 0.8) {
     multiplier = 1;
   } else {
-    multiplier = 1.8;
+    multiplier = 1.5;
   }
 
   if ((profile.curve === 'gamma' || profile.curve === 'exponential') && uiRatio > 0.75) {

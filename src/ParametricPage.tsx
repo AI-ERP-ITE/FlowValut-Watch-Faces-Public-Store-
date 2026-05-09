@@ -26,8 +26,8 @@ import { consumeDirtyElementIds, getElementDirtyReason, getDirtyElementIds, mark
 import { beginRenderInteraction, endRenderInteraction, getRenderQualityMode } from '../engine/rendering/renderInteractionState';
 import { resolveLayerRenderOutputWithInvalidation } from '@/lib/renderCacheScheduler';
 import { resolveAdaptiveRenderStep } from '../engine/ui/adaptiveSteps';
-import { getParameterProfile } from '../engine/ui/parameterProfiles';
-import type { ParameterCurve } from '../engine/ui/parameterProfiles';
+import { getParameterProfile } from '../engine/ui/shadowProfiles';
+import type { ParameterCurve } from '../engine/ui/shadowProfiles';
 import { normalizeMappedParameterValue } from '../engine/ui/parameterPrecision';
 import { mapRenderValueToUiValue, mapUiValueToRenderValue } from '../engine/ui/parameterMapping';
 import { normalizeSliderDebounceMs, shouldApplySliderUpdate } from '../engine/ui/sliderThrottle';
@@ -647,10 +647,10 @@ const DEPTH_CONTROL_LIMITS = {
   spread: { min: 0, max: 1, step: 0.02 },
 } as const;
 const DROP_SHADOW_CONTROL_LIMITS = {
-  opacity: { min: 0, max: 1, step: 0.02 },
-  blur: { min: 0, max: 40, step: 0.5 },
-  spread: { min: 0, max: 20, step: 0.5 },
-  offset: { min: -30, max: 30, step: 0.5 },
+  opacity: { min: 0, max: 100, step: 1 },
+  blur: { min: 0, max: 100, step: 1 },
+  spread: { min: 0, max: 100, step: 1 },
+  offset: { min: -100, max: 100, step: 1 },
 } as const;
 const DEPTH_PRESET_OPTIONS = [
   {
@@ -1691,10 +1691,11 @@ export default function ParametricPage() {
             const source = clone.dropShadow as Record<string, unknown>;
             clone.dropShadow = normalizeDropShadowForBake({
               color: typeof source.color === 'string' ? source.color : '#000000',
-              opacity: Number.isFinite(Number(source.opacity)) ? Number(source.opacity) : 0.45,
-              blur: Number.isFinite(Number(source.blur)) ? Number(source.blur) : 8,
-              offsetX: Number.isFinite(Number(source.offsetX)) ? Number(source.offsetX) : 2,
-              offsetY: Number.isFinite(Number(source.offsetY)) ? Number(source.offsetY) : 2,
+              opacity: Number.isFinite(Number(source.opacity)) ? Number(source.opacity) : 0.12,
+              blur: Number.isFinite(Number(source.blur)) ? Number(source.blur) : 1.2,
+              spread: Number.isFinite(Number(source.spread)) ? Number(source.spread) : 0,
+              offsetX: Number.isFinite(Number(source.offsetX)) ? Number(source.offsetX) : 1,
+              offsetY: Number.isFinite(Number(source.offsetY)) ? Number(source.offsetY) : 1,
             }) as unknown as TemplateElement['dropShadow'];
           }
           delete clone.id;
@@ -4370,14 +4371,19 @@ export default function ParametricPage() {
     const safeOffsetX = Number(source?.offsetX);
     const safeOffsetY = Number(source?.offsetY);
 
-    const normalized = normalizeDropShadowForBake({
+    const opacityProfile = getParameterProfile('shadowOpacity');
+    const blurProfile = getParameterProfile('shadowBlur');
+    const spreadProfile = getParameterProfile('shadowSpread');
+    const offsetProfile = getParameterProfile('shadowOffset');
+    const clampValue = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+    const normalized = {
       color: safeColor,
-      opacity: Number.isFinite(safeOpacity) ? safeOpacity : 0.45,
-      blur: Number.isFinite(safeBlur) ? safeBlur : 8,
-      spread: Number.isFinite(safeSpread) ? safeSpread : 0,
-      offsetX: Number.isFinite(safeOffsetX) ? safeOffsetX : 2,
-      offsetY: Number.isFinite(safeOffsetY) ? safeOffsetY : 2,
-    }) as Record<string, unknown>;
+      opacity: clampValue(Number.isFinite(safeOpacity) ? safeOpacity : 0.12, opacityProfile?.renderMin ?? 0, opacityProfile?.renderMax ?? 0.35),
+      blur: clampValue(Number.isFinite(safeBlur) ? safeBlur : 1.2, blurProfile?.renderMin ?? 0, blurProfile?.renderMax ?? 6),
+      spread: clampValue(Number.isFinite(safeSpread) ? safeSpread : 0, spreadProfile?.renderMin ?? 0, spreadProfile?.renderMax ?? 0.25),
+      offsetX: clampValue(Number.isFinite(safeOffsetX) ? safeOffsetX : 1, offsetProfile?.renderMin ?? -8, offsetProfile?.renderMax ?? 8),
+      offsetY: clampValue(Number.isFinite(safeOffsetY) ? safeOffsetY : 1, offsetProfile?.renderMin ?? -8, offsetProfile?.renderMax ?? 8),
+    } as Record<string, unknown>;
     normalized.mode = safeMode;
     return normalized;
   };
@@ -4427,14 +4433,12 @@ export default function ParametricPage() {
           ? 'shadowSpread'
           : 'shadowOffset';
     const profile = getParameterProfile(profileKey);
-    const limits = key === 'opacity'
-      ? DROP_SHADOW_CONTROL_LIMITS.opacity
-      : key === 'blur'
-        ? DROP_SHADOW_CONTROL_LIMITS.blur
-        : key === 'spread'
-          ? DROP_SHADOW_CONTROL_LIMITS.spread
-          : DROP_SHADOW_CONTROL_LIMITS.offset;
-    const normalizedValue = normalizeMappedParameterValue(value, profile, limits.min, limits.max);
+    const normalizedValue = normalizeMappedParameterValue(
+      value,
+      profile,
+      profile?.renderMin ?? value,
+      profile?.renderMax ?? value,
+    );
     updateTemplateElements(
       (elements) =>
         elements.map((element) => {
@@ -4451,6 +4455,28 @@ export default function ParametricPage() {
         }),
       'Adjust element drop shadow',
     );
+  };
+
+  const getShadowProfileKeyForValue = (key: 'opacity' | 'blur' | 'spread' | 'offsetX' | 'offsetY') =>
+    key === 'opacity'
+      ? 'shadowOpacity'
+      : key === 'blur'
+        ? 'shadowBlur'
+        : key === 'spread'
+          ? 'shadowSpread'
+          : 'shadowOffset';
+
+  const setSelectedDropShadowUiNumber = (
+    key: 'opacity' | 'blur' | 'spread' | 'offsetX' | 'offsetY',
+    uiValue: number,
+  ) => {
+    const profile = getParameterProfile(getShadowProfileKeyForValue(key));
+    if (!profile) {
+      setSelectedDropShadowNumber(key, uiValue);
+      return;
+    }
+    const mappedRenderValue = mapUiValueToRenderValue(uiValue, profile);
+    setSelectedDropShadowNumber(key, mappedRenderValue);
   };
 
   const setSelectedDropShadowColor = (color: string) => {
@@ -4499,6 +4525,18 @@ export default function ParametricPage() {
     return Number.isFinite(raw) ? raw : fallback;
   };
 
+  const getSelectedDropShadowUiNumber = (
+    key: 'opacity' | 'blur' | 'spread' | 'offsetX' | 'offsetY',
+    fallbackRenderValue: number,
+  ) => {
+    const renderValue = getSelectedDropShadowNumber(key, fallbackRenderValue);
+    const profile = getParameterProfile(getShadowProfileKeyForValue(key));
+    if (!profile) {
+      return renderValue;
+    }
+    return mapRenderValueToUiValue(renderValue, profile);
+  };
+
   const getSelectedDropShadowColor = (fallback: string) => {
     const shadow = getSelectedDropShadowRecord();
     return typeof shadow.color === 'string' ? shadow.color : fallback;
@@ -4541,11 +4579,11 @@ export default function ParametricPage() {
       });
     };
 
-    makeRow('Shadow Opacity', getSelectedDropShadowNumber('opacity', 0.45), opacityProfile);
-    makeRow('Shadow Blur', getSelectedDropShadowNumber('blur', 8), blurProfile);
+    makeRow('Shadow Opacity', getSelectedDropShadowNumber('opacity', 0.12), opacityProfile);
+    makeRow('Shadow Blur', getSelectedDropShadowNumber('blur', 1.2), blurProfile);
     makeRow('Shadow Spread', getSelectedDropShadowNumber('spread', 0), spreadProfile);
-    makeRow('Offset X (abs)', Math.abs(getSelectedDropShadowNumber('offsetX', 2)), offsetProfile);
-    makeRow('Offset Y (abs)', Math.abs(getSelectedDropShadowNumber('offsetY', 2)), offsetProfile);
+    makeRow('Offset X (abs)', Math.abs(getSelectedDropShadowNumber('offsetX', 1)), offsetProfile);
+    makeRow('Offset Y (abs)', Math.abs(getSelectedDropShadowNumber('offsetY', 1)), offsetProfile);
 
     return rows;
   };
@@ -8840,105 +8878,105 @@ export default function ParametricPage() {
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Shadow Opacity {formatPercent(getSelectedDropShadowNumber('opacity', 0.45))}</span>
+                        <span className="text-[11px] text-zinc-500">Shadow Opacity {Math.round(getSelectedDropShadowUiNumber('opacity', 0.12))}%</span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.opacity.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.opacity.max}
                           step={resolveAdaptiveRenderStep(
                             getParameterProfile('shadowOpacity'),
-                            getSelectedDropShadowNumber('opacity', 0.45),
+                            getSelectedDropShadowUiNumber('opacity', 0.12),
                             DROP_SHADOW_CONTROL_LIMITS.opacity.step,
                           )}
-                          value={getSelectedDropShadowNumber('opacity', 0.45)}
+                          value={getSelectedDropShadowUiNumber('opacity', 0.12)}
                           onChange={(e) => {
                             const nextValue = Number(e.target.value);
                             const debounceMs = getParameterProfile('shadowOpacity')?.debounceMs ?? 16;
-                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('opacity', nextValue), debounceMs);
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowUiNumber('opacity', nextValue), debounceMs);
                           }}
                           className="w-full"
                         />
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Shadow Blur {Math.round(getSelectedDropShadowNumber('blur', 8))}</span>
+                        <span className="text-[11px] text-zinc-500">Shadow Blur {Math.round(getSelectedDropShadowUiNumber('blur', 1.2))}%</span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.blur.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.blur.max}
                           step={resolveAdaptiveRenderStep(
                             getParameterProfile('shadowBlur'),
-                            getSelectedDropShadowNumber('blur', 8),
+                            getSelectedDropShadowUiNumber('blur', 1.2),
                             DROP_SHADOW_CONTROL_LIMITS.blur.step,
                           )}
-                          value={getSelectedDropShadowNumber('blur', 8)}
+                          value={getSelectedDropShadowUiNumber('blur', 1.2)}
                           onChange={(e) => {
                             const nextValue = Number(e.target.value);
                             const debounceMs = getParameterProfile('shadowBlur')?.debounceMs ?? 16;
-                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('blur', nextValue), debounceMs);
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowUiNumber('blur', nextValue), debounceMs);
                           }}
                           className="w-full"
                         />
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Shadow Spread {Math.round(getSelectedDropShadowNumber('spread', 0))}</span>
+                        <span className="text-[11px] text-zinc-500">Shadow Spread {Math.round(getSelectedDropShadowUiNumber('spread', 0))}%</span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.spread.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.spread.max}
                           step={resolveAdaptiveRenderStep(
                             getParameterProfile('shadowSpread'),
-                            getSelectedDropShadowNumber('spread', 0),
+                            getSelectedDropShadowUiNumber('spread', 0),
                             DROP_SHADOW_CONTROL_LIMITS.spread.step,
                           )}
-                          value={getSelectedDropShadowNumber('spread', 0)}
+                          value={getSelectedDropShadowUiNumber('spread', 0)}
                           onChange={(e) => {
                             const nextValue = Number(e.target.value);
                             const debounceMs = getParameterProfile('shadowSpread')?.debounceMs ?? 16;
-                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('spread', nextValue), debounceMs);
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowUiNumber('spread', nextValue), debounceMs);
                           }}
                           className="w-full"
                         />
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Offset X {Math.round(getSelectedDropShadowNumber('offsetX', 2))}px</span>
+                        <span className="text-[11px] text-zinc-500">Offset X {Math.round(getSelectedDropShadowUiNumber('offsetX', 1))}% ({getSelectedDropShadowNumber('offsetX', 1).toFixed(1)}px)</span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.offset.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.offset.max}
                           step={resolveAdaptiveRenderStep(
                             getParameterProfile('shadowOffset'),
-                            Math.abs(getSelectedDropShadowNumber('offsetX', 2)),
+                            getSelectedDropShadowUiNumber('offsetX', 1),
                             DROP_SHADOW_CONTROL_LIMITS.offset.step,
                           )}
-                          value={getSelectedDropShadowNumber('offsetX', 2)}
+                          value={getSelectedDropShadowUiNumber('offsetX', 1)}
                           onChange={(e) => {
                             const nextValue = Number(e.target.value);
                             const debounceMs = getParameterProfile('shadowOffset')?.debounceMs ?? 16;
-                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('offsetX', nextValue), debounceMs);
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowUiNumber('offsetX', nextValue), debounceMs);
                           }}
                           className="w-full"
                         />
                       </label>
 
                       <label className="block space-y-1">
-                        <span className="text-[11px] text-zinc-500">Offset Y {Math.round(getSelectedDropShadowNumber('offsetY', 2))}px</span>
+                        <span className="text-[11px] text-zinc-500">Offset Y {Math.round(getSelectedDropShadowUiNumber('offsetY', 1))}% ({getSelectedDropShadowNumber('offsetY', 1).toFixed(1)}px)</span>
                         <input
                           type="range"
                           min={DROP_SHADOW_CONTROL_LIMITS.offset.min}
                           max={DROP_SHADOW_CONTROL_LIMITS.offset.max}
                           step={resolveAdaptiveRenderStep(
                             getParameterProfile('shadowOffset'),
-                            Math.abs(getSelectedDropShadowNumber('offsetY', 2)),
+                            getSelectedDropShadowUiNumber('offsetY', 1),
                             DROP_SHADOW_CONTROL_LIMITS.offset.step,
                           )}
-                          value={getSelectedDropShadowNumber('offsetY', 2)}
+                          value={getSelectedDropShadowUiNumber('offsetY', 1)}
                           onChange={(e) => {
                             const nextValue = Number(e.target.value);
                             const debounceMs = getParameterProfile('shadowOffset')?.debounceMs ?? 16;
-                            queueThrottledSliderUpdate(() => setSelectedDropShadowNumber('offsetY', nextValue), debounceMs);
+                            queueThrottledSliderUpdate(() => setSelectedDropShadowUiNumber('offsetY', nextValue), debounceMs);
                           }}
                           className="w-full"
                         />

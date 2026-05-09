@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveAdaptiveRenderStep } from './adaptiveSteps';
 import { mapUiValueToRenderValue } from './parameterMapping';
-import { getParameterProfile } from './parameterProfiles';
+import { getParameterProfile } from './shadowProfiles';
 import { normalizeSliderDebounceMs, shouldApplySliderUpdate } from './sliderThrottle';
 
 function expectMonotonicNonDecreasing(values: number[]): void {
@@ -44,7 +44,7 @@ describe('parameter behavior validation', () => {
 
     const deltas = renderSamples.slice(1).map((value, index) => value - renderSamples[index]);
     const maxDelta = Math.max(...deltas);
-    expect(maxDelta).toBeLessThan(1.2);
+    expect(maxDelta).toBeLessThan(0.25);
   });
 
   it('keeps opacity progression without abrupt disappearance', () => {
@@ -71,7 +71,7 @@ describe('parameter behavior validation', () => {
 
     const lowRangeDeltas = renderSamples.slice(1, 16).map((value, index) => value - renderSamples[index]);
     const maxLowRangeDelta = Math.max(...lowRangeDeltas);
-    expect(maxLowRangeDelta).toBeLessThan(0.2);
+    expect(maxLowRangeDelta).toBeLessThan(0.04);
   });
 
   it('reduces slider drag write spam with minimum 16ms gating', () => {
@@ -90,8 +90,8 @@ describe('parameter behavior validation', () => {
     const profile = getParameterProfile('shadowBlur');
     expect(profile).toBeTruthy();
 
-    const lowStep = resolveAdaptiveRenderStep(profile, 2, 0.5);
-    const highStep = resolveAdaptiveRenderStep(profile, 48, 0.5);
+    const lowStep = resolveAdaptiveRenderStep(profile, 8, 1);
+    const highStep = resolveAdaptiveRenderStep(profile, 88, 1);
     expect(highStep).toBeGreaterThan(lowStep);
 
     const layerCount = 24;
