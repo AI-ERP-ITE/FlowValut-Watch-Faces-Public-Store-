@@ -25,4 +25,11 @@
 22. Added `engine/ui/sliderThrottle.ts` and routed existing queue logic to this helper for deterministic throttle validation coverage.
 23. Ran `npx vitest run engine/ui/parameterBehavior.test.ts` and confirmed 5/5 tests passing.
 24. Marked T-031 as Done in task tracker.
-25. Awaiting user approval to start T-040 only.
+25. Completed T-040 stage review and commit packaging with required commit names:
+	- `feat: add perceptual parameter response system`
+	- `feat: add nonlinear parameter mapping curves`
+	- `feat: add adaptive slider stepping`
+	- `fix: reduce slider rerender spam`
+	- `fix: normalize parameter precision`
+	- `test: add parameter behavior validation coverage`
+26. Added docs commit for 082 tracking artifacts and marked T-040 as Done.
