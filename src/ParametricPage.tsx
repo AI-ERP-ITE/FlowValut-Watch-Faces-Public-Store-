@@ -823,6 +823,35 @@ function normalizeLibraryEntries(parsed: Array<unknown>): Array<LibraryEntry> {
     });
 }
 
+function stripElementSnapshotForLibrary(element: TemplateElement): TemplateElement {
+  const normalized = ensureElement(deepClone(element));
+  const renderState = normalized.renderState && typeof normalized.renderState === 'object'
+    ? { ...(normalized.renderState as ParametricElementRenderState) }
+    : null;
+
+  if (!renderState) return normalized;
+  if (!renderState.snapshot) return normalized;
+
+  // Drawer library should keep reusable live element params, not heavy baked bitmap snapshots.
+  return {
+    ...normalized,
+    renderState: {
+      ...renderState,
+      sourceMode: 'live',
+      snapshotRenderMode: 'editable',
+      snapshotStatus: 'missing',
+      snapshot: null,
+    },
+  };
+}
+
+function sanitizeLibraryEntryForPersistence(entry: LibraryEntry): LibraryEntry {
+  return {
+    ...entry,
+    element: stripElementSnapshotForLibrary(entry.element),
+  };
+}
+
 function makeLibraryEntrySignature(entry: LibraryEntry): string {
   const id = typeof entry.id === 'string' ? entry.id.trim() : '';
   if (id.length > 0) return `id:${id}`;
@@ -1279,11 +1308,13 @@ export default function ParametricPage() {
     }
   };
 
-  const saveLibraryLocal = (items: Array<LibraryEntry>) => {
+  const saveLibraryLocal = (items: Array<LibraryEntry>): boolean => {
     try {
       window.localStorage.setItem(PARAMETRIC_LIBRARY_STORAGE_KEY, JSON.stringify(items));
+      return true;
     } catch {
       // Ignore localStorage failures.
+      return false;
     }
   };
 
@@ -1295,15 +1326,17 @@ export default function ParametricPage() {
     }
   };
 
-  const saveProgressSnapshotLocal = (entry: ProgressSnapshotEntry | null) => {
+  const saveProgressSnapshotLocal = (entry: ProgressSnapshotEntry | null): boolean => {
     try {
       if (!entry) {
         window.localStorage.removeItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY);
-        return;
+        return true;
       }
       window.localStorage.setItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY, JSON.stringify(entry));
+      return true;
     } catch {
       // Ignore localStorage failures.
+      return false;
     }
   };
 
@@ -1450,15 +1483,22 @@ export default function ParametricPage() {
   const persistLibraryFromAction = (updater: (prev: Array<LibraryEntry>) => Array<LibraryEntry>, successNotice: string) => {
     let pushed = false;
     setLibrary((prev) => {
-      const next = updater(prev);
-      saveLibraryLocal(next);
+      const next = updater(prev).map((entry) => sanitizeLibraryEntryForPersistence(entry));
+      const localSaved = saveLibraryLocal(next);
       void saveLibraryToFirebaseOnAction(next)
         .then(() => {
           pushed = true;
-          setDrawerNotice(authConfigured && getCurrentAuthUser() ? `${successNotice} Saved to Firebase.` : `${successNotice} Saved locally.`);
+          if (authConfigured && getCurrentAuthUser()) {
+            setDrawerNotice(`${successNotice} Saved to Firebase.`);
+          } else {
+            setDrawerNotice(localSaved ? `${successNotice} Saved locally.` : `${successNotice} Local save failed (storage full).`);
+          }
         })
-        .catch(() => {
-          setDrawerNotice(`${successNotice} Saved locally. Firebase unavailable.`);
+        .catch((error) => {
+          const reason = error instanceof Error && error.message ? error.message : 'Firebase unavailable';
+          setDrawerNotice(localSaved
+            ? `${successNotice} Saved locally. Firebase sync failed: ${reason}`
+            : `${successNotice} Save failed: local storage full and Firebase sync failed: ${reason}`);
         });
       return next;
     });
@@ -1533,8 +1573,10 @@ export default function ParametricPage() {
       template: deepClone(workingTemplate),
     };
     setProgressSnapshot(snapshotEntry);
-    saveProgressSnapshotLocal(snapshotEntry);
-    setDrawerNotice(`Progress snapshot saved locally at ${savedAt}.`);
+    const saved = saveProgressSnapshotLocal(snapshotEntry);
+    setDrawerNotice(saved
+      ? `Progress snapshot saved locally at ${savedAt}.`
+      : `Progress snapshot save failed at ${savedAt} (storage full).`);
   };
 
   const loadProgressSnapshot = () => {
@@ -2850,7 +2892,7 @@ export default function ParametricPage() {
       return;
     }
 
-    const normalized = ensureElement(deepClone(selectedElement));
+    const normalized = stripElementSnapshotForLibrary(ensureElement(deepClone(selectedElement)));
     const nextEntry: LibraryEntry = {
       id: makeId('lib'),
       name: typeof normalized.name === 'string' && normalized.name.trim().length > 0 ? normalized.name : 'Saved Element',
