@@ -80,7 +80,7 @@ function registerCustomElements() {
 	});
 }
 
-export function runEngine({ activeStyle = "gold_dark", paramOverrides = {}, colorControl = DEFAULT_COLOR_CONTROL_CONFIG, templateInput = null } = {}) {
+export function runEngine({ activeStyle = "gold_dark", paramOverrides = {}, colorControl = DEFAULT_COLOR_CONTROL_CONFIG, templateInput = null, renderQualityMode = "final" } = {}) {
 	registerBaseElements();
 	registerCustomElements();
 
@@ -91,6 +91,7 @@ export function runEngine({ activeStyle = "gold_dark", paramOverrides = {}, colo
 	return renderSvg(withRelationships, {
 		activeStyle,
 		colorControlConfig: colorControl,
+		renderQualityMode: renderQualityMode === "preview" ? "preview" : "final",
 	});
 }
 

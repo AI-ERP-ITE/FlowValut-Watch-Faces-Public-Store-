@@ -1222,6 +1222,26 @@ function resolveGlobalControllerSources() {
 	};
 }
 
+function resolveRenderQualityMode(context = {}) {
+	if (!context || typeof context !== "object") return "final";
+	return context.renderQualityMode === "preview" ? "preview" : "final";
+}
+
+function simplifyOverlayLayerForPreview(layer = {}) {
+	const safeLayer = layer && typeof layer === "object" ? layer : {};
+	const blur = safeLayer.blur && typeof safeLayer.blur === "object" ? safeLayer.blur : {};
+	return {
+		...safeLayer,
+		blur: {
+			...blur,
+			enabled: false,
+			amount: 0,
+			strength: 0,
+			samples: 3,
+		},
+	};
+}
+
 function renderLayer(localId, body, x, y, rotation, layerStyle, layerTextures, layerGradients, layerMaterials, depthEffect, dropShadowEffect, layoutMetrics, context = {}, currentElementName = "", elementMask = null, maskFrameMetrics = null, renderOptions = {}) {
 	const filterId = `layerFx-${localId}`;
 	const maskId = buildLayerMaskBaseId(localId, context);
@@ -1612,6 +1632,8 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 	};
 	const renderParams = applyColorControlToParams(mergedParams, context);
 	const requestedRenderSourceMode = resolveElementRenderSourceMode(safeElement);
+	const renderQualityMode = resolveRenderQualityMode(context);
+	const isPreviewQuality = renderQualityMode === "preview";
 
 	return positions
 		.map((position, positionIndex) => {
@@ -1688,6 +1710,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				: textureLayerSources.map((entry) =>
 					normalizeTexture(entry, { enabled: false, opacity: 0.22, blendMode: "overlay" }),
 				);
+			const resolvedTextureLayers = isPreviewQuality
+				? textureLayers.map((entry) => simplifyOverlayLayerForPreview(entry))
+				: textureLayers;
 			const gradientLayersFromElement = Array.isArray(safeElement.gradientLayers)
 				? safeElement.gradientLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1705,6 +1730,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				: gradientLayerSources.map((entry) =>
 					normalizeGradientOverlay(entry, { enabled: false, opacity: 0.24, blendMode: "overlay" }),
 				);
+			const resolvedGradientLayers = isPreviewQuality
+				? gradientLayers.map((entry) => simplifyOverlayLayerForPreview(entry))
+				: gradientLayers;
 			const materialLayersFromElement = Array.isArray(safeElement.materialLayers)
 				? safeElement.materialLayers.filter((entry) => entry && typeof entry === "object")
 				: [];
@@ -1722,7 +1750,9 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				: materialLayerSources.map((entry) =>
 					normalizeMaterialOverlay(entry, { enabled: false, color: "#ffffff", opacity: 0.18, blendMode: "multiply" }),
 				);
-			const depth = context.globalDepthEnabled
+			const depth = isPreviewQuality
+				? normalizeDepthEffect({ enabled: false }, null)
+				: (context.globalDepthEnabled
 				? { enabled: false, mode: "outer", intensity: 0, opacity: 0.8, dx: 0, dy: 0, falloff: 1, whiteBalance: 0, spread: 0 }
 				: (isFrozenSnapshot
 					? normalizeDepthEffect({ enabled: false }, null)
@@ -1732,8 +1762,8 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 						...(renderParams.effect3d && typeof renderParams.effect3d === "object" ? renderParams.effect3d : {}),
 					},
 					null,
-				));
-			const dropShadow = isFrozenSnapshot
+				)));
+			const dropShadow = isPreviewQuality || isFrozenSnapshot
 				? normalizeDropShadowEffect({ enabled: false })
 				: normalizeDropShadowEffect(
 					{
@@ -1768,8 +1798,8 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				y,
 				rotation,
 				styleAdjust,
-				textureLayers,
-				gradientLayers,
+				resolvedTextureLayers,
+				resolvedGradientLayers,
 				materialLayers,
 				depth,
 				dropShadow,
@@ -1793,14 +1823,17 @@ export function renderSvg(resolvedComposition, context = {}) {
 	const composition = requireObject(resolvedComposition, "resolvedComposition");
 	const layoutMetrics = buildLayoutMetrics(composition);
 	const depthEffect = buildDepthEffect(composition);
+	const renderQualityMode = resolveRenderQualityMode(context);
+	const isPreviewQuality = renderQualityMode === "preview";
 	const elements = Array.isArray(composition.elements) ? composition.elements : [];
 	let uid = 0;
 	const renderContext = {
 		...context,
 		layoutMetrics,
 		depthEffect,
+		renderQualityMode,
 		globalControllerSources: resolveGlobalControllerSources(),
-		globalDepthEnabled: depthEffect.enabled && depthEffect.intensity > 0,
+		globalDepthEnabled: !isPreviewQuality && depthEffect.enabled && depthEffect.intensity > 0,
 		composition,
 		layerMaskRegistry: {},
 		silhouetteSurfaceCacheByLayer: context && typeof context === "object" && context.silhouetteSurfaceCacheByLayer && typeof context.silhouetteSurfaceCacheByLayer === "object"
