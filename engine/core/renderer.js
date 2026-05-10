@@ -6,6 +6,7 @@ import { analyzeGradient, processColor } from "../color/colorController.js";
 import { resolvePlacement } from "./placement.js";
 import { applySymmetry } from "./symmetry.js";
 import { getMaskFrame, mapLocalPointToFrame } from "./maskFrame.js";
+import { resolveSurfaceSource } from "./sourceResolver.js";
 
 const COLOR_KEYS = new Set(["fill", "stroke", "color", "stopColor", "shadowColor", "highlightColor"]);
 const GRADIENT_KEYS = new Set(["gradientStops", "stops"]);
@@ -1769,7 +1770,10 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					},
 					null,
 				)));
-			const dropShadow = isPreviewQuality
+			// Spec 085 Phase 2 (T11): keep shadow enabled in preview when surface is a baked image.
+			const phase2SurfaceSource = resolveSurfaceSource(safeElement);
+			const phase2SurfaceIsBakedImage = !!(phase2SurfaceSource && phase2SurfaceSource.kind === "baked-image");
+			const dropShadow = (isPreviewQuality && !phase2SurfaceIsBakedImage)
 				? normalizeDropShadowEffect({ enabled: false })
 				: normalizeDropShadowEffect(
 					{
