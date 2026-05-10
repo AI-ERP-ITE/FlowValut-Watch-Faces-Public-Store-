@@ -1,5 +1,7 @@
 import type { ElementSnapshotCaptureResult } from './snapshotRenderer';
 import { generateElementRenderHash } from './snapshotHash';
+import type { RenderSourceMode } from '../../src/types/renderSourceMode';
+import { isRenderSourceMode } from '../../src/types/renderSourceMode';
 
 type TemplateElement = Record<string, unknown>;
 
@@ -18,13 +20,24 @@ export type SnapshotState = {
     height: number;
   } | null;
   snapshot: ElementSnapshotCaptureResult | null;
+  /**
+   * Canonical render-source mode (Phase 1 contract). When the legacy element
+   * lacks this field, it is inferred ONCE from snapshot + mask presence and
+   * stamped here; subsequent reads return the explicit value verbatim.
+   */
+  renderSourceMode: RenderSourceMode;
+  /**
+   * Whether the live mask was embedded into the baked snapshot at capture
+   * time. Only meaningful when a snapshot exists.
+   */
+  maskEmbeddedInSnapshot: boolean;
 };
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function normalizeRenderState(source: unknown): SnapshotState {
+function normalizeRenderState(source: unknown, parent?: TemplateElement): SnapshotState {
   const safe = source && typeof source === 'object' ? source as Record<string, unknown> : {};
   const sourceMode = safe.sourceMode === 'snapshot' ? 'snapshot' : 'live';
   const snapshotRenderMode: SnapshotRenderMode = safe.snapshotRenderMode === 'editable' ? 'editable' : 'frozen';
@@ -54,6 +67,24 @@ function normalizeRenderState(source: unknown): SnapshotState {
     ? deepClone(snapshotRaw as ElementSnapshotCaptureResult)
     : null;
 
+  let renderSourceMode: RenderSourceMode;
+  if (isRenderSourceMode(safe.renderSourceMode)) {
+    renderSourceMode = safe.renderSourceMode;
+  } else {
+    const hasSnapshotPixels = !!(snapshot && typeof (snapshot as Record<string, unknown>).imageDataUrl === 'string'
+      && ((snapshot as Record<string, unknown>).imageDataUrl as string).length > 0);
+    const parentMask = parent && typeof parent === 'object' ? (parent as Record<string, unknown>).mask : undefined;
+    const hasLiveMask = !!parentMask
+      && typeof parentMask === 'object'
+      && (parentMask as Record<string, unknown>).enabled !== false;
+    if (!hasSnapshotPixels) renderSourceMode = 'procedural';
+    else if (hasLiveMask) renderSourceMode = 'baked-live-mask';
+    else renderSourceMode = 'baked-baked-mask';
+  }
+  const maskEmbeddedInSnapshot = typeof safe.maskEmbeddedInSnapshot === 'boolean'
+    ? safe.maskEmbeddedInSnapshot
+    : renderSourceMode === 'baked-baked-mask';
+
   return {
     sourceMode,
     snapshotRenderMode,
@@ -62,11 +93,13 @@ function normalizeRenderState(source: unknown): SnapshotState {
     snapshotStatus,
     lastSnapshotFrame: normalizedLastSnapshotFrame,
     snapshot,
+    renderSourceMode,
+    maskEmbeddedInSnapshot,
   };
 }
 
 export function getElementRenderState(element: TemplateElement): SnapshotState {
-  return normalizeRenderState(element.renderState);
+  return normalizeRenderState(element.renderState, element);
 }
 
 export function getElementSnapshot(element: TemplateElement): ElementSnapshotCaptureResult | null {
@@ -89,9 +122,23 @@ export function setElementRenderSourceMode(element: TemplateElement, mode: Snaps
   return next;
 }
 
-export function setElementSnapshot(element: TemplateElement, snapshot: ElementSnapshotCaptureResult): TemplateElement {
+export function setElementSnapshot(
+  element: TemplateElement,
+  snapshot: ElementSnapshotCaptureResult,
+  options?: { maskEmbeddedInSnapshot?: boolean },
+): TemplateElement {
   const state = getElementRenderState(element);
   const nextSnapshot = deepClone(snapshot);
+  const parentMask = (element as Record<string, unknown>).mask;
+  const hasLiveMask = !!parentMask
+    && typeof parentMask === 'object'
+    && (parentMask as Record<string, unknown>).enabled !== false;
+  const maskEmbeddedInSnapshot = typeof options?.maskEmbeddedInSnapshot === 'boolean'
+    ? options.maskEmbeddedInSnapshot
+    : !hasLiveMask;
+  const renderSourceMode: RenderSourceMode = maskEmbeddedInSnapshot
+    ? 'baked-baked-mask'
+    : 'baked-live-mask';
   const next: TemplateElement = {
     ...element,
     renderState: {
@@ -108,6 +155,8 @@ export function setElementSnapshot(element: TemplateElement, snapshot: ElementSn
         height: Math.max(1, Number(nextSnapshot.height) || 1),
       },
       snapshot: nextSnapshot,
+      renderSourceMode,
+      maskEmbeddedInSnapshot,
     },
   };
   return next;
@@ -132,6 +181,8 @@ export function deleteElementSnapshot(element: TemplateElement): TemplateElement
       snapshotStatus: 'missing',
       lastSnapshotFrame: snapshotFrame,
       snapshot: null,
+      renderSourceMode: 'procedural',
+      maskEmbeddedInSnapshot: false,
     },
   };
   return next;

@@ -233,6 +233,13 @@ export type {
   ParametricSnapshotStatus,
 } from './parametric';
 
+export type {
+  RenderSourceMode,
+  SurfaceSource,
+  SilhouetteSource,
+} from './renderSourceMode';
+export { RENDER_SOURCE_MODES, isRenderSourceMode } from './renderSourceMode';
+
 export interface ElementImage {
   name: string;
   dataUrl: string;
