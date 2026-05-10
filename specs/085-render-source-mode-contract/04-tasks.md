@@ -29,3 +29,11 @@ Status legend: ✅ done · ◐ in progress · ☐ not started
 | T16 | Tests: regression test that asserts mask edits update silhouette for a `baked-live-mask` element without re-baking | ☐ |
 | T17 | Tests: regression test that asserts no procedural geometry is consulted for `baked-baked-mask` even with non-empty `params` | ☐ |
 | T18 | Build + private deploy + manual live verification on a `baked + live mask + dropShadow` element | ☐ |
+
+
+## Phase 2 status update (2026-05-11)
+
+T10-T18 all DONE in commit `7f554cf`. Hotfixes:
+- H01 (`e4321e1`): resolver back-compat fallback for legacy elements
+- H02 (`7fb6ecd`): remove preview-quality shadow gate + raise opacity clamp
+- H03 (`24540c3`): raise UI envelope caps (opacity 0.35->1.0, blur 8->20, spread 0.25->1.0, offset +-8->+-20) -- root-cause fix for "shadow still invisible" after H02
