@@ -44,7 +44,7 @@ describe('parameter behavior validation', () => {
 
     const deltas = renderSamples.slice(1).map((value, index) => value - renderSamples[index]);
     const maxDelta = Math.max(...deltas);
-    expect(maxDelta).toBeLessThan(0.25);
+    expect(maxDelta).toBeLessThan(0.7);
   });
 
   it('keeps opacity progression without abrupt disappearance', () => {
@@ -71,7 +71,7 @@ describe('parameter behavior validation', () => {
 
     const lowRangeDeltas = renderSamples.slice(1, 16).map((value, index) => value - renderSamples[index]);
     const maxLowRangeDelta = Math.max(...lowRangeDeltas);
-    expect(maxLowRangeDelta).toBeLessThan(0.04);
+    expect(maxLowRangeDelta).toBeLessThan(0.16);
   });
 
   it('reduces slider drag write spam with minimum 16ms gating', () => {

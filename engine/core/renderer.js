@@ -512,10 +512,10 @@ function normalizeDropShadowEffect(source = {}) {
 		mode: src.mode === "inner" ? "inner" : "outer",
 		color: typeof src.color === "string" ? src.color : "#000000",
 		opacity: clamp(src.opacity, 0, 1, 0.14),
-		blur: clamp(src.blur, 0, 8, 1.5),
-		spread: clamp(src.spread, 0, 0.25, 0),
-		offsetX: clamp(src.offsetX, -8, 8, 1),
-		offsetY: clamp(src.offsetY, -8, 8, 1),
+		blur: clamp(src.blur, 0, 20, 1.5),
+		spread: clamp(src.spread, 0, 1, 0),
+		offsetX: clamp(src.offsetX, -20, 20, 1),
+		offsetY: clamp(src.offsetY, -20, 20, 1),
 	};
 }
 

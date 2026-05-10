@@ -52,10 +52,10 @@ function normalizeShadowColorForDevice(hex: string): string {
 }
 
 export function normalizeDropShadowForBake(ds: DropShadowConfig): DropShadowConfig {
-  const blur = clamp(ds.blur, 0, 8);
-  const spread = clamp(Number.isFinite(Number(ds.spread)) ? Number(ds.spread) : 0, 0, 0.25);
-  const offsetX = clamp(ds.offsetX, -8, 8);
-  const offsetY = clamp(ds.offsetY, -8, 8);
+  const blur = clamp(ds.blur, 0, 20);
+  const spread = clamp(Number.isFinite(Number(ds.spread)) ? Number(ds.spread) : 0, 0, 1);
+  const offsetX = clamp(ds.offsetX, -20, 20);
+  const offsetY = clamp(ds.offsetY, -20, 20);
   const round3 = (value: number) => Math.round(value * 1000) / 1000;
   return {
     ...ds,
