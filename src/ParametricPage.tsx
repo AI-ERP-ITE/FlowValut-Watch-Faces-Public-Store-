@@ -4585,7 +4585,7 @@ export default function ParametricPage() {
   };
 
   const normalizeDropShadowRecord = (source?: Record<string, unknown>) => {
-    const safeColor = typeof source?.color === 'string' ? source.color : '#000000';
+    const safeColor = typeof source?.color === 'string' ? source.color : '#ffffff';
     const safeMode = source?.mode === 'inner' ? 'inner' : 'outer';
     const safeOpacity = Number(source?.opacity);
     const safeBlur = Number(source?.blur);
@@ -4602,7 +4602,7 @@ export default function ParametricPage() {
       color: safeColor,
       opacity: clampValue(Number.isFinite(safeOpacity) ? safeOpacity : 0.45, opacityProfile?.renderMin ?? 0, opacityProfile?.renderMax ?? 1.0),
       blur: clampValue(Number.isFinite(safeBlur) ? safeBlur : 5, blurProfile?.renderMin ?? 0, blurProfile?.renderMax ?? 20),
-      spread: clampValue(Number.isFinite(safeSpread) ? safeSpread : 0, spreadProfile?.renderMin ?? 0, spreadProfile?.renderMax ?? 1.0),
+      spread: clampValue(Number.isFinite(safeSpread) ? safeSpread : 0, spreadProfile?.renderMin ?? 0, spreadProfile?.renderMax ?? 20),
       offsetX: clampValue(Number.isFinite(safeOffsetX) ? safeOffsetX : 3, offsetProfile?.renderMin ?? -20, offsetProfile?.renderMax ?? 20),
       offsetY: clampValue(Number.isFinite(safeOffsetY) ? safeOffsetY : 3, offsetProfile?.renderMin ?? -20, offsetProfile?.renderMax ?? 20),
     } as Record<string, unknown>;

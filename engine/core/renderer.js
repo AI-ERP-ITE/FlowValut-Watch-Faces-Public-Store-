@@ -510,12 +510,12 @@ function normalizeDropShadowEffect(source = {}) {
 	return {
 		enabled: true,
 		mode: src.mode === "inner" ? "inner" : "outer",
-		color: typeof src.color === "string" ? src.color : "#000000",
-		opacity: clamp(src.opacity, 0, 1, 0.14),
-		blur: clamp(src.blur, 0, 20, 1.5),
-		spread: clamp(src.spread, 0, 1, 0),
-		offsetX: clamp(src.offsetX, -20, 20, 1),
-		offsetY: clamp(src.offsetY, -20, 20, 1),
+		color: typeof src.color === "string" ? src.color : "#ffffff",
+		opacity: clamp(src.opacity, 0, 1, 0.75),
+		blur: clamp(src.blur, 0, 20, 8),
+		spread: clamp(src.spread, 0, 20, 0),
+		offsetX: clamp(src.offsetX, -20, 20, 4),
+		offsetY: clamp(src.offsetY, -20, 20, 4),
 	};
 }
 
@@ -555,7 +555,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 
 	let chain = "tone";
 	const parts = [
-		`<filter id=\"${filterId}\" x=\"-25%\" y=\"-25%\" width=\"150%\" height=\"150%\">`,
+		`<filter id=\"${filterId}\" x=\"-200%\" y=\"-200%\" width=\"500%\" height=\"500%\">`,
 		...(useSnapshotImageSilhouette
 			? [
 				`<feImage href="${escapeAttribute(renderOptions.snapshotImageDataUrl.trim())}"${silhouetteW !== null && silhouetteH !== null ? ` x="${silhouetteX}" y="${silhouetteY}" width="${silhouetteW}" height="${silhouetteH}" preserveAspectRatio="none"` : ""} result="snapshotSurface" />`,

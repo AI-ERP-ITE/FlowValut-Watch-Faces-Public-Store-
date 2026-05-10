@@ -51,7 +51,7 @@ export const PARAMETER_PROFILE_REGISTRY: Record<
     uiMin: 0,
     uiMax: 100,
     renderMin: 0,
-    renderMax: 1.0,
+    renderMax: 20,
     curve: 'soft-knee',
     precision: 4,
     debounceMs: 16,
