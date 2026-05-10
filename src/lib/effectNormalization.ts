@@ -64,7 +64,7 @@ export function normalizeDropShadowForBake(ds: DropShadowConfig): DropShadowConf
     spread: round3(spread),
     offsetX: round3(offsetX),
     offsetY: round3(offsetY),
-    opacity: clamp(ds.opacity, 0, 0.35),
+    opacity: clamp(ds.opacity, 0, 1),
   };
 }
 

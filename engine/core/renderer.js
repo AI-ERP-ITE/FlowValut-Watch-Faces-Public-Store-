@@ -511,7 +511,7 @@ function normalizeDropShadowEffect(source = {}) {
 		enabled: true,
 		mode: src.mode === "inner" ? "inner" : "outer",
 		color: typeof src.color === "string" ? src.color : "#000000",
-		opacity: clamp(src.opacity, 0, 0.35, 0.14),
+		opacity: clamp(src.opacity, 0, 1, 0.14),
 		blur: clamp(src.blur, 0, 8, 1.5),
 		spread: clamp(src.spread, 0, 0.25, 0),
 		offsetX: clamp(src.offsetX, -8, 8, 1),
@@ -1770,12 +1770,10 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 					},
 					null,
 				)));
-			// Spec 085 Phase 2 (T11): keep shadow enabled in preview when surface is a baked image.
-			const phase2SurfaceSource = resolveSurfaceSource(safeElement);
-			const phase2SurfaceIsBakedImage = !!(phase2SurfaceSource && phase2SurfaceSource.kind === "baked-image");
-			const dropShadow = (isPreviewQuality && !phase2SurfaceIsBakedImage)
-				? normalizeDropShadowEffect({ enabled: false })
-				: normalizeDropShadowEffect(
+			// Spec 085 Phase 2 (T11) hotfix: always render drop shadow regardless of
+			// preview/interaction mode. Previous preview gate caused shadow to never
+			// reappear because no React subscriber re-rendered on idle transition.
+			const dropShadow = normalizeDropShadowEffect(
 					{
 						...(safeElement.dropShadow && typeof safeElement.dropShadow === "object" ? safeElement.dropShadow : {}),
 						...(renderParams.dropShadow && typeof renderParams.dropShadow === "object" ? renderParams.dropShadow : {}),

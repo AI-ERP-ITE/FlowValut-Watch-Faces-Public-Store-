@@ -30,7 +30,7 @@ function makeComposition({ renderSourceMode, mask, dropShadow, snapshot }) {
 }
 
 describe('Spec 085 Phase 2 - renderer routes shadow per resolver', () => {
-  it('preview quality: procedural element STILL disables shadow', () => {
+  it('preview quality: procedural element KEEPS shadow (hotfix: no preview gate)', () => {
     const svg = runEngine({
       templateInput: makeComposition({
         renderSourceMode: 'procedural',
@@ -39,7 +39,7 @@ describe('Spec 085 Phase 2 - renderer routes shadow per resolver', () => {
       }),
       renderQualityMode: 'preview',
     });
-    expect(svg).not.toMatch(/dsOuterBlur|dsInnerBlur|silhouetteAlpha/);
+    expect(svg).toMatch(/dsOuterBlur|dsInnerBlur/);
   });
 
   it('preview quality: baked-live-mask element KEEPS shadow enabled', () => {

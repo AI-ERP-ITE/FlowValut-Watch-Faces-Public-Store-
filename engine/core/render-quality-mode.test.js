@@ -69,7 +69,8 @@ describe('render quality mode', () => {
       renderQualityMode: 'preview',
     });
 
-    expect(svg).not.toContain('result="dropShadow"');
+    // Spec 085 Phase 2 hotfix: shadow now always renders (was: not.toContain)
+    expect(svg).toContain('result="dropShadow"');
     expect(svg).not.toContain('result="depthA"');
     expect(svg).not.toContain('result="texture-overlay-0-gauss"');
   });
