@@ -4600,11 +4600,11 @@ export default function ParametricPage() {
     const clampValue = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
     const normalized = {
       color: safeColor,
-      opacity: clampValue(Number.isFinite(safeOpacity) ? safeOpacity : 0.12, opacityProfile?.renderMin ?? 0, opacityProfile?.renderMax ?? 0.35),
-      blur: clampValue(Number.isFinite(safeBlur) ? safeBlur : 1.2, blurProfile?.renderMin ?? 0, blurProfile?.renderMax ?? 6),
-      spread: clampValue(Number.isFinite(safeSpread) ? safeSpread : 0, spreadProfile?.renderMin ?? 0, spreadProfile?.renderMax ?? 0.25),
-      offsetX: clampValue(Number.isFinite(safeOffsetX) ? safeOffsetX : 1, offsetProfile?.renderMin ?? -8, offsetProfile?.renderMax ?? 8),
-      offsetY: clampValue(Number.isFinite(safeOffsetY) ? safeOffsetY : 1, offsetProfile?.renderMin ?? -8, offsetProfile?.renderMax ?? 8),
+      opacity: clampValue(Number.isFinite(safeOpacity) ? safeOpacity : 0.45, opacityProfile?.renderMin ?? 0, opacityProfile?.renderMax ?? 1.0),
+      blur: clampValue(Number.isFinite(safeBlur) ? safeBlur : 5, blurProfile?.renderMin ?? 0, blurProfile?.renderMax ?? 20),
+      spread: clampValue(Number.isFinite(safeSpread) ? safeSpread : 0, spreadProfile?.renderMin ?? 0, spreadProfile?.renderMax ?? 1.0),
+      offsetX: clampValue(Number.isFinite(safeOffsetX) ? safeOffsetX : 3, offsetProfile?.renderMin ?? -20, offsetProfile?.renderMax ?? 20),
+      offsetY: clampValue(Number.isFinite(safeOffsetY) ? safeOffsetY : 3, offsetProfile?.renderMin ?? -20, offsetProfile?.renderMax ?? 20),
     } as Record<string, unknown>;
     normalized.mode = safeMode;
     return normalized;
