@@ -52,7 +52,7 @@ function normalizeShadowColorForDevice(hex: string): string {
 }
 
 export function normalizeDropShadowForBake(ds: DropShadowConfig): DropShadowConfig {
-  const blur = clamp(ds.blur, 0, 6);
+  const blur = clamp(ds.blur, 0, 8);
   const spread = clamp(Number.isFinite(Number(ds.spread)) ? Number(ds.spread) : 0, 0, 0.25);
   const offsetX = clamp(ds.offsetX, -8, 8);
   const offsetY = clamp(ds.offsetY, -8, 8);
