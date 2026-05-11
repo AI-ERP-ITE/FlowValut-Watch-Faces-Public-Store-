@@ -9,6 +9,27 @@ function parseArgs(argv) {
   };
 }
 
+// Dev entry template for app/index.html.
+// After a private deploy (which mirrors production to root), root index.html is
+// overwritten with the production bundle reference. A subsequent build would fail
+// because Vite can't resolve the hashed asset URL as a source file.
+// Private GH Pages serves from docs/ so root index.html only needs to be
+// production for the PUBLIC target. We restore it to dev after private deploys.
+const DEV_INDEX_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Watch Face Creator</title>
+    <script type="module" src="/src/main.tsx"><\/script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+`;
+
 async function ensureDir(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
 }
@@ -123,6 +144,16 @@ async function main() {
     await writeText(rootIndex, distHtml);
     await writeText(rootStudioIndex, distHtml);
     await writeText(rootStudioParametricIndex, distHtml);
+
+    // For private deploys: GH Pages (origin) serves from docs/, NOT root.
+    // Restore root index.html to the dev entry so the next build (e.g. public)
+    // doesn't fail with "Failed to resolve /Watch-Faces/assets/index-*.js".
+    // For public deploys: GH Pages (public remote) serves from root, so we
+    // leave root index.html as the production bundle reference.
+    if (target === 'private') {
+      await writeText(rootIndex, DEV_INDEX_HTML);
+      console.log('Root index.html restored to dev entry (target=private; GH Pages uses docs/).');
+    }
   }
 
   console.log(`Deploy sync complete for target=${target}`);
