@@ -1,4 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type FileSystemDirectoryHandle,
+  isFileSystemAccessSupported,
+  pickLocalDataFolder,
+  getHandleFromIDB,
+  clearHandleFromIDB,
+  requestFolderPermission,
+  saveThemeFile,
+  deleteThemeFile,
+  loadAllThemeFiles,
+  saveLibraryFile,
+  deleteLibraryFile,
+  loadAllLibraryFiles,
+} from '@/lib/fileSystemStorage';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -1066,6 +1080,7 @@ export default function ParametricPage() {
   const [libraryNameDrafts, setLibraryNameDrafts] = useState<Record<string, string>>({});
   const [isSnapshotActionRunning, setIsSnapshotActionRunning] = useState(false);
   const [showParameterInspector, setShowParameterInspector] = useState(false);
+  const [localFolderHandle, setLocalFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
 
   const [draftJson, setDraftJson] = useState(
     JSON.stringify(
@@ -1688,10 +1703,25 @@ export default function ParametricPage() {
     }
   }, [authConfigured, saveThemesToFirebaseOnAction]);
 
-  const persistLibraryFromAction = (updater: (prev: Array<LibraryEntry>) => Array<LibraryEntry>, successNotice: string) => {
+  const persistLibraryFromAction = (updater: (prev: Array<LibraryEntry>) => Array<LibraryEntry>, successNotice: string, deletedId?: string) => {
     const next = updater(library).map((entry) => sanitizeLibraryEntryForPersistence(entry));
     setLibrary(next);
     const localSaved = saveLibraryLocal(next);
+
+    // ── Disk: write changed files / delete removed file ──
+    if (localFolderHandle) {
+      if (deletedId) {
+        void deleteLibraryFile(localFolderHandle, deletedId).catch(() => {});
+      } else {
+        const prevIds = new Set(library.map(e => e.id));
+        for (const entry of next) {
+          const prevEntry = library.find(e => e.id === entry.id);
+          if (!prevIds.has(entry.id) || JSON.stringify(prevEntry) !== JSON.stringify(entry)) {
+            void saveLibraryFile(localFolderHandle, entry as { id: string; name: string; [key: string]: unknown }).catch(() => {});
+          }
+        }
+      }
+    }
 
     const pushToFirebase = (items: Array<LibraryEntry>) => {
       return saveLibraryToFirebaseOnAction(items)
@@ -1737,6 +1767,7 @@ export default function ParametricPage() {
     persistLibraryFromAction(
       (prev) => prev.filter((entry) => entry.id !== entryId),
       'Library entry deleted.',
+      entryId,
     );
   };
 
@@ -1753,7 +1784,7 @@ export default function ParametricPage() {
     );
   };
 
-  const persistThemes = (updater: (prev: Array<ThemeEntry>) => Array<ThemeEntry>, successNotice: string) => {
+  const persistThemes = (updater: (prev: Array<ThemeEntry>) => Array<ThemeEntry>, successNotice: string, deletedId?: string) => {
     // Compute next state outside updater so side effects are deterministic.
     const next = updater(themes);
     setThemes(next);
@@ -1766,6 +1797,21 @@ export default function ParametricPage() {
     void saveThemesToFirebaseOnAction(next).catch(() => {
       // Firebase push errors are non-fatal; local cache already saved.
     });
+    // ── Disk: write changed files / delete removed file ──
+    if (localFolderHandle) {
+      if (deletedId) {
+        void deleteThemeFile(localFolderHandle, deletedId).catch(() => {});
+      } else {
+        // Find the new / changed entry by comparing next vs prev.
+        const prevIds = new Set(themes.map(t => t.id));
+        for (const t of next) {
+          const prevEntry = themes.find(e => e.id === t.id);
+          if (!prevIds.has(t.id) || prevEntry?.updatedAt !== t.updatedAt || JSON.stringify(prevEntry) !== JSON.stringify(t)) {
+            void saveThemeFile(localFolderHandle, t as { id: string; name: string; [key: string]: unknown }).catch(() => {});
+          }
+        }
+      }
+    }
   };
 
   const saveCurrentAsTheme = () => {
@@ -1902,7 +1948,7 @@ export default function ParametricPage() {
   };
 
   const deleteThemeById = (themeId: string) => {
-    persistThemes((prev) => prev.filter((entry) => entry.id !== themeId), 'Theme deleted.');
+    persistThemes((prev) => prev.filter((entry) => entry.id !== themeId), 'Theme deleted.', themeId);
   };
 
   const renameThemeById = (themeId: string) => {
@@ -5074,6 +5120,30 @@ export default function ParametricPage() {
       setProgressSnapshot(storedProgressSnapshot);
     }
     void syncThemesFromFirebase();
+
+    // ── Restore local folder handle from IndexedDB and load per-file data ──
+    void (async () => {
+      const handle = await getHandleFromIDB();
+      if (!handle) return;
+      const granted = await requestFolderPermission(handle);
+      if (!granted) return;
+      setLocalFolderHandle(handle);
+
+      // Load themes from disk and merge with what we already have.
+      const diskThemesRaw = await loadAllThemeFiles(handle);
+      const diskThemes = normalizeThemeEntries(diskThemesRaw);
+      if (diskThemes.length > 0) {
+        setThemes((prev) => mergeThemeEntries(prev, diskThemes));
+      }
+
+      // Load library entries from disk and merge.
+      const diskLibRaw = await loadAllLibraryFiles(handle);
+      const diskLib = normalizeLibraryEntries(diskLibRaw);
+      if (diskLib.length > 0) {
+        setLibrary((prev) => mergeLibraryEntries(prev, diskLib));
+      }
+    })();
+
     void renderPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restoreCommandHistoryForTemplate]);
@@ -6661,6 +6731,55 @@ export default function ParametricPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* ── Local disk folder (File System Access API) ── */}
+                {isFileSystemAccessSupported() && (
+                  <div className="mt-2 border-t border-zinc-800 pt-2 space-y-1">
+                    <p className="text-[11px] uppercase tracking-wide text-zinc-400">Local Disk Folder</p>
+                    <p className="text-[10px] text-zinc-500">
+                      Each theme and element gets its own <code className="text-zinc-400">.json</code> file in the folder you pick.
+                      Survives browser cache clears. Works on localhost. When online, Firebase is still used in addition.
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const handle = await pickLocalDataFolder();
+                          if (!handle) return;
+                          setLocalFolderHandle(handle);
+                          // Write all current themes + library entries to disk immediately.
+                          for (const t of themes) {
+                            void saveThemeFile(handle, t as { id: string; name: string; [key: string]: unknown }).catch(() => {});
+                          }
+                          for (const e of library) {
+                            void saveLibraryFile(handle, e as { id: string; name: string; [key: string]: unknown }).catch(() => {});
+                          }
+                          setDrawerNotice(`Local folder set: ${handle.name}. All themes & elements written to disk.`);
+                        }}
+                        className="rounded border border-violet-700 bg-violet-950/40 px-2 py-1 text-[11px] text-violet-200 hover:bg-violet-900/40"
+                      >
+                        📁 {localFolderHandle ? `Change folder (${localFolderHandle.name})` : 'Set local data folder…'}
+                      </button>
+                      {localFolderHandle && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await clearHandleFromIDB();
+                            setLocalFolderHandle(null);
+                            setDrawerNotice('Local folder unlinked. Data still in localStorage & Firebase.');
+                          }}
+                          className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:bg-zinc-800"
+                        >
+                          Unlink
+                        </button>
+                      )}
+                    </div>
+                    {localFolderHandle && (
+                      <p className="text-[10px] text-emerald-400">✓ Linked: {localFolderHandle.name} — themes & elements save to disk automatically.</p>
+                    )}
+                  </div>
+                )}
+
                 {/* ── Auto-save ─────────────────────────────── */}
                 <div className="mt-2 border-t border-zinc-800 pt-2">
                   <div className="flex items-center justify-between">
