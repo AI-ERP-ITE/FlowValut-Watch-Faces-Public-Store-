@@ -275,3 +275,27 @@ export async function loadAllLibraryFiles(
     return [];
   }
 }
+
+// ─── Auto-save file ops ───────────────────────────────────────────────────────
+
+const AUTOSAVE_FILENAME = 'autosave.json';
+
+/** Overwrite <root>/autosave.json with the given data. */
+export async function saveAutoSaveFile(
+  root: FileSystemDirectoryHandle,
+  data: unknown,
+): Promise<void> {
+  await writeJsonFile(root, AUTOSAVE_FILENAME, data);
+}
+
+/** Read <root>/autosave.json. Returns null if the file doesn't exist or is corrupt. */
+export async function loadAutoSaveFile(
+  root: FileSystemDirectoryHandle,
+): Promise<unknown | null> {
+  try {
+    const fh = await root.getFileHandle(AUTOSAVE_FILENAME);
+    return await readJsonFile(fh);
+  } catch {
+    return null;
+  }
+}

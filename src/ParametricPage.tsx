@@ -12,6 +12,8 @@ import {
   saveLibraryFile,
   deleteLibraryFile,
   loadAllLibraryFiles,
+  saveAutoSaveFile,
+  loadAutoSaveFile,
 } from '@/lib/fileSystemStorage';
 import { useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, RefreshCw } from 'lucide-react';
@@ -1138,6 +1140,9 @@ export default function ParametricPage() {
   const pendingLibraryFirebaseSyncRef = useRef<Array<LibraryEntry> | null>(null);
   const renderDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workingTemplateRef = useRef<TemplateModel | null>(null);
+  const libraryRef = useRef<Array<LibraryEntry>>([]);
+  const themesRef = useRef<Array<ThemeEntry>>([]);
+  const localFolderHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
   const authConfigured = isFirebaseAuthConfigured();
   const markDirtyById = useCallback((elementId: string | null | undefined, reason: DirtyReason) => {
     if (typeof elementId !== 'string' || elementId.trim().length === 0) return;
@@ -1250,6 +1255,12 @@ export default function ParametricPage() {
     if (!autoSaveEnabled) return;
     const ms = autoSaveIntervalMin * 60 * 1000;
     const id = setInterval(() => {
+      // Flush current React state → localStorage first (avoids stale reads).
+      const tpl = workingTemplateRef.current;
+      if (tpl) saveTemplate(tpl);
+      saveLibraryLocal(libraryRef.current);
+      saveThemesLocal(themesRef.current);
+
       const storageKeys = [
         PARAMETRIC_TEMPLATE_STORAGE_KEY,
         PARAMETRIC_LIBRARY_STORAGE_KEY,
@@ -1261,7 +1272,13 @@ export default function ParametricPage() {
         const r = window.localStorage.getItem(key);
         if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
       }
+      // Persist to localStorage (fallback).
       window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, JSON.stringify(dump));
+      // Persist to autosave.json in the local folder (preferred — survives browser wipes).
+      const folderHandle = localFolderHandleRef.current;
+      if (folderHandle) {
+        void saveAutoSaveFile(folderHandle, dump).catch(() => {});
+      }
       setLastAutoSaveAt(new Date());
     }, ms);
     return () => clearInterval(id);
@@ -5140,6 +5157,30 @@ export default function ParametricPage() {
       if (!granted) return;
       setLocalFolderHandle(handle);
 
+      // Auto-restore from autosave.json if present (silently restores last auto-saved state).
+      const autoSaveDump = await loadAutoSaveFile(handle);
+      if (autoSaveDump && typeof autoSaveDump === 'object') {
+        const dump = autoSaveDump as Record<string, unknown>;
+        const storageKeys = [
+          PARAMETRIC_TEMPLATE_STORAGE_KEY,
+          PARAMETRIC_LIBRARY_STORAGE_KEY,
+          PARAMETRIC_THEME_STORAGE_KEY,
+          PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+        ];
+        let restored = false;
+        for (const key of storageKeys) {
+          if (key in dump) {
+            window.localStorage.setItem(key, JSON.stringify(dump[key]));
+            restored = true;
+          }
+        }
+        if (restored) {
+          // Reload so all state slices pick up the restored data cleanly.
+          window.location.reload();
+          return;
+        }
+      }
+
       // Load themes from disk and merge with what we already have.
       const diskThemesRaw = await loadAllThemeFiles(handle);
       const diskThemes = normalizeThemeEntries(diskThemesRaw);
@@ -5192,10 +5233,14 @@ export default function ParametricPage() {
     setLayoutDraft(JSON.stringify(workingTemplate.layout, null, 2));
   }, [workingTemplate]);
 
-  // Keep a ref so the Ctrl+Enter handler always sees latest template without stale closure.
+  // Keep refs so auto-save timer always sees latest state without stale closures.
   useEffect(() => {
     workingTemplateRef.current = workingTemplate ?? null;
   }, [workingTemplate]);
+
+  useEffect(() => { libraryRef.current = library; }, [library]);
+  useEffect(() => { themesRef.current = themes; }, [themes]);
+  useEffect(() => { localFolderHandleRef.current = localFolderHandle; }, [localFolderHandle]);
 
   // Debounced render: fires 2 s after the last change, or immediately on Ctrl+Enter.
   useEffect(() => {
