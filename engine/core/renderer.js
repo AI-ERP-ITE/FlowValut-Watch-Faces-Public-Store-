@@ -1581,12 +1581,20 @@ function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 	const requestedMode = resolveElementRenderSourceMode(element);
 	const fallbackMaskFrameMetrics = resolveSnapshotMaskFrameMetrics(element, layoutMetrics);
 
-	// If the element has an active live mask with a painted field, force live rendering.
-	// The mask field (PNG pixel buffer) is excluded from the snapshot hash (NON_VISUAL_KEYS),
-	// so a snapshot can be "fresh" while the mask field has been painted — causing the baked
-	// PNG to be used as the body and making fill-color changes invisible to the user.
+	// Read the spec-085 canonical render source mode.
+	// Baked elements (baked-live-mask / baked-baked-mask) use the snapshot as their body;
+	// the live mask is meant to clip that snapshot body, not revert the element to live rendering.
+	// Only force live when the element is truly procedural: a painted mask field on a procedural
+	// element that was snapshotted could otherwise leave fill-color changes invisible because
+	// the mask field is excluded from the snapshot hash (NON_VISUAL_KEYS).
+	const rs = element && typeof element === "object" && element.renderState && typeof element.renderState === "object"
+		? element.renderState
+		: {};
+	const canonicalRenderSourceMode = typeof rs.renderSourceMode === "string" ? rs.renderSourceMode : "procedural";
+	const isBaked = canonicalRenderSourceMode === "baked-live-mask" || canonicalRenderSourceMode === "baked-baked-mask";
+
 	const elementMask = element && typeof element === "object" ? element.mask : null;
-	const hasMaskField = !!(elementMask
+	const hasMaskField = !isBaked && !!(elementMask
 		&& typeof elementMask === "object"
 		&& elementMask.enabled === true
 		&& elementMask.field
