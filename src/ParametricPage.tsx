@@ -1142,7 +1142,6 @@ export default function ParametricPage() {
   const workingTemplateRef = useRef<TemplateModel | null>(null);
   const libraryRef = useRef<Array<LibraryEntry>>([]);
   const themesRef = useRef<Array<ThemeEntry>>([]);
-  const localFolderHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
   const authConfigured = isFirebaseAuthConfigured();
   const markDirtyById = useCallback((elementId: string | null | undefined, reason: DirtyReason) => {
     if (typeof elementId !== 'string' || elementId.trim().length === 0) return;
@@ -1269,16 +1268,20 @@ export default function ParametricPage() {
       const progressRaw = window.localStorage.getItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY);
       if (progressRaw) { try { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = JSON.parse(progressRaw); } catch { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = progressRaw; } }
 
-      // Also flush to localStorage (best-effort, may fail on large templates).
-      if (tpl) saveTemplate(tpl);
-      saveLibraryLocal(libraryRef.current);
-      saveThemesLocal(themesRef.current);
-
-      // Persist to autosave.json in the local folder.
+      // Persist dump.
       if (localFolderHandle) {
+        // Folder linked: write autosave.json (primary crash recovery).
+        // Also flush individual keys to localStorage as best-effort backup.
+        if (tpl) saveTemplate(tpl);
+        saveLibraryLocal(libraryRef.current);
+        saveThemesLocal(themesRef.current);
         void saveAutoSaveFile(localFolderHandle, dump).catch(() => {});
       } else {
-        // No folder linked — fall back to localStorage (best-effort, may fail if quota exceeded).
+        // No folder — write ONLY the combined dump to localStorage.
+        // Avoid writing template/library/themes individually AND then the combined dump:
+        // double-writing doubles quota pressure and if template is large both fail silently.
+        // Individual keys are already kept fresh by every normal edit; the timer's only
+        // job here is crash recovery via the combined dump.
         try {
           window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, JSON.stringify(dump));
         } catch { /* quota exceeded — skip */ }
@@ -1598,21 +1601,18 @@ export default function ParametricPage() {
   };
 
   const downloadAutoSaveAsFile = () => {
-    // Always flush current state first so download reflects RIGHT NOW, not last interval tick.
-    const storageKeys = [
-      PARAMETRIC_TEMPLATE_STORAGE_KEY,
-      PARAMETRIC_LIBRARY_STORAGE_KEY,
-      PARAMETRIC_THEME_STORAGE_KEY,
-      PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-    ];
-    if (workingTemplate) saveTemplate(workingTemplate);
+    // Build dump directly from in-memory state/refs — never read back from localStorage.
+    // localStorage writes can fail silently (QuotaExceededError), so reading back would
+    // return stale data. Library and themes are not written to localStorage here at all.
+    const tpl = workingTemplate ?? workingTemplateRef.current;
     const dump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
-    for (const key of storageKeys) {
-      const r = window.localStorage.getItem(key);
-      if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
-    }
+    if (tpl) dump[PARAMETRIC_TEMPLATE_STORAGE_KEY] = tpl;
+    dump[PARAMETRIC_LIBRARY_STORAGE_KEY] = libraryRef.current;
+    dump[PARAMETRIC_THEME_STORAGE_KEY] = themesRef.current;
+    const progressRaw = window.localStorage.getItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY);
+    if (progressRaw) { try { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = JSON.parse(progressRaw); } catch { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = progressRaw; } }
     const serialized = JSON.stringify(dump, null, 2);
-    window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, serialized);
+    try { window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, serialized); } catch { /* quota exceeded — skip */ }
     setLastAutoSaveAt(new Date());
     const blob = new Blob([serialized], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -5342,7 +5342,6 @@ export default function ParametricPage() {
 
   useEffect(() => { libraryRef.current = library; }, [library]);
   useEffect(() => { themesRef.current = themes; }, [themes]);
-  useEffect(() => { localFolderHandleRef.current = localFolderHandle; }, [localFolderHandle]);
 
   // Debounced render: fires 2 s after the last change, or immediately on Ctrl+Enter.
   useEffect(() => {
