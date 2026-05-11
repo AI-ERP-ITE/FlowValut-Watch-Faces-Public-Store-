@@ -663,7 +663,7 @@ function buildLayerFilterDef(filterId, styleAdjust, depthEffect, dropShadowEffec
 
 	if (styleAdjust.color && styleAdjust.colorOpacity > 0) {
 		parts.push(`<feFlood flood-color=\"${styleAdjust.color}\" flood-opacity=\"${styleAdjust.colorOpacity.toFixed(3)}\" result=\"tintFill\" />`);
-		parts.push("<feComposite in=\"tintFill\" in2=\"SourceAlpha\" operator=\"in\" result=\"tintMask\" />");
+		parts.push(`<feComposite in="tintFill" in2="${alphaRef}" operator="in" result="tintMask" />`);
 		parts.push(`<feBlend in=\"${chain}\" in2=\"tintMask\" mode=\"multiply\" result=\"tinted\" />`);
 		chain = "tinted";
 	}
@@ -1865,7 +1865,12 @@ export function renderElement(element, context = {}, elementIndex = 0) {
 				{
 					useSnapshotSource,
 					snapshotRenderMode,
-					effectSilhouetteSource: useSnapshotSource ? "snapshot-image-alpha" : "source-alpha",
+					// Always use SourceAlpha — even for baked elements.
+					// The feImage silhouette path placed the baked PNG at world (-x,-y) inside
+					// the filter, landing the silhouette at (0,0) while SourceAlpha sits at (x,y).
+					// Shadow primitives computed from (0,0) cast off-screen for non-origin elements.
+					// SourceAlpha is always correct: the baked PNG has transparent bg so alpha is identical.
+					effectSilhouetteSource: "source-alpha",
 					snapshotImageDataUrl: snapshotSource?.imageDataUrl || "",
 					snapshotSilhouetteX: snapshotImageX,
 					snapshotSilhouetteY: snapshotImageY,
