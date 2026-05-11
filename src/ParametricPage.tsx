@@ -5590,7 +5590,9 @@ export default function ParametricPage() {
   ) => {
     const frame = resolveMaskFieldFrameForElement(element);
     const field = mask.field && typeof mask.field === 'object' ? mask.field as Record<string, unknown> : null;
-    const initialValue = mask.invert === true ? 0 : 255;
+    // initialValue is always 255: renderer alpha-flips (255→hidden, 0→shown) when invert=true,
+    // so both paths start with "all opaque" and the alpha-flip in the renderer handles the inversion.
+    const initialValue = 255;
     const values = decodeMaskFieldValues(field, frame.width, frame.height, initialValue);
     // When invert=true, the renderer alpha-flips the field image (255→hidden, 0→shown).
     // So we must flip the stroke action so the user-visible intent (reveal/hide) is correct.
@@ -5620,9 +5622,9 @@ export default function ParametricPage() {
 
   const resetMaskField = (mask: Record<string, unknown>, element: TemplateElement) => {
     const frame = resolveMaskFieldFrameForElement(element);
-    const initialValue = mask.invert === true ? 0 : 255;
+    // Always 255: renderer alpha-flip handles invert=true display (255→alpha-flip→0→hidden).
     const values = new Uint8ClampedArray(frame.width * frame.height);
-    values.fill(initialValue);
+    values.fill(255);
     const imageDataUrl = buildMaskFieldDataUrl(values, frame.width, frame.height);
     return {
       ...mask,
