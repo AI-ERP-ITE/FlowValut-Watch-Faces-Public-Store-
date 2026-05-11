@@ -8486,7 +8486,16 @@ export default function ParametricPage() {
 
                 {/* ── Image Layer inspector ─────────────────────────────── */}
                 {selectedElement.type === 'image_layer' && (() => {
-                  const imgParams = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params as Record<string, unknown> : {};
+                  const imgParams = (() => {
+                    const raw = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params as Record<string, unknown> : {};
+                    // Migrate legacy x/y → imgX/imgY (elements created before the coordinate rename)
+                    const migrated: Record<string, unknown> = { ...raw };
+                    if ('x' in migrated && !('imgX' in migrated)) migrated.imgX = migrated.x;
+                    if ('y' in migrated && !('imgY' in migrated)) migrated.imgY = migrated.y;
+                    delete migrated.x;
+                    delete migrated.y;
+                    return migrated;
+                  })();
                   const currentDataUrl = typeof imgParams.imageDataUrl === 'string' ? imgParams.imageDataUrl : '';
                   const approxBytes = Math.round(currentDataUrl.length * 0.75);
                   const approxKB = Math.round(approxBytes / 1024);
