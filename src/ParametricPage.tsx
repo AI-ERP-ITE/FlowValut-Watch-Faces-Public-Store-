@@ -5200,6 +5200,21 @@ export default function ParametricPage() {
       if (diskLib.length > 0) {
         setLibrary((prev) => mergeLibraryEntries(prev, diskLib));
       }
+
+      // Write autosave.json immediately from localStorage so the file always exists
+      // after a page load (not just after the first timer tick).
+      const autoSaveStorageKeys = [
+        PARAMETRIC_TEMPLATE_STORAGE_KEY,
+        PARAMETRIC_LIBRARY_STORAGE_KEY,
+        PARAMETRIC_THEME_STORAGE_KEY,
+        PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+      ];
+      const mountDump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
+      for (const key of autoSaveStorageKeys) {
+        const r = window.localStorage.getItem(key);
+        if (r) { try { mountDump[key] = JSON.parse(r); } catch { mountDump[key] = r; } }
+      }
+      void saveAutoSaveFile(handle, mountDump).catch(() => {});
     })();
 
     void renderPreview();
