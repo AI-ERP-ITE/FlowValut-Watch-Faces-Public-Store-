@@ -11,6 +11,7 @@
     "deploy:docs": "node scripts/deployDistToDocs.mjs --mirror-root",
     "deploy:docs:public": "npm run build:public && node scripts/deployDistToDocs.mjs --target=public --mirror-root",
     "deploy:docs:private": "npm run build:private && node scripts/deployDistToDocs.mjs --target=private --mirror-root",
+    "deploy:full:public": "node scripts/deployPublicFull.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "sync-downloads": "tsx scripts/syncDownloads.ts",
