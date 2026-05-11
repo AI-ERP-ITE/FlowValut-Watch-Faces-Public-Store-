@@ -1094,11 +1094,12 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 		const regionX = -fieldWidth / 2;
 		const regionY = -fieldHeight / 2;
 		if (mask.invert === true) {
-			// Invert the field image: use a feComponentTransfer to flip alpha channel,
-			// then composite over a full-white rect so the inverted alpha becomes the mask.
+			// Invert the field image: feComponentTransfer flips alpha (255→0 hidden, 0→255 shown).
+			// NO background rect — SVG mask default background is transparent (alpha=0=hidden),
+			// so filtered-to-transparent pixels correctly hide and there's no bleed-through.
 			const filterId = `${maskId}_inv`;
 			const filterDef = `<filter id="${filterId}" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncA type="linear" slope="-1" intercept="1"/></feComponentTransfer></filter>`;
-			const defs = `${filterDef}<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" style="mask-type:alpha"><rect x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" fill="white"/><image x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" preserveAspectRatio="none" href="${escapeAttribute(fieldImageDataUrl)}" filter="url(#${filterId})"/></mask>`;
+			const defs = `${filterDef}<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" style="mask-type:alpha"><image x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" preserveAspectRatio="none" href="${escapeAttribute(fieldImageDataUrl)}" filter="url(#${filterId})"/></mask>`;
 			return {
 				defs,
 				active: true,
