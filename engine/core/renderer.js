@@ -510,7 +510,7 @@ function normalizeDropShadowEffect(source = {}) {
 	return {
 		enabled: true,
 		mode: src.mode === "inner" ? "inner" : "outer",
-		color: typeof src.color === "string" ? src.color : "#ffffff",
+		color: typeof src.color === "string" ? src.color : "#000000",
 		opacity: clamp(src.opacity, 0, 1, 0.75),
 		blur: clamp(src.blur, 0, 20, 8),
 		spread: clamp(src.spread, 0, 20, 0),

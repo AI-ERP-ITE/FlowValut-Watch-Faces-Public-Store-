@@ -4657,7 +4657,7 @@ export default function ParametricPage() {
   };
 
   const normalizeDropShadowRecord = (source?: Record<string, unknown>) => {
-    const safeColor = typeof source?.color === 'string' ? source.color : '#ffffff';
+    const safeColor = typeof source?.color === 'string' ? source.color : '#000000';
     const safeMode = source?.mode === 'inner' ? 'inner' : 'outer';
     const safeOpacity = Number(source?.opacity);
     const safeBlur = Number(source?.blur);
