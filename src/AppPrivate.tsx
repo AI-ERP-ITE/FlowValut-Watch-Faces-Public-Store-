@@ -14,6 +14,9 @@ import {
 } from '@/lib/firebaseAuthClient';
 
 function PrivateRouteGuard({ children }: { children: ReactNode }) {
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const authConfigured = isFirebaseAuthConfigured();
   const location = useLocation();
   const [hasUser, setHasUser] = useState(() => !!getCurrentAuthUser());
@@ -26,6 +29,9 @@ function PrivateRouteGuard({ children }: { children: ReactNode }) {
       setAuthReady(true);
     });
   }, [authConfigured]);
+
+  // On localhost: skip Firebase auth entirely — dev mode, no credentials needed
+  if (isLocalhost) return <>{children}</>;
 
   if (authConfigured && !authReady) {
     return (

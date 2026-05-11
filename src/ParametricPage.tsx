@@ -1369,6 +1369,71 @@ export default function ParametricPage() {
     }
   };
 
+  // ── Local disk export / import (no Firebase, no size limit) ──────────────
+  const exportAllDataToFile = () => {
+    const allKeys = [
+      PARAMETRIC_TEMPLATE_STORAGE_KEY,
+      PARAMETRIC_LIBRARY_STORAGE_KEY,
+      PARAMETRIC_THEME_STORAGE_KEY,
+      PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+      PARAMETRIC_HISTORY_STORAGE_KEY,
+    ];
+    const dump: Record<string, unknown> = { _exportedAt: new Date().toISOString() };
+    for (const key of allKeys) {
+      const raw = window.localStorage.getItem(key);
+      if (raw) {
+        try { dump[key] = JSON.parse(raw); } catch { dump[key] = raw; }
+      }
+    }
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `parametric-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setDrawerNotice('All data exported to file on your disk.');
+  };
+
+  const importAllDataFromFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const dump = JSON.parse(ev.target?.result as string) as Record<string, unknown>;
+          const allKeys = [
+            PARAMETRIC_TEMPLATE_STORAGE_KEY,
+            PARAMETRIC_LIBRARY_STORAGE_KEY,
+            PARAMETRIC_THEME_STORAGE_KEY,
+            PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+            PARAMETRIC_HISTORY_STORAGE_KEY,
+          ];
+          for (const key of allKeys) {
+            if (key in dump) {
+              window.localStorage.setItem(key, JSON.stringify(dump[key]));
+            }
+          }
+          // Reload page so the app picks up all restored data fresh
+          window.location.reload();
+        } catch {
+          setDrawerNotice('Import failed: invalid file format.');
+        }
+      };
+      reader.readAsText(file);
+    };
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
   const saveProgressSnapshotLocal = (entry: ProgressSnapshotEntry | null): boolean => {
     try {
       if (!entry) {
@@ -4950,6 +5015,31 @@ export default function ParametricPage() {
     void renderPreview(workingTemplate);
   }, [colorMode, renderPreview, workingTemplate]);
 
+  const exportPreviewAsPng = async () => {
+    if (!svgMarkup) return;
+    const size = resolveTemplatePixelSize(workingTemplate);
+    const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = await loadImageFromUrl(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, size.width, size.height);
+      const dataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'parametric-layer.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
   const getCanvasGradientPointNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to' | 'center' | 'focal', axis: 0 | 1) => {
     const fallback = anchor === 'from'
       ? 0
@@ -6384,6 +6474,25 @@ export default function ParametricPage() {
                     Load Progress
                   </button>
                 </div>
+                <div className="mt-2 border-t border-zinc-800 pt-2">
+                  <p className="text-[11px] text-zinc-500">Export / Import all data (elements, themes, progress) as a file on your disk. No size limit, no cloud.</p>
+                  <div className="mt-1 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={exportAllDataToFile}
+                      className="rounded border border-emerald-800 bg-emerald-950/40 px-2 py-1 text-[11px] text-emerald-300 hover:bg-emerald-900/40"
+                    >
+                      Export All → File
+                    </button>
+                    <button
+                      type="button"
+                      onClick={importAllDataFromFile}
+                      className="rounded border border-sky-800 bg-sky-950/40 px-2 py-1 text-[11px] text-sky-300 hover:bg-sky-900/40"
+                    >
+                      Import All ← File
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-2 flex gap-2">
@@ -6642,15 +6751,26 @@ export default function ParametricPage() {
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold text-zinc-100">Preview</h2>
-                <Button
-                  type="button"
-                  className="h-9 bg-amber-500 text-black hover:bg-amber-400"
-                  onClick={() => void renderPreview()}
-                  disabled={isRendering}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isRendering ? 'animate-spin' : ''}`} />
-                  {isRendering ? 'Rendering...' : 'Apply Preview'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {svgMarkup ? (
+                    <Button
+                      type="button"
+                      className="h-9 bg-emerald-600 text-white hover:bg-emerald-500"
+                      onClick={() => void exportPreviewAsPng()}
+                    >
+                      Export PNG
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    className="h-9 bg-amber-500 text-black hover:bg-amber-400"
+                    onClick={() => void renderPreview()}
+                    disabled={isRendering}
+                  >
+                    <RefreshCw className={`mr-2 h-4 w-4 ${isRendering ? 'animate-spin' : ''}`} />
+                    {isRendering ? 'Rendering...' : 'Apply Preview'}
+                  </Button>
+                </div>
               </div>
               <div className="mt-3 grid place-items-center rounded-lg border border-zinc-800 bg-black/60 p-4 min-h-[360px]">
                 {svgMarkup ? (
