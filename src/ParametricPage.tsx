@@ -4155,6 +4155,7 @@ export default function ParametricPage() {
 
   const setSelectedMaskBoolean = (path: string, value: boolean) => {
     if (!selectedElement) return;
+    markSelectedElementDirty('mask');
     const segments = path.split('.');
     updateTemplateElements((elements) =>
       elements.map((element) => {

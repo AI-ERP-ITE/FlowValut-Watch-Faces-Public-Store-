@@ -1089,10 +1089,25 @@ function buildElementMaskDef(maskId, mask = {}, layoutMetrics) {
 	const fieldImageDataUrl = typeof field?.imageDataUrl === "string" ? field.imageDataUrl.trim() : "";
 	const fieldWidth = Math.max(1, Number(field?.width) || width);
 	const fieldHeight = Math.max(1, Number(field?.height) || height);
-	const fieldIsUsable = mask.invert !== true && fieldImageDataUrl.length > 0;
+	const fieldIsUsable = fieldImageDataUrl.length > 0;
 	if (fieldIsUsable) {
 		const regionX = -fieldWidth / 2;
 		const regionY = -fieldHeight / 2;
+		if (mask.invert === true) {
+			// Invert the field image: use a feComponentTransfer to flip alpha channel,
+			// then composite over a full-white rect so the inverted alpha becomes the mask.
+			const filterId = `${maskId}_inv`;
+			const filterDef = `<filter id="${filterId}" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncA type="linear" slope="-1" intercept="1"/></feComponentTransfer></filter>`;
+			const defs = `${filterDef}<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" style="mask-type:alpha"><rect x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" fill="white"/><image x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" preserveAspectRatio="none" href="${escapeAttribute(fieldImageDataUrl)}" filter="url(#${filterId})"/></mask>`;
+			return {
+				defs,
+				active: true,
+				primitives: "",
+				region: { x: regionX, y: regionY, width: fieldWidth, height: fieldHeight },
+				coordinateSpace: "local",
+				source: "field-inverted",
+			};
+		}
 		const defs = `<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" style="mask-type:alpha"><image x="${regionX}" y="${regionY}" width="${fieldWidth}" height="${fieldHeight}" preserveAspectRatio="none" href="${escapeAttribute(fieldImageDataUrl)}" /></mask>`;
 		return {
 			defs,
