@@ -149,8 +149,10 @@ async function main() {
     // For public deploys: GH Pages (public remote) ALSO serves from docs/.
     // In both cases, root index.html only needs the production bundle reference
     // at the moment of git-push (already captured in the commit above before restore).
-    // Restore root to dev entry so the next Vite build can resolve /src/main.tsx.
+    // Restore root + studio entries to dev entry so Vite can resolve /src/main.tsx locally.
     await writeText(rootIndex, DEV_INDEX_HTML);
+    await writeText(rootStudioIndex, DEV_INDEX_HTML);
+    await writeText(rootStudioParametricIndex, DEV_INDEX_HTML);
     if (target === 'private') {
       console.log('Root index.html restored to dev entry (target=private; GH Pages uses docs/).');
     } else {
