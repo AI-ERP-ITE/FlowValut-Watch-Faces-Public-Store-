@@ -5379,26 +5379,33 @@ export default function ParametricPage() {
   const exportPreviewAsPng = async () => {
     if (!svgMarkup) return;
     const size = resolveTemplatePixelSize(workingTemplate);
-    const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    try {
-      const img = await loadImageFromUrl(url);
-      const canvas = document.createElement('canvas');
-      canvas.width = size.width;
-      canvas.height = size.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0, size.width, size.height);
-      const dataUrl = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = 'parametric-layer.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } finally {
-      URL.revokeObjectURL(url);
+    // Composite ALL layers in draw order — same as the stacked preview divs.
+    // svgMarkup = layer 0, svgOverlayLayers = layers 1..N.
+    // Each SVG has the same canvas dimensions and transparent background.
+    const allLayers = [svgMarkup, ...svgOverlayLayers];
+    const canvas = document.createElement('canvas');
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    for (const layerSvg of allLayers) {
+      if (!layerSvg) continue;
+      const blob = new Blob([layerSvg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      try {
+        const img = await loadImageFromUrl(url);
+        ctx.drawImage(img, 0, 0, size.width, size.height);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     }
+    const dataUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'parametric-watchface.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const getCanvasGradientPointNumber = (target: 'texture' | 'gradient', anchor: 'from' | 'to' | 'center' | 'focal', axis: 0 | 1) => {
