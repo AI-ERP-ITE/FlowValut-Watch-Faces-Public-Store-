@@ -27,6 +27,7 @@ import { freePolygonElement } from "./elements/baseElements/freePolygon.js";
 import { outlineRingElement } from "./elements/baseElements/outlineRing.js";
 import { outlineRectElement } from "./elements/baseElements/outlineRect.js";
 import { textureLayerElement } from "./elements/baseElements/textureLayer.js";
+import { imageLayerElement } from "./elements/baseElements/imageLayer.js";
 import { baseElement } from "./elements/baseElements/base.js";
 
 function registerBaseElements() {
@@ -50,6 +51,7 @@ function registerBaseElements() {
 	registerElement("outline_ring", outlineRingElement);
 	registerElement("outline_rect", outlineRectElement);
 	registerElement("texture_layer", textureLayerElement);
+	registerElement("image_layer", imageLayerElement);
 	registerElement("rect", rectElement);
 }
 

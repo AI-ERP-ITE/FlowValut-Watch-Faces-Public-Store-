@@ -103,6 +103,9 @@ const PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY = 'parametric-progress-snapshot-v
 const PARAMETRIC_HISTORY_STORAGE_KEY = 'parametric-template-history-v1';
 const PARAMETRIC_PROGRESS_SNAPSHOT_THEME_ID = '__parametric-progress-snapshot__';
 const PARAMETRIC_PROGRESS_SNAPSHOT_THEME_NAME = '__progress_snapshot__';
+const PARAMETRIC_AUTO_SAVE_STORAGE_KEY = 'parametric-auto-save-v1';
+const PARAMETRIC_AUTO_SAVE_SETTINGS_KEY = 'parametric-auto-save-settings-v1';
+const AUTO_SAVE_INTERVAL_OPTIONS = [1, 2, 5, 10, 15, 30] as const;
 
 const DEFAULT_COLOR_CONTROL = {
   colorControl: {
@@ -546,6 +549,7 @@ const CATEGORY_HEADER_DEFAULTS: Record<string, { type: string; role: string }> =
   Outline: { type: 'outline_ring', role: 'outline_ring' },
   'Free Objects': { type: 'free_rect', role: 'free_rect' },
   Texture: { type: 'texture_layer', role: 'texture_layer' },
+  'Image Layer': { type: 'image_layer', role: 'image_layer' },
   General: { type: 'element', role: 'element' },
 };
 
@@ -1047,6 +1051,14 @@ export default function ParametricPage() {
   const [layoutDraftError, setLayoutDraftError] = useState<string | null>(null);
   const [editorNotice, setEditorNotice] = useState<string | null>(null);
   const [drawerNotice, setDrawerNotice] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => {
+    try { return JSON.parse(window.localStorage.getItem(PARAMETRIC_AUTO_SAVE_SETTINGS_KEY) ?? '{}')?.enabled ?? true; } catch { return true; }
+  });
+  const [autoSaveIntervalMin, setAutoSaveIntervalMin] = useState<number>(() => {
+    try { return JSON.parse(window.localStorage.getItem(PARAMETRIC_AUTO_SAVE_SETTINGS_KEY) ?? '{}')?.intervalMin ?? 5; } catch { return 5; }
+  });
+  const [lastAutoSaveAt, setLastAutoSaveAt] = useState<Date | null>(null);
+  const [autoSaveRecovery, setAutoSaveRecovery] = useState<Record<string, unknown> | null>(null);
   const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({});
   const [categoryHeaderLocks, setCategoryHeaderLocks] = useState<Record<string, boolean>>({});
   const [freeObjectShapeType, setFreeObjectShapeType] = useState<string>('free_rect');
@@ -1194,6 +1206,43 @@ export default function ParametricPage() {
     }
     sliderThrottlePendingRef.current = null;
   }, []);
+
+  // ── Auto-save: crash recovery check on mount ─────────────────────────────
+  useEffect(() => {
+    const raw = window.localStorage.getItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as Record<string, unknown>;
+      if (saved?._autoSavedAt) setAutoSaveRecovery(saved);
+    } catch { /* ignore */ }
+  }, []);
+
+  // ── Auto-save: interval ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    const ms = autoSaveIntervalMin * 60 * 1000;
+    const id = setInterval(() => {
+      const storageKeys = [
+        PARAMETRIC_TEMPLATE_STORAGE_KEY,
+        PARAMETRIC_LIBRARY_STORAGE_KEY,
+        PARAMETRIC_THEME_STORAGE_KEY,
+        PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+      ];
+      const dump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
+      for (const key of storageKeys) {
+        const r = window.localStorage.getItem(key);
+        if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
+      }
+      window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, JSON.stringify(dump));
+      setLastAutoSaveAt(new Date());
+    }, ms);
+    return () => clearInterval(id);
+  }, [autoSaveEnabled, autoSaveIntervalMin]);
+
+  // ── Auto-save: persist settings ───────────────────────────────────────────
+  useEffect(() => {
+    window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_SETTINGS_KEY, JSON.stringify({ enabled: autoSaveEnabled, intervalMin: autoSaveIntervalMin }));
+  }, [autoSaveEnabled, autoSaveIntervalMin]);
 
   const getTemplateFingerprint = useCallback((template: TemplateModel | null): string => {
     if (!template) return 'null';
@@ -1437,6 +1486,34 @@ export default function ParametricPage() {
     document.body.appendChild(input);
     input.click();
     document.body.removeChild(input);
+  };
+
+  const restoreFromAutoSave = (dump: Record<string, unknown>) => {
+    const storageKeys = [
+      PARAMETRIC_TEMPLATE_STORAGE_KEY,
+      PARAMETRIC_LIBRARY_STORAGE_KEY,
+      PARAMETRIC_THEME_STORAGE_KEY,
+      PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+    ];
+    for (const key of storageKeys) {
+      if (key in dump) window.localStorage.setItem(key, JSON.stringify(dump[key]));
+    }
+    window.sessionStorage.removeItem(PARAMETRIC_HISTORY_STORAGE_KEY);
+    window.location.reload();
+  };
+
+  const downloadAutoSaveAsFile = () => {
+    const raw = window.localStorage.getItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY);
+    if (!raw) { setDrawerNotice('No auto-save found yet.'); return; }
+    const blob = new Blob([raw], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `parametric-autosave-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -3444,6 +3521,7 @@ export default function ParametricPage() {
     const hasStroke = strokeRaw.length > 0;
     const fillVisible = hasFill && fillRaw.toLowerCase() !== 'none';
 
+    if (elementType === 'image_layer') return 'none';
     if (elementType === 'base') return 'fill';
     if (elementType === 'ring' || elementType === 'bezel' || elementType === 'outline_ring' || elementType === 'ticks_radial' || elementType === 'radialTicks') {
       if (hasStroke) return 'stroke';
@@ -6047,6 +6125,33 @@ export default function ParametricPage() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_8%_12%,#1e293b_0%,#0b1020_35%,#08090c_100%)] text-white p-4 md:p-6">
+      {/* ── Crash-recovery banner ───────────────────────────────────────── */}
+      {autoSaveRecovery && (
+        <div className="mb-4 mx-auto w-full max-w-[1700px] flex items-center justify-between gap-3 rounded-xl border border-amber-700 bg-amber-950/60 px-4 py-2.5 shadow-lg">
+          <div>
+            <span className="text-[12px] font-semibold text-amber-300">Auto-save found</span>
+            <span className="ml-2 text-[11px] text-amber-400/80">
+              from {new Date(autoSaveRecovery._autoSavedAt as string).toLocaleString()} — restore to recover your work?
+            </span>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => restoreFromAutoSave(autoSaveRecovery)}
+              className="rounded border border-amber-600 bg-amber-900/50 px-3 py-1 text-[11px] text-amber-200 hover:bg-amber-800/60 font-medium"
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoSaveRecovery(null)}
+              className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-400 hover:bg-zinc-800"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       <section className="mx-auto w-full max-w-[1700px] rounded-2xl border border-zinc-800/80 bg-zinc-950/90 p-4 md:p-6 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -6507,8 +6612,50 @@ export default function ParametricPage() {
                     </button>
                   </div>
                 </div>
+                {/* ── Auto-save ─────────────────────────────── */}
+                <div className="mt-2 border-t border-zinc-800 pt-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-zinc-400">Auto-Save (crash protection)</p>
+                    <button
+                      type="button"
+                      onClick={() => setAutoSaveEnabled(v => !v)}
+                      className={`rounded px-2 py-0.5 text-[10px] font-medium border ${autoSaveEnabled ? 'border-emerald-700 bg-emerald-950/50 text-emerald-300' : 'border-zinc-700 bg-zinc-800 text-zinc-400'}`}
+                    >
+                      {autoSaveEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                  {autoSaveEnabled && (
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] text-zinc-500">Every</span>
+                      {AUTO_SAVE_INTERVAL_OPTIONS.map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setAutoSaveIntervalMin(m)}
+                          className={`rounded px-1.5 py-0.5 text-[10px] border ${autoSaveIntervalMin === m ? 'border-amber-600 bg-amber-950/50 text-amber-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}
+                        >
+                          {m}m
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    {lastAutoSaveAt ? (
+                      <span className="text-[10px] text-zinc-500">Last saved: {lastAutoSaveAt.toLocaleTimeString()}</span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-600">No save yet this session</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={downloadAutoSaveAsFile}
+                      className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      ↓ Download last auto-save
+                    </button>
+                  </div>
+                </div>
               </div>
-
+            
               <div className="mt-2 flex gap-2">
                 <input
                   value={themeNameDraft}
@@ -8149,6 +8296,136 @@ export default function ParametricPage() {
             {selectedPanelTarget === 'element' && selectedElement ? (
               <div className="space-y-3 rounded border border-zinc-800 bg-zinc-950/60 p-3">
                 <p className="text-xs uppercase tracking-wide text-amber-300">Editing: {selectedElement.type}</p>
+
+                {/* ── Image Layer inspector ─────────────────────────────── */}
+                {selectedElement.type === 'image_layer' && (() => {
+                  const imgParams = selectedElement.params && typeof selectedElement.params === 'object' ? selectedElement.params as Record<string, unknown> : {};
+                  const currentDataUrl = typeof imgParams.imageDataUrl === 'string' ? imgParams.imageDataUrl : '';
+                  const approxBytes = Math.round(currentDataUrl.length * 0.75);
+                  const approxKB = Math.round(approxBytes / 1024);
+                  const sizeWarning = approxKB > 2048
+                    ? { level: 'red', msg: `Image is very large (~${approxKB} KB) — auto-save may fail. Please resize.` }
+                    : approxKB > 800
+                      ? { level: 'orange', msg: `Large image (~${approxKB} KB) — consider resizing before upload.` }
+                      : approxKB > 500
+                        ? { level: 'yellow', msg: `Image is ${approxKB} KB — may slow auto-save.` }
+                        : null;
+                  const setImgParam = (key: string, value: unknown) => {
+                    const updated = { ...imgParams, [key]: value };
+                    applyTemplateCommand(`Image Layer: set ${key}`, (prev) => ({
+                      ...prev,
+                      elements: (prev.elements ?? []).map(el =>
+                        el.id === selectedElement.id ? { ...el, params: updated } : el
+                      ),
+                    }));
+                    markSelectedElementDirty('geometry');
+                  };
+                  return (
+                    <div className="space-y-2 rounded border border-sky-800/60 bg-sky-950/20 p-2">
+                      <p className="text-[11px] uppercase tracking-wide text-sky-300">Image Layer</p>
+                      <p className="text-[10px] text-zinc-500">Upload a PNG/JPG as a base reference layer. Stacks with other elements by layer order.</p>
+
+                      {/* Upload / Clear */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = () => {
+                              const file = input.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                const result = ev.target?.result as string;
+                                if (typeof result === 'string' && result.startsWith('data:image/')) {
+                                  setImgParam('imageDataUrl', result);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            };
+                            document.body.appendChild(input);
+                            input.click();
+                            document.body.removeChild(input);
+                          }}
+                          className="rounded border border-sky-700 bg-sky-950/40 px-2 py-1 text-[11px] text-sky-200 hover:bg-sky-900/40"
+                        >
+                          {currentDataUrl ? 'Replace image…' : 'Upload image…'}
+                        </button>
+                        {currentDataUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setImgParam('imageDataUrl', '')}
+                            className="rounded border border-zinc-700 px-2 py-0.5 text-[11px] text-zinc-400 hover:bg-zinc-800"
+                          >
+                            Clear
+                          </button>
+                        )}
+                        {currentDataUrl && (
+                          <span className="text-[10px] text-zinc-500">~{approxKB} KB</span>
+                        )}
+                      </div>
+
+                      {/* Size warning */}
+                      {sizeWarning && (
+                        <p className={`text-[10px] ${sizeWarning.level === 'red' ? 'text-red-400' : sizeWarning.level === 'orange' ? 'text-orange-400' : 'text-yellow-400'}`}>
+                          ⚠ {sizeWarning.msg}
+                        </p>
+                      )}
+
+                      {/* Fit */}
+                      <div className="space-y-1">
+                        <p className="text-[11px] text-zinc-400">Fit</p>
+                        <div className="flex gap-2">
+                          {(['fill', 'cover', 'contain'] as const).map(f => (
+                            <button
+                              key={f}
+                              type="button"
+                              onClick={() => setImgParam('fit', f)}
+                              className={`rounded border px-2 py-0.5 text-[10px] ${(imgParams.fit ?? 'fill') === f ? 'border-sky-600 bg-sky-950/50 text-sky-300' : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-zinc-600">
+                          {(imgParams.fit ?? 'fill') === 'fill' ? 'Stretch to exact canvas size — best for dial photos' :
+                           (imgParams.fit ?? 'fill') === 'cover' ? 'Fill canvas, crop overflow — preserves aspect ratio' :
+                           'Fit inside canvas — may show bars'}
+                        </p>
+                      </div>
+
+                      {/* Opacity */}
+                      <label className="block space-y-1">
+                        <span className="text-[11px] text-zinc-400">Opacity {(Number(imgParams.opacity ?? 1) * 100).toFixed(0)}%</span>
+                        <input
+                          type="range" min={0} max={1} step={0.01}
+                          value={Number(imgParams.opacity ?? 1)}
+                          onChange={e => setImgParam('opacity', Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+
+                      {/* Position + Size */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['x', 'y', 'width', 'height'] as const).map(k => (
+                          <label key={k} className="block space-y-0.5">
+                            <span className="text-[10px] text-zinc-500">{k.toUpperCase()} (fraction)</span>
+                            <input
+                              type="number" step={0.01} min={k === 'x' || k === 'y' ? -1 : 0.01} max={2}
+                              value={Number(imgParams[k] ?? (k === 'width' || k === 'height' ? 1 : 0)).toFixed(3)}
+                              onChange={e => setImgParam(k, Number(e.target.value))}
+                              className="h-7 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-[11px] text-zinc-100"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {selectedElement.type !== 'image_layer' && (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -8165,7 +8442,9 @@ export default function ParametricPage() {
                     Collapse All Effects
                   </button>
                 </div>
+                )}
 
+                {selectedElement.type !== 'image_layer' && (
                 <div className="space-y-2 rounded border border-zinc-800 p-2">
                   <p className="text-[11px] uppercase tracking-wide text-zinc-400">Snapshot Render Source</p>
                   <p className="text-[11px] text-zinc-500">
@@ -8232,6 +8511,7 @@ export default function ParametricPage() {
                     </button>
                   </div>
                 </div>
+                )}
 
                 <label className="block space-y-1">
                   <span className="text-[11px] text-zinc-400">Name</span>
