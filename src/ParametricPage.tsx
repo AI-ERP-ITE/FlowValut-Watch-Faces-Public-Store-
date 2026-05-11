@@ -5181,12 +5181,12 @@ export default function ParametricPage() {
     setLayoutDraft(JSON.stringify(workingTemplate.layout, null, 2));
   }, [workingTemplate]);
 
-  // Keep a ref so the Ctrl+R handler always sees latest template without stale closure.
+  // Keep a ref so the Ctrl+Enter handler always sees latest template without stale closure.
   useEffect(() => {
     workingTemplateRef.current = workingTemplate ?? null;
   }, [workingTemplate]);
 
-  // Debounced render: fires 2 s after the last change, or immediately on Ctrl+R.
+  // Debounced render: fires 2 s after the last change, or immediately on Ctrl+Enter.
   useEffect(() => {
     if (!workingTemplate) return;
     if (renderDebounceTimerRef.current !== null) clearTimeout(renderDebounceTimerRef.current);
@@ -5202,10 +5202,10 @@ export default function ParametricPage() {
     };
   }, [colorMode, renderPreview, workingTemplate]);
 
-  // Ctrl+R — force-render immediately.
+  // Ctrl+Enter — force-render immediately (Ctrl+R avoided: browser page-refresh conflict).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'r') {
+      if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
         if (renderDebounceTimerRef.current !== null) {
           clearTimeout(renderDebounceTimerRef.current);
