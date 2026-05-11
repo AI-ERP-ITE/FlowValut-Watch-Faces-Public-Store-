@@ -1110,6 +1110,8 @@ export default function ParametricPage() {
   const sliderThrottleLastAppliedRef = useRef(0);
   const sliderThrottlePendingRef = useRef<null | { apply: () => void; debounceMs: number }>(null);
   const pendingLibraryFirebaseSyncRef = useRef<Array<LibraryEntry> | null>(null);
+  const renderDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workingTemplateRef = useRef<TemplateModel | null>(null);
   const authConfigured = isFirebaseAuthConfigured();
   const markDirtyById = useCallback((elementId: string | null | undefined, reason: DirtyReason) => {
     if (typeof elementId !== 'string' || elementId.trim().length === 0) return;
@@ -5095,10 +5097,43 @@ export default function ParametricPage() {
     setLayoutDraft(JSON.stringify(workingTemplate.layout, null, 2));
   }, [workingTemplate]);
 
+  // Keep a ref so the Ctrl+R handler always sees latest template without stale closure.
+  useEffect(() => {
+    workingTemplateRef.current = workingTemplate ?? null;
+  }, [workingTemplate]);
+
+  // Debounced render: fires 2 s after the last change, or immediately on Ctrl+R.
   useEffect(() => {
     if (!workingTemplate) return;
-    void renderPreview(workingTemplate);
+    if (renderDebounceTimerRef.current !== null) clearTimeout(renderDebounceTimerRef.current);
+    renderDebounceTimerRef.current = setTimeout(() => {
+      renderDebounceTimerRef.current = null;
+      void renderPreview(workingTemplate);
+    }, 2000);
+    return () => {
+      if (renderDebounceTimerRef.current !== null) {
+        clearTimeout(renderDebounceTimerRef.current);
+        renderDebounceTimerRef.current = null;
+      }
+    };
   }, [colorMode, renderPreview, workingTemplate]);
+
+  // Ctrl+R — force-render immediately.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'r') {
+        e.preventDefault();
+        if (renderDebounceTimerRef.current !== null) {
+          clearTimeout(renderDebounceTimerRef.current);
+          renderDebounceTimerRef.current = null;
+        }
+        const tpl = workingTemplateRef.current;
+        if (tpl) void renderPreview(tpl);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [renderPreview]);
 
   const exportPreviewAsPng = async () => {
     if (!svgMarkup) return;
