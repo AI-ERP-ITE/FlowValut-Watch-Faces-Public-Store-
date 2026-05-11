@@ -553,6 +553,17 @@ const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
       map.set(entry.category, deepClone(entry.element));
     }
   }
+  // Image Layer has no SAMPLE_LIBRARY entry — seed a bare default so addNewElementFromDefaults works.
+  if (!map.has('Image Layer')) {
+    map.set('Image Layer', {
+      type: 'image_layer',
+      role: 'image_layer',
+      name: 'Image Layer',
+      params: { imageDataUrl: '', x: 0, y: 0, width: 1, height: 1, fit: 'fill', opacity: 1 },
+      placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
+      symmetry: { mode: 'none', config: {} },
+    } as unknown as TemplateElement);
+  }
   return map;
 })();
 
@@ -3148,7 +3159,7 @@ export default function ParametricPage() {
   const isCategoryHeaderLocked = (category: string): boolean => {
     const current = categoryHeaderLocks[category];
     if (typeof current === 'boolean') return current;
-    return category === 'Free Objects';
+    return category === 'Free Objects' || category === 'Image Layer';
   };
 
   const applyCategoryHeaderLock = (
