@@ -1257,23 +1257,23 @@ export default function ParametricPage() {
     if (!autoSaveEnabled) return;
     const ms = autoSaveIntervalMin * 60 * 1000;
     const id = setInterval(() => {
-      // Flush current React state → localStorage first (avoids stale reads).
+      // Build dump directly from refs — never read back from localStorage.
+      // localStorage writes can fail silently (QuotaExceededError on large templates),
+      // so reading localStorage back would return a stale initial snapshot.
       const tpl = workingTemplateRef.current;
+      const dump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
+      if (tpl) dump[PARAMETRIC_TEMPLATE_STORAGE_KEY] = tpl;
+      dump[PARAMETRIC_LIBRARY_STORAGE_KEY] = libraryRef.current;
+      dump[PARAMETRIC_THEME_STORAGE_KEY] = themesRef.current;
+      // progress snapshot is small — safe to read from localStorage
+      const progressRaw = window.localStorage.getItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY);
+      if (progressRaw) { try { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = JSON.parse(progressRaw); } catch { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = progressRaw; } }
+
+      // Also flush to localStorage (best-effort, may fail on large templates).
       if (tpl) saveTemplate(tpl);
       saveLibraryLocal(libraryRef.current);
       saveThemesLocal(themesRef.current);
 
-      const storageKeys = [
-        PARAMETRIC_TEMPLATE_STORAGE_KEY,
-        PARAMETRIC_LIBRARY_STORAGE_KEY,
-        PARAMETRIC_THEME_STORAGE_KEY,
-        PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-      ];
-      const dump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
-      for (const key of storageKeys) {
-        const r = window.localStorage.getItem(key);
-        if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
-      }
       // Persist to autosave.json in the local folder.
       if (localFolderHandle) {
         void saveAutoSaveFile(localFolderHandle, dump).catch(() => {});
@@ -6837,20 +6837,12 @@ export default function ParametricPage() {
                           }
                           // Write an immediate autosave.json so it exists right away.
                           const tpl = workingTemplateRef.current;
-                          if (tpl) saveTemplate(tpl);
-                          saveLibraryLocal(library);
-                          saveThemesLocal(themes);
-                          const storageKeys = [
-                            PARAMETRIC_TEMPLATE_STORAGE_KEY,
-                            PARAMETRIC_LIBRARY_STORAGE_KEY,
-                            PARAMETRIC_THEME_STORAGE_KEY,
-                            PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-                          ];
                           const dump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
-                          for (const key of storageKeys) {
-                            const r = window.localStorage.getItem(key);
-                            if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
-                          }
+                          if (tpl) dump[PARAMETRIC_TEMPLATE_STORAGE_KEY] = tpl;
+                          dump[PARAMETRIC_LIBRARY_STORAGE_KEY] = libraryRef.current;
+                          dump[PARAMETRIC_THEME_STORAGE_KEY] = themesRef.current;
+                          const progressRaw2 = window.localStorage.getItem(PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY);
+                          if (progressRaw2) { try { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = JSON.parse(progressRaw2); } catch { dump[PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY] = progressRaw2; } }
                           void saveAutoSaveFile(handle, dump).catch(() => {});
                           setDrawerNotice(`Local folder set: ${handle.name}. All themes & elements written to disk.`);
                         }}
