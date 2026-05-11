@@ -146,13 +146,15 @@ async function main() {
     await writeText(rootStudioParametricIndex, distHtml);
 
     // For private deploys: GH Pages (origin) serves from docs/, NOT root.
-    // Restore root index.html to the dev entry so the next build (e.g. public)
-    // doesn't fail with "Failed to resolve /Watch-Faces/assets/index-*.js".
-    // For public deploys: GH Pages (public remote) serves from root, so we
-    // leave root index.html as the production bundle reference.
+    // For public deploys: GH Pages (public remote) ALSO serves from docs/.
+    // In both cases, root index.html only needs the production bundle reference
+    // at the moment of git-push (already captured in the commit above before restore).
+    // Restore root to dev entry so the next Vite build can resolve /src/main.tsx.
+    await writeText(rootIndex, DEV_INDEX_HTML);
     if (target === 'private') {
-      await writeText(rootIndex, DEV_INDEX_HTML);
       console.log('Root index.html restored to dev entry (target=private; GH Pages uses docs/).');
+    } else {
+      console.log(`Root index.html restored to dev entry (target=${target}; prevents next build failure).`);
     }
   }
 
