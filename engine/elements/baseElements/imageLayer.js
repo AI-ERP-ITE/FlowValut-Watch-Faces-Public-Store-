@@ -42,14 +42,17 @@ export function renderImageLayer(params = {}, position = {}, context = {}) {
 	const W = Number.isFinite(canvasW) && canvasW > 0 ? canvasW : 100;
 	const H = Number.isFinite(canvasH) && canvasH > 0 ? canvasH : 100;
 
-	// imgX/imgY are center-offset fractions: (0,0) = image centered on canvas.
-	// Compute image top-left from canvas center + offset - half image size.
+	// The renderer wraps this element in translate(50 50) in normalized 0-100 space,
+	// meaning (0,0) here = canvas center in SVG coordinates.
+	// layoutMetrics.width/height are the canvas dimensions in those same SVG units.
+	// To center the image on canvas: top-left = (-W/2 + offsetX, -H/2 + offsetY).
+	// imgX/imgY are center-offset fractions: (0,0) = perfectly centered.
 	const offsetX = clamp(p.imgX, -1, 2, 0) * W;
 	const offsetY = clamp(p.imgY, -1, 2, 0) * H;
 	const width  = clamp(p.width,  0.01, 2, 1) * W;
 	const height = clamp(p.height, 0.01, 2, 1) * H;
-	const x = W / 2 - width / 2 + offsetX;
-	const y = H / 2 - height / 2 + offsetY;
+	const x = -width / 2 + offsetX;
+	const y = -height / 2 + offsetY;
 	const opacity = clamp(p.opacity, 0, 1, 1);
 
 	const fit = typeof p.fit === "string" && FIT_TO_PAR[p.fit] ? p.fit : "fill";
