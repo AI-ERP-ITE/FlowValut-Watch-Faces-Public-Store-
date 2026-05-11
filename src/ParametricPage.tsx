@@ -544,7 +544,7 @@ async function buildPixelColorPassAssets(
   }
 }
 
-const DEFAULT_DRAWER_CATEGORY_ORDER = ['Base', 'Bezel', 'Ticks', 'Outline', 'Free Objects', 'Texture', 'General'] as const;
+const DEFAULT_DRAWER_CATEGORY_ORDER = ['Base', 'Bezel', 'Ticks', 'Outline', 'Free Objects', 'Texture', 'Image Layer', 'General'] as const;
 
 const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
   const map = new Map<string, TemplateElement>();
@@ -8156,6 +8156,14 @@ export default function ParametricPage() {
                 <h2 className="text-sm font-semibold text-zinc-100">Layers (Order = Render Order)</h2>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-400">{(workingTemplate?.elements ?? []).length} layer(s)</span>
+                  <button
+                    type="button"
+                    onClick={() => addNewElementFromDefaults('Image Layer')}
+                    className="rounded border border-violet-700 bg-violet-950/40 px-2 py-0.5 text-[11px] text-violet-200 hover:bg-violet-900/40"
+                    title="Add a new image reference layer (PNG/JPG)"
+                  >
+                    + Image Layer
+                  </button>
                   <span className="text-[11px] text-zinc-500">Height {Math.round(layersPanelHeight)}px</span>
                 </div>
               </div>
