@@ -5173,24 +5173,49 @@ export default function ParametricPage() {
         const lastRestoredTs = window.localStorage.getItem(AUTOSAVE_LAST_RESTORED_KEY);
         // Only restore if autosave.json has a newer timestamp than last restore.
         if (dumpTs && dumpTs !== lastRestoredTs) {
-          const storageKeys = [
-            PARAMETRIC_TEMPLATE_STORAGE_KEY,
-            PARAMETRIC_LIBRARY_STORAGE_KEY,
-            PARAMETRIC_THEME_STORAGE_KEY,
-            PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-          ];
+          // Apply dump DIRECTLY to React state — never route through localStorage.
+          // localStorage has a 5MB quota; large templates with baked image snapshots
+          // silently exceed it (QuotaExceededError swallowed), so a write→reload cycle
+          // would restore an empty/stale template. Setting state directly bypasses the
+          // quota wall entirely and requires no page reload.
           let restored = false;
-          for (const key of storageKeys) {
-            if (key in dump) {
-              window.localStorage.setItem(key, JSON.stringify(dump[key]));
+
+          const tplRaw = dump[PARAMETRIC_TEMPLATE_STORAGE_KEY];
+          if (tplRaw && typeof tplRaw === 'object') {
+            const tpl = tplRaw as TemplateModel;
+            if (Array.isArray(tpl.elements)) {
+              const normalized: TemplateModel = {
+                ...tpl,
+                elements: tpl.elements.map((e, i) => ensureElement(e as TemplateElement, i)),
+              };
+              setWorkingTemplate(normalized);
+              restoreCommandHistoryForTemplate(normalized);
+              if (normalized.elements.length > 0) {
+                setSelectedElementId(normalized.elements[0].id ?? null);
+                setSelectedPanelTarget('element');
+              } else {
+                setSelectedPanelTarget('layout');
+              }
               restored = true;
             }
           }
+
+          const libRaw = dump[PARAMETRIC_LIBRARY_STORAGE_KEY];
+          if (Array.isArray(libRaw)) {
+            setLibrary(normalizeLibraryEntries(libRaw as Array<unknown>));
+            restored = true;
+          }
+
+          const themesRaw = dump[PARAMETRIC_THEME_STORAGE_KEY];
+          if (Array.isArray(themesRaw)) {
+            setThemes(normalizeThemeEntries(themesRaw as Array<unknown>));
+            restored = true;
+          }
+
           if (restored) {
-            // Record which timestamp we just restored so next load doesn't loop.
+            // Record restored timestamp so next refresh only re-restores if autosave is newer.
             window.localStorage.setItem(AUTOSAVE_LAST_RESTORED_KEY, dumpTs);
-            window.location.reload();
-            return;
+            setDrawerNotice(`✓ Auto-restored from ${new Date(dumpTs).toLocaleString()}`);
           }
         }
       }
