@@ -5162,13 +5162,17 @@ export default function ParametricPage() {
       setLocalFolderHandle(handle);
 
       // Auto-restore from autosave.json if present (silently restores last auto-saved state).
-      // Guard: only restore once per browser session to prevent infinite reload loop.
-      const AUTOSAVE_RESTORED_FLAG = 'parametric-autosave-restored-v1';
-      const alreadyRestored = window.sessionStorage.getItem(AUTOSAVE_RESTORED_FLAG) === '1';
-      if (!alreadyRestored) {
-        const autoSaveDump = await loadAutoSaveFile(handle);
-        if (autoSaveDump && typeof autoSaveDump === 'object') {
-          const dump = autoSaveDump as Record<string, unknown>;
+      // Guard: compare _autoSavedAt timestamps to avoid infinite reload loop.
+      // sessionStorage was wrong here — it persists across manual refreshes (same tab session),
+      // so it would block restore on every refresh after the first one.
+      const AUTOSAVE_LAST_RESTORED_KEY = 'parametric-autosave-last-restored-ts-v1';
+      const autoSaveDump = await loadAutoSaveFile(handle);
+      if (autoSaveDump && typeof autoSaveDump === 'object') {
+        const dump = autoSaveDump as Record<string, unknown>;
+        const dumpTs = typeof dump['_autoSavedAt'] === 'string' ? dump['_autoSavedAt'] : null;
+        const lastRestoredTs = window.localStorage.getItem(AUTOSAVE_LAST_RESTORED_KEY);
+        // Only restore if autosave.json has a newer timestamp than last restore.
+        if (dumpTs && dumpTs !== lastRestoredTs) {
           const storageKeys = [
             PARAMETRIC_TEMPLATE_STORAGE_KEY,
             PARAMETRIC_LIBRARY_STORAGE_KEY,
@@ -5183,8 +5187,8 @@ export default function ParametricPage() {
             }
           }
           if (restored) {
-            // Mark restored so the reload doesn't trigger restore again.
-            window.sessionStorage.setItem(AUTOSAVE_RESTORED_FLAG, '1');
+            // Record which timestamp we just restored so next load doesn't loop.
+            window.localStorage.setItem(AUTOSAVE_LAST_RESTORED_KEY, dumpTs);
             window.location.reload();
             return;
           }
@@ -5219,6 +5223,9 @@ export default function ParametricPage() {
         if (r) { try { mountDump[key] = JSON.parse(r); } catch { mountDump[key] = r; } }
       }
       void saveAutoSaveFile(handle, mountDump).catch(() => {});
+      // Keep last-restored timestamp in sync with mount write so the next
+      // manual refresh doesn't re-restore a snapshot we just wrote ourselves.
+      window.localStorage.setItem('parametric-autosave-last-restored-ts-v1', mountDump['_autoSavedAt'] as string);
     })();
 
     void renderPreview();
