@@ -2,8 +2,8 @@
 
 const DEFAULTS = {
 	imageDataUrl: "",
-	x: 0,
-	y: 0,
+	imgX: 0,
+	imgY: 0,
 	width: 1,
 	height: 1,
 	fit: "fill",
@@ -43,8 +43,8 @@ export function renderImageLayer(params = {}, position = {}, context = {}) {
 	const H = Number.isFinite(canvasH) && canvasH > 0 ? canvasH : 100;
 
 	// Fractions → canvas pixels; allow slight over-canvas placement
-	const x      = clamp(p.x,      -1, 2, 0) * W;
-	const y      = clamp(p.y,      -1, 2, 0) * H;
+	const x      = clamp(p.imgX,   -1, 2, 0) * W;
+	const y      = clamp(p.imgY,   -1, 2, 0) * H;
 	const width  = clamp(p.width,  0.01, 2, 1) * W;
 	const height = clamp(p.height, 0.01, 2, 1) * H;
 	const opacity = clamp(p.opacity, 0, 1, 1);

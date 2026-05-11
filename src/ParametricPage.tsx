@@ -559,7 +559,7 @@ const DEFAULT_DRAWER_TEMPLATES_BY_CATEGORY = (() => {
       type: 'image_layer',
       role: 'image_layer',
       name: 'Image Layer',
-      params: { imageDataUrl: '', x: 0, y: 0, width: 1, height: 1, fit: 'fill', opacity: 1 },
+      params: { imageDataUrl: '', imgX: 0, imgY: 0, width: 1, height: 1, fit: 'fill', opacity: 1 },
       placement: { mode: 'center', config: { offset: [0, 0], rotation: 0 } },
       symmetry: { mode: 'none', config: {} },
     } as unknown as TemplateElement);
@@ -8596,11 +8596,11 @@ export default function ParametricPage() {
 
                       {/* Position + Size */}
                       <div className="grid grid-cols-2 gap-2">
-                        {(['x', 'y', 'width', 'height'] as const).map(k => (
+                        {(['imgX', 'imgY', 'width', 'height'] as const).map(k => (
                           <label key={k} className="block space-y-0.5">
-                            <span className="text-[10px] text-zinc-500">{k.toUpperCase()} (fraction)</span>
+                            <span className="text-[10px] text-zinc-500">{k === 'imgX' ? 'X' : k === 'imgY' ? 'Y' : k.toUpperCase()} (fraction)</span>
                             <input
-                              type="number" step={0.01} min={k === 'x' || k === 'y' ? -1 : 0.01} max={2}
+                              type="number" step={0.01} min={k === 'imgX' || k === 'imgY' ? -1 : 0.01} max={2}
                               value={Number(imgParams[k] ?? (k === 'width' || k === 'height' ? 1 : 0)).toFixed(3)}
                               onChange={e => setImgParam(k, Number(e.target.value))}
                               className="h-7 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-[11px] text-zinc-100"
