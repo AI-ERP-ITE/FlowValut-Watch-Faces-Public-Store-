@@ -5158,26 +5158,32 @@ export default function ParametricPage() {
       setLocalFolderHandle(handle);
 
       // Auto-restore from autosave.json if present (silently restores last auto-saved state).
-      const autoSaveDump = await loadAutoSaveFile(handle);
-      if (autoSaveDump && typeof autoSaveDump === 'object') {
-        const dump = autoSaveDump as Record<string, unknown>;
-        const storageKeys = [
-          PARAMETRIC_TEMPLATE_STORAGE_KEY,
-          PARAMETRIC_LIBRARY_STORAGE_KEY,
-          PARAMETRIC_THEME_STORAGE_KEY,
-          PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-        ];
-        let restored = false;
-        for (const key of storageKeys) {
-          if (key in dump) {
-            window.localStorage.setItem(key, JSON.stringify(dump[key]));
-            restored = true;
+      // Guard: only restore once per browser session to prevent infinite reload loop.
+      const AUTOSAVE_RESTORED_FLAG = 'parametric-autosave-restored-v1';
+      const alreadyRestored = window.sessionStorage.getItem(AUTOSAVE_RESTORED_FLAG) === '1';
+      if (!alreadyRestored) {
+        const autoSaveDump = await loadAutoSaveFile(handle);
+        if (autoSaveDump && typeof autoSaveDump === 'object') {
+          const dump = autoSaveDump as Record<string, unknown>;
+          const storageKeys = [
+            PARAMETRIC_TEMPLATE_STORAGE_KEY,
+            PARAMETRIC_LIBRARY_STORAGE_KEY,
+            PARAMETRIC_THEME_STORAGE_KEY,
+            PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+          ];
+          let restored = false;
+          for (const key of storageKeys) {
+            if (key in dump) {
+              window.localStorage.setItem(key, JSON.stringify(dump[key]));
+              restored = true;
+            }
           }
-        }
-        if (restored) {
-          // Reload so all state slices pick up the restored data cleanly.
-          window.location.reload();
-          return;
+          if (restored) {
+            // Mark restored so the reload doesn't trigger restore again.
+            window.sessionStorage.setItem(AUTOSAVE_RESTORED_FLAG, '1');
+            window.location.reload();
+            return;
+          }
         }
       }
 
@@ -6810,6 +6816,23 @@ export default function ParametricPage() {
                           for (const e of library) {
                             void saveLibraryFile(handle, e as { id: string; name: string; [key: string]: unknown }).catch(() => {});
                           }
+                          // Write an immediate autosave.json so it exists right away.
+                          const tpl = workingTemplateRef.current;
+                          if (tpl) saveTemplate(tpl);
+                          saveLibraryLocal(library);
+                          saveThemesLocal(themes);
+                          const storageKeys = [
+                            PARAMETRIC_TEMPLATE_STORAGE_KEY,
+                            PARAMETRIC_LIBRARY_STORAGE_KEY,
+                            PARAMETRIC_THEME_STORAGE_KEY,
+                            PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+                          ];
+                          const dump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
+                          for (const key of storageKeys) {
+                            const r = window.localStorage.getItem(key);
+                            if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
+                          }
+                          void saveAutoSaveFile(handle, dump).catch(() => {});
                           setDrawerNotice(`Local folder set: ${handle.name}. All themes & elements written to disk.`);
                         }}
                         className="rounded border border-violet-700 bg-violet-950/40 px-2 py-1 text-[11px] text-violet-200 hover:bg-violet-900/40"
