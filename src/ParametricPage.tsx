@@ -1371,15 +1371,20 @@ export default function ParametricPage() {
 
   // ── Local disk export / import (no Firebase, no size limit) ──────────────
   const exportAllDataToFile = () => {
-    const allKeys = [
+    // Flush current in-memory template to localStorage first so nothing is missed.
+    // (applyTemplateCommand already does this on every edit, but this is a safety net.)
+    if (workingTemplate) {
+      saveTemplate(workingTemplate);
+    }
+    // History lives in sessionStorage (not localStorage) — excluded intentionally.
+    const storageKeys = [
       PARAMETRIC_TEMPLATE_STORAGE_KEY,
       PARAMETRIC_LIBRARY_STORAGE_KEY,
       PARAMETRIC_THEME_STORAGE_KEY,
       PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-      PARAMETRIC_HISTORY_STORAGE_KEY,
     ];
-    const dump: Record<string, unknown> = { _exportedAt: new Date().toISOString() };
-    for (const key of allKeys) {
+    const dump: Record<string, unknown> = { _exportedAt: new Date().toISOString(), _version: 1 };
+    for (const key of storageKeys) {
       const raw = window.localStorage.getItem(key);
       if (raw) {
         try { dump[key] = JSON.parse(raw); } catch { dump[key] = raw; }
@@ -1394,7 +1399,7 @@ export default function ParametricPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setDrawerNotice('All data exported to file on your disk.');
+    setDrawerNotice('All data exported — this is a snapshot of RIGHT NOW. Re-export after more changes.');
   };
 
   const importAllDataFromFile = () => {
@@ -1408,18 +1413,19 @@ export default function ParametricPage() {
       reader.onload = (ev) => {
         try {
           const dump = JSON.parse(ev.target?.result as string) as Record<string, unknown>;
-          const allKeys = [
+          const storageKeys = [
             PARAMETRIC_TEMPLATE_STORAGE_KEY,
             PARAMETRIC_LIBRARY_STORAGE_KEY,
             PARAMETRIC_THEME_STORAGE_KEY,
             PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-            PARAMETRIC_HISTORY_STORAGE_KEY,
           ];
-          for (const key of allKeys) {
+          for (const key of storageKeys) {
             if (key in dump) {
               window.localStorage.setItem(key, JSON.stringify(dump[key]));
             }
           }
+          // Also clear session history so undo stack matches the restored state
+          window.sessionStorage.removeItem(PARAMETRIC_HISTORY_STORAGE_KEY);
           // Reload page so the app picks up all restored data fresh
           window.location.reload();
         } catch {
