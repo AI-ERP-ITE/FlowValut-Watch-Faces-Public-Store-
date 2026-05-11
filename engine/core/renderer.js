@@ -1580,6 +1580,28 @@ function resolveElementMaskFrameMetrics(element = {}, layoutMetrics = {}) {
 function resolveElementRenderSourceDecision(element = {}, layoutMetrics = {}) {
 	const requestedMode = resolveElementRenderSourceMode(element);
 	const fallbackMaskFrameMetrics = resolveSnapshotMaskFrameMetrics(element, layoutMetrics);
+
+	// If the element has an active live mask with a painted field, force live rendering.
+	// The mask field (PNG pixel buffer) is excluded from the snapshot hash (NON_VISUAL_KEYS),
+	// so a snapshot can be "fresh" while the mask field has been painted — causing the baked
+	// PNG to be used as the body and making fill-color changes invisible to the user.
+	const elementMask = element && typeof element === "object" ? element.mask : null;
+	const hasMaskField = !!(elementMask
+		&& typeof elementMask === "object"
+		&& elementMask.enabled === true
+		&& elementMask.field
+		&& typeof elementMask.field === "object"
+		&& typeof elementMask.field.imageDataUrl === "string"
+		&& elementMask.field.imageDataUrl.trim().length > 0);
+	if (hasMaskField) {
+		return {
+			requestedMode,
+			effectiveMode: "live",
+			snapshotSource: null,
+			maskFrameMetrics: fallbackMaskFrameMetrics,
+		};
+	}
+
 	if (requestedMode !== "snapshot") {
 		return {
 			requestedMode,
