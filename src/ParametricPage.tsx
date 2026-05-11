@@ -1412,21 +1412,22 @@ export default function ParametricPage() {
     }
   };
 
-  const saveThemesLocal = (items: Array<ThemeEntry>) => {
+  const saveThemesLocal = (items: Array<ThemeEntry>): boolean => {
     try {
       window.localStorage.setItem(PARAMETRIC_THEME_STORAGE_KEY, JSON.stringify(items));
+      return true;
     } catch {
-      // Ignore localStorage failures.
+      return false;
     }
   };
 
   // ── Local disk export / import (no Firebase, no size limit) ──────────────
   const exportAllDataToFile = () => {
-    // Flush current in-memory template to localStorage first so nothing is missed.
-    // (applyTemplateCommand already does this on every edit, but this is a safety net.)
-    if (workingTemplate) {
-      saveTemplate(workingTemplate);
-    }
+    // Flush all in-memory state to localStorage first — covers cases where prior saves
+    // failed silently (e.g. QuotaExceededError) so export always reflects RIGHT NOW.
+    if (workingTemplate) saveTemplate(workingTemplate);
+    saveThemesLocal(themes);
+    saveLibraryLocal(library);
     // History lives in sessionStorage (not localStorage) — excluded intentionally.
     const storageKeys = [
       PARAMETRIC_TEMPLATE_STORAGE_KEY,
@@ -1753,19 +1754,18 @@ export default function ParametricPage() {
   };
 
   const persistThemes = (updater: (prev: Array<ThemeEntry>) => Array<ThemeEntry>, successNotice: string) => {
-    let pushed: Array<ThemeEntry> | null = null;
-    setThemes((prev) => {
-      const next = updater(prev);
-      saveThemesLocal(next);
-      pushed = next;
-      return next;
-    });
-    if (pushed) {
-      void saveThemesToFirebaseOnAction(pushed).catch(() => {
-        // Firebase push errors are non-fatal; local cache already saved.
-      });
+    // Compute next state outside updater so side effects are deterministic.
+    const next = updater(themes);
+    setThemes(next);
+    const localSaved = saveThemesLocal(next);
+    if (!localSaved) {
+      setDrawerNotice(`${successNotice} ⚠ Local save failed — storage may be full. Use Export All to back up.`);
+    } else {
+      setDrawerNotice(successNotice);
     }
-    setDrawerNotice(successNotice);
+    void saveThemesToFirebaseOnAction(next).catch(() => {
+      // Firebase push errors are non-fatal; local cache already saved.
+    });
   };
 
   const saveCurrentAsTheme = () => {
