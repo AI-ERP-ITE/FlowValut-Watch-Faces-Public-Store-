@@ -1505,9 +1505,23 @@ export default function ParametricPage() {
   };
 
   const downloadAutoSaveAsFile = () => {
-    const raw = window.localStorage.getItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY);
-    if (!raw) { setDrawerNotice('No auto-save found yet.'); return; }
-    const blob = new Blob([raw], { type: 'application/json' });
+    // Always flush current state first so download reflects RIGHT NOW, not last interval tick.
+    const storageKeys = [
+      PARAMETRIC_TEMPLATE_STORAGE_KEY,
+      PARAMETRIC_LIBRARY_STORAGE_KEY,
+      PARAMETRIC_THEME_STORAGE_KEY,
+      PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
+    ];
+    if (workingTemplate) saveTemplate(workingTemplate);
+    const dump: Record<string, unknown> = { _autoSavedAt: new Date().toISOString(), _version: 1 };
+    for (const key of storageKeys) {
+      const r = window.localStorage.getItem(key);
+      if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
+    }
+    const serialized = JSON.stringify(dump, null, 2);
+    window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, serialized);
+    setLastAutoSaveAt(new Date());
+    const blob = new Blob([serialized], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
