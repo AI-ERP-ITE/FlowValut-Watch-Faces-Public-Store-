@@ -1251,6 +1251,8 @@ export default function ParametricPage() {
   }, []);
 
   // ── Auto-save: interval ───────────────────────────────────────────────────
+  // localFolderHandle is included in deps so the timer restarts when the folder is linked,
+  // ensuring the closure always has the current handle (not null from initial mount).
   useEffect(() => {
     if (!autoSaveEnabled) return;
     const ms = autoSaveIntervalMin * 60 * 1000;
@@ -1275,14 +1277,13 @@ export default function ParametricPage() {
       // Persist to localStorage (fallback).
       window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, JSON.stringify(dump));
       // Persist to autosave.json in the local folder (preferred — survives browser wipes).
-      const folderHandle = localFolderHandleRef.current;
-      if (folderHandle) {
-        void saveAutoSaveFile(folderHandle, dump).catch(() => {});
+      if (localFolderHandle) {
+        void saveAutoSaveFile(localFolderHandle, dump).catch(() => {});
       }
       setLastAutoSaveAt(new Date());
     }, ms);
     return () => clearInterval(id);
-  }, [autoSaveEnabled, autoSaveIntervalMin]);
+  }, [autoSaveEnabled, autoSaveIntervalMin, localFolderHandle]);
 
   // ── Auto-save: persist settings ───────────────────────────────────────────
   useEffect(() => {
