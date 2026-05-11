@@ -1512,21 +1512,51 @@ export default function ParametricPage() {
       reader.onload = (ev) => {
         try {
           const dump = JSON.parse(ev.target?.result as string) as Record<string, unknown>;
-          const storageKeys = [
-            PARAMETRIC_TEMPLATE_STORAGE_KEY,
-            PARAMETRIC_LIBRARY_STORAGE_KEY,
-            PARAMETRIC_THEME_STORAGE_KEY,
-            PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-          ];
-          for (const key of storageKeys) {
-            if (key in dump) {
-              window.localStorage.setItem(key, JSON.stringify(dump[key]));
+
+          // Apply directly to React state — never route through localStorage.
+          // Large templates with baked image snapshots exceed the 5MB localStorage quota;
+          // the setItem() silently fails → reload loads stale data. Set state directly instead.
+          let restored = false;
+
+          const tplRaw = dump[PARAMETRIC_TEMPLATE_STORAGE_KEY];
+          if (tplRaw && typeof tplRaw === 'object') {
+            const tpl = tplRaw as TemplateModel;
+            if (Array.isArray(tpl.elements)) {
+              const normalized: TemplateModel = {
+                ...tpl,
+                elements: tpl.elements.map((e, i) => ensureElement(e as TemplateElement, i)),
+              };
+              setWorkingTemplate(normalized);
+              restoreCommandHistoryForTemplate(normalized);
+              if (normalized.elements.length > 0) {
+                setSelectedElementId(normalized.elements[0].id ?? null);
+                setSelectedPanelTarget('element');
+              } else {
+                setSelectedPanelTarget('layout');
+              }
+              restored = true;
             }
           }
-          // Also clear session history so undo stack matches the restored state
+
+          const libRaw = dump[PARAMETRIC_LIBRARY_STORAGE_KEY];
+          if (Array.isArray(libRaw)) {
+            setLibrary(normalizeLibraryEntries(libRaw as Array<unknown>));
+            restored = true;
+          }
+
+          const themesRaw = dump[PARAMETRIC_THEME_STORAGE_KEY];
+          if (Array.isArray(themesRaw)) {
+            setThemes(normalizeThemeEntries(themesRaw as Array<unknown>));
+            restored = true;
+          }
+
           window.sessionStorage.removeItem(PARAMETRIC_HISTORY_STORAGE_KEY);
-          // Reload page so the app picks up all restored data fresh
-          window.location.reload();
+
+          if (restored) {
+            setDrawerNotice('Import successful.');
+          } else {
+            setDrawerNotice('Import failed: no recognisable data found in file.');
+          }
         } catch {
           setDrawerNotice('Import failed: invalid file format.');
         }
@@ -1539,17 +1569,32 @@ export default function ParametricPage() {
   };
 
   const restoreFromAutoSave = (dump: Record<string, unknown>) => {
-    const storageKeys = [
-      PARAMETRIC_TEMPLATE_STORAGE_KEY,
-      PARAMETRIC_LIBRARY_STORAGE_KEY,
-      PARAMETRIC_THEME_STORAGE_KEY,
-      PARAMETRIC_PROGRESS_SNAPSHOT_STORAGE_KEY,
-    ];
-    for (const key of storageKeys) {
-      if (key in dump) window.localStorage.setItem(key, JSON.stringify(dump[key]));
+    // Set state directly — same reason as importAllDataFromFile (localStorage quota).
+    const tplRaw = dump[PARAMETRIC_TEMPLATE_STORAGE_KEY];
+    if (tplRaw && typeof tplRaw === 'object') {
+      const tpl = tplRaw as TemplateModel;
+      if (Array.isArray(tpl.elements)) {
+        const normalized: TemplateModel = {
+          ...tpl,
+          elements: tpl.elements.map((e, i) => ensureElement(e as TemplateElement, i)),
+        };
+        setWorkingTemplate(normalized);
+        restoreCommandHistoryForTemplate(normalized);
+        if (normalized.elements.length > 0) {
+          setSelectedElementId(normalized.elements[0].id ?? null);
+          setSelectedPanelTarget('element');
+        } else {
+          setSelectedPanelTarget('layout');
+        }
+      }
     }
+    const libRaw = dump[PARAMETRIC_LIBRARY_STORAGE_KEY];
+    if (Array.isArray(libRaw)) setLibrary(normalizeLibraryEntries(libRaw as Array<unknown>));
+    const themesRaw = dump[PARAMETRIC_THEME_STORAGE_KEY];
+    if (Array.isArray(themesRaw)) setThemes(normalizeThemeEntries(themesRaw as Array<unknown>));
     window.sessionStorage.removeItem(PARAMETRIC_HISTORY_STORAGE_KEY);
-    window.location.reload();
+    setAutoSaveRecovery(null);
+    setDrawerNotice('Restored from auto-save.');
   };
 
   const downloadAutoSaveAsFile = () => {
