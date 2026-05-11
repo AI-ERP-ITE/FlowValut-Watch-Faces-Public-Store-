@@ -1274,11 +1274,14 @@ export default function ParametricPage() {
         const r = window.localStorage.getItem(key);
         if (r) { try { dump[key] = JSON.parse(r); } catch { dump[key] = r; } }
       }
-      // Persist to localStorage (fallback).
-      window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, JSON.stringify(dump));
-      // Persist to autosave.json in the local folder (preferred — survives browser wipes).
+      // Persist to autosave.json in the local folder.
       if (localFolderHandle) {
         void saveAutoSaveFile(localFolderHandle, dump).catch(() => {});
+      } else {
+        // No folder linked — fall back to localStorage (best-effort, may fail if quota exceeded).
+        try {
+          window.localStorage.setItem(PARAMETRIC_AUTO_SAVE_STORAGE_KEY, JSON.stringify(dump));
+        } catch { /* quota exceeded — skip */ }
       }
       setLastAutoSaveAt(new Date());
     }, ms);
