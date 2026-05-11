@@ -5592,10 +5592,15 @@ export default function ParametricPage() {
     const field = mask.field && typeof mask.field === 'object' ? mask.field as Record<string, unknown> : null;
     const initialValue = mask.invert === true ? 0 : 255;
     const values = decodeMaskFieldValues(field, frame.width, frame.height, initialValue);
-    if (stroke.tool === 'selection') {
-      applySelectionStrokeToField(values, frame.width, frame.height, stroke);
+    // When invert=true, the renderer alpha-flips the field image (255→hidden, 0→shown).
+    // So we must flip the stroke action so the user-visible intent (reveal/hide) is correct.
+    const effectiveStroke = mask.invert === true
+      ? { ...stroke, action: stroke.action === 'reveal' ? 'hide' : 'reveal' }
+      : stroke;
+    if (effectiveStroke.tool === 'selection') {
+      applySelectionStrokeToField(values, frame.width, frame.height, effectiveStroke);
     } else {
-      applyBrushStrokeToField(values, frame.width, frame.height, stroke);
+      applyBrushStrokeToField(values, frame.width, frame.height, effectiveStroke);
     }
     const imageDataUrl = buildMaskFieldDataUrl(values, frame.width, frame.height);
     return {
