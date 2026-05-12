@@ -1,11 +1,13 @@
 import path from "path"
 import { execSync } from "node:child_process"
 import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import { defineConfig, loadEnv } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+  // loadEnv makes .env.<mode> vars available to vite.config.ts (process.env alone does NOT load them)
+  const env = loadEnv(mode, process.cwd(), '');
   const resolveBuildVersion = () => {
     if (typeof process.env.VITE_APP_BUILD_VERSION === 'string' && process.env.VITE_APP_BUILD_VERSION.trim().length > 0) {
       return process.env.VITE_APP_BUILD_VERSION.trim();
@@ -22,8 +24,8 @@ export default defineConfig(({ mode }) => {
   const buildVersion = resolveBuildVersion();
   const routeModule = buildTarget === 'public' ? './src/AppPublic.tsx' : './src/AppPrivate.tsx';
   const providersModule = buildTarget === 'public' ? './src/AppProvidersPublic.tsx' : './src/AppProvidersPrivate.tsx';
-  const publicBase = process.env.VITE_PUBLIC_BASE || '/FlowValut-Watch-Faces-Public-Store-/';
-  const privateBase = process.env.VITE_PRIVATE_BASE || '/Watch-Faces/';
+  const publicBase = env.VITE_PUBLIC_BASE || process.env.VITE_PUBLIC_BASE || '/FlowValut-Watch-Faces-Public-Store-/';
+  const privateBase = env.VITE_PRIVATE_BASE || process.env.VITE_PRIVATE_BASE || '/Watch-Faces/';
 
   return {
     base: buildTarget === 'public' ? publicBase : privateBase,
