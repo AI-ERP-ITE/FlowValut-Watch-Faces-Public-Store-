@@ -452,10 +452,15 @@ function normalizeDepthEffect(source = {}, fallback = null) {
 	const whiteBalance = clamp(src.whiteBalance, -1, 1, base.whiteBalance ?? 0);
 	const spread = clamp(src.spread, 0, 1, base.spread ?? 0);
 	const light = src.light && typeof src.light === "object" ? src.light : {};
+	const lightingMode = typeof src.lightingMode === "string" ? src.lightingMode : null;
 	const lightX = Number(light.x);
 	const lightY = Number(light.y);
 	const lightZ = Number(light.z);
-	const hasManualLightVector = Number.isFinite(lightX) && Number.isFinite(lightY);
+	// Only use manual light vector in 3D mode AND when lateral direction is non-zero.
+	// 2D mode must always use angle path. Zero x/y (default slider state) falls through to angle too.
+	const hasManualLightVector = lightingMode !== "2d"
+		&& Number.isFinite(lightX) && Number.isFinite(lightY)
+		&& (lightX !== 0 || lightY !== 0);
 
 	if (hasManualLightVector) {
 		const safeZ = Number.isFinite(lightZ) ? lightZ : 1;

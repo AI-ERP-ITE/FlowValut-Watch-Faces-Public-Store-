@@ -6662,6 +6662,7 @@ export default function ParametricPage() {
                 </select>
               </label>
 
+              {!isGlobal3DLightingMode && (
               <label className="rounded border border-zinc-800 bg-zinc-950/60 px-2 py-1">
                 <span className="text-[11px] text-zinc-500">Angle {Math.round(getTemplateEffectNumber('angle', -35))}deg</span>
                 <input
@@ -6674,6 +6675,7 @@ export default function ParametricPage() {
                   className="mt-1 w-full"
                 />
               </label>
+              )}
 
               {isGlobal3DLightingMode ? (
                 <>
