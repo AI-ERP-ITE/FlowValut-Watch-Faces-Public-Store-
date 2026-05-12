@@ -4,23 +4,26 @@
  * All-in-one public deploy. Runs in sequence:
  *   1. Build public bundle (vite --mode public)
  *   2. Copy dist → docs/ + root/ (public bundle paths)
- *   3. git add -A  →  git commit "Deploy: public build <hash>"  →  git push public main
- *   4. Immediately rebuild private bundle
- *   5. Copy dist → docs/ + root/ (private bundle paths)
- *   6. git add -A  →  git commit "Restore: private docs…"  →  git push origin main
- *   7. Restore root index.html files to dev entry (uncommitted — for local npm run dev)
+ *   3. Mirror static catalog data (catalog.json, models.json, specGroups.json,
+ *      storeConfig.json, fonts/, zpk/) from docs/ → repo root.
+ *      GH Pages serves from ROOT — these files must be at root, not just in docs/.
+ *   4. Ensure CNAME at root. git add -A → commit → git push public main
+ *   5. Immediately rebuild private bundle
+ *   6. Copy dist → docs/ + root/ (private bundle paths)
+ *   7. git add -A  →  git commit "Restore: private docs…"  →  git push origin main
+ *   8. Restore root index.html files to dev entry (uncommitted — for local npm run dev)
  *
- * KEY INVARIANT: root index.html MUST have the production bundle in committed/pushed
- * state. GH Pages serves from repo root (not docs/). deployDistToDocs --mirror-root
- * writes production to root but then restores to dev shell — we override that BEFORE
- * git add so the pushed commit always has production at root.
+ * KEY INVARIANTS:
+ *   - root index.html MUST have the production bundle in committed/pushed state.
+ *   - catalog.json, models.json, specGroups.json, storeConfig.json, fonts/, zpk/ MUST
+ *     be at repo root on the public remote — they are sourced from docs/ at deploy time.
  *
  * Usage: node scripts/deployPublicFull.mjs
  * Or via npm: npm run deploy:full:public
  */
 
 import { execSync, spawnSync } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, cpSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -87,6 +90,40 @@ function restoreRootToDev() {
 }
 
 /**
+ * STATIC DATA INVARIANT: catalog.json, models.json, specGroups.json, storeConfig.json,
+ * fonts/, and zpk/ must exist at the repo root on the public remote.
+ * GH Pages serves from root (NOT docs/), so fetching /catalog.json requires it at root.
+ * Source of truth: docs/ (populated by the publish workflow and committed).
+ * This function mirrors them from docs/ → root before git add -A.
+ */
+function ensurePublicStaticData() {
+  const STATIC_FILES = ['catalog.json', 'models.json', 'specGroups.json', 'storeConfig.json'];
+  const STATIC_DIRS  = ['fonts', 'zpk'];
+
+  for (const file of STATIC_FILES) {
+    const src = path.join(appRoot, 'docs', file);
+    const dst = path.join(appRoot, file);
+    if (existsSync(src)) {
+      cpSync(src, dst);
+      console.log(`Static file mirrored: docs/${file} → ${file}`);
+    } else {
+      console.warn(`Warning: docs/${file} not found — skipping (site may show empty catalog)`);
+    }
+  }
+
+  for (const dir of STATIC_DIRS) {
+    const src = path.join(appRoot, 'docs', dir);
+    const dst = path.join(appRoot, dir);
+    if (existsSync(src)) {
+      cpSync(src, dst, { recursive: true });
+      console.log(`Static dir mirrored: docs/${dir}/ → ${dir}/`);
+    } else {
+      console.warn(`Warning: docs/${dir}/ not found — skipping`);
+    }
+  }
+}
+
+/**
  * CNAME INVARIANT: GitHub Pages custom domain requires CNAME at the repo root.
  * git add -A will commit whatever is at root — if CNAME is missing, GH Pages drops
  * the custom domain and the site returns 404. Always call this before git add -A.
@@ -116,8 +153,13 @@ async function main() {
   const publicHash = overrideRootWithProduction();
   console.log(`\n📦 Public bundle: ${publicHash}`);
 
-  // ── Step 3: Commit + push public (root = production bundle) ──────────────  // CNAME INVARIANT: must write CNAME before git add -A or GH Pages drops custom domain.
-  ensurePublicCNAME();  run('git add -A', 'Staging public docs + root…');
+  // ── Step 3: Mirror static catalog data + CNAME + commit + push public ─────
+  // STATIC DATA INVARIANT: catalog.json, models.json, specGroups.json, storeConfig.json,
+  // fonts/, zpk/ must be at ROOT (not just docs/) — GH Pages serves from root.
+  ensurePublicStaticData();
+  // CNAME INVARIANT: must write CNAME before git add -A or GH Pages drops custom domain.
+  ensurePublicCNAME();
+  run('git add -A', 'Staging public docs + root…');
   run(`git commit -m "Deploy: public build ${publicHash}"`, 'Committing public build…');
   run('git push public main', 'Pushing to public remote…');
   console.log(`\n✅ Public push done. Bundle: ${publicHash}`);

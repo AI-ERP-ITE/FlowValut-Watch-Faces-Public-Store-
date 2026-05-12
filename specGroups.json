@@ -1,0 +1,68 @@
+{
+  "480-round-v2": {
+    "resolution": "480x480",
+    "shape": "round",
+    "apiVersion": "v2",
+    "deviceSources": [8519936, 8519937, 8519939]
+  },
+  "454-round-v2": {
+    "resolution": "454x454",
+    "shape": "round",
+    "apiVersion": "v2",
+    "deviceSources": [8519936, 8519937, 8519939]
+  },
+  "416-round-v2": {
+    "resolution": "416x416",
+    "shape": "round",
+    "apiVersion": "v2",
+    "deviceSources": [8519936, 8519937, 8519939]
+  },
+  "320x380-square-v2": {
+    "resolution": "320x380",
+    "shape": "square",
+    "apiVersion": "v2",
+    "deviceSources": [8519936, 8519937, 8519939]
+  },
+  "480-round-v3": {
+    "resolution": "480x480",
+    "shape": "round",
+    "apiVersion": "v3",
+    "deviceSources": [8388608, 8388609]
+  },
+  "466-round-v3": {
+    "resolution": "466x466",
+    "shape": "round",
+    "apiVersion": "v3",
+    "deviceSources": [8388608, 8388609]
+  },
+  "454-round-v3": {
+    "resolution": "454x454",
+    "shape": "round",
+    "apiVersion": "v3",
+    "deviceSources": [8388608, 8388609]
+  },
+  "416-round-v3": {
+    "resolution": "416x416",
+    "shape": "round",
+    "apiVersion": "v3",
+    "deviceSources": [8388608, 8388609]
+  },
+  "390x450-square-v3": {
+    "resolution": "390x450",
+    "shape": "square",
+    "apiVersion": "v3",
+    "deviceSources": [8388610, 8388611]
+  },
+  "360-round-v3": {
+    "resolution": "360x360",
+    "shape": "round",
+    "apiVersion": "v3",
+    "deviceSources": [8388608, 8388609]
+  },
+  "320x380-square-v3": {
+    "resolution": "320x380",
+    "shape": "square",
+    "apiVersion": "v3",
+    "deviceSources": [8388610, 8388611]
+  }
+}
