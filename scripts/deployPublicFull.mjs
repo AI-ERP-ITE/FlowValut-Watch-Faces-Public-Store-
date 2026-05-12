@@ -20,7 +20,7 @@
  */
 
 import { execSync, spawnSync } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -86,6 +86,22 @@ function restoreRootToDev() {
   console.log('Root index.html files restored to dev entry (local only — not committed).');
 }
 
+/**
+ * CNAME INVARIANT: GitHub Pages custom domain requires CNAME at the repo root.
+ * git add -A will commit whatever is at root — if CNAME is missing, GH Pages drops
+ * the custom domain and the site returns 404. Always call this before git add -A.
+ */
+function ensurePublicCNAME() {
+  const cnamePath = path.join(appRoot, 'CNAME');
+  const cnameDomain = 'www.fvwatchfaces.com';
+  if (!existsSync(cnamePath) || readFileSync(cnamePath, 'utf8').trim() !== cnameDomain) {
+    writeFileSync(cnamePath, cnameDomain + '\n');
+    console.log(`CNAME written: ${cnameDomain}`);
+  } else {
+    console.log(`CNAME OK: ${cnameDomain}`);
+  }
+}
+
 async function main() {
   // ── Step 1: Build public ─────────────────────────────────────────────────
   run('npm run build:public', 'Building public bundle…');
@@ -100,8 +116,8 @@ async function main() {
   const publicHash = overrideRootWithProduction();
   console.log(`\n📦 Public bundle: ${publicHash}`);
 
-  // ── Step 3: Commit + push public (root = production bundle) ──────────────
-  run('git add -A', 'Staging public docs + root…');
+  // ── Step 3: Commit + push public (root = production bundle) ──────────────  // CNAME INVARIANT: must write CNAME before git add -A or GH Pages drops custom domain.
+  ensurePublicCNAME();  run('git add -A', 'Staging public docs + root…');
   run(`git commit -m "Deploy: public build ${publicHash}"`, 'Committing public build…');
   run('git push public main', 'Pushing to public remote…');
   console.log(`\n✅ Public push done. Bundle: ${publicHash}`);
