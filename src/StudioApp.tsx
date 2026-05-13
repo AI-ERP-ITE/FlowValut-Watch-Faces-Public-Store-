@@ -3032,7 +3032,13 @@ function StudioApp() {
     // Temporarily hide grid so it doesn't appear in the preview screenshot
     const gridWasOn = showGrid;
     if (gridWasOn) setShowGrid(false);
-    // Wait two animation frames for InteractiveCanvas to redraw without selection + grid
+    // Temporarily force MAIN mode so preview always shows the main watchface (not AOD)
+    const prevEditorMode = editorMode;
+    if (editorMode === 'AOD') setEditorMode('MAIN');
+    // Temporarily hide flicker overlay so it doesn't bake into the preview
+    const flickerWasOn = flickerOverlayEnabled;
+    if (flickerWasOn) setFlickerOverlayEnabled(false);
+    // Wait two animation frames for InteractiveCanvas to redraw without selection + grid + overlays
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
     // Capture canvas screenshot FIRST before step change unmounts the canvas
@@ -3051,8 +3057,10 @@ function StudioApp() {
       if (previewDataUrl) setPreviewImageUrl(previewDataUrl);
     }
 
-    // Restore grid after capture
+    // Restore grid, editor mode, and flicker overlay after capture
     if (gridWasOn) setShowGrid(true);
+    if (prevEditorMode === 'AOD') setEditorMode('AOD');
+    if (flickerWasOn) setFlickerOverlayEnabled(true);
 
     if (!state.watchFaceConfig) {
       console.log('[App] ERROR: Missing watchFaceConfig');
@@ -3602,13 +3610,13 @@ function StudioApp() {
         if (timePointerEl.handStyle?.startsWith('custom_hand:')) {
           const customHand = await getCustomHandByKey(timePointerEl.handStyle);
           if (customHand) {
-            if (!timePointerEl.hourPos && typeof customHand.hourPosX === 'number' && typeof customHand.hourPosY === 'number') {
+            if (typeof customHand.hourPosX === 'number' && typeof customHand.hourPosY === 'number') {
               timePointerEl.hourPos = { x: customHand.hourPosX, y: customHand.hourPosY };
             }
-            if (!timePointerEl.minutePos && typeof customHand.minutePosX === 'number' && typeof customHand.minutePosY === 'number') {
+            if (typeof customHand.minutePosX === 'number' && typeof customHand.minutePosY === 'number') {
               timePointerEl.minutePos = { x: customHand.minutePosX, y: customHand.minutePosY };
             }
-            if (!timePointerEl.secondPos && typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
+            if (typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
               timePointerEl.secondPos = { x: customHand.secondPosX, y: customHand.secondPosY };
             }
             const resolvedPack = resolveCustomHandPack(customHand);
