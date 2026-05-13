@@ -3624,9 +3624,17 @@ function StudioApp() {
             const sourceMode = resolvedPack?.mode === 'source-based-custom';
             const sourcePivotRatios = sourceMode
               ? {
-                hour: parsePivotRatioFromSource(customHand.sourceHourHtml),
-                minute: parsePivotRatioFromSource(customHand.sourceMinuteHtml),
-                second: parsePivotRatioFromSource(customHand.sourceSecondHtml),
+                // Prefer IDB-stored pivot coordinates (which already incorporate tip-tail
+                // adjustment) over SVG-parsed ratios that know nothing of the adjustment.
+                hour: (customHand.hourPosX !== undefined && customHand.hourPosY !== undefined)
+                  ? { x: customHand.hourPosX / 22, y: customHand.hourPosY / 140 }
+                  : parsePivotRatioFromSource(customHand.sourceHourHtml),
+                minute: (customHand.minutePosX !== undefined && customHand.minutePosY !== undefined)
+                  ? { x: customHand.minutePosX / 16, y: customHand.minutePosY / 200 }
+                  : parsePivotRatioFromSource(customHand.sourceMinuteHtml),
+                second: (customHand.secondPosX !== undefined && customHand.secondPosY !== undefined)
+                  ? { x: customHand.secondPosX / 8, y: customHand.secondPosY / 240 }
+                  : parsePivotRatioFromSource(customHand.sourceSecondHtml),
                 cover: { x: 0.5, y: 0.5 },
               }
               : null;
