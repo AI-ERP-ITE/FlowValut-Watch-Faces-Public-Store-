@@ -2,16 +2,25 @@
  * deployPublicFull.mjs
  *
  * All-in-one public deploy. Runs in sequence:
+ *
+ * Phase A — public bundle push:
  *   1. Build public bundle (vite --mode public)
- *   2. Copy dist → docs/ + root/ (public bundle paths)
- *   3. Mirror static catalog data (catalog.json, models.json, specGroups.json,
- *      storeConfig.json, fonts/, zpk/) from docs/ → repo root.
- *      GH Pages serves from ROOT — these files must be at root, not just in docs/.
- *   4. Ensure CNAME at root. git add -A → commit → git push public main
- *   5. Immediately rebuild private bundle
- *   6. Copy dist → docs/ + root/ (private bundle paths)
- *   7. git add -A  →  git commit "Restore: private docs…"  →  git push origin main
- *   8. Restore root index.html files to dev entry (uncommitted — for local npm run dev)
+ *   2. deployDistToDocs --target=public --mirror-root
+ *      → copies dist/assets → root/assets/, writes root HTML, then RESTORES to dev shell.
+ *      Working tree stays clean. Vite never disturbed.
+ *   3. Mirror static catalog data + CNAME
+ *   4. git add -A  (stages everything; root HTML in stage = dev shell)
+ *   5. stageProductionIndexInGit() — replaces staged root HTML with production via
+ *      git plumbing (hash-object + update-index). NO working tree modification.
+ *   6. git commit + git push public main
+ *
+ * Phase B — private bundle restore:
+ *   7. Build private bundle (vite --mode private)
+ *   8. deployDistToDocs --target=private --mirror-root  (same working-tree-safe pattern)
+ *   9. git add -A
+ *  10. stageProductionIndexInGit() for private bundle
+ *  11. git commit + git push origin main
+ *      Working tree root already has dev shell throughout both phases — no restore step.
  *
  * KEY INVARIANTS:
  *   - root index.html MUST have the production bundle in committed/pushed state.
@@ -23,28 +32,39 @@
  */
 
 import { execSync, spawnSync } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, cpSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, cpSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
 
-// Dev entry — restored to root after every push so `npm run dev` keeps working.
-const DEV_INDEX_HTML = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Watch Face Creator</title>
-    <script type="module" src="/src/main.tsx"><\/script>
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
-</html>
-`;
+/**
+ * Stage production HTML directly into git's index WITHOUT writing to the working tree.
+ *
+ * WHY: The naive approach (overrideRootWithProduction) writes production HTML to root
+ * index.html on disk. If Vite dev server is running it hot-reloads to the hashed asset
+ * path which doesn't exist in dev mode → blank page for ~20-30s.
+ * This git-plumbing approach stages production HTML using git hash-object + git
+ * update-index so the commit contains production HTML while the working tree keeps the
+ * dev shell. Vite never sees any change.
+ */
+function stageProductionIndexInGit() {
+  const docsHtml = readFileSync(path.join(appRoot, 'docs', 'index.html'), 'utf8');
+  if (/src\/main\.tsx/.test(docsHtml)) {
+    throw new Error('docs/index.html contains /src/main.tsx — refusing to stage dev entry as production.');
+  }
+  const blobHash = execSync('git hash-object -w --stdin', {
+    cwd: appRoot,
+    input: docsHtml,
+    encoding: 'utf8',
+  }).trim();
+  execSync(`git update-index --cacheinfo 100644,${blobHash},index.html`, { cwd: appRoot });
+  execSync(`git update-index --cacheinfo 100644,${blobHash},studio/index.html`, { cwd: appRoot });
+  execSync(`git update-index --cacheinfo 100644,${blobHash},studio/parametric/index.html`, { cwd: appRoot });
+  const m = docsHtml.match(/assets\/(index-[A-Za-z0-9_-]+\.js)/);
+  return m ? m[1] : '?';
+}
 
 function run(cmd, label) {
   console.log(`\n▶  ${label || cmd}`);
@@ -56,37 +76,6 @@ function run(cmd, label) {
 
 function gitOutput(cmd) {
   return execSync(cmd, { cwd: appRoot, encoding: 'utf8' }).trim();
-}
-
-/**
- * deployDistToDocs --mirror-root writes production to root index.html files but then
- * immediately restores them to the dev entry. This means if we ran `git add -A` right
- * after, the committed root would have the dev shell — GH Pages (which serves from repo
- * root, NOT docs/) would get a blank page.
- *
- * Solution: after deployDistToDocs returns, re-read docs/index.html and write it back
- * to root index files, overriding the dev restoration. Then commit+push THAT. Only
- * after the push do we restore root to dev so `npm run dev` still works locally.
- */
-function overrideRootWithProduction() {
-  const docsHtml = readFileSync(path.join(appRoot, 'docs', 'index.html'), 'utf8');
-  if (/src\/main\.tsx/.test(docsHtml)) {
-    throw new Error('docs/index.html contains /src/main.tsx — refusing to mirror dev entry to root.');
-  }
-  writeFileSync(path.join(appRoot, 'index.html'), docsHtml);
-  mkdirSync(path.join(appRoot, 'studio'), { recursive: true });
-  writeFileSync(path.join(appRoot, 'studio', 'index.html'), docsHtml);
-  mkdirSync(path.join(appRoot, 'studio', 'parametric'), { recursive: true });
-  writeFileSync(path.join(appRoot, 'studio', 'parametric', 'index.html'), docsHtml);
-  const m = docsHtml.match(/assets\/(index-[A-Za-z0-9_-]+\.js)/);
-  return m ? m[1] : '?';
-}
-
-function restoreRootToDev() {
-  writeFileSync(path.join(appRoot, 'index.html'), DEV_INDEX_HTML);
-  writeFileSync(path.join(appRoot, 'studio', 'index.html'), DEV_INDEX_HTML);
-  writeFileSync(path.join(appRoot, 'studio', 'parametric', 'index.html'), DEV_INDEX_HTML);
-  console.log('Root index.html files restored to dev entry (local only — not committed).');
 }
 
 /**
@@ -149,23 +138,27 @@ async function main() {
     'Writing public bundle to docs/…',
   );
 
-  // Override the dev-entry restoration so root index.html = production for GH Pages.
-  const publicHash = overrideRootWithProduction();
-  console.log(`\n📦 Public bundle: ${publicHash}`);
+  // deployDistToDocs --mirror-root copies assets to root/assets/ and writes root HTML,
+  // then RESTORES root HTML to dev shell. Working tree stays clean for Vite.
 
-  // ── Step 3: Mirror static catalog data + CNAME + commit + push public ─────
+  // ── Step 3: Mirror static catalog data + CNAME + commit + push public ───────
   // STATIC DATA INVARIANT: catalog.json, models.json, specGroups.json, storeConfig.json,
   // fonts/, zpk/ must be at ROOT (not just docs/) — GH Pages serves from root.
   ensurePublicStaticData();
   // CNAME INVARIANT: must write CNAME before git add -A or GH Pages drops custom domain.
   ensurePublicCNAME();
   run('git add -A', 'Staging public docs + root…');
+  // Stage production HTML via git plumbing — no working tree modification (Vite-safe).
+  const publicHash = stageProductionIndexInGit();
+  console.log(`\n📦 Public bundle: ${publicHash}`);
   run(`git commit -m "Deploy: public build ${publicHash}"`, 'Committing public build…');
   run('git push public main', 'Pushing to public remote…');
   console.log(`\n✅ Public push done. Bundle: ${publicHash}`);
+  console.log('Root index.html unchanged in working tree (dev shell preserved — Vite safe).');
 
   // Restore root to dev entry locally after public push.
-  restoreRootToDev();
+  // NOTE: with stageProductionIndexInGit(), working tree is already dev shell.
+  // This comment is retained for documentation purposes only — no restore call needed.
 
   // ── Step 4: Rebuild private ───────────────────────────────────────────────
   console.log('\n▶  Rebuilding private bundle to restore docs/…');
@@ -174,19 +167,17 @@ async function main() {
     'node scripts/deployDistToDocs.mjs --target=private --mirror-root',
     'Writing private bundle to docs/…',
   );
+  // deployDistToDocs restores root to dev shell — working tree stays clean.
 
-  // Override dev-entry restoration again for private root.
-  const privateHash = overrideRootWithProduction();
-  console.log(`\n📦 Private bundle: ${privateHash}`);
-
-  // ── Step 5: Commit + push private (root = production bundle) ─────────────
+  // ── Step 5: Commit + push private (root = production bundle) ────────────
   run('git add -A', 'Staging private docs restore + root…');
+  // Stage production HTML via git plumbing — no working tree modification.
+  const privateHash = stageProductionIndexInGit();
+  console.log(`\n📦 Private bundle: ${privateHash}`);
   run(`git commit -m "Restore: private docs after public deploy (${privateHash})"`, 'Committing private restore…');
   run('git push origin main', 'Pushing to origin (private)…');
   console.log(`\n✅ Private restore pushed. Bundle: ${privateHash}`);
-
-  // Restore root to dev entry locally so next `npm run dev` works.
-  restoreRootToDev();
+  console.log('Root index.html unchanged in working tree (dev shell preserved — Vite safe).', '\nℹ\ufe0f  If dev server was running during deploy, restart it now.');
 
   console.log('\n🎉 Full public deploy complete.');
   console.log(`   Public  → public/main   bundle: ${publicHash}`);
