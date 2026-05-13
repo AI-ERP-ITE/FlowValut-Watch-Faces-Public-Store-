@@ -41,13 +41,18 @@ import {
   serializeCustomFonts,
   deserializeCustomFonts,
 } from './customFontStore';
+import type { CustomGaugePointerRecord } from './customGaugePointerStore';
+import {
+  loadCustomGaugePointers,
+  replaceCustomGaugePointers,
+} from './customGaugePointerStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Asset type keys. 'gaugePointers' added in T-014. */
-export type LabAssetType = 'icons' | 'hands' | 'fonts';
+/** Asset type keys. */
+export type LabAssetType = 'icons' | 'hands' | 'fonts' | 'gaugePointers';
 
-export type LabRecord = CustomIconRecord | CustomHandRecord | CustomFontRecord;
+export type LabRecord = CustomIconRecord | CustomHandRecord | CustomFontRecord | CustomGaugePointerRecord;
 
 // ── Firestore helpers ─────────────────────────────────────────────────────────
 
@@ -122,6 +127,20 @@ async function pullFonts(uid: string): Promise<void> {
   await registerCustomFonts();
 }
 
+async function pullGaugePointers(uid: string): Promise<void> {
+  const snap = await getDocs(labCol(uid, 'gaugePointers'));
+  if (snap.empty) return;
+
+  const firestoreMap = new Map<string, CustomGaugePointerRecord>();
+  snap.forEach(d => firestoreMap.set(d.id, d.data() as CustomGaugePointerRecord));
+
+  const local = await loadCustomGaugePointers();
+  const merged = new Map<string, CustomGaugePointerRecord>(local.map(r => [r.key, r]));
+  firestoreMap.forEach((rec, key) => merged.set(key, rec));
+
+  await replaceCustomGaugePointers([...merged.values()]);
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -138,6 +157,7 @@ export async function pullLabAssetsFromFirestore(): Promise<void> {
       pullIcons(uid),
       pullHands(uid),
       pullFonts(uid),
+      pullGaugePointers(uid),
     ]);
   } catch (err) {
     console.warn('[firestoreLabSync] pull failed — continuing with local IDB:', err);
@@ -164,6 +184,10 @@ export async function pushLabAssetToFirestore(
       docId = font.name;
       const [serialized] = serializeCustomFonts([font]);
       data = serialized as unknown as Record<string, unknown>;
+    } else if (type === 'gaugePointers') {
+      const gp = record as CustomGaugePointerRecord;
+      docId = gp.key;
+      data = gp as unknown as Record<string, unknown>;
     } else {
       const keyed = record as CustomIconRecord | CustomHandRecord;
       docId = keyed.key;

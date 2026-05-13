@@ -12,6 +12,7 @@ import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
 import type { CustomHandRecord } from '@/lib/customHandStore';
+import type { CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getAllowedDataTypesForElement,
@@ -33,6 +34,7 @@ export interface PropertyPanelProps {
   onRemoveFrame?: (parent: WatchFaceElement) => void;
   iconLibraryKey?: number; // increment to force icon list refresh
   customHandStyles?: CustomHandRecord[]; // user-created hand styles from IconLab
+  customGaugePointers?: CustomGaugePointerRecord[]; // user-created gauge pointers from IconLab
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -140,7 +142,7 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [] }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [] }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
@@ -990,6 +992,37 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               />
             </FieldRow>
             <p className="text-[9px] text-white/35">Pivot uses normalized values in local pointer box (0..1).</p>
+            {customGaugePointers.length > 0 && (
+              <div className="pt-2 border-t border-white/10 space-y-1">
+                <p className="text-[9px] text-cyan-400/60 uppercase tracking-wider">My Gauge Pointers</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {customGaugePointers.map(gp => {
+                    const active = element.src === gp.dataUrl;
+                    return (
+                      <button
+                        key={gp.key}
+                        title={gp.name}
+                        onClick={() => update({ src: gp.dataUrl, pivotX: gp.pivotX, pivotY: gp.pivotY })}
+                        className={cn(
+                          'flex flex-col items-center gap-1 py-2 px-1 rounded border text-[9px] transition-colors',
+                          active
+                            ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                            : 'border-cyan-500/20 bg-cyan-500/5 text-white/60 hover:border-cyan-500/50 hover:text-white/90'
+                        )}
+                      >
+                        <img
+                          src={gp.dataUrl}
+                          alt={gp.name}
+                          className="w-8 h-16 object-contain"
+                          style={{ borderRadius: 2, border: active ? '1px solid #22d3ee' : '1px solid rgba(100,200,255,0.15)' }}
+                        />
+                        <span className="leading-tight text-center px-0.5 truncate w-full">{gp.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="pt-2 border-t border-white/10 space-y-2">
               <p className="text-[10px] text-cyan-300/80 uppercase tracking-wider">SVG/HTML Gauge Creator</p>
               <textarea

@@ -45,12 +45,18 @@ import {
   pushLabAssetToFirestore,
   deleteLabAssetFromFirestore,
 } from '@/lib/firestoreLabSync';
+import {
+  saveCustomGaugePointer,
+  deleteCustomGaugePointer,
+  loadCustomGaugePointers,
+  type CustomGaugePointerRecord,
+} from '@/lib/customGaugePointerStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type CodeMode = 'svg' | 'html';
 type AIModel = 'gpt-4o' | 'gemini-2.5-flash';
-type TabId = 'icons' | 'pointers' | 'fonts';
+type TabId = 'icons' | 'pointers' | 'gaugePointers' | 'fonts';
 
 const ICON_SOURCE_VERSION = 1;
 
@@ -91,6 +97,8 @@ interface Props {
   onFontsSaved?: () => void;
   /** Called after a new clock hand style is saved so PropertyPanel can refresh. */
   onHandsSaved?: () => void;
+  /** Called after a gauge pointer is saved/deleted so PropertyPanel can refresh. */
+  onGaugePointersSaved?: () => void;
 }
 
 // ── AI generation helpers ─────────────────────────────────────────────────────
@@ -212,7 +220,7 @@ async function generateWithGemini(
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSaved }: Props) {
+export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSaved, onGaugePointersSaved }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('icons');
 
   // ── Icon Lab state ─────────────────────────────────────────────────────────
@@ -307,6 +315,15 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     second: { xRatio: 0.5, yRatio: 0.5 },
   });
 
+  // ── Gauge Pointer tab state ────────────────────────────────────────────────
+  const [savedGaugePointers, setSavedGaugePointers] = useState<CustomGaugePointerRecord[]>([]);
+  const [gpName, setGpName] = useState('');
+  const [gpHtml, setGpHtml] = useState('');
+  const [gpPivotX, setGpPivotX] = useState(0.5);
+  const [gpPivotY, setGpPivotY] = useState(0.9);
+  const [gpSaving, setGpSaving] = useState(false);
+  const [gpMsg, setGpMsg] = useState('');
+
   // ── Iframe ref ─────────────────────────────────────────────────────────────
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -337,14 +354,16 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   }, []);
 
   const reloadSavedAssets = useCallback(async () => {
-    const [icons, fonts, hands] = await Promise.all([
+    const [icons, fonts, hands, gaugePointers] = await Promise.all([
       loadCustomIcons(),
       loadCustomFonts(),
       loadCustomHandStyles(),
+      loadCustomGaugePointers(),
     ]);
     setSavedIcons(icons);
     setSavedFonts(fonts);
     setSavedHands(hands);
+    setSavedGaugePointers(gaugePointers);
   }, []);
 
   // ── Load persisted data on open ────────────────────────────────────────────
@@ -781,6 +800,35 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     onFontsSaved?.();
   };
 
+  // ── Gauge pointer handlers ───────────────────────────────────────
+  const handleSaveGaugePointer = async () => {
+    if (!gpName.trim() || !gpHtml.trim()) return;
+    setGpSaving(true);
+    setGpMsg('');
+    try {
+      const dataUrl = await renderHtmlToDataUrl(gpHtml, 128);
+      const record = await saveCustomGaugePointer(gpName.trim(), gpHtml, dataUrl, gpPivotX, gpPivotY);
+      setSavedGaugePointers(prev => {
+        const filtered = prev.filter(p => p.key !== record.key);
+        return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
+      });
+      setGpMsg('✓ Saved gauge pointer');
+      pushLabAssetToFirestore('gaugePointers', record).catch(e => console.warn('[IconLab] Firestore push gaugePointers failed:', e));
+      onGaugePointersSaved?.();
+    } catch (err) {
+      setGpMsg(`✗ ${(err as Error).message}`);
+    } finally {
+      setGpSaving(false);
+    }
+  };
+
+  const handleDeleteGaugePointer = async (key: string) => {
+    await deleteCustomGaugePointer(key);
+    setSavedGaugePointers(prev => prev.filter(p => p.key !== key));
+    deleteLabAssetFromFirestore('gaugePointers', key).catch(e => console.warn('[IconLab] Firestore delete gaugePointers failed:', e));
+    onGaugePointersSaved?.();
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   const layerStatus = (value: string): 'empty' | 'ready' => (value.trim() ? 'ready' : 'empty');
   const updateComposerDraft = (patch: Partial<PointerComposerDraft>) => {
@@ -968,7 +1016,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
           </div>
           {/* Tabs */}
           <div className="flex items-center gap-1">
-            {(['icons', 'pointers', 'fonts'] as TabId[]).map(t => (
+            {(['icons', 'pointers', 'gaugePointers', 'fonts'] as TabId[]).map(t => (
               <button
                 key={t}
                 onClick={() => setActiveTab(t)}
@@ -978,7 +1026,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     : 'text-white/40 hover:text-white/70'
                 }`}
               >
-                {t === 'icons' ? '🎨 Icons' : t === 'pointers' ? '🕒 Pointers' : '🔤 Fonts'}
+                {t === 'icons' ? '🎨 Icons' : t === 'pointers' ? '🕒 Pointers' : t === 'gaugePointers' ? '📈 Gauge' : '🔤 Fonts'}
               </button>
             ))}
           </div>
@@ -1544,6 +1592,154 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
           )}
 
           {/* ── FONTS TAB ──────────────────────────────────────────────────── */}
+          {activeTab === 'gaugePointers' && (
+            <div className="p-5 space-y-5 max-w-2xl mx-auto">
+              <p className="text-xs text-white/40">
+                Create reusable gauge pointer images from SVG/HTML. Saved pointers appear in the
+                <span className="text-white/60"> Gauge Pointer</span> element's image picker.
+              </p>
+
+              {/* HTML editor */}
+              <div className="space-y-3 border border-white/10 rounded-lg p-4">
+                <textarea
+                  value={gpHtml}
+                  onChange={e => setGpHtml(e.target.value)}
+                  placeholder="Paste SVG or HTML for gauge pointer…"
+                  rows={6}
+                  className="w-full text-xs font-mono bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50 resize-y"
+                />
+
+                {/* Pivot sliders */}
+                <div className="space-y-2">
+                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot X (horizontal) — {(gpPivotX * 100).toFixed(0)}%</label>
+                  <input type="range" min={0} max={1} step={0.01} value={gpPivotX}
+                    onChange={e => setGpPivotX(Number(e.target.value))}
+                    className="w-full h-1 accent-violet-500" />
+                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot Y (vertical) — {(gpPivotY * 100).toFixed(0)}%</label>
+                  <input type="range" min={0} max={1} step={0.01} value={gpPivotY}
+                    onChange={e => setGpPivotY(Number(e.target.value))}
+                    className="w-full h-1 accent-violet-500" />
+                </div>
+
+                <input
+                  type="text"
+                  value={gpName}
+                  onChange={e => setGpName(e.target.value)}
+                  placeholder="Pointer name…"
+                  className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50"
+                />
+
+                {gpMsg && (
+                  <p className={`text-[10px] ${gpMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{gpMsg}</p>
+                )}
+
+                <button
+                  onClick={handleSaveGaugePointer}
+                  disabled={gpSaving || !gpName.trim() || !gpHtml.trim()}
+                  className="w-full py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs rounded font-medium transition-colors"
+                >
+                  {gpSaving ? 'Saving…' : 'Save Gauge Pointer'}
+                </button>
+              </div>
+
+              {/* Saved gauge pointers grid */}
+              {savedGaugePointers.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] text-white/40 uppercase tracking-widest">Saved ({savedGaugePointers.length})</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {savedGaugePointers.map(gp => (
+                      <div key={gp.key} className="relative group bg-zinc-900 rounded-lg border border-white/10 p-2 flex flex-col items-center gap-1">
+                        <img src={gp.dataUrl} alt={gp.name} className="w-16 h-16 object-contain" />
+                        <p className="text-[9px] text-white/50 truncate w-full text-center">{gp.name}</p>
+                        <p className="text-[9px] text-white/30">px={( gp.pivotX * 100).toFixed(0)}% py={(gp.pivotY * 100).toFixed(0)}%</p>
+                        <button
+                          onClick={() => handleDeleteGaugePointer(gp.key)}
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 text-red-500 hover:text-red-400 transition-opacity"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'gaugePointers' && (
+            <div className="p-5 space-y-5 max-w-2xl mx-auto">
+              <p className="text-xs text-white/40">
+                Create reusable gauge pointer images from SVG/HTML. Saved pointers appear in the
+                <span className="text-white/60"> Gauge Pointer</span> element's image picker.
+              </p>
+
+              {/* HTML editor */}
+              <div className="space-y-3 border border-white/10 rounded-lg p-4">
+                <textarea
+                  value={gpHtml}
+                  onChange={e => setGpHtml(e.target.value)}
+                  placeholder="Paste SVG or HTML for gauge pointer…"
+                  rows={6}
+                  className="w-full text-xs font-mono bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50 resize-y"
+                />
+
+                {/* Pivot sliders */}
+                <div className="space-y-2">
+                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot X (horizontal) — {(gpPivotX * 100).toFixed(0)}%</label>
+                  <input type="range" min={0} max={1} step={0.01} value={gpPivotX}
+                    onChange={e => setGpPivotX(Number(e.target.value))}
+                    className="w-full h-1 accent-violet-500" />
+                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot Y (vertical) — {(gpPivotY * 100).toFixed(0)}%</label>
+                  <input type="range" min={0} max={1} step={0.01} value={gpPivotY}
+                    onChange={e => setGpPivotY(Number(e.target.value))}
+                    className="w-full h-1 accent-violet-500" />
+                </div>
+
+                <input
+                  type="text"
+                  value={gpName}
+                  onChange={e => setGpName(e.target.value)}
+                  placeholder="Pointer name…"
+                  className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50"
+                />
+
+                {gpMsg && (
+                  <p className={`text-[10px] ${gpMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{gpMsg}</p>
+                )}
+
+                <button
+                  onClick={handleSaveGaugePointer}
+                  disabled={gpSaving || !gpName.trim() || !gpHtml.trim()}
+                  className="w-full py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs rounded font-medium transition-colors"
+                >
+                  {gpSaving ? 'Saving…' : 'Save Gauge Pointer'}
+                </button>
+              </div>
+
+              {/* Saved gauge pointers grid */}
+              {savedGaugePointers.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] text-white/40 uppercase tracking-widest">Saved ({savedGaugePointers.length})</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {savedGaugePointers.map(gp => (
+                      <div key={gp.key} className="relative group bg-zinc-900 rounded-lg border border-white/10 p-2 flex flex-col items-center gap-1">
+                        <img src={gp.dataUrl} alt={gp.name} className="w-16 h-16 object-contain" />
+                        <p className="text-[9px] text-white/50 truncate w-full text-center">{gp.name}</p>
+                        <p className="text-[9px] text-white/30">px={(gp.pivotX * 100).toFixed(0)}% py={(gp.pivotY * 100).toFixed(0)}%</p>
+                        <button
+                          onClick={() => handleDeleteGaugePointer(gp.key)}
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 text-red-500 hover:text-red-400 transition-opacity"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'fonts' && (
             <div className="p-5 space-y-5 max-w-2xl mx-auto">
               <p className="text-xs text-white/40">

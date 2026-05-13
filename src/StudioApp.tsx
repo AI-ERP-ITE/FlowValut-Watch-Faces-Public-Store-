@@ -47,6 +47,7 @@ import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
 import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
+import { loadCustomGaugePointers, type CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
 import { isLabCloudSyncEnabled } from '@/lib/labCloudSync';
 import { pullLabAssetsFromFirestore, isFirestoreSyncEnabled } from '@/lib/firestoreLabSync';
 import { subscribeAuthState } from '@/lib/firebaseAuthClient';
@@ -2001,6 +2002,7 @@ function StudioApp() {
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
   const [iconLibraryKey, setIconLibraryKey] = useState(0);
   const [customHandStyles, setCustomHandStyles] = useState<CustomHandRecord[]>([]);
+  const [customGaugePointers, setCustomGaugePointers] = useState<CustomGaugePointerRecord[]>([]);
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
@@ -2181,15 +2183,17 @@ function StudioApp() {
         // Legacy GitHub-bridge fallback (disabled by default, kept for migration safety)
         console.debug('[StudioApp] Firestore not available; skipping cloud pull.');
       }
-      const [icons, , loadedFontNames, hands] = await Promise.all([
+      const [icons, , loadedFontNames, hands, gaugePointers] = await Promise.all([
         loadCustomIcons(),
         loadCustomFonts(),
         registerCustomFonts(),
         loadCustomHandStyles(),
+        loadCustomGaugePointers(),
       ]);
       if (icons.length > 0) registerCustomIconsInLibrary(icons);
       if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
       if (hands.length > 0) setCustomHandStyles(hands);
+      if (gaugePointers.length > 0) setCustomGaugePointers(gaugePointers);
       if (icons.length > 0) setIconLibraryKey(k => k + 1);
     };
 
@@ -2221,6 +2225,10 @@ function StudioApp() {
 
   const handleLabHandsSaved = useCallback(() => {
     loadCustomHandStyles().then(setCustomHandStyles);
+  }, []);
+
+  const handleLabGaugePointersSaved = useCallback(() => {
+    loadCustomGaugePointers().then(setCustomGaugePointers);
   }, []);
 
   const registerPointerParitySnapshot = useCallback((stage: PointerParityStage, snapshot: ImageData | null) => {
@@ -4414,6 +4422,7 @@ function StudioApp() {
                         onRemoveFrame={handleRemoveFrame}
                         iconLibraryKey={iconLibraryKey}
                         customHandStyles={customHandStyles}
+                        customGaugePointers={customGaugePointers}
                       />
                     </div>
                     <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] xl:overflow-y-auto 2xl:max-h-[calc(100vh-15rem)]">
@@ -4450,6 +4459,7 @@ function StudioApp() {
                   onIconsSaved={handleLabIconsSaved}
                   onFontsSaved={handleLabFontsSaved}
                   onHandsSaved={handleLabHandsSaved}
+                  onGaugePointersSaved={handleLabGaugePointersSaved}
                 />
 
                 {/* Add Element Dialog */}
@@ -4819,6 +4829,7 @@ function StudioApp() {
           onIconsSaved={handleLabIconsSaved}
           onFontsSaved={handleLabFontsSaved}
           onHandsSaved={handleLabHandsSaved}
+          onGaugePointersSaved={handleLabGaugePointersSaved}
         />
 
         {/* Tips */}
