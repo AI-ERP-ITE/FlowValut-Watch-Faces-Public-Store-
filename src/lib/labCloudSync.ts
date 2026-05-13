@@ -53,13 +53,14 @@ export async function pullAllLabAssetsFromCloud(): Promise<void> {
     getEnvelope<SerializableCustomFontRecord>('fonts'),
   ]);
 
-  if (isRecordArray<CustomIconRecord>(icons.items)) {
+  // Only replace local store if cloud has actual items — never wipe on empty/missing file.
+  if (isRecordArray<CustomIconRecord>(icons.items) && icons.items.length > 0) {
     await replaceCustomIcons(icons.items);
   }
-  if (isRecordArray<CustomHandRecord>(hands.items)) {
+  if (isRecordArray<CustomHandRecord>(hands.items) && hands.items.length > 0) {
     await replaceCustomHandStyles(hands.items);
   }
-  if (isRecordArray<SerializableCustomFontRecord>(fonts.items)) {
+  if (isRecordArray<SerializableCustomFontRecord>(fonts.items) && fonts.items.length > 0) {
     await replaceCustomFonts(deserializeCustomFonts(fonts.items));
     await registerCustomFonts();
   }

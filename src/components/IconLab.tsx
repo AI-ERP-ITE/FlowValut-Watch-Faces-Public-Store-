@@ -650,7 +650,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
               },
               pivotOffsets,
             }
-          : undefined,
+          : { pivotOffsets },
       );
       setSavedHands(prev => {
         const filtered = prev.filter(h => h.key !== record.key);
