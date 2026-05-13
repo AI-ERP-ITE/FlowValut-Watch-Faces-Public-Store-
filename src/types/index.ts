@@ -98,6 +98,9 @@ export interface WatchFaceElement {
   // Weather IMG_LEVEL style
   weatherStyle?: string;
 
+  /** Links this IMG_LEVEL element to a saved ImageSwitcherDefinition */
+  imageSwitcherDefinitionId?: string;
+
   // Clock hand style (TIME_POINTER) — 'white' | 'silver' | 'black' | 'brown' | 'gold' | 'poedagar' | 'fleming' | 'montagut' | 'olevs'
   handStyle?: string;
 

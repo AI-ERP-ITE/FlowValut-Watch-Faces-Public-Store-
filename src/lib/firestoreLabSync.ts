@@ -1,15 +1,21 @@
 /**
  * firestoreLabSync.ts
- * Firestore-backed persistence for all lab assets (icons, hands, fonts).
- * Phase 2 of Spec 087 — replaces GitHub-bridge cloud sync.
+ * Firestore-backed persistence for all lab assets (icons, hands, fonts, gaugePointers).
+ * Spec 088 — Dual-layer storage: source + baked PNG in Firebase Storage; metadata only in Firestore.
  *
  * Contract:
- *  - Pull = UPSERT (Firestore wins on conflict, local-only records are preserved)
- *  - Push = setDoc immediately on save (fire-and-forget, never blocks IDB)
- *  - Delete = deleteDoc immediately on delete
+ *  - Pull = UPSERT (Firestore metadata wins on sourceHash conflict, local-only records preserved)
+ *  - Push = upload to Storage → setDoc(metadata) immediately on save (fire-and-forget, never blocks IDB)
+ *  - Delete = deleteDoc + delete Storage objects
  *  - Auth not available → skip silently, IDB works standalone
+ *  - Backward-compat: old docs with direct `dataUrl` field are detected and silently skipped
+ *    (they will be re-pushed with Storage URLs on next explicit save from the user)
  *
- * T-014 will extend this file to add 'gaugePointers' support.
+ * Firestore schema (NO base64 fields anywhere):
+ *  icons/{key}:          IconStorageMeta
+ *  hands/{key}:          HandStorageMeta
+ *  fonts/{name}:         FontStorageMeta
+ *  gaugePointers/{key}:  GaugePointerStorageMeta
  */
 
 import { getApp } from 'firebase/app';
@@ -25,7 +31,7 @@ import {
 import { getCurrentAuthUser } from './firebaseAuthClient';
 import type { CustomIconRecord } from './customIconStore';
 import type { CustomHandRecord } from './customHandStore';
-import type { CustomFontRecord, SerializableCustomFontRecord } from './customFontStore';
+import type { CustomFontRecord } from './customFontStore';
 import {
   loadCustomIcons,
   replaceCustomIcons,
@@ -38,21 +44,92 @@ import {
   loadCustomFonts,
   replaceCustomFonts,
   registerCustomFonts,
-  serializeCustomFonts,
-  deserializeCustomFonts,
 } from './customFontStore';
 import type { CustomGaugePointerRecord } from './customGaugePointerStore';
 import {
   loadCustomGaugePointers,
   replaceCustomGaugePointers,
 } from './customGaugePointerStore';
+import {
+  uploadSourceText,
+  uploadBinaryBlob,
+  downloadBlob,
+  downloadText,
+  deleteStorageObject,
+  dataUrlToBlob,
+  blobToDataUrl,
+  arrayBufferToBlob,
+  sha256Hex,
+} from './firebaseStorageClient';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Asset type keys. */
 export type LabAssetType = 'icons' | 'hands' | 'fonts' | 'gaugePointers';
 
 export type LabRecord = CustomIconRecord | CustomHandRecord | CustomFontRecord | CustomGaugePointerRecord;
+
+// ── Internal storage metadata interfaces ─────────────────────────────────────
+
+interface IconStorageMeta {
+  key: string;
+  name: string;
+  category: string;
+  width: number;
+  height: number;
+  createdAt: number;
+  updatedAt: number;
+  sourceMode: 'svg' | 'html' | null;
+  sourcePath: string;
+  sourceURL: string;
+  sourceHash: string;
+  bakedPath: string;
+  downloadURL: string;
+  bakedVersion: number;
+}
+
+interface HandStorageMeta {
+  key: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  handRenderVersion: number;
+  pivotOffsets?: {
+    hour: { x: number; y: number };
+    minute: { x: number; y: number };
+    second: { x: number; y: number };
+  };
+  sourcePaths: { hour: string; minute: string; second: string; hub: string };
+  sourceURLs: { hour: string; minute: string; second: string; hub: string };
+  sourceHash: string;
+  bakedPaths: { hour: string; minute: string; second: string; cover: string; swatch: string };
+  downloadURLs: { hour: string; minute: string; second: string; cover: string; swatch: string };
+  bakedVersion: number;
+}
+
+interface FontStorageMeta {
+  name: string;
+  fileName: string;
+  createdAt: number;
+  updatedAt: number;
+  storagePath: string;
+  downloadURL: string;
+  fileHash: string;
+}
+
+interface GaugePointerStorageMeta {
+  key: string;
+  name: string;
+  pivotX: number;
+  pivotY: number;
+  createdAt: number;
+  updatedAt: number;
+  sourcePath: string;
+  sourceURL: string;
+  sourceHash: string;
+  bakedPath: string;
+  downloadURL: string;
+  bakedVersion: number;
+}
 
 // ── Firestore helpers ─────────────────────────────────────────────────────────
 
@@ -77,76 +154,453 @@ function labDocRef(uid: string, type: LabAssetType, docId: string) {
   return doc(getDb(), 'users', uid, 'labAssets', type, docId);
 }
 
-// ── Pull helpers (per type) ───────────────────────────────────────────────────
+// ── ICONS ─────────────────────────────────────────────────────────────────────
+
+async function pushIcon(uid: string, record: CustomIconRecord): Promise<void> {
+  const sourceContent = record.sourceCode ?? '';
+  const newHash = await sha256Hex(sourceContent || record.dataUrl);
+
+  const sourceExt = record.sourceMode === 'svg' ? 'svg' : 'html';
+  const sourcePath = `users/${uid}/labAssets/icons/${record.key}/source.${sourceExt}`;
+  const bakedPath  = `users/${uid}/labAssets/icons/${record.key}/baked_${record.width}x${record.height}.png`;
+
+  // Read existing doc to check hash and grab existing URLs
+  let existingHash: string | null = null;
+  let bakedVersion = 0;
+  let existingSourceURL = '';
+  let existingDownloadURL = '';
+  try {
+    const snap = await getDocs(labCol(uid, 'icons'));
+    snap.forEach(d => {
+      if (d.id === record.key) {
+        const data = d.data() as Partial<IconStorageMeta>;
+        existingHash       = data.sourceHash ?? null;
+        bakedVersion       = data.bakedVersion ?? 0;
+        existingSourceURL  = data.sourceURL ?? '';
+        existingDownloadURL = data.downloadURL ?? '';
+      }
+    });
+  } catch { /* ignore — treat as first upload */ }
+
+  const needsRebake = existingHash !== newHash;
+  let sourceURL  = existingSourceURL;
+  let downloadURL = existingDownloadURL;
+
+  if (needsRebake) {
+    if (sourceContent.trim()) {
+      ({ downloadURL: sourceURL } = await uploadSourceText(sourcePath, sourceContent));
+    }
+    const pngBlob = dataUrlToBlob(record.dataUrl);
+    ({ downloadURL } = await uploadBinaryBlob(bakedPath, pngBlob, 'image/png'));
+    bakedVersion++;
+  }
+
+  const meta: IconStorageMeta = {
+    key: record.key,
+    name: record.name,
+    category: record.category,
+    width: record.width,
+    height: record.height,
+    createdAt: record.createdAt,
+    updatedAt: Date.now(),
+    sourceMode: record.sourceMode ?? null,
+    sourcePath,
+    sourceURL,
+    sourceHash: newHash,
+    bakedPath,
+    downloadURL,
+    bakedVersion,
+  };
+
+  await setDoc(labDocRef(uid, 'icons', record.key), meta);
+}
 
 async function pullIcons(uid: string): Promise<void> {
   const snap = await getDocs(labCol(uid, 'icons'));
   if (snap.empty) return;
 
-  const firestoreMap = new Map<string, CustomIconRecord>();
-  snap.forEach(d => firestoreMap.set(d.id, d.data() as CustomIconRecord));
-
   const local = await loadCustomIcons();
-  const merged = new Map<string, CustomIconRecord>(local.map(r => [r.key, r]));
-  // Firestore wins on conflict
-  firestoreMap.forEach((rec, key) => merged.set(key, rec));
+  const localMap = new Map<string, CustomIconRecord>(local.map(r => [r.key, r]));
 
-  await replaceCustomIcons([...merged.values()]);
+  for (const d of snap.docs) {
+    const data = d.data();
+
+    // Backward-compat: old docs have `dataUrl` directly — skip (re-pushed on next explicit save)
+    if (!data.downloadURL && data.dataUrl) continue;
+    if (!data.downloadURL) continue;
+
+    const meta = data as IconStorageMeta;
+    const existing = localMap.get(meta.key);
+
+    // Skip if local IDB already has same hash
+    if (existing && (existing as CustomIconRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
+      continue;
+    }
+
+    try {
+      const pngBlob = await downloadBlob(meta.downloadURL);
+      const dataUrl = await blobToDataUrl(pngBlob);
+      let sourceCode: string | undefined;
+      if (meta.sourceURL) {
+        sourceCode = await downloadText(meta.sourceURL).catch(() => undefined);
+      }
+      const record: CustomIconRecord = {
+        key: meta.key,
+        name: meta.name,
+        category: meta.category,
+        dataUrl,
+        width: meta.width,
+        height: meta.height,
+        createdAt: meta.createdAt,
+        sourceMode: meta.sourceMode ?? undefined,
+        sourceCode,
+        sourceVersion: meta.bakedVersion,
+      };
+      localMap.set(meta.key, record);
+    } catch (err) {
+      console.warn(`[firestoreLabSync] pull icon ${meta.key} failed:`, err);
+    }
+  }
+
+  await replaceCustomIcons([...localMap.values()]);
 }
 
-async function pullHands(uid: string): Promise<void> {
-  const snap = await getDocs(labCol(uid, 'hands'));
-  if (snap.empty) return;
+// ── GAUGE POINTERS ────────────────────────────────────────────────────────────
 
-  const firestoreMap = new Map<string, CustomHandRecord>();
-  snap.forEach(d => firestoreMap.set(d.id, d.data() as CustomHandRecord));
+async function pushGaugePointer(uid: string, record: CustomGaugePointerRecord): Promise<void> {
+  const sourceContent = record.sourceHtml ?? '';
+  const newHash = await sha256Hex(sourceContent || record.dataUrl);
 
-  const local = await loadCustomHandStyles();
-  const merged = new Map<string, CustomHandRecord>(local.map(r => [r.key, r]));
-  firestoreMap.forEach((rec, key) => merged.set(key, rec));
+  const sourcePath = `users/${uid}/labAssets/gaugePointers/${record.key}/source.html`;
+  const bakedPath  = `users/${uid}/labAssets/gaugePointers/${record.key}/baked.png`;
 
-  await replaceCustomHandStyles([...merged.values()]);
-}
+  let existingHash: string | null = null;
+  let bakedVersion = 0;
+  let existingSourceURL = '';
+  let existingDownloadURL = '';
+  try {
+    const snap = await getDocs(labCol(uid, 'gaugePointers'));
+    snap.forEach(d => {
+      if (d.id === record.key) {
+        const data = d.data() as Partial<GaugePointerStorageMeta>;
+        existingHash        = data.sourceHash ?? null;
+        bakedVersion        = data.bakedVersion ?? 0;
+        existingSourceURL   = data.sourceURL ?? '';
+        existingDownloadURL = data.downloadURL ?? '';
+      }
+    });
+  } catch { /* ignore */ }
 
-async function pullFonts(uid: string): Promise<void> {
-  const snap = await getDocs(labCol(uid, 'fonts'));
-  if (snap.empty) return;
+  const needsRebake = existingHash !== newHash;
+  let sourceURL   = existingSourceURL;
+  let downloadURL  = existingDownloadURL;
 
-  const firestoreMap = new Map<string, SerializableCustomFontRecord>();
-  snap.forEach(d => firestoreMap.set(d.id, d.data() as SerializableCustomFontRecord));
+  if (needsRebake) {
+    if (sourceContent.trim()) {
+      ({ downloadURL: sourceURL } = await uploadSourceText(sourcePath, sourceContent));
+    }
+    const pngBlob = dataUrlToBlob(record.dataUrl);
+    ({ downloadURL } = await uploadBinaryBlob(bakedPath, pngBlob, 'image/png'));
+    bakedVersion++;
+  }
 
-  const local = await loadCustomFonts();
-  const localSerialized = serializeCustomFonts(local);
-  const merged = new Map<string, SerializableCustomFontRecord>(
-    localSerialized.map(r => [r.name, r]),
-  );
-  firestoreMap.forEach((rec, name) => merged.set(name, rec));
+  const meta: GaugePointerStorageMeta = {
+    key: record.key,
+    name: record.name,
+    pivotX: record.pivotX,
+    pivotY: record.pivotY,
+    createdAt: record.createdAt,
+    updatedAt: Date.now(),
+    sourcePath,
+    sourceURL,
+    sourceHash: newHash,
+    bakedPath,
+    downloadURL,
+    bakedVersion,
+  };
 
-  const mergedDeserialized = deserializeCustomFonts([...merged.values()]);
-  await replaceCustomFonts(mergedDeserialized);
-  await registerCustomFonts();
+  await setDoc(labDocRef(uid, 'gaugePointers', record.key), meta);
 }
 
 async function pullGaugePointers(uid: string): Promise<void> {
   const snap = await getDocs(labCol(uid, 'gaugePointers'));
   if (snap.empty) return;
 
-  const firestoreMap = new Map<string, CustomGaugePointerRecord>();
-  snap.forEach(d => firestoreMap.set(d.id, d.data() as CustomGaugePointerRecord));
-
   const local = await loadCustomGaugePointers();
-  const merged = new Map<string, CustomGaugePointerRecord>(local.map(r => [r.key, r]));
-  firestoreMap.forEach((rec, key) => merged.set(key, rec));
+  const localMap = new Map<string, CustomGaugePointerRecord>(local.map(r => [r.key, r]));
 
-  await replaceCustomGaugePointers([...merged.values()]);
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (!data.downloadURL && data.dataUrl) continue;
+    if (!data.downloadURL) continue;
+
+    const meta = data as GaugePointerStorageMeta;
+    const existing = localMap.get(meta.key);
+    if (existing && (existing as CustomGaugePointerRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
+      continue;
+    }
+
+    try {
+      const pngBlob = await downloadBlob(meta.downloadURL);
+      const dataUrl = await blobToDataUrl(pngBlob);
+      let sourceHtml = '';
+      if (meta.sourceURL) {
+        sourceHtml = await downloadText(meta.sourceURL).catch(() => '');
+      }
+      const record: CustomGaugePointerRecord = {
+        key: meta.key,
+        name: meta.name,
+        sourceHtml,
+        dataUrl,
+        pivotX: meta.pivotX,
+        pivotY: meta.pivotY,
+        createdAt: meta.createdAt,
+      };
+      localMap.set(meta.key, record);
+    } catch (err) {
+      console.warn(`[firestoreLabSync] pull gaugePointer ${meta.key} failed:`, err);
+    }
+  }
+
+  await replaceCustomGaugePointers([...localMap.values()]);
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── HANDS ─────────────────────────────────────────────────────────────────────
+
+async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
+  const sourceHour   = record.sourceHourHtml   ?? '';
+  const sourceMinute = record.sourceMinuteHtml ?? '';
+  const sourceSecond = record.sourceSecondHtml ?? '';
+  const sourceHub    = record.sourceHubHtml    ?? '';
+
+  const combinedSource = sourceHour + sourceMinute + sourceSecond + sourceHub;
+  const newHash = await sha256Hex(combinedSource || record.hourDataUrl);
+
+  const base = `users/${uid}/labAssets/hands/${record.key}`;
+
+  let existingHash: string | null = null;
+  let bakedVersion = 0;
+  let existingSourceURLs = { hour: '', minute: '', second: '', hub: '' };
+  let existingDownloadURLs = { hour: '', minute: '', second: '', cover: '', swatch: '' };
+
+  try {
+    const snap = await getDocs(labCol(uid, 'hands'));
+    snap.forEach(d => {
+      if (d.id === record.key) {
+        const data = d.data() as Partial<HandStorageMeta>;
+        existingHash         = data.sourceHash ?? null;
+        bakedVersion         = data.bakedVersion ?? 0;
+        existingSourceURLs   = data.sourceURLs ?? existingSourceURLs;
+        existingDownloadURLs = data.downloadURLs ?? existingDownloadURLs;
+      }
+    });
+  } catch { /* ignore */ }
+
+  const needsRebake = existingHash !== newHash;
+  let sourceURLs   = existingSourceURLs;
+  let downloadURLs  = existingDownloadURLs;
+
+  if (needsRebake) {
+    const sourceUploads = await Promise.all([
+      sourceHour.trim()   ? uploadSourceText(`${base}/source_hour.html`,   sourceHour)   : Promise.resolve({ storagePath: '', downloadURL: '' }),
+      sourceMinute.trim() ? uploadSourceText(`${base}/source_minute.html`, sourceMinute) : Promise.resolve({ storagePath: '', downloadURL: '' }),
+      sourceSecond.trim() ? uploadSourceText(`${base}/source_second.html`, sourceSecond) : Promise.resolve({ storagePath: '', downloadURL: '' }),
+      sourceHub.trim()    ? uploadSourceText(`${base}/source_hub.html`,    sourceHub)    : Promise.resolve({ storagePath: '', downloadURL: '' }),
+    ]);
+    sourceURLs = {
+      hour:   sourceUploads[0].downloadURL,
+      minute: sourceUploads[1].downloadURL,
+      second: sourceUploads[2].downloadURL,
+      hub:    sourceUploads[3].downloadURL,
+    };
+
+    const bakedUploads = await Promise.all([
+      uploadBinaryBlob(`${base}/baked_hour.png`,   dataUrlToBlob(record.hourDataUrl),   'image/png'),
+      uploadBinaryBlob(`${base}/baked_minute.png`, dataUrlToBlob(record.minuteDataUrl), 'image/png'),
+      uploadBinaryBlob(`${base}/baked_second.png`, dataUrlToBlob(record.secondDataUrl), 'image/png'),
+      uploadBinaryBlob(`${base}/baked_cover.png`,  dataUrlToBlob(record.coverDataUrl),  'image/png'),
+      uploadBinaryBlob(`${base}/baked_swatch.png`, dataUrlToBlob(record.swatchDataUrl), 'image/png'),
+    ]);
+    downloadURLs = {
+      hour:   bakedUploads[0].downloadURL,
+      minute: bakedUploads[1].downloadURL,
+      second: bakedUploads[2].downloadURL,
+      cover:  bakedUploads[3].downloadURL,
+      swatch: bakedUploads[4].downloadURL,
+    };
+    bakedVersion++;
+  }
+
+  const meta: HandStorageMeta = {
+    key: record.key,
+    name: record.name,
+    createdAt: record.createdAt,
+    updatedAt: Date.now(),
+    handRenderVersion: record.handRenderVersion ?? 4,
+    pivotOffsets: record.pivotOffsets,
+    sourcePaths: {
+      hour:   `${base}/source_hour.html`,
+      minute: `${base}/source_minute.html`,
+      second: `${base}/source_second.html`,
+      hub:    `${base}/source_hub.html`,
+    },
+    sourceURLs,
+    sourceHash: newHash,
+    bakedPaths: {
+      hour:   `${base}/baked_hour.png`,
+      minute: `${base}/baked_minute.png`,
+      second: `${base}/baked_second.png`,
+      cover:  `${base}/baked_cover.png`,
+      swatch: `${base}/baked_swatch.png`,
+    },
+    downloadURLs,
+    bakedVersion,
+  };
+
+  await setDoc(labDocRef(uid, 'hands', record.key), meta);
+}
+
+async function pullHands(uid: string): Promise<void> {
+  const snap = await getDocs(labCol(uid, 'hands'));
+  if (snap.empty) return;
+
+  const local = await loadCustomHandStyles();
+  const localMap = new Map<string, CustomHandRecord>(local.map(r => [r.key, r]));
+
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (!data.downloadURLs && data.hourDataUrl) continue;
+    if (!data.downloadURLs?.hour) continue;
+
+    const meta = data as HandStorageMeta;
+    const existing = localMap.get(meta.key);
+    if (existing && (existing as CustomHandRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
+      continue;
+    }
+
+    try {
+      const blobs = await Promise.all([
+        downloadBlob(meta.downloadURLs.hour),
+        downloadBlob(meta.downloadURLs.minute),
+        downloadBlob(meta.downloadURLs.second),
+        downloadBlob(meta.downloadURLs.cover),
+        downloadBlob(meta.downloadURLs.swatch),
+      ]);
+      const dataUrls = await Promise.all(blobs.map(b => blobToDataUrl(b)));
+
+      const sourceTexts = await Promise.all([
+        meta.sourceURLs?.hour   ? downloadText(meta.sourceURLs.hour).catch(()   => '') : Promise.resolve(''),
+        meta.sourceURLs?.minute ? downloadText(meta.sourceURLs.minute).catch(() => '') : Promise.resolve(''),
+        meta.sourceURLs?.second ? downloadText(meta.sourceURLs.second).catch(() => '') : Promise.resolve(''),
+        meta.sourceURLs?.hub    ? downloadText(meta.sourceURLs.hub).catch(()    => '') : Promise.resolve(''),
+      ]);
+
+      const record: CustomHandRecord = {
+        key: meta.key,
+        name: meta.name,
+        hourDataUrl:      dataUrls[0],
+        minuteDataUrl:    dataUrls[1],
+        secondDataUrl:    dataUrls[2],
+        coverDataUrl:     dataUrls[3],
+        swatchDataUrl:    dataUrls[4],
+        sourceHourHtml:   sourceTexts[0] || undefined,
+        sourceMinuteHtml: sourceTexts[1] || undefined,
+        sourceSecondHtml: sourceTexts[2] || undefined,
+        sourceHubHtml:    sourceTexts[3] || undefined,
+        handRenderVersion: meta.handRenderVersion,
+        pivotOffsets: meta.pivotOffsets,
+        createdAt: meta.createdAt,
+      };
+      localMap.set(meta.key, record);
+    } catch (err) {
+      console.warn(`[firestoreLabSync] pull hand ${meta.key} failed:`, err);
+    }
+  }
+
+  await replaceCustomHandStyles([...localMap.values()]);
+}
+
+// ── FONTS ─────────────────────────────────────────────────────────────────────
+
+async function pushFont(uid: string, record: CustomFontRecord): Promise<void> {
+  const newHash = await sha256Hex(record.buffer);
+  const storagePath = `users/${uid}/labAssets/fonts/${encodeURIComponent(record.name)}/font.bin`;
+
+  let existingHash: string | null = null;
+  let existingDownloadURL = '';
+  try {
+    const snap = await getDocs(labCol(uid, 'fonts'));
+    snap.forEach(d => {
+      if (d.id === record.name) {
+        const data = d.data() as Partial<FontStorageMeta>;
+        existingHash        = data.fileHash ?? null;
+        existingDownloadURL = data.downloadURL ?? '';
+      }
+    });
+  } catch { /* ignore */ }
+
+  let downloadURL = existingDownloadURL;
+  if (existingHash !== newHash) {
+    const fontBlob = arrayBufferToBlob(record.buffer, 'font/ttf');
+    ({ downloadURL } = await uploadBinaryBlob(storagePath, fontBlob, 'font/ttf'));
+  }
+
+  const meta: FontStorageMeta = {
+    name: record.name,
+    fileName: record.fileName,
+    createdAt: record.createdAt,
+    updatedAt: Date.now(),
+    storagePath,
+    downloadURL,
+    fileHash: newHash,
+  };
+
+  await setDoc(labDocRef(uid, 'fonts', record.name), meta);
+}
+
+async function pullFonts(uid: string): Promise<void> {
+  const snap = await getDocs(labCol(uid, 'fonts'));
+  if (snap.empty) return;
+
+  const local = await loadCustomFonts();
+  const localMap = new Map<string, CustomFontRecord>(local.map(r => [r.name, r]));
+
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (!data.downloadURL && data.bufferBase64) continue;
+    if (!data.downloadURL) continue;
+
+    const meta = data as FontStorageMeta;
+    const existing = localMap.get(meta.name);
+    if (existing && (existing as CustomFontRecord & { fileHash?: string }).fileHash === meta.fileHash) {
+      continue;
+    }
+
+    try {
+      const fontBlob = await downloadBlob(meta.downloadURL);
+      const buffer   = await fontBlob.arrayBuffer();
+      const record: CustomFontRecord = {
+        name: meta.name,
+        fileName: meta.fileName,
+        buffer,
+        createdAt: meta.createdAt,
+      };
+      localMap.set(meta.name, record);
+    } catch (err) {
+      console.warn(`[firestoreLabSync] pull font ${meta.name} failed:`, err);
+    }
+  }
+
+  await replaceCustomFonts([...localMap.values()]);
+  await registerCustomFonts();
+}
+
+// ── Public API — Pull all ─────────────────────────────────────────────────────
 
 /**
- * Pull all lab assets from Firestore and upsert into local IDB.
+ * Pull all lab assets from Firestore/Storage and upsert into local IDB.
  * Never clears IDB — local-only assets are preserved.
- * Silently skips if user is not signed in or on any Firestore error.
+ * Silently skips if user is not signed in or on any error.
  */
 export async function pullLabAssetsFromFirestore(): Promise<void> {
   const uid = getUid();
@@ -164,8 +618,10 @@ export async function pullLabAssetsFromFirestore(): Promise<void> {
   }
 }
 
+// ── Public API — Push single asset ───────────────────────────────────────────
+
 /**
- * Push a single lab asset record to Firestore.
+ * Push a single lab asset record to Storage + Firestore.
  * Fire-and-forget — never blocks the IDB save. Logs on failure.
  */
 export async function pushLabAssetToFirestore(
@@ -176,32 +632,24 @@ export async function pushLabAssetToFirestore(
   if (!uid) return;
 
   try {
-    let docId: string;
-    let data: Record<string, unknown>;
-
-    if (type === 'fonts') {
-      const font = record as CustomFontRecord;
-      docId = font.name;
-      const [serialized] = serializeCustomFonts([font]);
-      data = serialized as unknown as Record<string, unknown>;
+    if (type === 'icons') {
+      await pushIcon(uid, record as CustomIconRecord);
     } else if (type === 'gaugePointers') {
-      const gp = record as CustomGaugePointerRecord;
-      docId = gp.key;
-      data = gp as unknown as Record<string, unknown>;
-    } else {
-      const keyed = record as CustomIconRecord | CustomHandRecord;
-      docId = keyed.key;
-      data = keyed as unknown as Record<string, unknown>;
+      await pushGaugePointer(uid, record as CustomGaugePointerRecord);
+    } else if (type === 'hands') {
+      await pushHand(uid, record as CustomHandRecord);
+    } else if (type === 'fonts') {
+      await pushFont(uid, record as CustomFontRecord);
     }
-
-    await setDoc(labDocRef(uid, type, docId), data);
   } catch (err) {
     console.warn(`[firestoreLabSync] push ${type} failed:`, err);
   }
 }
 
+// ── Public API — Delete single asset ─────────────────────────────────────────
+
 /**
- * Delete a single lab asset from Firestore.
+ * Delete a single lab asset from Firestore and its Storage files.
  * Fire-and-forget. For fonts pass the font `name` as key.
  */
 export async function deleteLabAssetFromFirestore(
@@ -212,8 +660,39 @@ export async function deleteLabAssetFromFirestore(
   if (!uid) return;
 
   try {
+    // Read the doc first to get storage paths for cleanup
+    const snap = await getDocs(labCol(uid, type));
+    const storagePaths: string[] = [];
+
+    snap.forEach(d => {
+      if (d.id === key) {
+        const data = d.data();
+        if (type === 'icons') {
+          const m = data as Partial<IconStorageMeta>;
+          if (m.sourcePath) storagePaths.push(m.sourcePath);
+          if (m.bakedPath)  storagePaths.push(m.bakedPath);
+        } else if (type === 'gaugePointers') {
+          const m = data as Partial<GaugePointerStorageMeta>;
+          if (m.sourcePath) storagePaths.push(m.sourcePath);
+          if (m.bakedPath)  storagePaths.push(m.bakedPath);
+        } else if (type === 'hands') {
+          const m = data as Partial<HandStorageMeta>;
+          if (m.sourcePaths) storagePaths.push(...Object.values(m.sourcePaths));
+          if (m.bakedPaths)  storagePaths.push(...Object.values(m.bakedPaths));
+        } else if (type === 'fonts') {
+          const m = data as Partial<FontStorageMeta>;
+          if (m.storagePath) storagePaths.push(m.storagePath);
+        }
+      }
+    });
+
+    // Delete Storage objects (best-effort, ignore missing)
+    await Promise.allSettled(storagePaths.map(p => deleteStorageObject(p)));
+
+    // Delete Firestore doc
     await deleteDoc(labDocRef(uid, type, key));
   } catch (err) {
     console.warn(`[firestoreLabSync] delete ${type}/${key} failed:`, err);
   }
 }
+

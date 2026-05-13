@@ -48,6 +48,7 @@ import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
 import { loadCustomGaugePointers, type CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
+import { getSwitcherDefinition } from '@/lib/imageSwitcherStore';
 import { isLabCloudSyncEnabled } from '@/lib/labCloudSync';
 import { pullLabAssetsFromFirestore, isFirestoreSyncEnabled } from '@/lib/firestoreLabSync';
 import { subscribeAuthState } from '@/lib/firebaseAuthClient';
@@ -3121,9 +3122,37 @@ function StudioApp() {
 
       // Build ZPK using File objects
       console.log('[App] Calling buildZPK...');
-      
+
+      // Resolve imageSwitcherDefinitionId slots → extra ElementImages before building elementFiles
+      const switcherSlotImages: ElementImage[] = [];
+      const allExportElements = [
+        ...mainEditorElements,
+        ...(aodEditorElements ?? []),
+      ];
+      for (const el of allExportElements) {
+        if (el.type === 'IMG_LEVEL' && el.imageSwitcherDefinitionId) {
+          const def = await getSwitcherDefinition(el.imageSwitcherDefinitionId);
+          if (def) {
+            def.ranges.forEach((slot, i) => {
+              if (slot.dataUrl) {
+                const slotName = `switcher_${el.id}_slot_${String(i).padStart(2, '0')}.png`;
+                if (!state.elementImages.some(img => img.name === slotName)) {
+                  switcherSlotImages.push({
+                    name: slotName,
+                    dataUrl: slot.dataUrl!,
+                    bounds: { x: 0, y: 0, width: el.bounds.width, height: el.bounds.height },
+                    type: 'IMG_LEVEL',
+                  });
+                }
+              }
+            });
+          }
+        }
+      }
+      const allElementImages = [...state.elementImages, ...switcherSlotImages];
+
       // Convert elementImages from dataUrl to File objects
-      const elementFiles = state.elementImages.map((img) => {
+      const elementFiles = allElementImages.map((img) => {
         console.log('[App] Converting element image to file:', img.name);
         
         const { mimeType, bytes } = decodeDataUrlToBytes(img.dataUrl, `Element image ${img.name}`);

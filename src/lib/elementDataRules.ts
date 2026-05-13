@@ -236,6 +236,34 @@ export const IMAGE_SWITCHER_MIN_NON_WEATHER_FRAMES = 2;
 export const IMAGE_SWITCHER_WEATHER_FRAME_COUNT = 29;
 export const IMAGE_SWITCHER_LEGACY_DEFAULT_FRAMES = 10;
 
+import type { PolicyType } from '@/types/imageSwitcher';
+
+export const IMAGE_SWITCHER_POLICY: Record<string, PolicyType> = {
+  WEATHER_CURRENT: 'FIXED_CODES',
+  WEATHER_STATUS:  'FIXED_CODES',
+  MOON:            'FIXED_CODES',
+  BATTERY:         'PERCENT_RANGES',
+  HEART:           'DYNAMIC_RANGES',
+  STEP:            'ABSOLUTE_RANGES',
+  CAL:             'ABSOLUTE_RANGES',
+  DISTANCE:        'ABSOLUTE_RANGES',
+  STAND:           'ABSOLUTE_RANGES',
+  PAI:             'ABSOLUTE_RANGES',
+  PAI_WEEKLY:      'ABSOLUTE_RANGES',
+  FAT_BURN:        'ABSOLUTE_RANGES',
+  STRESS:          'ABSOLUTE_RANGES',
+  SPO2:            'ABSOLUTE_RANGES',
+  UVI:             'ABSOLUTE_RANGES',
+  AQI:             'ABSOLUTE_RANGES',
+  HUMIDITY:        'ABSOLUTE_RANGES',
+};
+
+export const IMAGE_SWITCHER_FIXED_SLOT_COUNTS: Record<string, number> = {
+  WEATHER_CURRENT: 29,
+  WEATHER_STATUS:  29,
+  MOON:            8,
+};
+
 export interface ImageSwitcherCountResolution {
   expectedCount: number | null;
   minCount: number;

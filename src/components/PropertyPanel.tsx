@@ -35,6 +35,8 @@ export interface PropertyPanelProps {
   iconLibraryKey?: number; // increment to force icon list refresh
   customHandStyles?: CustomHandRecord[]; // user-created hand styles from IconLab
   customGaugePointers?: CustomGaugePointerRecord[]; // user-created gauge pointers from IconLab
+  switcherDefinitions?: import('@/types/imageSwitcher').ImageSwitcherDefinition[];
+  onOpenSwitcherLab?: () => void;
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -142,7 +144,7 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [] }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
@@ -911,6 +913,39 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               )}
             </div>
           )}
+        </Section>
+      )}
+
+      {/* Image Switcher link — IMG_LEVEL only */}
+      {element.type === 'IMG_LEVEL' && (
+        <Section label="Image Switcher">
+          <div className="space-y-2">
+            <p className="text-[10px] text-white/40">
+              Link a saved Switcher Definition to drive images automatically from a live data value.
+            </p>
+            <Select
+              value={element.imageSwitcherDefinitionId ?? ''}
+              onValueChange={(v) => update({ imageSwitcherDefinitionId: v || undefined })}
+            >
+              <SelectTrigger className="h-7 text-xs bg-zinc-800 border-white/10 text-white">
+                <SelectValue placeholder="— none (manual images) —" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— none (manual images) —</SelectItem>
+                {switcherDefinitions.map((def) => (
+                  <SelectItem key={def.id} value={def.id}>{def.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {onOpenSwitcherLab && (
+              <button
+                onClick={onOpenSwitcherLab}
+                className="w-full text-[10px] py-1 px-2 rounded border border-cyan-500/30 bg-cyan-500/8 hover:bg-cyan-500/15 text-cyan-400 transition-colors"
+              >
+                Open in Switcher Lab
+              </button>
+            )}
+          </div>
         </Section>
       )}
 

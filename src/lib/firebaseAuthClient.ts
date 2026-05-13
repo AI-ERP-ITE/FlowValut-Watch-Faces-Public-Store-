@@ -17,6 +17,7 @@ interface FirebaseWebConfig {
   apiKey: string;
   authDomain: string;
   projectId: string;
+  storageBucket: string;
   appId: string;
 }
 
@@ -24,6 +25,7 @@ const FALLBACK_FIREBASE_CONFIG: FirebaseWebConfig = {
   apiKey: 'AIzaSyCz6av7Wqu4yEE_ATEgN3ObFrPtnPj65Zk',
   authDomain: 'zeppfaceloader-b0b106e9.firebaseapp.com',
   projectId: 'zeppfaceloader-b0b106e9',
+  storageBucket: 'zeppfaceloader-b0b106e9.firebasestorage.app',
   appId: '1:63546256310:web:ba4ae563ed321776e9ef17',
 };
 
@@ -37,6 +39,9 @@ function getFirebaseConfig(): FirebaseWebConfig | null {
   const projectId =
     (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined)?.trim() ||
     FALLBACK_FIREBASE_CONFIG.projectId;
+  const storageBucket =
+    (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined)?.trim() ||
+    FALLBACK_FIREBASE_CONFIG.storageBucket;
   const appId =
     (import.meta.env.VITE_FIREBASE_APP_ID as string | undefined)?.trim() ||
     FALLBACK_FIREBASE_CONFIG.appId;
@@ -45,7 +50,7 @@ function getFirebaseConfig(): FirebaseWebConfig | null {
     return null;
   }
 
-  return { apiKey, authDomain, projectId, appId };
+  return { apiKey, authDomain, projectId, storageBucket, appId };
 }
 
 function ensureFirebaseApp() {

@@ -51,12 +51,13 @@ import {
   loadCustomGaugePointers,
   type CustomGaugePointerRecord,
 } from '@/lib/customGaugePointerStore';
+import ImageSwitcherLab from './ImageSwitcherLab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type CodeMode = 'svg' | 'html';
 type AIModel = 'gpt-4o' | 'gemini-2.5-flash';
-type TabId = 'icons' | 'pointers' | 'gaugePointers' | 'fonts';
+type TabId = 'icons' | 'pointers' | 'gaugePointers' | 'fonts' | 'switchers';
 
 const ICON_SOURCE_VERSION = 1;
 
@@ -1016,7 +1017,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
           </div>
           {/* Tabs */}
           <div className="flex items-center gap-1">
-            {(['icons', 'pointers', 'gaugePointers', 'fonts'] as TabId[]).map(t => (
+            {(['icons', 'pointers', 'gaugePointers', 'fonts', 'switchers'] as TabId[]).map(t => (
               <button
                 key={t}
                 onClick={() => setActiveTab(t)}
@@ -1026,7 +1027,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     : 'text-white/40 hover:text-white/70'
                 }`}
               >
-                {t === 'icons' ? '🎨 Icons' : t === 'pointers' ? '🕒 Pointers' : t === 'gaugePointers' ? '📈 Gauge' : '🔤 Fonts'}
+                {t === 'icons' ? '🎨 Icons' : t === 'pointers' ? '🕒 Pointers' : t === 'gaugePointers' ? '📈 Gauge' : t === 'fonts' ? '🔤 Fonts' : '🔀 Switchers'}
               </button>
             ))}
           </div>
@@ -1814,6 +1815,12 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'switchers' && (
+            <div className="p-5 max-w-2xl mx-auto">
+              <ImageSwitcherLab />
             </div>
           )}
 
