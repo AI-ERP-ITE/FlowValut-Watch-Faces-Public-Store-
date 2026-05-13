@@ -47,6 +47,7 @@ import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
 import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
+import { isLabCloudSyncEnabled, pullAllLabAssetsFromCloud } from '@/lib/labCloudSync';
 import {
   POINTER_PARITY_TOLERANCE,
   createMissingStageParityResult,
@@ -2166,15 +2167,28 @@ function StudioApp() {
 
   // Load custom icons + fonts from IndexedDB on startup and register them
   useEffect(() => {
-    Promise.all([loadCustomIcons(), loadCustomFonts(), registerCustomFonts(), loadCustomHandStyles()]).then(
-      ([icons, , loadedFontNames, hands]) => {
-        if (icons.length > 0) registerCustomIconsInLibrary(icons);
-        if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
-        if (hands.length > 0) setCustomHandStyles(hands);
-        // Trigger PropertyPanel icon picker to re-fetch now that custom icons are registered
-        if (icons.length > 0) setIconLibraryKey(k => k + 1);
+    const run = async () => {
+      // Pull cloud assets first so IndexedDB is up-to-date before we read it
+      if (isLabCloudSyncEnabled()) {
+        try {
+          await pullAllLabAssetsFromCloud();
+        } catch (err) {
+          console.warn('[StudioApp] Cloud pull on startup failed:', err);
+        }
       }
-    );
+      const [icons, , loadedFontNames, hands] = await Promise.all([
+        loadCustomIcons(),
+        loadCustomFonts(),
+        registerCustomFonts(),
+        loadCustomHandStyles(),
+      ]);
+      if (icons.length > 0) registerCustomIconsInLibrary(icons);
+      if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
+      if (hands.length > 0) setCustomHandStyles(hands);
+      // Trigger PropertyPanel icon picker to re-fetch now that custom icons are registered
+      if (icons.length > 0) setIconLibraryKey(k => k + 1);
+    };
+    run().catch(err => console.warn('[StudioApp] Startup asset load failed:', err));
   }, []);
 
   const handleLabIconsSaved = useCallback(() => {
