@@ -47,7 +47,8 @@ import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
 import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
-import { isLabCloudSyncEnabled, pullAllLabAssetsFromCloud } from '@/lib/labCloudSync';
+import { isLabCloudSyncEnabled } from '@/lib/labCloudSync';
+import { pullLabAssetsFromFirestore, isFirestoreSyncEnabled } from '@/lib/firestoreLabSync';
 import { subscribeAuthState } from '@/lib/firebaseAuthClient';
 import {
   POINTER_PARITY_TOLERANCE,
@@ -2167,15 +2168,18 @@ function StudioApp() {
   }, []);
 
   // Load custom icons + fonts from IndexedDB on startup and register them.
-  // Cloud pull requires a valid Firebase ID token — wait for auth to settle first.
+  // Firestore pull requires auth — wait for auth to settle first.
   useEffect(() => {
-    const loadAssets = async (isSignedIn: boolean) => {
-      if (isLabCloudSyncEnabled() && isSignedIn) {
+    const loadAssets = async (_isSignedIn: boolean) => {
+      if (isFirestoreSyncEnabled()) {
         try {
-          await pullAllLabAssetsFromCloud();
+          await pullLabAssetsFromFirestore();
         } catch (err) {
-          console.warn('[StudioApp] Cloud pull on startup failed:', err);
+          console.warn('[StudioApp] Firestore pull on startup failed:', err);
         }
+      } else if (isLabCloudSyncEnabled()) {
+        // Legacy GitHub-bridge fallback (disabled by default, kept for migration safety)
+        console.debug('[StudioApp] Firestore not available; skipping cloud pull.');
       }
       const [icons, , loadedFontNames, hands] = await Promise.all([
         loadCustomIcons(),

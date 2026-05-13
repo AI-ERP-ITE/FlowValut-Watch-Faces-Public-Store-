@@ -41,6 +41,10 @@ import {
   pushLabAssetTypeToCloud,
   type LabAssetType,
 } from '@/lib/labCloudSync';
+import {
+  pushLabAssetToFirestore,
+  deleteLabAssetFromFirestore,
+} from '@/lib/firestoreLabSync';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -575,6 +579,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       setSaveMsg('✓ Saved to library');
       publishLabAssetsChanged('icons');
       scheduleCloudPush('icons');
+      pushLabAssetToFirestore('icons', record).catch(e => console.warn('[IconLab] Firestore push icons failed:', e));
       onIconsSaved?.();
     } catch (err) {
       setSaveMsg(`✗ ${(err as Error).message}`);
@@ -590,6 +595,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavedIcons(prev => prev.filter(i => i.key !== key));
     publishLabAssetsChanged('icons');
     scheduleCloudPush('icons');
+    deleteLabAssetFromFirestore('icons', key).catch(e => console.warn('[IconLab] Firestore delete icons failed:', e));
     onIconsSaved?.();
   };
 
@@ -665,6 +671,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       }
       publishLabAssetsChanged('hands');
       scheduleCloudPush('hands');
+      pushLabAssetToFirestore('hands', record).catch(e => console.warn('[IconLab] Firestore push hands failed:', e));
       onHandsSaved?.();
     } catch (err) {
       setSaveHandMsg(`✗ ${(err as Error).message}`);
@@ -726,6 +733,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavedHands(prev => prev.filter(h => h.key !== key));
     publishLabAssetsChanged('hands');
     scheduleCloudPush('hands');
+    deleteLabAssetFromFirestore('hands', key).catch(e => console.warn('[IconLab] Firestore delete hands failed:', e));
     onHandsSaved?.();
   };
 
@@ -755,6 +763,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       setFontName('');
       publishLabAssetsChanged('fonts');
       scheduleCloudPush('fonts');
+      pushLabAssetToFirestore('fonts', record).catch(e => console.warn('[IconLab] Firestore push fonts failed:', e));
       onFontsSaved?.();
     } catch (err) {
       setFontMsg(`✗ ${(err as Error).message}`);
@@ -768,6 +777,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavedFonts(prev => prev.filter(f => f.name !== name));
     publishLabAssetsChanged('fonts');
     scheduleCloudPush('fonts');
+    deleteLabAssetFromFirestore('fonts', name).catch(e => console.warn('[IconLab] Firestore delete fonts failed:', e));
     onFontsSaved?.();
   };
 
