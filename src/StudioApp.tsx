@@ -48,6 +48,7 @@ import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
 import { isLabCloudSyncEnabled, pullAllLabAssetsFromCloud } from '@/lib/labCloudSync';
+import { subscribeAuthState } from '@/lib/firebaseAuthClient';
 import {
   POINTER_PARITY_TOLERANCE,
   createMissingStageParityResult,
@@ -2165,11 +2166,11 @@ function StudioApp() {
     });
   }, []);
 
-  // Load custom icons + fonts from IndexedDB on startup and register them
+  // Load custom icons + fonts from IndexedDB on startup and register them.
+  // Cloud pull requires a valid Firebase ID token — wait for auth to settle first.
   useEffect(() => {
-    const run = async () => {
-      // Pull cloud assets first so IndexedDB is up-to-date before we read it
-      if (isLabCloudSyncEnabled()) {
+    const loadAssets = async (isSignedIn: boolean) => {
+      if (isLabCloudSyncEnabled() && isSignedIn) {
         try {
           await pullAllLabAssetsFromCloud();
         } catch (err) {
@@ -2185,10 +2186,19 @@ function StudioApp() {
       if (icons.length > 0) registerCustomIconsInLibrary(icons);
       if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
       if (hands.length > 0) setCustomHandStyles(hands);
-      // Trigger PropertyPanel icon picker to re-fetch now that custom icons are registered
       if (icons.length > 0) setIconLibraryKey(k => k + 1);
     };
-    run().catch(err => console.warn('[StudioApp] Startup asset load failed:', err));
+
+    // Wait for Firebase auth to rehydrate before attempting cloud pull.
+    // onAuthStateChanged fires once immediately with the settled state.
+    let settled = false;
+    const unsubscribe = subscribeAuthState((user) => {
+      if (settled) return; // only handle first event
+      settled = true;
+      unsubscribe();
+      loadAssets(!!user).catch(err => console.warn('[StudioApp] Startup asset load failed:', err));
+    });
+    return () => { unsubscribe(); };
   }, []);
 
   const handleLabIconsSaved = useCallback(() => {
