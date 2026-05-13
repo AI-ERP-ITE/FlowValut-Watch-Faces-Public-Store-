@@ -2779,7 +2779,51 @@ function StudioApp() {
     }
   }, [state.backgroundImage, state.fullDesignImage, watchModel, watchFaceName, aiProvider, aiApiKey, useMockAnalysis, dispatch]);
 
-  // T020–T022: HTML-driven pipeline — no AI, DOM → elements → generator
+  // Skip HTML/AI input — go straight to blank canvas and add widgets manually
+  const handleStartBlank = useCallback(() => {
+    const MODEL_RES: Record<string, { width: number; height: number }> = {
+      'Balance 2': { width: 480, height: 480 },
+      'Balance': { width: 480, height: 480 },
+      'Active Max': { width: 480, height: 480 },
+      'Active 3 Premium': { width: 466, height: 466 },
+      'Active 2 Round': { width: 466, height: 466 },
+      'Active 2 Square': { width: 390, height: 450 },
+      'Active': { width: 390, height: 450 },
+      'Pop 3S (PIB)': { width: 410, height: 502 },
+      'GTR4': { width: 466, height: 466 },
+      'GTS4': { width: 390, height: 450 },
+      'Cheetah Pro': { width: 466, height: 466 },
+      'T-Rex 2': { width: 454, height: 454 },
+      'Falcon': { width: 416, height: 416 },
+    };
+    const res = MODEL_RES[watchModel] ?? { width: 480, height: 480 };
+    const elements: WatchFaceElement[] = [];
+    if (state.backgroundImage) {
+      elements.push({
+        id: generateId(),
+        type: 'IMG',
+        name: 'Background',
+        bounds: { x: 0, y: 0, width: res.width, height: res.height },
+        src: state.backgroundImage,
+        visible: false,
+        zIndex: 0,
+      });
+    }
+    const config: WatchFaceConfig = {
+      name: watchFaceName || 'Blank Watch Face',
+      watchModel: watchModel || 'Balance 2',
+      resolution: res,
+      background: { src: 'background.png', format: 'TGA-P' },
+      elements,
+      aodBackgroundMode: 'USE_MAIN_BACKGROUND',
+      aodBackgroundSrc: null,
+      aodSolidColor: '#000000',
+    };
+    dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects(config)));
+    dispatch(actions.setElementImages([]));
+    dispatch(actions.setStep('preview'));
+    toast.success('Blank canvas ready — add widgets with the + button');
+  }, [watchModel, watchFaceName, state.backgroundImage, dispatch]);
   const handleLoadLayout = useCallback(async () => {
     if (!htmlInput.trim()) return;
     dispatch(actions.setLoading(true));
@@ -4090,6 +4134,16 @@ function StudioApp() {
                 <><Sparkles className="h-5 w-5 mr-2" />Inject to Library</>
               )}
               <ArrowRight className="h-5 w-5 ml-2" />
+            </Button>
+
+            {/* Skip widget HTML — go straight to canvas with background, add widgets manually */}
+            <Button
+              onClick={handleStartBlank}
+              disabled={!state.backgroundImage}
+              variant="outline"
+              className="w-full h-10 border-zinc-600 text-zinc-400 hover:border-zinc-400 hover:text-white hover:bg-zinc-800 text-xs disabled:opacity-40"
+            >
+              Skip widgets — go to canvas with background
             </Button>
           </div>
         );
