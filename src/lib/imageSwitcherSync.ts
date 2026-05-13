@@ -11,6 +11,7 @@ import {
   getFirestore,
   collection,
   getDocs,
+  getDoc,
   setDoc,
   deleteDoc,
   doc,
@@ -224,23 +225,36 @@ export async function pushSwitcherDefinition(def: ImageSwitcherDefinition): Prom
 
 /**
  * Delete a switcher definition from Firestore and its Storage slot files.
+ * Pass knownSlotCount (from IDB before it's deleted) to guarantee cleanup even
+ * when the Firestore push hasn't completed yet (race condition fix).
  */
-export async function deleteSwitcherFromCloud(id: string): Promise<void> {
+export async function deleteSwitcherFromCloud(id: string, knownSlotCount = 0): Promise<void> {
   const uid = getUid();
   if (!uid) return;
 
   try {
-    // Read slots to get storage paths
-    const snap = await getDocs(switcherCol(uid));
+    const base = `users/${uid}/imageSwitchers/${id}`;
+
+    // Build deterministic paths from knownSlotCount — these are guaranteed correct
+    // regardless of whether the Firestore push has completed yet.
     const storagePaths: string[] = [];
-    snap.forEach(d => {
-      if (d.id === id) {
-        const meta = d.data() as SwitcherMeta;
+    for (let i = 0; i < knownSlotCount; i++) {
+      storagePaths.push(`${base}/slot_${i}.png`);
+    }
+
+    // Also read the Firestore doc for any extra paths (e.g. if slot count grew
+    // in a previous edit). Best-effort: no-op if doc doesn't exist.
+    try {
+      const docSnap = await getDoc(switcherDocRef(uid, id));
+      if (docSnap.exists()) {
+        const meta = docSnap.data() as SwitcherMeta;
         for (const slot of meta.slots) {
-          if (slot.bakedPath) storagePaths.push(slot.bakedPath);
+          if (slot.bakedPath && !storagePaths.includes(slot.bakedPath)) {
+            storagePaths.push(slot.bakedPath);
+          }
         }
       }
-    });
+    } catch { /* doc may not exist yet — deterministic paths above cover it */ }
 
     await Promise.allSettled(storagePaths.map(p => deleteStorageObject(p)));
     await deleteDoc(switcherDocRef(uid, id));

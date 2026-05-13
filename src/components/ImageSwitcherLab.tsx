@@ -181,8 +181,11 @@ export default function ImageSwitcherLab() {
 
   // Delete
   const handleDelete = async (id: string) => {
+    // Read slotCount from already-loaded state BEFORE deleting from IDB, so the
+    // cloud delete can build deterministic storage paths without a Firestore read.
+    const slotCount = defs.find(d => d.id === id)?.slotCount ?? 0;
     await deleteSwitcherDefinition(id);
-    deleteSwitcherFromCloud(id).catch(console.warn);
+    deleteSwitcherFromCloud(id, slotCount).catch(console.warn);
     await reload();
     if (editingId === id) resetEditor();
   };

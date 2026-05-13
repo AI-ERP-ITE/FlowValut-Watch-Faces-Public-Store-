@@ -23,6 +23,7 @@ import {
   getFirestore,
   collection,
   getDocs,
+  getDoc,
   setDoc,
   deleteDoc,
   doc,
@@ -660,33 +661,49 @@ export async function deleteLabAssetFromFirestore(
   if (!uid) return;
 
   try {
-    // Read the doc first to get storage paths for cleanup
-    const snap = await getDocs(labCol(uid, type));
+    const base = `users/${uid}/labAssets/${type}/${key}`;
+
+    // Build deterministic paths first — these are known from the key alone and don't
+    // require a Firestore read. deleteStorageObject() silently ignores missing files,
+    // so it's safe to over-include. This also fixes the race condition where a
+    // fire-and-forget push hasn't finished writing the Firestore doc yet when
+    // delete runs, leaving Storage files permanently orphaned.
     const storagePaths: string[] = [];
 
-    snap.forEach(d => {
-      if (d.id === key) {
-        const data = d.data();
+    if (type === 'gaugePointers') {
+      storagePaths.push(`${base}/source.html`, `${base}/baked.png`);
+    } else if (type === 'hands') {
+      storagePaths.push(
+        `${base}/source_hour.html`, `${base}/source_minute.html`,
+        `${base}/source_second.html`, `${base}/source_hub.html`,
+        `${base}/baked_hour.png`, `${base}/baked_minute.png`,
+        `${base}/baked_second.png`, `${base}/baked_cover.png`, `${base}/baked_swatch.png`,
+      );
+    } else if (type === 'icons') {
+      // Source extension varies — try both; one will be a no-op.
+      storagePaths.push(`${base}/source.svg`, `${base}/source.html`);
+      // Baked PNG has dynamic dimensions; fall through to Firestore read below.
+    }
+    // fonts: path is user-named; must rely on Firestore doc (see below).
+
+    // For types with dynamic/unknown paths (icon baked PNG, font file), read the
+    // Firestore doc. Best-effort: if it doesn't exist yet the deterministic paths
+    // above still cover the cleanup for gaugePointers and hands.
+    try {
+      const docSnap = await getDoc(labDocRef(uid, type, key));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
         if (type === 'icons') {
           const m = data as Partial<IconStorageMeta>;
-          if (m.sourcePath) storagePaths.push(m.sourcePath);
-          if (m.bakedPath)  storagePaths.push(m.bakedPath);
-        } else if (type === 'gaugePointers') {
-          const m = data as Partial<GaugePointerStorageMeta>;
-          if (m.sourcePath) storagePaths.push(m.sourcePath);
-          if (m.bakedPath)  storagePaths.push(m.bakedPath);
-        } else if (type === 'hands') {
-          const m = data as Partial<HandStorageMeta>;
-          if (m.sourcePaths) storagePaths.push(...Object.values(m.sourcePaths));
-          if (m.bakedPaths)  storagePaths.push(...Object.values(m.bakedPaths));
+          if (m.bakedPath) storagePaths.push(m.bakedPath);
         } else if (type === 'fonts') {
           const m = data as Partial<FontStorageMeta>;
           if (m.storagePath) storagePaths.push(m.storagePath);
         }
       }
-    });
+    } catch { /* doc may not exist yet — that's fine, use deterministic paths */ }
 
-    // Delete Storage objects (best-effort, ignore missing)
+    // Delete all Storage objects (no-op if a path is already missing)
     await Promise.allSettled(storagePaths.map(p => deleteStorageObject(p)));
 
     // Delete Firestore doc

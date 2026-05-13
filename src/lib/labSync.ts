@@ -1,4 +1,4 @@
-export type LabAssetKind = 'icons' | 'fonts' | 'hands' | 'all';
+export type LabAssetKind = 'icons' | 'fonts' | 'hands' | 'gaugePointers' | 'all';
 
 interface LabAssetsChangedPayload {
   kind: LabAssetKind;

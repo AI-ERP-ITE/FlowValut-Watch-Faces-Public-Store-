@@ -814,6 +814,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
       });
       setGpMsg('✓ Saved gauge pointer');
+      publishLabAssetsChanged('gaugePointers');
       pushLabAssetToFirestore('gaugePointers', record).catch(e => console.warn('[IconLab] Firestore push gaugePointers failed:', e));
       onGaugePointersSaved?.();
     } catch (err) {
@@ -826,6 +827,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const handleDeleteGaugePointer = async (key: string) => {
     await deleteCustomGaugePointer(key);
     setSavedGaugePointers(prev => prev.filter(p => p.key !== key));
+    publishLabAssetsChanged('gaugePointers');
     deleteLabAssetFromFirestore('gaugePointers', key).catch(e => console.warn('[IconLab] Firestore delete gaugePointers failed:', e));
     onGaugePointersSaved?.();
   };
