@@ -148,11 +148,14 @@ export function isFirestoreSyncEnabled(): boolean {
 }
 
 function labCol(uid: string, type: LabAssetType) {
-  return collection(getDb(), 'users', uid, 'labAssets', type);
+  // 3 segments = ODD ✅ valid Firestore collection reference
+  return collection(getDb(), 'users', uid, type);
 }
 
 function labDocRef(uid: string, type: LabAssetType, docId: string) {
-  return doc(getDb(), 'users', uid, 'labAssets', type, docId);
+  // 4 segments = EVEN ✅ valid Firestore document reference
+  // encodeURIComponent so icon keys containing '/' (forbidden in Firestore IDs) are safe
+  return doc(getDb(), 'users', uid, type, encodeURIComponent(docId));
 }
 
 // ── ICONS ─────────────────────────────────────────────────────────────────────
@@ -173,7 +176,7 @@ async function pushIcon(uid: string, record: CustomIconRecord): Promise<void> {
   try {
     const snap = await getDocs(labCol(uid, 'icons'));
     snap.forEach(d => {
-      if (d.id === record.key) {
+      if (decodeURIComponent(d.id) === record.key) {
         const data = d.data() as Partial<IconStorageMeta>;
         existingHash       = data.sourceHash ?? null;
         bakedVersion       = data.bakedVersion ?? 0;
@@ -283,7 +286,7 @@ async function pushGaugePointer(uid: string, record: CustomGaugePointerRecord): 
   try {
     const snap = await getDocs(labCol(uid, 'gaugePointers'));
     snap.forEach(d => {
-      if (d.id === record.key) {
+      if (decodeURIComponent(d.id) === record.key) {
         const data = d.data() as Partial<GaugePointerStorageMeta>;
         existingHash        = data.sourceHash ?? null;
         bakedVersion        = data.bakedVersion ?? 0;
@@ -389,7 +392,7 @@ async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
   try {
     const snap = await getDocs(labCol(uid, 'hands'));
     snap.forEach(d => {
-      if (d.id === record.key) {
+      if (decodeURIComponent(d.id) === record.key) {
         const data = d.data() as Partial<HandStorageMeta>;
         existingHash         = data.sourceHash ?? null;
         bakedVersion         = data.bakedVersion ?? 0;
@@ -535,7 +538,7 @@ async function pushFont(uid: string, record: CustomFontRecord): Promise<void> {
   try {
     const snap = await getDocs(labCol(uid, 'fonts'));
     snap.forEach(d => {
-      if (d.id === record.name) {
+      if (decodeURIComponent(d.id) === record.name) {
         const data = d.data() as Partial<FontStorageMeta>;
         existingHash        = data.fileHash ?? null;
         existingDownloadURL = data.downloadURL ?? '';
@@ -670,7 +673,7 @@ export async function backfillIconsToFirestore(): Promise<void> {
     ]);
     if (idbIcons.length === 0) return;
 
-    const cloudKeys = new Set(snap.docs.map(d => d.id));
+    const cloudKeys = new Set(snap.docs.map(d => decodeURIComponent(d.id)));
     const missing = idbIcons.filter(r => !cloudKeys.has(r.key));
     if (missing.length === 0) return;
 
