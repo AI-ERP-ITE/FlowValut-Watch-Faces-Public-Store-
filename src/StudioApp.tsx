@@ -3643,9 +3643,14 @@ function StudioApp() {
             timePointerEl.minuteHandSrc = 'minute_hand.png';
             timePointerEl.secondHandSrc = 'second_hand.png';
             const handFiles = [
-              { name: 'hour_hand.png', dataUrl: resolvedPack?.sources.hour ?? customHand.hourDataUrl },
-              { name: 'minute_hand.png', dataUrl: resolvedPack?.sources.minute ?? customHand.minuteDataUrl },
-              { name: 'second_hand.png', dataUrl: resolvedPack?.sources.second ?? customHand.secondDataUrl },
+              // Always use the pre-baked 22×140 / 16×200 / 8×240 PNG for hand layers.
+              // The IDB hourPosY is in the pre-baked PNG coordinate space (rendered via
+              // renderHandToPngWithPivot with cover-fit + crop). Using the raw SVG source
+              // instead caused a coordinate-space mismatch that made tip-tail adjustments
+              // appear on-screen but have no effect in the exported ZPK.
+              { name: 'hour_hand.png', dataUrl: customHand.hourDataUrl },
+              { name: 'minute_hand.png', dataUrl: customHand.minuteDataUrl },
+              { name: 'second_hand.png', dataUrl: customHand.secondDataUrl },
             ];
             if (coverDataUrl) {
               handFiles.push({ name: 'hand_cover.png', dataUrl: coverDataUrl });
@@ -3663,15 +3668,10 @@ function StudioApp() {
                   : name.startsWith('second_')
                     ? 'second'
                     : 'cover';
-              const ratio = sourceMode
-                ? (layer === 'hour'
-                  ? sourcePivotRatios?.hour
-                  : layer === 'minute'
-                    ? sourcePivotRatios?.minute
-                    : layer === 'second'
-                      ? sourcePivotRatios?.second
-                      : sourcePivotRatios?.cover)
-                : null;
+              // For hand layers (hour/minute/second): always null — pivot comes from
+              // IDB hourPos which is already in the pre-baked PNG coordinate space.
+              // Cover keeps source ratio since its pivot is always 0.5/0.5 regardless.
+              const ratio = (layer === 'cover' && sourceMode) ? sourcePivotRatios?.cover : null;
               const prepared = await preparePointerGeometryForExport(dataUrl, layer, timePointerEl, customHand, ratio);
               if (layer === 'hour' && prepared.pivot) timePointerEl.hourPos = prepared.pivot;
               if (layer === 'minute' && prepared.pivot) timePointerEl.minutePos = prepared.pivot;
