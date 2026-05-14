@@ -1324,11 +1324,14 @@ async function preparePointerGeometryForExport(
   const drawPivotY = layer === 'cover' ? pivotY : (pivotY / baseH) * targetH;
 
   // Hub must keep a stable runtime contract for overlay placement.
-  // Always export cover as 30x30 with pivot 15,15.
-  const finalTargetW = layer === 'cover' ? POINTER_BASE_METRICS.cover.width : targetW;
-  const finalTargetH = layer === 'cover' ? POINTER_BASE_METRICS.cover.height : targetH;
-  const finalPivotX = layer === 'cover' ? POINTER_BASE_METRICS.cover.pivotX : drawPivotX;
-  const finalPivotY = layer === 'cover' ? POINTER_BASE_METRICS.cover.pivotY : drawPivotY;
+  // Cover exports at element-provided dimensions when present (custom hands
+  // derive these from the SVG natural size); otherwise falls back to 30×30.
+  const coverW = (el.coverWidth && el.coverWidth > 0) ? el.coverWidth : POINTER_BASE_METRICS.cover.width;
+  const coverH = (el.coverHeight && el.coverHeight > 0) ? el.coverHeight : POINTER_BASE_METRICS.cover.height;
+  const finalTargetW = layer === 'cover' ? coverW : targetW;
+  const finalTargetH = layer === 'cover' ? coverH : targetH;
+  const finalPivotX = layer === 'cover' ? coverW / 2 : drawPivotX;
+  const finalPivotY = layer === 'cover' ? coverH / 2 : drawPivotY;
 
   // Reserve safe margins so baked pointer shadows/glow are not clipped at export time.
   const effectPadRaw = pointerEffectPaddingFromIntensity(el.handShadow ?? 0, el.handGlow ?? 0, el.handTrail ?? 0);
@@ -3618,6 +3621,14 @@ function StudioApp() {
             }
             if (typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
               timePointerEl.secondPos = { x: customHand.secondPosX, y: customHand.secondPosY };
+            }
+            // Propagate the SVG-derived hub dimensions so v2/v3 generators emit
+            // the cap at the artwork's true size instead of a fixed 30×30.
+            if (typeof customHand.coverWidth === 'number' && customHand.coverWidth > 0) {
+              timePointerEl.coverWidth = customHand.coverWidth;
+            }
+            if (typeof customHand.coverHeight === 'number' && customHand.coverHeight > 0) {
+              timePointerEl.coverHeight = customHand.coverHeight;
             }
             const resolvedPack = resolveCustomHandPack(customHand);
             const coverDataUrl = resolvedPack?.sources.cover ?? customHand.coverDataUrl;

@@ -1634,8 +1634,12 @@ function drawTimePointer(
 
       const srcW = Math.max(1, img.naturalWidth || img.width || def.w);
       const srcH = Math.max(1, img.naturalHeight || img.height || def.h);
-      const baseW = sourceMode ? srcW : def.w;
-      const baseH = sourceMode ? srcH : def.h;
+      // For the cover/hub layer, always honor the baked PNG's natural size.
+      // Custom hands derive cover dimensions from the source SVG (see
+      // resolveHubBakeSize in customHandStore), so the baked image carries the
+      // intended size — using def.w/def.h (30) would force a square scale-down.
+      const baseW = sourceMode ? srcW : (def.key === 'cover' ? srcW : def.w);
+      const baseH = sourceMode ? srcH : (def.key === 'cover' ? srcH : def.h);
 
       let pivotX: number;
       let pivotY: number;
@@ -1658,6 +1662,11 @@ function drawTimePointer(
         } else if (def.key === 'second') {
           pivotX = customRecord?.secondPosX ?? el.secondPos?.x ?? def.pivotX;
           pivotY = customRecord?.secondPosY ?? el.secondPos?.y ?? def.pivotY;
+        } else if (def.key === 'cover') {
+          // Cover pivot is always its own center (matches the v2/v3 ZPK overlay
+          // emitter which centers the cap at centerX/centerY).
+          pivotX = baseW / 2;
+          pivotY = baseH / 2;
         }
       }
 

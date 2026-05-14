@@ -1038,11 +1038,12 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       return { canvas: out, artMinY: oMinY, artMaxY: oMaxY };
     };
 
-    // ── Hub bake: contain-fit (matches renderHubToContainPng) ──
-    const bakeHub = (img: HTMLImageElement, size: number): HTMLCanvasElement | null => {
+    // ── Hub bake: trim transparent bounds, contain-fit into outW×outH ──
+    // Mirrors renderHubToFittedPng in customHandStore so the composer preview
+    // shows the cap at the same size the watchface will render it.
+    const bakeHub = (img: HTMLImageElement, outW: number, outH: number): HTMLCanvasElement | null => {
       const nw = Math.max(1, img.naturalWidth || img.width);
       const nh = Math.max(1, img.naturalHeight || img.height);
-      // First trim transparent padding so the hub fills its 30×30 box.
       const sample = document.createElement('canvas');
       sample.width = nw;
       sample.height = nh;
@@ -1072,17 +1073,37 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       const cropH = maxY < minY ? nh : Math.max(1, maxY - minY + 1);
 
       const out = document.createElement('canvas');
-      out.width = size;
-      out.height = size;
+      out.width = outW;
+      out.height = outH;
       const octx = out.getContext('2d');
       if (!octx) return null;
       octx.imageSmoothingEnabled = true;
       octx.imageSmoothingQuality = 'high';
-      const scale = Math.min(size / cropW, size / cropH);
+      const scale = Math.min(outW / cropW, outH / cropH);
       const dW = cropW * scale;
       const dH = cropH * scale;
-      octx.drawImage(sample, cropX, cropY, cropW, cropH, (size - dW) / 2, (size - dH) / 2, dW, dH);
+      octx.drawImage(sample, cropX, cropY, cropW, cropH, (outW - dW) / 2, (outH - dH) / 2, dW, dH);
       return out;
+    };
+
+    // Derive hub bake dimensions from the source image's natural size, clamped
+    // to the same safe range as resolveHubBakeSize() in customHandStore. This
+    // keeps the composer preview byte-aligned with the saved record + ZPK.
+    const HUB_MIN_SIDE = 8;
+    const HUB_MAX_SIDE = 120;
+    const HUB_DEFAULT_SIDE = 30;
+    const resolveHubSize = (img: HTMLImageElement): { w: number; h: number } => {
+      const nw = img.naturalWidth || 0;
+      const nh = img.naturalHeight || 0;
+      if (nw <= 0 || nh <= 0) return { w: HUB_DEFAULT_SIDE, h: HUB_DEFAULT_SIDE };
+      const longest = Math.max(nw, nh);
+      let scale = 1;
+      if (longest > HUB_MAX_SIDE) scale = HUB_MAX_SIDE / longest;
+      else if (longest < HUB_MIN_SIDE) scale = HUB_MIN_SIDE / longest;
+      return {
+        w: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(nw * scale))),
+        h: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(nh * scale))),
+      };
     };
 
     // Draw a baked hand canvas at NATIVE pixel size (same as InteractiveCanvas).
@@ -1136,11 +1157,12 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       }
 
       if (hubImg) {
-        const hub = bakeHub(hubImg, 30);
+        const { w: hubW, h: hubH } = resolveHubSize(hubImg);
+        const hub = bakeHub(hubImg, hubW, hubH);
         if (hub) {
-          ctx.drawImage(hub, cx - 15, cy - 15);
+          ctx.drawImage(hub, cx - hubW / 2, cy - hubH / 2);
         } else {
-          ctx.drawImage(hubImg, cx - 15, cy - 15, 30, 30);
+          ctx.drawImage(hubImg, cx - hubW / 2, cy - hubH / 2, hubW, hubH);
         }
       } else {
         ctx.fillStyle = 'rgba(255,255,255,0.75)';

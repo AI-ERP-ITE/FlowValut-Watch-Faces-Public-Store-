@@ -42,6 +42,10 @@ export interface WatchFaceElement {
   minuteHandSrc?: string;
   secondHandSrc?: string;
   coverSrc?: string;
+  // Optional baked-cover dimensions in PNG pixels. Custom hands derive these
+  // from the source SVG natural size; built-in styles default to 30×30.
+  coverWidth?: number;
+  coverHeight?: number;
   pointerCenter?: { x: number; y: number };
   hourPos?: { x: number; y: number };
   minutePos?: { x: number; y: number };

@@ -8,7 +8,7 @@ const DB_NAME = 'zepp-studio-hands';
 const DB_VERSION = 1;
 const STORE = 'custom-hands';
 const HAND_RENDER_VERSION = 4;
-const HUB_RENDER_VERSION = 2;
+const HUB_RENDER_VERSION = 3;
 
 export interface CustomHandRecord {
   key: string;           // 'custom_hand:slug'
@@ -16,8 +16,13 @@ export interface CustomHandRecord {
   hourDataUrl: string;   // 22×140 PNG data URL
   minuteDataUrl: string; // 16×200 PNG data URL
   secondDataUrl: string; // 8×240 PNG data URL
-  coverDataUrl: string;  // 30×30 PNG data URL
+  coverDataUrl: string;  // Hub PNG data URL — size = baked dimensions below
   swatchDataUrl: string; // 24×24 thumbnail for UI preview
+  // Baked hub PNG dimensions (derived from source SVG natural size, clamped to safe range).
+  // The ZPK exporter and composer preview both read these so the cap reflects the artwork's
+  // true aspect/size instead of being locked to a fixed square.
+  coverWidth?: number;
+  coverHeight?: number;
   // Optional per-hand pivot points (in pixels) derived from marker metadata.
   // These map directly to TIME_POINTER hour_posX/Y, minute_posX/Y, second_posX/Y.
   hourPosX?: number;
@@ -403,12 +408,17 @@ export async function saveCustomHandStyle(
     ? (extractPivotFromSvg(secondSourceSvg) ?? inferCenteredPivot(secondSourceSvg))
     : parsedPivot;
 
+  // Derive cap dimensions from the source SVG natural size so the cap on the
+  // watchface reflects the artwork the user actually pasted. Clamped to a safe
+  // range to avoid degenerate or absurdly huge bakes. Falls back to 30×30 when
+  // the SVG has no parseable size.
+  const hubSize = resolveHubBakeSize(hubSvg);
   const [hourLayer, minuteLayer, secondLayer, coverDataUrl, swatchDataUrl] =
     await Promise.all([
       renderHandToPngWithPivot(hourSvg, 22, 140, hourPivotSource),
       renderHandToPngWithPivot(minuteSvg, 16, 200, minutePivotSource),
       renderHandToPngWithPivot(secondSvg, 8, 240, secondPivotSource),
-      renderHubToContainPng(hubSvg, 30),  // hub: trim transparent bounds before fitting
+      renderHubToFittedPng(hubSvg, hubSize.width, hubSize.height),  // hub at natural size
       renderHubToContainPng(hubSvg, 24),  // swatch: trim transparent bounds before fitting
     ]);
 
@@ -511,6 +521,8 @@ export async function saveCustomHandStyle(
     minuteDataUrl: minuteLayer.dataUrl,
     secondDataUrl: secondLayer.dataUrl,
     coverDataUrl,
+    coverWidth: hubSize.width,
+    coverHeight: hubSize.height,
     swatchDataUrl,
     hourPosX,
     hourPosY,
@@ -805,6 +817,96 @@ async function renderHandToPngWithPivot(
   });
 }
 
+/**
+ * Resolve the baked hub PNG dimensions from the source SVG.
+ *
+ * Reads the SVG's natural size (viewBox or width/height attributes), preserves
+ * aspect ratio, and clamps to a safe range so neither degenerate nor absurd
+ * sizes leak into the ZPK. Returns 30×30 when no usable size is found
+ * (matches the legacy default).
+ */
+const HUB_MIN_SIDE = 8;
+const HUB_MAX_SIDE = 120;
+const HUB_DEFAULT_SIDE = 30;
+
+export function resolveHubBakeSize(svg: string): { width: number; height: number } {
+  const natural = parseSvgSize(svg);
+  if (!natural || natural.width <= 0 || natural.height <= 0) {
+    return { width: HUB_DEFAULT_SIDE, height: HUB_DEFAULT_SIDE };
+  }
+  const longest = Math.max(natural.width, natural.height);
+  // Scale so the longer side fits inside [HUB_MIN_SIDE, HUB_MAX_SIDE].
+  let scale = 1;
+  if (longest > HUB_MAX_SIDE) scale = HUB_MAX_SIDE / longest;
+  else if (longest < HUB_MIN_SIDE) scale = HUB_MIN_SIDE / longest;
+  const w = Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(natural.width * scale)));
+  const h = Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(natural.height * scale)));
+  return { width: w, height: h };
+}
+
+/**
+ * Bake the hub SVG to a PNG of the given (possibly non-square) dimensions,
+ * trimming transparent padding first so the artwork fills the box.
+ */
+function renderHubToFittedPng(code: string, outW: number, outH: number): Promise<string> {
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  const svgCode = svgMatch ? svgMatch[0] : code;
+  return new Promise((resolve) => {
+    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const nw = Math.max(1, img.naturalWidth || outW);
+      const nh = Math.max(1, img.naturalHeight || outH);
+      const maxSide = 1024;
+      const downscale = Math.min(1, maxSide / Math.max(nw, nh));
+      const sampleW = Math.max(1, Math.round(nw * downscale));
+      const sampleH = Math.max(1, Math.round(nh * downscale));
+      const sample = document.createElement('canvas');
+      sample.width = sampleW;
+      sample.height = sampleH;
+      const sctx = sample.getContext('2d');
+      if (!sctx) {
+        URL.revokeObjectURL(url);
+        renderToContainPng(code, Math.max(outW, outH)).then(resolve);
+        return;
+      }
+      sctx.clearRect(0, 0, sampleW, sampleH);
+      sctx.drawImage(img, 0, 0, sampleW, sampleH);
+
+      const raw = findOpaqueBounds(sample);
+      const cropX = raw ? raw.minX : 0;
+      const cropY = raw ? raw.minY : 0;
+      const cropW = raw ? Math.max(1, raw.maxX - raw.minX + 1) : sampleW;
+      const cropH = raw ? Math.max(1, raw.maxY - raw.minY + 1) : sampleH;
+
+      const out = document.createElement('canvas');
+      out.width = outW;
+      out.height = outH;
+      const octx = out.getContext('2d');
+      if (!octx) {
+        URL.revokeObjectURL(url);
+        renderToContainPng(code, Math.max(outW, outH)).then(resolve);
+        return;
+      }
+      octx.clearRect(0, 0, outW, outH);
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = 'high';
+      const scale = Math.min(outW / cropW, outH / cropH);
+      const dW = cropW * scale;
+      const dH = cropH * scale;
+      octx.drawImage(sample, cropX, cropY, cropW, cropH, (outW - dW) / 2, (outH - dH) / 2, dW, dH);
+      URL.revokeObjectURL(url);
+      resolve(out.toDataURL('image/png'));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      renderToContainPng(code, Math.max(outW, outH)).then(resolve);
+    };
+    img.src = url;
+  });
+}
+
 function renderHubToContainPng(code: string, size: number): Promise<string> {
   const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
   const svgCode = svgMatch ? svgMatch[0] : code;
@@ -962,13 +1064,16 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
     }
 
     if (shouldMigrateHub) {
+      const hubSize = resolveHubBakeSize(extractSvgFromCode(next.sourceHubHtml!));
       const [coverDataUrl, swatchDataUrl] = await Promise.all([
-        renderHubToContainPng(next.sourceHubHtml!, 30),
+        renderHubToFittedPng(next.sourceHubHtml!, hubSize.width, hubSize.height),
         renderHubToContainPng(next.sourceHubHtml!, 24),
       ]);
       next = {
         ...next,
         coverDataUrl,
+        coverWidth: hubSize.width,
+        coverHeight: hubSize.height,
         swatchDataUrl,
         hubRenderVersion: HUB_RENDER_VERSION,
       };

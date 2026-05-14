@@ -854,6 +854,8 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
     const minuteSrc = toHandPath(element.minuteHandSrc || 'minute_hand.png')!;
     const secondSrc = toHandPath(element.secondHandSrc || 'second_hand.png')!;
     const coverSrc = toHandPath(element.coverSrc);
+  const coverW = (element.coverWidth && element.coverWidth > 0) ? element.coverWidth : 30;
+  const coverH = (element.coverHeight && element.coverHeight > 0) ? element.coverHeight : 30;
   const hasSeconds = !element.hideSeconds;
 
   const secondParams = hasSeconds ? `
@@ -866,10 +868,10 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
   const coverOverlay = coverSrc ? `
                 // ${element.name} - Hub overlay (kept above hands)
                 let widget_${widgetIndex}_cover = hmUI.createWidget(hmUI.widget.IMG, {
-                    x: px(${centerX - 15}),
-                    y: px(${centerY - 15}),
-            w: px(30),
-            h: px(30),
+                    x: px(${centerX - Math.round(coverW / 2)}),
+                    y: px(${centerY - Math.round(coverH / 2)}),
+            w: px(${coverW}),
+            h: px(${coverH}),
                     src: '${coverSrc}',
                     show_level: hmUI.show_level.${showLevel}
                 });` : '';
