@@ -1639,43 +1639,17 @@ function drawTimePointer(
         pivotX = def.pivotX;
         pivotY = def.pivotY;
         if (def.key === 'hour') {
-          // If the record has geometry metadata, derive pivot from art bounds.
-          // This ensures the pivot is relative to the visible art, not the full canvas.
+          // customRecord is always fresh from IDB (refreshed on every save via labAssetsChanged).
+          // hourPosY is the canonical pivot pixel in baked PNG space — computed with the
+          // art-bounds geometry model at save time, so it is already correct.
           pivotX = customRecord?.hourPosX ?? el.hourPos?.x ?? def.pivotX;
-          if (
-            customRecord?.hourPivotNorm !== undefined
-            && customRecord.hourArtMinY !== undefined
-            && customRecord.hourArtMaxY !== undefined
-            && customRecord.hourArtMaxY > customRecord.hourArtMinY
-          ) {
-            pivotY = customRecord.hourArtMinY + customRecord.hourPivotNorm * (customRecord.hourArtMaxY - customRecord.hourArtMinY);
-          } else {
-            pivotY = customRecord?.hourPosY ?? el.hourPos?.y ?? def.pivotY;
-          }
+          pivotY = customRecord?.hourPosY ?? el.hourPos?.y ?? def.pivotY;
         } else if (def.key === 'minute') {
           pivotX = customRecord?.minutePosX ?? el.minutePos?.x ?? def.pivotX;
-          if (
-            customRecord?.minutePivotNorm !== undefined
-            && customRecord.minuteArtMinY !== undefined
-            && customRecord.minuteArtMaxY !== undefined
-            && customRecord.minuteArtMaxY > customRecord.minuteArtMinY
-          ) {
-            pivotY = customRecord.minuteArtMinY + customRecord.minutePivotNorm * (customRecord.minuteArtMaxY - customRecord.minuteArtMinY);
-          } else {
-            pivotY = customRecord?.minutePosY ?? el.minutePos?.y ?? def.pivotY;
-          }
+          pivotY = customRecord?.minutePosY ?? el.minutePos?.y ?? def.pivotY;
         } else if (def.key === 'second') {
           pivotX = customRecord?.secondPosX ?? el.secondPos?.x ?? def.pivotX;
-          if (
-            customRecord?.secondPivotNorm !== undefined
-            && customRecord.secondArtMinY !== undefined
-            && customRecord.secondArtMaxY !== undefined
-            && customRecord.secondArtMaxY > customRecord.secondArtMinY
-          ) {
-            pivotY = customRecord.secondArtMinY + customRecord.secondPivotNorm * (customRecord.secondArtMaxY - customRecord.secondArtMinY);
-          } else {
-            pivotY = customRecord?.secondPosY ?? el.secondPos?.y ?? def.pivotY;
-          }
+          pivotY = customRecord?.secondPosY ?? el.secondPos?.y ?? def.pivotY;
         }
       }
 
