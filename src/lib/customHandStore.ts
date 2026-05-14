@@ -8,7 +8,7 @@ const DB_NAME = 'zepp-studio-hands';
 const DB_VERSION = 1;
 const STORE = 'custom-hands';
 const HAND_RENDER_VERSION = 4;
-const HUB_RENDER_VERSION = 3;
+const HUB_RENDER_VERSION = 4;
 
 export interface CustomHandRecord {
   key: string;           // 'custom_hand:slug'
@@ -408,11 +408,10 @@ export async function saveCustomHandStyle(
     ? (extractPivotFromSvg(secondSourceSvg) ?? inferCenteredPivot(secondSourceSvg))
     : parsedPivot;
 
-  // Derive cap dimensions from the source SVG natural size so the cap on the
-  // watchface reflects the artwork the user actually pasted. Clamped to a safe
-  // range to avoid degenerate or absurdly huge bakes. Falls back to 30×30 when
-  // the SVG has no parseable size.
-  const hubSize = resolveHubBakeSize(hubSvg);
+  // Derive cap dimensions from the actual rendered art (not the SVG viewBox),
+  // so a 17px cap drawn inside a 120×120 viewBox bakes as ~34×34, not 120×120.
+  // Falls back to 30×30 if measurement fails.
+  const hubSize = await measureHubArtSize(hubSvg);
   const [hourLayer, minuteLayer, secondLayer, coverDataUrl, swatchDataUrl] =
     await Promise.all([
       renderHandToPngWithPivot(hourSvg, 22, 140, hourPivotSource),
@@ -845,6 +844,65 @@ export function resolveHubBakeSize(svg: string): { width: number; height: number
 }
 
 /**
+ * Measure the cap's true rendered art size by rasterizing the SVG and finding
+ * the opaque pixel bounds. This catches the common case where the SVG viewBox
+ * is large (e.g. 120×120) but the cap art only occupies a small inner region
+ * (e.g. r=17 → ~34px). Returns dimensions clamped to [HUB_MIN_SIDE, HUB_MAX_SIDE]
+ * with aspect ratio preserved. Falls back to viewBox-based sizing on error.
+ */
+export function measureHubArtSize(code: string): Promise<{ width: number; height: number }> {
+  const fallback = resolveHubBakeSize(code);
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  const svgCode = svgMatch ? svgMatch[0] : code;
+  return new Promise((resolve) => {
+    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const nw = Math.max(1, img.naturalWidth || fallback.width);
+      const nh = Math.max(1, img.naturalHeight || fallback.height);
+      const maxSide = 1024;
+      const downscale = Math.min(1, maxSide / Math.max(nw, nh));
+      const sampleW = Math.max(1, Math.round(nw * downscale));
+      const sampleH = Math.max(1, Math.round(nh * downscale));
+      const canvas = document.createElement('canvas');
+      canvas.width = sampleW;
+      canvas.height = sampleH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        resolve(fallback);
+        return;
+      }
+      ctx.clearRect(0, 0, sampleW, sampleH);
+      ctx.drawImage(img, 0, 0, sampleW, sampleH);
+      URL.revokeObjectURL(url);
+      const bounds = findOpaqueBounds(canvas);
+      if (!bounds) {
+        resolve(fallback);
+        return;
+      }
+      // Project measured pixel size back to the SVG's natural coordinate space
+      // so we don't get tiny bakes when the rasterizer downscaled big SVGs.
+      const artW = (bounds.maxX - bounds.minX + 1) / downscale;
+      const artH = (bounds.maxY - bounds.minY + 1) / downscale;
+      const longest = Math.max(artW, artH);
+      let scale = 1;
+      if (longest > HUB_MAX_SIDE) scale = HUB_MAX_SIDE / longest;
+      else if (longest < HUB_MIN_SIDE) scale = HUB_MIN_SIDE / longest;
+      const w = Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(artW * scale)));
+      const h = Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(artH * scale)));
+      resolve({ width: w, height: h });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(fallback);
+    };
+    img.src = url;
+  });
+}
+
+/**
  * Bake the hub SVG to a PNG of the given (possibly non-square) dimensions,
  * trimming transparent padding first so the artwork fills the box.
  */
@@ -1064,7 +1122,7 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
     }
 
     if (shouldMigrateHub) {
-      const hubSize = resolveHubBakeSize(extractSvgFromCode(next.sourceHubHtml!));
+      const hubSize = await measureHubArtSize(extractSvgFromCode(next.sourceHubHtml!));
       const [coverDataUrl, swatchDataUrl] = await Promise.all([
         renderHubToFittedPng(next.sourceHubHtml!, hubSize.width, hubSize.height),
         renderHubToContainPng(next.sourceHubHtml!, 24),

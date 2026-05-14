@@ -1086,9 +1086,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       return out;
     };
 
-    // Derive hub bake dimensions from the source image's natural size, clamped
-    // to the same safe range as resolveHubBakeSize() in customHandStore. This
-    // keeps the composer preview byte-aligned with the saved record + ZPK.
+    // Derive hub bake dimensions from the actual rendered art (opaque-pixel
+    // bounds), not the image's natural width/height — a 17px cap inside a
+    // 120×120 viewBox should bake at ~34×34, not 120×120. Mirrors
+    // measureHubArtSize() in customHandStore so the composer preview matches
+    // the saved record + ZPK output exactly.
     const HUB_MIN_SIDE = 8;
     const HUB_MAX_SIDE = 120;
     const HUB_DEFAULT_SIDE = 30;
@@ -1096,13 +1098,40 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       const nw = img.naturalWidth || 0;
       const nh = img.naturalHeight || 0;
       if (nw <= 0 || nh <= 0) return { w: HUB_DEFAULT_SIDE, h: HUB_DEFAULT_SIDE };
-      const longest = Math.max(nw, nh);
+      // Sample the image to find true opaque bounds.
+      const sample = document.createElement('canvas');
+      sample.width = nw;
+      sample.height = nh;
+      const sctx = sample.getContext('2d');
+      if (!sctx) return { w: HUB_DEFAULT_SIDE, h: HUB_DEFAULT_SIDE };
+      sctx.drawImage(img, 0, 0, nw, nh);
+      let data: Uint8ClampedArray;
+      try {
+        data = sctx.getImageData(0, 0, nw, nh).data;
+      } catch {
+        return { w: HUB_DEFAULT_SIDE, h: HUB_DEFAULT_SIDE };
+      }
+      let minX = nw, minY = nh, maxX = -1, maxY = -1;
+      for (let y = 0; y < nh; y++) {
+        for (let x = 0; x < nw; x++) {
+          if (data[(y * nw + x) * 4 + 3] > 8) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < minX || maxY < minY) return { w: HUB_DEFAULT_SIDE, h: HUB_DEFAULT_SIDE };
+      const artW = maxX - minX + 1;
+      const artH = maxY - minY + 1;
+      const longest = Math.max(artW, artH);
       let scale = 1;
       if (longest > HUB_MAX_SIDE) scale = HUB_MAX_SIDE / longest;
       else if (longest < HUB_MIN_SIDE) scale = HUB_MIN_SIDE / longest;
       return {
-        w: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(nw * scale))),
-        h: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(nh * scale))),
+        w: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(artW * scale))),
+        h: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(artH * scale))),
       };
     };
 
