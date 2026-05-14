@@ -924,14 +924,14 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               Link a saved Switcher Definition to drive images automatically from a live data value.
             </p>
             <Select
-              value={element.imageSwitcherDefinitionId ?? ''}
-              onValueChange={(v) => update({ imageSwitcherDefinitionId: v || undefined })}
+              value={element.imageSwitcherDefinitionId ?? '__none__'}
+              onValueChange={(v) => update({ imageSwitcherDefinitionId: v === '__none__' ? undefined : v })}
             >
               <SelectTrigger className="h-7 text-xs bg-zinc-800 border-white/10 text-white">
                 <SelectValue placeholder="— none (manual images) —" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">— none (manual images) —</SelectItem>
+                <SelectItem value="__none__">— none (manual images) —</SelectItem>
                 {switcherDefinitions.map((def) => (
                   <SelectItem key={def.id} value={def.id}>{def.name}</SelectItem>
                 ))}
