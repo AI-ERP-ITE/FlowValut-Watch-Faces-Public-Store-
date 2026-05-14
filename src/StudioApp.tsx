@@ -50,7 +50,7 @@ import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type C
 import { loadCustomGaugePointers, type CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
 import { getSwitcherDefinition } from '@/lib/imageSwitcherStore';
 import { isLabCloudSyncEnabled } from '@/lib/labCloudSync';
-import { pullLabAssetsFromFirestore, isFirestoreSyncEnabled } from '@/lib/firestoreLabSync';
+import { pullLabAssetsFromFirestore, backfillIconsToFirestore, isFirestoreSyncEnabled } from '@/lib/firestoreLabSync';
 import { subscribeAuthState } from '@/lib/firebaseAuthClient';
 import {
   POINTER_PARITY_TOLERANCE,
@@ -2180,6 +2180,11 @@ function StudioApp() {
       if (isFirestoreSyncEnabled()) {
         try {
           await pullLabAssetsFromFirestore();
+          // Backfill any IDB icons not yet in Storage (retroactive fix for the
+          // storage.rules depth bug — icon keys with '/' were silently denied).
+          backfillIconsToFirestore().catch(err =>
+            console.warn('[StudioApp] icon backfill failed:', err)
+          );
         } catch (err) {
           console.warn('[StudioApp] Firestore pull on startup failed:', err);
         }

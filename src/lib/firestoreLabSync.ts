@@ -647,6 +647,44 @@ export async function pushLabAssetToFirestore(
   }
 }
 
+// ── Public API — Backfill icons ───────────────────────────────────────────────
+
+/**
+ * Push every IDB icon that is not yet in Firestore/Storage.
+ * Called once on login to retroactively sync icons that were saved before
+ * the storage.rules fix (icon keys contain '/' which broke the old rule).
+ * Fire-and-forget — never throws; logs progress to console.
+ */
+export async function backfillIconsToFirestore(): Promise<void> {
+  const uid = getUid();
+  if (!uid) return;
+
+  try {
+    const [idbIcons, snap] = await Promise.all([
+      loadCustomIcons(),
+      getDocs(labCol(uid, 'icons')),
+    ]);
+    if (idbIcons.length === 0) return;
+
+    const cloudKeys = new Set(snap.docs.map(d => d.id));
+    const missing = idbIcons.filter(r => !cloudKeys.has(r.key));
+    if (missing.length === 0) return;
+
+    console.info(`[firestoreLabSync] backfilling ${missing.length} icon(s) to Storage+Firestore…`);
+    for (const icon of missing) {
+      try {
+        await pushIcon(uid, icon);
+        console.info(`[firestoreLabSync] backfilled icon: ${icon.key}`);
+      } catch (err) {
+        console.warn(`[firestoreLabSync] backfill icon ${icon.key} failed:`, err);
+      }
+    }
+    console.info('[firestoreLabSync] icon backfill complete.');
+  } catch (err) {
+    console.warn('[firestoreLabSync] icon backfill failed:', err);
+  }
+}
+
 // ── Public API — Delete single asset ─────────────────────────────────────────
 
 /**
