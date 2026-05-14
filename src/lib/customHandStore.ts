@@ -50,6 +50,8 @@ export interface CustomHandRecord {
   sourceHubHtml?: string;
   handRenderVersion?: number;
   hubRenderVersion?: number;
+  /** SHA-256 at last cloud sync — used to skip re-download on pull */
+  sourceHash?: string;
   pivotOffsets?: {
     hour: { x: number; y: number };
     minute: { x: number; y: number };

@@ -256,6 +256,7 @@ async function pullIcons(uid: string): Promise<void> {
         sourceMode: meta.sourceMode ?? undefined,
         sourceCode,
         sourceVersion: meta.bakedVersion,
+        sourceHash: meta.sourceHash,  // persisted so next startup skips re-download
       };
       localMap.set(meta.key, record);
     } catch (err) {
@@ -356,6 +357,7 @@ async function pullGaugePointers(uid: string): Promise<void> {
         pivotX: meta.pivotX,
         pivotY: meta.pivotY,
         createdAt: meta.createdAt,
+        sourceHash: meta.sourceHash,  // persisted so next startup skips re-download
       };
       localMap.set(meta.key, record);
     } catch (err) {
@@ -511,6 +513,7 @@ async function pullHands(uid: string): Promise<void> {
         handRenderVersion: meta.handRenderVersion,
         pivotOffsets: meta.pivotOffsets,
         createdAt: meta.createdAt,
+        sourceHash: meta.sourceHash,  // persisted so next startup skips re-download
       };
       localMap.set(meta.key, record);
     } catch (err) {
@@ -585,6 +588,7 @@ async function pullFonts(uid: string): Promise<void> {
         fileName: meta.fileName,
         buffer,
         createdAt: meta.createdAt,
+        fileHash: meta.fileHash,  // persisted so next startup skips re-download
       };
       localMap.set(meta.name, record);
     } catch (err) {

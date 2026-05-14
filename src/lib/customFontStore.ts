@@ -13,6 +13,8 @@ export interface CustomFontRecord {
   fileName: string;     // original uploaded filename
   buffer: ArrayBuffer;  // raw font bytes
   createdAt: number;
+  /** SHA-256 at last cloud sync — used to skip re-download on pull */
+  fileHash?: string;
 }
 
 export interface SerializableCustomFontRecord {

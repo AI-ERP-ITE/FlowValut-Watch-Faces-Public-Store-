@@ -20,6 +20,8 @@ export interface CustomGaugePointerRecord {
   pivotX: number;     // 0–1 ratio (horizontal pivot), default 0.5
   pivotY: number;     // 0–1 ratio (vertical pivot), default 0.9
   createdAt: number;  // Unix ms timestamp
+  /** SHA-256 at last cloud sync — used to skip re-download on pull */
+  sourceHash?: string;
 }
 
 // ── DB open ───────────────────────────────────────────────────────────────────

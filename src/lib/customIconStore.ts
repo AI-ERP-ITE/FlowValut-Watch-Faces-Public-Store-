@@ -19,6 +19,8 @@ export interface CustomIconRecord {
   sourceMode?: 'svg' | 'html';
   sourceCode?: string;
   sourceVersion?: number;
+  /** SHA-256 of source/dataUrl at last cloud sync — used to skip re-download on pull */
+  sourceHash?: string;
 }
 
 export interface CustomIconSourcePayload {
