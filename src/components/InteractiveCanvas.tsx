@@ -1562,10 +1562,17 @@ function loadHandImages(
   }
   for (const [name, src] of entries) {
     const img = new Image();
-    img.onload = () => {
-      imgMap.set(name, img);
+    const done = () => {
       pending--;
       if (pending === 0) onLoaded?.();
+    };
+    img.onload = () => {
+      imgMap.set(name, img);
+      done();
+    };
+    img.onerror = () => {
+      // Image failed — skip it but still count as settled so onLoaded fires.
+      done();
     };
     img.src = src;
   }
@@ -1612,7 +1619,8 @@ function drawTimePointer(
   const pointerEffects = normalizePointerEffects(el);
   const hasPointerEffects = hasNonDefaultPointerEffects(pointerEffects);
 
-  if (imgMap && imgMap.size === 4) {
+  // Require the 3 mandatory hands; cover is optional (drawn if present, skipped if missing).
+  if (imgMap && imgMap.has('hour') && imgMap.has('minute') && imgMap.has('second')) {
     // Draw using real hand images
     const angles: Record<string, number> = {
       hour:   degToRad(hourAngle),
