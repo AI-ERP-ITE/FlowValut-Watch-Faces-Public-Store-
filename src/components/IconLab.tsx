@@ -949,24 +949,159 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
 
     drawGuide();
 
-    const drawRotatedLayer = (
+    // ── Bake helper: replicates saveCustomHandStyle/renderHandToPngWithPivot ──
+    // Takes a loaded image, finds opaque bounds, cover-fits into outW×outH,
+    // then re-measures opaque bounds in the output canvas. Returns the baked
+    // canvas + art bounds — exactly matching what the watchface preview gets.
+    const bakeHand = (
       img: HTMLImageElement,
+      outW: number,
+      outH: number,
+    ): { canvas: HTMLCanvasElement; artMinY: number; artMaxY: number } | null => {
+      const nw = Math.max(1, img.naturalWidth || img.width);
+      const nh = Math.max(1, img.naturalHeight || img.height);
+
+      // Step 1: rasterize source into sample canvas
+      const sample = document.createElement('canvas');
+      sample.width = nw;
+      sample.height = nh;
+      const sctx = sample.getContext('2d');
+      if (!sctx) return null;
+      sctx.imageSmoothingEnabled = true;
+      sctx.imageSmoothingQuality = 'high';
+      sctx.drawImage(img, 0, 0, nw, nh);
+
+      // Step 2: find opaque bounds in source
+      let sData: Uint8ClampedArray;
+      try {
+        sData = sctx.getImageData(0, 0, nw, nh).data;
+      } catch {
+        return null;
+      }
+      let sMinX = nw, sMinY = nh, sMaxX = -1, sMaxY = -1;
+      for (let y = 0; y < nh; y++) {
+        for (let x = 0; x < nw; x++) {
+          if (sData[(y * nw + x) * 4 + 3] > 8) {
+            if (x < sMinX) sMinX = x;
+            if (y < sMinY) sMinY = y;
+            if (x > sMaxX) sMaxX = x;
+            if (y > sMaxY) sMaxY = y;
+          }
+        }
+      }
+      if (sMaxX < sMinX || sMaxY < sMinY) return null;
+
+      // Step 3: 4% padding (matches padBounds in customHandStore)
+      const span = Math.max(sMaxX - sMinX + 1, sMaxY - sMinY + 1);
+      const pad = Math.ceil(span * 0.04);
+      const bMinX = Math.max(0, sMinX - pad);
+      const bMinY = Math.max(0, sMinY - pad);
+      const bMaxX = Math.min(nw - 1, sMaxX + pad);
+      const bMaxY = Math.min(nh - 1, sMaxY + pad);
+      const cropW = Math.max(1, bMaxX - bMinX + 1);
+      const cropH = Math.max(1, bMaxY - bMinY + 1);
+
+      // Step 4: cover-fit into outW×outH
+      const out = document.createElement('canvas');
+      out.width = outW;
+      out.height = outH;
+      const octx = out.getContext('2d');
+      if (!octx) return null;
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = 'high';
+      const scale = Math.max(outW / cropW, outH / cropH);
+      const dW = cropW * scale;
+      const dH = cropH * scale;
+      const dx = (outW - dW) / 2;
+      const dy = (outH - dH) / 2;
+      octx.drawImage(sample, bMinX, bMinY, cropW, cropH, dx, dy, dW, dH);
+
+      // Step 5: measure art bounds in output canvas (canonical reference)
+      let oData: Uint8ClampedArray;
+      try {
+        oData = octx.getImageData(0, 0, outW, outH).data;
+      } catch {
+        return null;
+      }
+      let oMinY = outH, oMaxY = -1;
+      for (let y = 0; y < outH; y++) {
+        for (let x = 0; x < outW; x++) {
+          if (oData[(y * outW + x) * 4 + 3] > 8) {
+            if (y < oMinY) oMinY = y;
+            if (y > oMaxY) oMaxY = y;
+          }
+        }
+      }
+      if (oMaxY < oMinY) {
+        return { canvas: out, artMinY: 0, artMaxY: outH };
+      }
+      return { canvas: out, artMinY: oMinY, artMaxY: oMaxY };
+    };
+
+    // ── Hub bake: contain-fit (matches renderHubToContainPng) ──
+    const bakeHub = (img: HTMLImageElement, size: number): HTMLCanvasElement | null => {
+      const nw = Math.max(1, img.naturalWidth || img.width);
+      const nh = Math.max(1, img.naturalHeight || img.height);
+      // First trim transparent padding so the hub fills its 30×30 box.
+      const sample = document.createElement('canvas');
+      sample.width = nw;
+      sample.height = nh;
+      const sctx = sample.getContext('2d');
+      if (!sctx) return null;
+      sctx.drawImage(img, 0, 0, nw, nh);
+      let sData: Uint8ClampedArray;
+      try {
+        sData = sctx.getImageData(0, 0, nw, nh).data;
+      } catch {
+        return null;
+      }
+      let minX = nw, minY = nh, maxX = -1, maxY = -1;
+      for (let y = 0; y < nh; y++) {
+        for (let x = 0; x < nw; x++) {
+          if (sData[(y * nw + x) * 4 + 3] > 8) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      const cropX = maxX < minX ? 0 : minX;
+      const cropY = maxY < minY ? 0 : minY;
+      const cropW = maxX < minX ? nw : Math.max(1, maxX - minX + 1);
+      const cropH = maxY < minY ? nh : Math.max(1, maxY - minY + 1);
+
+      const out = document.createElement('canvas');
+      out.width = size;
+      out.height = size;
+      const octx = out.getContext('2d');
+      if (!octx) return null;
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = 'high';
+      const scale = Math.min(size / cropW, size / cropH);
+      const dW = cropW * scale;
+      const dH = cropH * scale;
+      octx.drawImage(sample, cropX, cropY, cropW, cropH, (size - dW) / 2, (size - dH) / 2, dW, dH);
+      return out;
+    };
+
+    // Draw a baked hand canvas at NATIVE pixel size (same as InteractiveCanvas).
+    // This makes the composer preview pixel-identical to the watchface preview.
+    const drawBakedHand = (
+      baked: { canvas: HTMLCanvasElement; artMinY: number; artMaxY: number },
+      def: { w: number; h: number },
       deg: number,
-      anchor: PointerLayerAnchor,
-      axisShiftRatio = 0,
+      sliderNorm: number,
     ) => {
       const rad = (deg * Math.PI) / 180;
-      // True no-resize preview: draw source at its native dimensions.
-      const drawW = Math.max(1, img.width);
-      const drawH = Math.max(1, img.height);
-      const anchorX = drawW * anchor.xRatio;
-      // axisShiftRatio is now an absolute [0,1] pivot position within image height.
-      // Position the image so this pivot aligns with the canvas center.
-      const pivotYInImg = drawH * axisShiftRatio;
+      const pivotX = def.w / 2;
+      const pivotY = baked.artMaxY > baked.artMinY
+        ? baked.artMinY + sliderNorm * (baked.artMaxY - baked.artMinY)
+        : sliderNorm * def.h;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(rad);
-      ctx.drawImage(img, -anchorX, -pivotYInImg, drawW, drawH);
+      ctx.drawImage(baked.canvas, -pivotX, -pivotY);
       ctx.restore();
     };
 
@@ -985,16 +1120,28 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       loadImage(composerLayerPng.hub),
     ]).then(([hourImg, minuteImg, secondImg, hubImg]) => {
       drawGuide();
-      // Default angles requested in spec
-      // hour=2PM (60deg), minute=10PM mark (300deg), second=12AM (0deg)
-      if (hourImg) drawRotatedLayer(hourImg, 60, composerLayerAnchor.hour, composerAxis.hour);
-      if (minuteImg) drawRotatedLayer(minuteImg, 300, composerLayerAnchor.minute, composerAxis.minute);
-      if (secondImg) drawRotatedLayer(secondImg, 0, composerLayerAnchor.second, composerAxis.second);
+      // Bake at the SAME canvas dimensions used in saveCustomHandStyle/InteractiveCanvas.
+      // Default demo angles: hour=2PM (60°), minute=10PM mark (300°), second=12AM (0°)
+      if (hourImg) {
+        const baked = bakeHand(hourImg, 22, 140);
+        if (baked) drawBakedHand(baked, { w: 22, h: 140 }, 60, composerAxis.hour);
+      }
+      if (minuteImg) {
+        const baked = bakeHand(minuteImg, 16, 200);
+        if (baked) drawBakedHand(baked, { w: 16, h: 200 }, 300, composerAxis.minute);
+      }
+      if (secondImg) {
+        const baked = bakeHand(secondImg, 8, 240);
+        if (baked) drawBakedHand(baked, { w: 8, h: 240 }, 0, composerAxis.second);
+      }
 
       if (hubImg) {
-        const hubW = Math.max(1, hubImg.width);
-        const hubH = Math.max(1, hubImg.height);
-        ctx.drawImage(hubImg, cx - hubW / 2, cy - hubH / 2, hubW, hubH);
+        const hub = bakeHub(hubImg, 30);
+        if (hub) {
+          ctx.drawImage(hub, cx - 15, cy - 15);
+        } else {
+          ctx.drawImage(hubImg, cx - 15, cy - 15, 30, 30);
+        }
       } else {
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
         ctx.beginPath();
