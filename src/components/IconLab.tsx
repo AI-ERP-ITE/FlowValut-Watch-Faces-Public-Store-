@@ -1801,53 +1801,108 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
 
           {/* ── FONTS TAB ──────────────────────────────────────────────────── */}
           {activeTab === 'gaugePointers' && (
-            <div className="p-5 space-y-5 max-w-2xl mx-auto">
+            <div className="p-5 space-y-5 max-w-4xl mx-auto">
               <p className="text-xs text-white/40">
                 Create reusable gauge pointer images from SVG/HTML. Saved pointers appear in the
                 <span className="text-white/60"> Gauge Pointer</span> element's image picker.
               </p>
 
-              {/* HTML editor */}
-              <div className="space-y-3 border border-white/10 rounded-lg p-4">
-                <textarea
-                  value={gpHtml}
-                  onChange={e => setGpHtml(e.target.value)}
-                  placeholder="Paste SVG or HTML for gauge pointer…"
-                  rows={6}
-                  className="w-full text-xs font-mono bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50 resize-y"
-                />
+              {/* HTML editor + live preview side-by-side (Spec 089) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 border border-white/10 rounded-lg p-4">
+                <div className="space-y-3">
+                  <textarea
+                    value={gpHtml}
+                    onChange={e => setGpHtml(e.target.value)}
+                    placeholder="Paste SVG or HTML for gauge pointer…"
+                    rows={8}
+                    className="w-full text-xs font-mono bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50 resize-y"
+                  />
 
-                {/* Pivot sliders */}
-                <div className="space-y-2">
-                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot X (horizontal) — {(gpPivotX * 100).toFixed(0)}%</label>
-                  <input type="range" min={0} max={1} step={0.01} value={gpPivotX}
-                    onChange={e => setGpPivotX(Number(e.target.value))}
-                    className="w-full h-1 accent-violet-500" />
-                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot Y (vertical) — {(gpPivotY * 100).toFixed(0)}%</label>
-                  <input type="range" min={0} max={1} step={0.01} value={gpPivotY}
-                    onChange={e => setGpPivotY(Number(e.target.value))}
-                    className="w-full h-1 accent-violet-500" />
+                  {/* Pivot sliders */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot X (horizontal) — {(gpPivotX * 100).toFixed(0)}%</label>
+                    <input type="range" min={0} max={1} step={0.01} value={gpPivotX}
+                      onChange={e => setGpPivotX(Number(e.target.value))}
+                      className="w-full h-1 accent-violet-500" />
+                    <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot Y (vertical) — {(gpPivotY * 100).toFixed(0)}%</label>
+                    <input type="range" min={0} max={1} step={0.01} value={gpPivotY}
+                      onChange={e => setGpPivotY(Number(e.target.value))}
+                      className="w-full h-1 accent-violet-500" />
+                  </div>
+
+                  <input
+                    type="text"
+                    value={gpName}
+                    onChange={e => setGpName(e.target.value)}
+                    placeholder="Pointer name…"
+                    className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50"
+                  />
+
+                  {gpMsg && (
+                    <p className={`text-[10px] ${gpMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{gpMsg}</p>
+                  )}
+
+                  <button
+                    onClick={handleSaveGaugePointer}
+                    disabled={gpSaving || !gpName.trim() || !gpHtml.trim()}
+                    className="w-full py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs rounded font-medium transition-colors"
+                  >
+                    {gpSaving ? 'Saving…' : 'Save Gauge Pointer'}
+                  </button>
                 </div>
 
-                <input
-                  type="text"
-                  value={gpName}
-                  onChange={e => setGpName(e.target.value)}
-                  placeholder="Pointer name…"
-                  className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50"
-                />
-
-                {gpMsg && (
-                  <p className={`text-[10px] ${gpMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{gpMsg}</p>
-                )}
-
-                <button
-                  onClick={handleSaveGaugePointer}
-                  disabled={gpSaving || !gpName.trim() || !gpHtml.trim()}
-                  className="w-full py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs rounded font-medium transition-colors"
-                >
-                  {gpSaving ? 'Saving…' : 'Save Gauge Pointer'}
-                </button>
+                {/* Live iframe preview with pivot crosshair (Spec 089) */}
+                <div className="flex flex-col items-center justify-start gap-2">
+                  <span className="text-[10px] text-white/50 uppercase tracking-widest">Live preview</span>
+                  <div
+                    className="relative bg-zinc-950 border border-white/10 rounded"
+                    style={{ width: 192, height: 192 }}
+                  >
+                    <iframe
+                      title="gauge-pointer-preview"
+                      sandbox=""
+                      srcDoc={`<!doctype html><html><head><style>html,body{margin:0;padding:0;background:transparent;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;}svg,img{max-width:100%;max-height:100%;}</style></head><body>${gpHtml || ''}</body></html>`}
+                      style={{ width: '100%', height: '100%', border: 'none', background: 'transparent' }}
+                    />
+                    {/* Pivot crosshair overlay */}
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${gpPivotX * 100}%`,
+                        top: `${gpPivotY * 100}%`,
+                        transform: 'translate(-50%, -50%)',
+                        width: 14,
+                        height: 14,
+                        border: '1px solid rgba(167,139,250,0.9)',
+                        borderRadius: '50%',
+                        boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
+                      }}
+                    />
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${gpPivotX * 100}%`,
+                        top: 0,
+                        bottom: 0,
+                        width: 1,
+                        background: 'rgba(167,139,250,0.25)',
+                      }}
+                    />
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        top: `${gpPivotY * 100}%`,
+                        left: 0,
+                        right: 0,
+                        height: 1,
+                        background: 'rgba(167,139,250,0.25)',
+                      }}
+                    />
+                  </div>
+                  <p className="text-[9px] text-white/35 text-center max-w-[192px]">
+                    Sandboxed (no script execution). Crosshair = current pivot.
+                  </p>
+                </div>
               </div>
 
               {/* Saved gauge pointers grid */}
@@ -1860,80 +1915,6 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                         <img src={gp.dataUrl} alt={gp.name} className="w-16 h-16 object-contain" />
                         <p className="text-[9px] text-white/50 truncate w-full text-center">{gp.name}</p>
                         <p className="text-[9px] text-white/30">px={( gp.pivotX * 100).toFixed(0)}% py={(gp.pivotY * 100).toFixed(0)}%</p>
-                        <button
-                          onClick={() => handleDeleteGaugePointer(gp.key)}
-                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 text-red-500 hover:text-red-400 transition-opacity"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'gaugePointers' && (
-            <div className="p-5 space-y-5 max-w-2xl mx-auto">
-              <p className="text-xs text-white/40">
-                Create reusable gauge pointer images from SVG/HTML. Saved pointers appear in the
-                <span className="text-white/60"> Gauge Pointer</span> element's image picker.
-              </p>
-
-              {/* HTML editor */}
-              <div className="space-y-3 border border-white/10 rounded-lg p-4">
-                <textarea
-                  value={gpHtml}
-                  onChange={e => setGpHtml(e.target.value)}
-                  placeholder="Paste SVG or HTML for gauge pointer…"
-                  rows={6}
-                  className="w-full text-xs font-mono bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50 resize-y"
-                />
-
-                {/* Pivot sliders */}
-                <div className="space-y-2">
-                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot X (horizontal) — {(gpPivotX * 100).toFixed(0)}%</label>
-                  <input type="range" min={0} max={1} step={0.01} value={gpPivotX}
-                    onChange={e => setGpPivotX(Number(e.target.value))}
-                    className="w-full h-1 accent-violet-500" />
-                  <label className="text-[10px] text-white/50 uppercase tracking-widest">Pivot Y (vertical) — {(gpPivotY * 100).toFixed(0)}%</label>
-                  <input type="range" min={0} max={1} step={0.01} value={gpPivotY}
-                    onChange={e => setGpPivotY(Number(e.target.value))}
-                    className="w-full h-1 accent-violet-500" />
-                </div>
-
-                <input
-                  type="text"
-                  value={gpName}
-                  onChange={e => setGpName(e.target.value)}
-                  placeholder="Pointer name…"
-                  className="w-full text-xs bg-zinc-900 border border-white/10 rounded px-3 py-2 text-white/80 focus:outline-none focus:border-violet-500/50"
-                />
-
-                {gpMsg && (
-                  <p className={`text-[10px] ${gpMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{gpMsg}</p>
-                )}
-
-                <button
-                  onClick={handleSaveGaugePointer}
-                  disabled={gpSaving || !gpName.trim() || !gpHtml.trim()}
-                  className="w-full py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-xs rounded font-medium transition-colors"
-                >
-                  {gpSaving ? 'Saving…' : 'Save Gauge Pointer'}
-                </button>
-              </div>
-
-              {/* Saved gauge pointers grid */}
-              {savedGaugePointers.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] text-white/40 uppercase tracking-widest">Saved ({savedGaugePointers.length})</span>
-                  <div className="grid grid-cols-4 gap-2">
-                    {savedGaugePointers.map(gp => (
-                      <div key={gp.key} className="relative group bg-zinc-900 rounded-lg border border-white/10 p-2 flex flex-col items-center gap-1">
-                        <img src={gp.dataUrl} alt={gp.name} className="w-16 h-16 object-contain" />
-                        <p className="text-[9px] text-white/50 truncate w-full text-center">{gp.name}</p>
-                        <p className="text-[9px] text-white/30">px={(gp.pivotX * 100).toFixed(0)}% py={(gp.pivotY * 100).toFixed(0)}%</p>
                         <button
                           onClick={() => handleDeleteGaugePointer(gp.key)}
                           className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 text-red-500 hover:text-red-400 transition-opacity"

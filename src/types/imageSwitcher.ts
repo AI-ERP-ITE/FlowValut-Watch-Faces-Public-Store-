@@ -39,6 +39,11 @@ export interface RangeSlot {
 
   // Local offline cache — populated when pulled from Storage
   dataUrl?: string;
+
+  // Spec 089 — source HTML roundtrip (in-memory + IDB; persisted via per-slot
+  // Storage upload, NOT inlined in Firestore — see imageSwitcherSync.ts).
+  sourceHtml?: string;  // editable truth — raw HTML/SVG pasted by user
+  sourceHash?: string;  // SHA-256 of sourceHtml — used to detect stale bake + skip-upload-if-unchanged
 }
 
 // ── User profile (for DYNAMIC_RANGES / HEART) ─────────────────────────────────

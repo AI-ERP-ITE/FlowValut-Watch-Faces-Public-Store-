@@ -1,11 +1,13 @@
 /**
- * ImageSwitcherSlotRow.tsx — Spec 088 Phase B
+ * ImageSwitcherSlotRow.tsx — Spec 088 Phase B + Spec 089 (HTML source roundtrip)
  * Single row in the ImageSwitcherLab slot table.
  */
 
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import type { RangeSlot } from '@/types/imageSwitcher';
+import { renderHtmlToDataUrl } from '@/lib/customIconStore';
+import { sha256Hex } from '@/lib/firebaseStorageClient';
 
 interface Props {
   slot: RangeSlot;
@@ -15,8 +17,28 @@ interface Props {
   onRemove?: () => void;
 }
 
+const BAKE_SIZE = 128;
+
 export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpdate, onRemove }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [baking, setBaking] = useState(false);
+  const [bakeError, setBakeError] = useState<string | null>(null);
+  const [liveHash, setLiveHash] = useState<string | null>(null);
+
+  // Recompute hash of current sourceHtml whenever it changes — used for stale-bake detection
+  useEffect(() => {
+    let cancelled = false;
+    const html = slot.sourceHtml ?? '';
+    if (!html) { setLiveHash(null); return; }
+    sha256Hex(html).then((h) => { if (!cancelled) setLiveHash(h); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [slot.sourceHtml]);
+
+  const stale = useMemo(() => {
+    if (!slot.sourceHtml || !slot.sourceHash || !liveHash) return false;
+    return liveHash !== slot.sourceHash;
+  }, [slot.sourceHtml, slot.sourceHash, liveHash]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -31,7 +53,25 @@ export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpda
     e.target.value = '';
   };
 
+  const handleBake = async () => {
+    const html = slot.sourceHtml ?? '';
+    if (!html.trim()) { setBakeError('source empty'); return; }
+    setBaking(true);
+    setBakeError(null);
+    try {
+      const dataUrl = await renderHtmlToDataUrl(html, BAKE_SIZE);
+      if (!dataUrl) throw new Error('render returned empty');
+      const hash = await sha256Hex(html);
+      onUpdate({ dataUrl, sourceHtml: html, sourceHash: hash });
+    } catch (err) {
+      setBakeError(err instanceof Error ? err.message : 'bake failed');
+    } finally {
+      setBaking(false);
+    }
+  };
+
   return (
+    <>
     <tr className="border-b border-white/5 hover:bg-white/3 transition-colors">
       {/* Slot # */}
       <td className="py-1.5 px-2 text-[10px] text-white/40 w-8 text-center">
@@ -107,6 +147,25 @@ export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpda
             onChange={handleFileChange}
             className="hidden"
           />
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+              expanded
+                ? 'border-cyan-400/50 bg-cyan-500/15 text-cyan-200'
+                : 'border-white/20 bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+            }`}
+            title="Edit HTML/SVG source for this slot"
+          >
+            HTML
+          </button>
+          {stale && (
+            <span
+              className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-amber-200"
+              title="source HTML changed — rebake to refresh PNG"
+            >
+              rebake
+            </span>
+          )}
         </div>
       </td>
 
@@ -123,5 +182,61 @@ export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpda
         )}
       </td>
     </tr>
+
+    {expanded && (
+      <tr className="border-b border-white/5 bg-black/20">
+        <td colSpan={8} className="py-2 px-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* HTML / SVG editor */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase tracking-wide text-white/40">
+                HTML / SVG source (slot {slot.slotIndex})
+              </label>
+              <textarea
+                value={slot.sourceHtml ?? ''}
+                onChange={(e) => onUpdate({ sourceHtml: e.target.value })}
+                spellCheck={false}
+                placeholder="<svg viewBox='0 0 64 64'>...</svg>  or  <div style='...'>...</div>"
+                className="font-mono text-[11px] leading-snug bg-black/40 border border-white/10 rounded px-2 py-1.5 text-white/85 min-h-[140px] resize-y focus:outline-none focus:border-cyan-400/50"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleBake}
+                  disabled={baking || !(slot.sourceHtml ?? '').trim()}
+                  className="text-[10px] px-2 py-1 rounded border border-cyan-400/40 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {baking ? 'Baking…' : 'Bake to PNG'}
+                </button>
+                {bakeError && (
+                  <span className="text-[10px] text-red-300">⚠ {bakeError}</span>
+                )}
+                {!bakeError && slot.sourceHash && !stale && (
+                  <span className="text-[10px] text-emerald-300/80">✓ baked</span>
+                )}
+              </div>
+            </div>
+
+            {/* Live iframe preview */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase tracking-wide text-white/40">
+                Live preview
+              </label>
+              <div className="bg-black/40 border border-white/10 rounded p-2 flex items-center justify-center min-h-[140px]">
+                <iframe
+                  title={`slot-${slot.slotIndex}-preview`}
+                  sandbox=""
+                  srcDoc={`<!doctype html><html><head><style>html,body{margin:0;padding:0;background:transparent;display:flex;align-items:center;justify-content:center;height:100%;width:100%;}svg,img{max-width:100%;max-height:100%;}</style></head><body>${slot.sourceHtml ?? ''}</body></html>`}
+                  style={{ width: 128, height: 128, border: 'none', background: 'transparent' }}
+                />
+              </div>
+              <p className="text-[9px] text-white/35">
+                Preview rasterized at {BAKE_SIZE}×{BAKE_SIZE} on bake. Sandboxed (no script execution).
+              </p>
+            </div>
+          </div>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }

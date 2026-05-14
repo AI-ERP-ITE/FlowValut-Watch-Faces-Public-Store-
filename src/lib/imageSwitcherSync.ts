@@ -23,7 +23,9 @@ import {
 } from './imageSwitcherStore';
 import {
   uploadBinaryBlob,
+  uploadSourceText,
   downloadBlob,
+  downloadText,
   deleteStorageObject,
   dataUrlToBlob,
   blobToDataUrl,
@@ -56,10 +58,15 @@ interface SlotMeta {
   code?: number;
   min?: number;
   max?: number;
+  // Baked PNG (Spec 088)
   bakedPath?: string;
   bakedDownloadURL?: string;
   bakedHash?: string;
   bakedVersion?: number;
+  // Source HTML (Spec 089) — uploaded as Storage file, refs only in Firestore
+  sourcePath?: string;
+  sourceURL?: string;
+  sourceHash?: string;
 }
 
 interface SwitcherMeta {
@@ -103,6 +110,15 @@ export async function pullSwitcherDefinitions(): Promise<void> {
               // non-critical — slot will render blank until re-uploaded
             }
           }
+          // Spec 089 — hydrate source HTML if present
+          let sourceHtml: string | undefined;
+          if (slot.sourceURL) {
+            try {
+              sourceHtml = await downloadText(slot.sourceURL);
+            } catch {
+              // non-critical — user may re-paste source
+            }
+          }
           return {
             slotIndex: slot.slotIndex,
             label: slot.label,
@@ -110,6 +126,8 @@ export async function pullSwitcherDefinitions(): Promise<void> {
             min: slot.min,
             max: slot.max,
             dataUrl,
+            sourceHtml,
+            sourceHash: slot.sourceHash,
             baked: slot.bakedDownloadURL
               ? {
                   storagePath: slot.bakedPath ?? '',
@@ -178,7 +196,33 @@ export async function pushSwitcherDefinition(def: ImageSwitcherDefinition): Prom
           bakedDownloadURL: existing?.bakedDownloadURL,
           bakedHash: existing?.bakedHash,
           bakedVersion: existing?.bakedVersion ?? 0,
+          // Carry existing source refs forward; will be replaced below if HTML changed.
+          sourcePath: existing?.sourcePath,
+          sourceURL: existing?.sourceURL,
+          sourceHash: existing?.sourceHash,
         };
+
+        // Spec 089 — upload source HTML if present and changed (or never uploaded).
+        if (slot.sourceHtml && slot.sourceHtml.trim()) {
+          const newSourceHash = slot.sourceHash ?? (await sha256Hex(slot.sourceHtml));
+          if (existing?.sourceHash !== newSourceHash) {
+            const sourceStoragePath = `users/${uid}/imageSwitchers/${def.id}/slot_${slot.slotIndex}.html`;
+            try {
+              const { downloadURL } = await uploadSourceText(sourceStoragePath, slot.sourceHtml);
+              slotMeta.sourcePath = sourceStoragePath;
+              slotMeta.sourceURL = downloadURL;
+              slotMeta.sourceHash = newSourceHash;
+            } catch (err) {
+              console.warn(`[imageSwitcherSync] upload source slot ${slot.slotIndex} failed:`, err);
+            }
+          }
+        } else if (existing?.sourcePath && !slot.sourceHtml) {
+          // Source HTML was cleared by user — drop the Storage file and refs.
+          try { await deleteStorageObject(existing.sourcePath); } catch { /* best-effort */ }
+          slotMeta.sourcePath = undefined;
+          slotMeta.sourceURL = undefined;
+          slotMeta.sourceHash = undefined;
+        }
 
         if (!slot.dataUrl) return slotMeta;
 
@@ -189,13 +233,11 @@ export async function pushSwitcherDefinition(def: ImageSwitcherDefinition): Prom
         try {
           const pngBlob = dataUrlToBlob(slot.dataUrl);
           const { downloadURL } = await uploadBinaryBlob(storagePath, pngBlob, 'image/png');
-          return {
-            ...slotMeta,
-            bakedPath: storagePath,
-            bakedDownloadURL: downloadURL,
-            bakedHash: newHash,
-            bakedVersion: (slotMeta.bakedVersion ?? 0) + 1,
-          };
+          slotMeta.bakedPath = storagePath;
+          slotMeta.bakedDownloadURL = downloadURL;
+          slotMeta.bakedHash = newHash;
+          slotMeta.bakedVersion = (slotMeta.bakedVersion ?? 0) + 1;
+          return slotMeta;
         } catch (err) {
           console.warn(`[imageSwitcherSync] upload slot ${slot.slotIndex} failed:`, err);
           return slotMeta;
@@ -240,6 +282,7 @@ export async function deleteSwitcherFromCloud(id: string, knownSlotCount = 0): P
     const storagePaths: string[] = [];
     for (let i = 0; i < knownSlotCount; i++) {
       storagePaths.push(`${base}/slot_${i}.png`);
+      storagePaths.push(`${base}/slot_${i}.html`);  // Spec 089 — also clear source HTML
     }
 
     // Also read the Firestore doc for any extra paths (e.g. if slot count grew
@@ -251,6 +294,9 @@ export async function deleteSwitcherFromCloud(id: string, knownSlotCount = 0): P
         for (const slot of meta.slots) {
           if (slot.bakedPath && !storagePaths.includes(slot.bakedPath)) {
             storagePaths.push(slot.bakedPath);
+          }
+          if (slot.sourcePath && !storagePaths.includes(slot.sourcePath)) {
+            storagePaths.push(slot.sourcePath);
           }
         }
       }
