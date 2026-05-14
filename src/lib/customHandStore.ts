@@ -26,6 +26,18 @@ export interface CustomHandRecord {
   minutePosY?: number;
   secondPosX?: number;
   secondPosY?: number;
+  // Normalized pivot positions [0=tip, 1=tail] relative to the trimmed visible
+  // art bounds in the baked PNG. These are the canonical reference for the
+  // tip-tail slider — posY fields above are derived from these.
+  hourPivotNorm?: number;
+  hourArtMinY?: number;
+  hourArtMaxY?: number;
+  minutePivotNorm?: number;
+  minuteArtMinY?: number;
+  minuteArtMaxY?: number;
+  secondPivotNorm?: number;
+  secondArtMinY?: number;
+  secondArtMaxY?: number;
   // Optional composer metadata for separated HTML workflow.
   sourceHourHtml?: string;
   sourceMinuteHtml?: string;
@@ -52,6 +64,16 @@ export interface SaveCustomHandStyleOptions {
     hour: { x: number; y: number };
     minute: { x: number; y: number };
     second: { x: number; y: number };
+  };
+  /**
+   * Direct normalized pivot overrides [0=tip, 1=tail] within the trimmed art
+   * of the baked PNG. Supersedes pivotOffsets when provided. The slider in
+   * IconLab sends these after the geometry model fix.
+   */
+  pivotNormOverrides?: {
+    hour?: number;
+    minute?: number;
+    second?: number;
   };
 }
 
@@ -395,21 +417,92 @@ export async function saveCustomHandStyle(
   const secondPivot = secondLayer.pivot;
 
   const pivotOffsets = options?.pivotOffsets;
+  const pivotNormOverrides = options?.pivotNormOverrides;
+
+  // ── Helper: normalize a canvas-px pivot into [0,1] within the art bounds ──
+  // If art bounds are unavailable, fall back to canvas-fraction.
+  function toPivotNorm(
+    posY: number,
+    artBoundsY: { minY: number; maxY: number } | null,
+    canvasH: number,
+  ): number {
+    if (artBoundsY && artBoundsY.maxY > artBoundsY.minY) {
+      return clamp((posY - artBoundsY.minY) / (artBoundsY.maxY - artBoundsY.minY), 0, 1);
+    }
+    return clamp(posY / canvasH, 0, 1);
+  }
+
+  // ── Helper: reconstruct canvas-px pivot from normalized position ──
+  function fromPivotNorm(
+    norm: number,
+    artBoundsY: { minY: number; maxY: number } | null,
+    canvasH: number,
+  ): number {
+    if (artBoundsY && artBoundsY.maxY > artBoundsY.minY) {
+      return Math.round(artBoundsY.minY + clamp(norm, 0, 1) * (artBoundsY.maxY - artBoundsY.minY));
+    }
+    return Math.round(clamp(norm, 0, 1) * canvasH);
+  }
 
   // Effective hand positions for TIME_POINTER selection/export.
   // If no marker-derived pivot exists, fall back to known stable defaults.
   const baseHour = hourPivot ?? { x: 11, y: 118 };
   const baseMinute = minutePivot ?? { x: 8, y: 172 };
   const baseSecond = secondPivot ?? { x: 4, y: 180 };
-  const effectiveHour = pivotOffsets
-    ? { x: clamp(Math.round(baseHour.x + pivotOffsets.hour.x), 0, 22), y: clamp(Math.round(baseHour.y + pivotOffsets.hour.y), 0, 140) }
-    : baseHour;
-  const effectiveMinute = pivotOffsets
-    ? { x: clamp(Math.round(baseMinute.x + pivotOffsets.minute.x), 0, 16), y: clamp(Math.round(baseMinute.y + pivotOffsets.minute.y), 0, 200) }
-    : baseMinute;
-  const effectiveSecond = pivotOffsets
-    ? { x: clamp(Math.round(baseSecond.x + pivotOffsets.second.x), 0, 8), y: clamp(Math.round(baseSecond.y + pivotOffsets.second.y), 0, 240) }
-    : baseSecond;
+
+  // ── Hour ──
+  // Priority: pivotNormOverrides > pivotOffsets (legacy pixel offset) > marker-derived
+  let hourPosY: number;
+  let hourPivotNorm: number;
+  if (pivotNormOverrides?.hour !== undefined) {
+    // Slider sends a direct normalized position within the art bounds.
+    hourPivotNorm = clamp(pivotNormOverrides.hour, 0, 1);
+    hourPosY = fromPivotNorm(hourPivotNorm, hourLayer.artBoundsY, 140);
+  } else if (pivotOffsets) {
+    // Legacy pixel-offset path (backward compat — old records without norm data).
+    hourPosY = clamp(Math.round(baseHour.y + pivotOffsets.hour.y), 0, 140);
+    hourPivotNorm = toPivotNorm(hourPosY, hourLayer.artBoundsY, 140);
+  } else {
+    hourPosY = baseHour.y;
+    hourPivotNorm = toPivotNorm(hourPosY, hourLayer.artBoundsY, 140);
+  }
+  const hourPosX = pivotOffsets
+    ? clamp(Math.round(baseHour.x + pivotOffsets.hour.x), 0, 22)
+    : baseHour.x;
+
+  // ── Minute ──
+  let minutePosY: number;
+  let minutePivotNorm: number;
+  if (pivotNormOverrides?.minute !== undefined) {
+    minutePivotNorm = clamp(pivotNormOverrides.minute, 0, 1);
+    minutePosY = fromPivotNorm(minutePivotNorm, minuteLayer.artBoundsY, 200);
+  } else if (pivotOffsets) {
+    minutePosY = clamp(Math.round(baseMinute.y + pivotOffsets.minute.y), 0, 200);
+    minutePivotNorm = toPivotNorm(minutePosY, minuteLayer.artBoundsY, 200);
+  } else {
+    minutePosY = baseMinute.y;
+    minutePivotNorm = toPivotNorm(minutePosY, minuteLayer.artBoundsY, 200);
+  }
+  const minutePosX = pivotOffsets
+    ? clamp(Math.round(baseMinute.x + pivotOffsets.minute.x), 0, 16)
+    : baseMinute.x;
+
+  // ── Second ──
+  let secondPosY: number;
+  let secondPivotNorm: number;
+  if (pivotNormOverrides?.second !== undefined) {
+    secondPivotNorm = clamp(pivotNormOverrides.second, 0, 1);
+    secondPosY = fromPivotNorm(secondPivotNorm, secondLayer.artBoundsY, 240);
+  } else if (pivotOffsets) {
+    secondPosY = clamp(Math.round(baseSecond.y + pivotOffsets.second.y), 0, 240);
+    secondPivotNorm = toPivotNorm(secondPosY, secondLayer.artBoundsY, 240);
+  } else {
+    secondPosY = baseSecond.y;
+    secondPivotNorm = toPivotNorm(secondPosY, secondLayer.artBoundsY, 240);
+  }
+  const secondPosX = pivotOffsets
+    ? clamp(Math.round(baseSecond.x + pivotOffsets.second.x), 0, 8)
+    : baseSecond.x;
 
   const record: CustomHandRecord = {
     key: `custom_hand:${slugify(name)}`,
@@ -419,12 +512,19 @@ export async function saveCustomHandStyle(
     secondDataUrl: secondLayer.dataUrl,
     coverDataUrl,
     swatchDataUrl,
-    hourPosX: effectiveHour.x,
-    hourPosY: effectiveHour.y,
-    minutePosX: effectiveMinute.x,
-    minutePosY: effectiveMinute.y,
-    secondPosX: effectiveSecond.x,
-    secondPosY: effectiveSecond.y,
+    hourPosX,
+    hourPosY,
+    minutePosX,
+    minutePosY,
+    secondPosX,
+    secondPosY,
+    // Geometry metadata for the tip-tail pivot model.
+    hourPivotNorm,
+    ...(hourLayer.artBoundsY ? { hourArtMinY: hourLayer.artBoundsY.minY, hourArtMaxY: hourLayer.artBoundsY.maxY } : {}),
+    minutePivotNorm,
+    ...(minuteLayer.artBoundsY ? { minuteArtMinY: minuteLayer.artBoundsY.minY, minuteArtMaxY: minuteLayer.artBoundsY.maxY } : {}),
+    secondPivotNorm,
+    ...(secondLayer.artBoundsY ? { secondArtMinY: secondLayer.artBoundsY.minY, secondArtMaxY: secondLayer.artBoundsY.maxY } : {}),
     ...(hasComposedSources ? {
       sourceHourHtml: composed!.hourHtml,
       sourceMinuteHtml: composed!.minuteHtml,
@@ -607,7 +707,7 @@ async function renderHandToPngWithPivot(
   outW: number,
   outH: number,
   pivotSource: ParsedPivot | null,
-): Promise<{ dataUrl: string; pivot: { x: number; y: number } | null }> {
+): Promise<{ dataUrl: string; pivot: { x: number; y: number } | null; artBoundsY: { minY: number; maxY: number } | null }> {
   const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
   const svgCode = svgMatch ? svgMatch[0] : code;
 
@@ -631,7 +731,7 @@ async function renderHandToPngWithPivot(
       if (!sampleCtx) {
         URL.revokeObjectURL(url);
         const fallback = await renderToHandPng(code, outW, outH);
-        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
         return;
       }
       sampleCtx.clearRect(0, 0, sampleW, sampleH);
@@ -643,7 +743,7 @@ async function renderHandToPngWithPivot(
       if (!rawBounds) {
         URL.revokeObjectURL(url);
         const fallback = await renderToHandPng(code, outW, outH);
-        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
         return;
       }
 
@@ -658,7 +758,7 @@ async function renderHandToPngWithPivot(
       if (!outCtx) {
         URL.revokeObjectURL(url);
         const fallback = await renderToHandPng(code, outW, outH);
-        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+        resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
         return;
       }
 
@@ -688,13 +788,18 @@ async function renderHandToPngWithPivot(
         };
       }
 
+      // Measure where the art actually landed in the output canvas.
+      // This is the canonical geometry reference for pivot normalization.
+      const outArtBounds = findOpaqueBounds(outCanvas);
+      const artBoundsY = outArtBounds ? { minY: outArtBounds.minY, maxY: outArtBounds.maxY } : null;
+
       URL.revokeObjectURL(url);
-      resolve({ dataUrl: outCanvas.toDataURL('image/png'), pivot });
+      resolve({ dataUrl: outCanvas.toDataURL('image/png'), pivot, artBoundsY });
     };
     img.onerror = async () => {
       URL.revokeObjectURL(url);
       const fallback = await renderToHandPng(code, outW, outH);
-      resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null });
+      resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
     };
     img.src = url;
   });

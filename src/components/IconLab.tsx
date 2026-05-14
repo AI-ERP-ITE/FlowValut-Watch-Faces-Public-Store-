@@ -86,7 +86,9 @@ type ComposerLayerValidation = {
 };
 
 const POINTER_COMPOSER_DRAFT_KEY = 'zepp-pointer-composer-draft-v1';
-const POINTER_COMPOSER_AXIS_KEY = 'zepp-pointer-composer-axis-v2';
+const POINTER_COMPOSER_AXIS_KEY = 'zepp-pointer-composer-axis-v3';
+// Typical normalized pivot positions (art-space) for fresh hands.
+const DEFAULT_AXIS: PointerAxisAdjustments = { hour: 0.843, minute: 0.860, second: 0.750 };
 const COMPOSER_PREVIEW_RASTER_SIZE = 512;
 
 interface Props {
@@ -297,17 +299,18 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const [composerAxis, setComposerAxis] = useState<PointerAxisAdjustments>(() => {
     try {
       const raw = localStorage.getItem(POINTER_COMPOSER_AXIS_KEY);
-      if (!raw) {
-        return { hour: 0, minute: 0, second: 0 };
-      }
+      if (!raw) return DEFAULT_AXIS;
       const parsed = JSON.parse(raw) as Partial<PointerAxisAdjustments>;
+      // Validate values are in [0,1] — old v2 values were in [-0.45, 0.45].
+      const valid = (v: unknown, def: number) =>
+        typeof v === 'number' && v >= 0 && v <= 1 ? v : def;
       return {
-        hour: typeof parsed.hour === 'number' ? parsed.hour : 0,
-        minute: typeof parsed.minute === 'number' ? parsed.minute : 0,
-        second: typeof parsed.second === 'number' ? parsed.second : 0,
+        hour: valid(parsed.hour, DEFAULT_AXIS.hour),
+        minute: valid(parsed.minute, DEFAULT_AXIS.minute),
+        second: valid(parsed.second, DEFAULT_AXIS.second),
       };
     } catch {
-      return { hour: 0, minute: 0, second: 0 };
+      return DEFAULT_AXIS;
     }
   });
   const [composerLayerAnchor, setComposerLayerAnchor] = useState<Record<'hour' | 'minute' | 'second', PointerLayerAnchor>>({
@@ -657,10 +660,10 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavingHand(true);
     setSaveHandMsg('');
     try {
-      const pivotOffsets = {
-        hour: { x: 0, y: Math.round(composerAxis.hour * 140) },
-        minute: { x: 0, y: Math.round(composerAxis.minute * 200) },
-        second: { x: 0, y: Math.round(composerAxis.second * 240) },
+      const pivotNormOverrides = {
+        hour: composerAxis.hour,
+        minute: composerAxis.minute,
+        second: composerAxis.second,
       };
       const seedCode = hasComposedSources ? composerDraft.hourHtml : code;
       const record = await saveCustomHandStyle(
@@ -674,9 +677,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                 secondHtml: composerDraft.secondHtml,
                 hubHtml: composerDraft.hubHtml,
               },
-              pivotOffsets,
+              pivotNormOverrides,
             }
-          : { pivotOffsets },
+          : { pivotNormOverrides },
       );
       setSavedHands(prev => {
         const filtered = prev.filter(h => h.key !== record.key);
@@ -870,7 +873,10 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       setLayerValidation(key, { state: 'valid', message: svgLayer ? 'Valid SVG layer' : 'Valid HTML layer' });
       setLayerPng(key, layerSrc);
       if (key !== 'hub') {
-        setLayerAnchor(key, svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 });
+        const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 };
+        setLayerAnchor(key, anchor);
+        // Auto-initialize the pivot slider to the SVG's natural pivot position.
+        setComposerAxis(prev => ({ ...prev, [key]: anchor.yRatio }));
       }
     } catch (err) {
       setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
@@ -901,9 +907,10 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   };
 
   const resetAxisAdjustment = (hand: 'hour' | 'minute' | 'second') => {
+    // Reset to the SVG-parsed anchor for this layer (the natural pivot).
     setComposerAxis(prev => ({
       ...prev,
-      [hand]: 0,
+      [hand]: composerLayerAnchor[hand].yRatio,
     }));
   };
 
@@ -953,13 +960,13 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       const drawW = Math.max(1, img.width);
       const drawH = Math.max(1, img.height);
       const anchorX = drawW * anchor.xRatio;
-      const anchorY = drawH * anchor.yRatio;
-      const axisShift = axisShiftRatio * drawH;
+      // axisShiftRatio is now an absolute [0,1] pivot position within image height.
+      // Position the image so this pivot aligns with the canvas center.
+      const pivotYInImg = drawH * axisShiftRatio;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(rad);
-      // axisShift moves artwork along the hand direction while keeping pivot fixed at center.
-      ctx.drawImage(img, -anchorX, -anchorY - axisShift, drawW, drawH);
+      ctx.drawImage(img, -anchorX, -pivotYInImg, drawW, drawH);
       ctx.restore();
     };
 
@@ -1519,11 +1526,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                           <button onClick={() => resetAxisAdjustment(hand.key)} className="text-[10px] text-white/40 hover:text-white/70 border border-white/10 rounded px-2 py-0.5">Reset</button>
                         </div>
                         <div className="grid grid-cols-[56px_1fr_46px] items-center gap-1.5">
-                          <span className="text-[10px] text-white/35">Tail↔Tip</span>
+                          <span className="text-[10px] text-white/35">Tip↔Tail</span>
                           <input
                             type="range"
-                            min={-0.45}
-                            max={0.45}
+                            min={0}
+                            max={1}
                             step={0.005}
                             value={composerAxis[hand.key]}
                             onChange={e => updateAxisAdjustment(hand.key, Number(e.target.value))}
@@ -1532,8 +1539,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                           <span className="text-[10px] text-white/45 text-right">{Math.round(composerAxis[hand.key] * 100)}%</span>
                         </div>
                         <div className="flex items-center justify-between text-[9px] text-white/35">
-                          <span>- = more tail after hub</span>
-                          <span>+ = more tip before hub</span>
+                          <span>0% = pivot at tip</span>
+                          <span>100% = pivot at tail</span>
                         </div>
                       </div>
                     ))}
