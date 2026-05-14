@@ -1525,30 +1525,6 @@ const HAND_DEFS = [
   { key: 'cover',  w: 30,  h: 30,  pivotX: 15, pivotY: 15  },
 ] as const;
 
-function extractSvgFromHtmlSource(code?: string): string | null {
-  if (!code) return null;
-  const m = code.match(/<svg[\s\S]*<\/svg>/i);
-  return m ? m[0] : null;
-}
-
-function parsePivotRatioFromSource(code?: string): { x: number; y: number } {
-  const svg = extractSvgFromHtmlSource(code);
-  if (!svg) return { x: 0.5, y: 0.5 };
-  const tag = svg.match(/<svg\b[^>]*>/i)?.[0] ?? '';
-  const vb = tag.match(/viewBox\s*=\s*["']([^"']+)["']/i)?.[1] ?? '';
-  const parts = vb.trim().split(/[\s,]+/).map(Number);
-  if (parts.length < 4 || parts.some(Number.isNaN) || parts[2] <= 0 || parts[3] <= 0) {
-    return { x: 0.5, y: 0.5 };
-  }
-  const [minX, minY, w, h] = parts;
-  const pxRaw = Number(tag.match(/\bdata-pivot-x\s*=\s*["']([^"']+)["']/i)?.[1]);
-  const pyRaw = Number(tag.match(/\bdata-pivot-y\s*=\s*["']([^"']+)["']/i)?.[1]);
-  if (Number.isNaN(pxRaw) || Number.isNaN(pyRaw)) return { x: 0.5, y: 0.5 };
-  const x = Math.max(0, Math.min(1, (pxRaw - minX) / w));
-  const y = Math.max(0, Math.min(1, (pyRaw - minY) / h));
-  return { x, y };
-}
-
 function loadHandImages(
   style: string,
   cache: Map<string, Map<string, HTMLImageElement>>,
@@ -1563,9 +1539,12 @@ function loadHandImages(
   if (customRecord) {
     const resolved = resolveCustomHandPack(customRecord);
     srcs = {
-      hour: resolved?.sources.hour ?? customRecord.hourDataUrl ?? null,
-      minute: resolved?.sources.minute ?? customRecord.minuteDataUrl ?? null,
-      second: resolved?.sources.second ?? customRecord.secondDataUrl ?? null,
+      // Always use the pre-baked PNG for hand layers — the IDB hourPosX/Y pivot
+      // is in that coordinate space. Raw SVG source causes a coord mismatch that
+      // makes tip-tail adjustments invisible in the preview.
+      hour: customRecord.hourDataUrl ?? null,
+      minute: customRecord.minuteDataUrl ?? null,
+      second: customRecord.secondDataUrl ?? null,
       cover: resolved?.sources.cover ?? customRecord.coverDataUrl ?? null,
     };
   } else {
@@ -1609,14 +1588,9 @@ function drawTimePointer(
 
   const style = el.handStyle ?? 'silver';
   const customRecord = customHands?.find(h => h.key === style);
-  const resolvedPack = customRecord ? resolveCustomHandPack(customRecord) : null;
-  const sourceMode = resolvedPack?.mode === 'source-based-custom';
-  const sourcePivot = sourceMode && customRecord ? {
-    hour: parsePivotRatioFromSource(customRecord.sourceHourHtml),
-    minute: parsePivotRatioFromSource(customRecord.sourceMinuteHtml),
-    second: parsePivotRatioFromSource(customRecord.sourceSecondHtml),
-    cover: { x: 0.5, y: 0.5 },
-  } : null;
+  // Always false: preview uses pre-baked PNG + IDB pivot (tip-tail aware coord space).
+  const sourceMode = false;
+  const sourcePivot = null;
   const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
