@@ -37,10 +37,8 @@ import {
   loadCustomIcons,
   replaceCustomIcons,
 } from './customIconStore';
-import {
-  loadCustomHandStyles,
-  replaceCustomHandStyles,
-} from './customHandStore';
+// loadCustomHandStyles / replaceCustomHandStyles intentionally omitted:
+// pullHands() is disabled (ISSUE_LOG #17) until HandStorageMeta stores pivot fields.
 import {
   loadCustomFonts,
   replaceCustomFonts,
@@ -466,65 +464,13 @@ async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
   await setDoc(labDocRef(uid, 'hands', record.key), meta);
 }
 
-async function pullHands(uid: string): Promise<void> {
-  const snap = await getDocs(labCol(uid, 'hands'));
-  if (snap.empty) return;
-
-  const local = await loadCustomHandStyles();
-  const localMap = new Map<string, CustomHandRecord>(local.map(r => [r.key, r]));
-
-  for (const d of snap.docs) {
-    const data = d.data();
-    if (!data.downloadURLs && data.hourDataUrl) continue;
-    if (!data.downloadURLs?.hour) continue;
-
-    const meta = data as HandStorageMeta;
-    const existing = localMap.get(meta.key);
-    if (existing && (existing as CustomHandRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
-      continue;
-    }
-
-    try {
-      const blobs = await Promise.all([
-        downloadBlob(meta.downloadURLs.hour),
-        downloadBlob(meta.downloadURLs.minute),
-        downloadBlob(meta.downloadURLs.second),
-        downloadBlob(meta.downloadURLs.cover),
-        downloadBlob(meta.downloadURLs.swatch),
-      ]);
-      const dataUrls = await Promise.all(blobs.map(b => blobToDataUrl(b)));
-
-      const sourceTexts = await Promise.all([
-        meta.sourceURLs?.hour   ? downloadText(meta.sourceURLs.hour).catch(()   => '') : Promise.resolve(''),
-        meta.sourceURLs?.minute ? downloadText(meta.sourceURLs.minute).catch(() => '') : Promise.resolve(''),
-        meta.sourceURLs?.second ? downloadText(meta.sourceURLs.second).catch(() => '') : Promise.resolve(''),
-        meta.sourceURLs?.hub    ? downloadText(meta.sourceURLs.hub).catch(()    => '') : Promise.resolve(''),
-      ]);
-
-      const record: CustomHandRecord = {
-        key: meta.key,
-        name: meta.name,
-        hourDataUrl:      dataUrls[0],
-        minuteDataUrl:    dataUrls[1],
-        secondDataUrl:    dataUrls[2],
-        coverDataUrl:     dataUrls[3],
-        swatchDataUrl:    dataUrls[4],
-        sourceHourHtml:   sourceTexts[0] || undefined,
-        sourceMinuteHtml: sourceTexts[1] || undefined,
-        sourceSecondHtml: sourceTexts[2] || undefined,
-        sourceHubHtml:    sourceTexts[3] || undefined,
-        handRenderVersion: meta.handRenderVersion,
-        pivotOffsets: meta.pivotOffsets,
-        createdAt: meta.createdAt,
-        sourceHash: meta.sourceHash,  // persisted so next startup skips re-download
-      };
-      localMap.set(meta.key, record);
-    } catch (err) {
-      console.warn(`[firestoreLabSync] pull hand ${meta.key} failed:`, err);
-    }
-  }
-
-  await replaceCustomHandStyles([...localMap.values()]);
+async function pullHands(_uid: string): Promise<void> {
+  // DISABLED (ISSUE_LOG #17): HandStorageMeta does not store pivot position fields
+  // (hourPosX/Y, minutePosX/Y, secondPosX/Y). Downloading and calling
+  // replaceCustomHandStyles() overwrites IDB records with pivot-less data,
+  // causing the clock hand preview to rotate from wrong default positions.
+  // Re-enable once pivot fields are added to HandStorageMeta.
+  return;
 }
 
 // ── FONTS ─────────────────────────────────────────────────────────────────────

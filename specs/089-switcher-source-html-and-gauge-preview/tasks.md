@@ -11,5 +11,6 @@ Sequential execution. Each task: edit → save → quick local lint/type check v
 | T5 | Add iframe live preview to Gauge Pointer tab | `app/src/components/IconLab.tsx` | pending |
 | T6 | Run `npm run lint` + `npm run build` from `app/`; fix any errors | — | pending |
 | T7 | Update `ISSUE_LOG.md` #14, #15 to ✅ Resolved with commit hash + bundle hash references | `ISSUE_LOG.md` | pending |
-| T8 | Deploy private: `npm run deploy:full:private` (kill any running dev server first) | — | pending |
+| T8 | Deploy private: `npm run deploy:full:private` (killing dev server beforehand is optional — HMR race fixed in `deployDistToDocs.mjs`, ISSUE_LOG.md #16) | — | pending |
 | T9 | Post-deploy verify: bundle hash on live private site, lab page loads, no console errors | — | pending |
+| T10 | Post-deploy localhost verify: navigate to `localhost:5173/Watch-Faces/studio/parametric` — should load without restart (HMR race eliminated by code fix) | — | pending |

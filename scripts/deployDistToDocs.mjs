@@ -136,28 +136,18 @@ async function main() {
 
   if (mirrorRoot) {
     const rootAssets = path.join(appRoot, 'assets');
-    const rootIndex = path.join(appRoot, 'index.html');
-    const rootStudioIndex = path.join(appRoot, 'studio', 'index.html');
-    const rootStudioParametricIndex = path.join(appRoot, 'studio', 'parametric', 'index.html');
     await copyDirContents(distAssets, rootAssets);
     await removeStaleFiles(rootAssets, distAssets);
-    await writeText(rootIndex, distHtml);
-    await writeText(rootStudioIndex, distHtml);
-    await writeText(rootStudioParametricIndex, distHtml);
 
-    // For private deploys: GH Pages (origin) serves from docs/, NOT root.
-    // For public deploys: GH Pages (public remote) ALSO serves from docs/.
-    // In both cases, root index.html only needs the production bundle reference
-    // at the moment of git-push (already captured in the commit above before restore).
-    // Restore root + studio entries to dev entry so Vite can resolve /src/main.tsx locally.
-    await writeText(rootIndex, DEV_INDEX_HTML);
-    await writeText(rootStudioIndex, DEV_INDEX_HTML);
-    await writeText(rootStudioParametricIndex, DEV_INDEX_HTML);
-    if (target === 'private') {
-      console.log('Root index.html restored to dev entry (target=private; GH Pages uses docs/).');
-    } else {
-      console.log(`Root index.html restored to dev entry (target=${target}; prevents next build failure).`);
-    }
+    // Root HTML files are intentionally NOT written here.
+    // Both deployPrivateFull.mjs and deployPublicFull.mjs use stageProductionIndexInGit()
+    // to commit production HTML via git plumbing (hash-object + update-index) without
+    // ever touching the working tree. Writing production HTML here then immediately
+    // restoring it was purely redundant and caused a Vite HMR race: Vite's file watcher
+    // could fire during the brief production-on-disk window, hot-reloading the browser
+    // to a hashed asset URL that doesn't exist in dev mode → blank page at
+    // /studio/parametric and other deep routes (ISSUE_LOG.md #16).
+    // Only the asset folder sync is needed here so git add -A picks up new/removed assets.
   }
 
   console.log(`Deploy sync complete for target=${target}`);
@@ -166,7 +156,7 @@ async function main() {
     `docs updated: ${path.relative(appRoot, docsIndex)}, ${path.relative(appRoot, docsStudioIndex)}, ${path.relative(appRoot, docsStudioParametricIndex)}`,
   );
   if (mirrorRoot) {
-    console.log('Root mirror enabled: index.html + studio entries + assets synced from dist.');
+    console.log('Root mirror: assets synced from dist (HTML left as dev shell — managed by stageProductionIndexInGit).');
   }
 }
 
