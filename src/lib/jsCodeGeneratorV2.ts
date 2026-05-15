@@ -263,27 +263,6 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
     ? sortVisible(config.aodElements)
     : elements;
 
-  // Bug #24: AOD TIME_POINTER hands appeared off-center and hub cover was missing.
-  // Root cause: when AOD uses a dedicated layout, its TIME_POINTER element can drift from
-  // the main one (stale center, missing cover fields). Fix = copy main TIME_POINTER pivot
-  // and hub-cover fields onto the matching AOD pointer when they are missing/falsy. This
-  // does NOT overwrite explicitly-set AOD values; it only fills gaps so AOD mirrors main
-  // by default, matching the user's expectation ("copy main to AOD for these two points").
-  if (config.aodElements && config.aodElements.length > 0) {
-    const mainPointers = elements.filter((e) => e.type === 'TIME_POINTER');
-    for (const aodEl of aodElements) {
-      if (aodEl.type !== 'TIME_POINTER') continue;
-      const mainEl = mainPointers.find((m) => m.id === aodEl.id)
-        ?? mainPointers.find((m) => m.name === aodEl.name)
-        ?? mainPointers[0];
-      if (!mainEl) continue;
-      if (!aodEl.center && mainEl.center) aodEl.center = { ...mainEl.center };
-      if (!aodEl.coverSrc && mainEl.coverSrc) aodEl.coverSrc = mainEl.coverSrc;
-      if (!aodEl.coverWidth && mainEl.coverWidth) aodEl.coverWidth = mainEl.coverWidth;
-      if (!aodEl.coverHeight && mainEl.coverHeight) aodEl.coverHeight = mainEl.coverHeight;
-    }
-  }
-
   const aodSourceLabel = config.aodElements && config.aodElements.length > 0
     ? 'dedicated AOD layout'
     : 'main layout fallback';
@@ -556,8 +535,8 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
 
 // Generate IMG_DATE widget with day arrays
 function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  const x = element.bounds.x ?? 92;
-  const y = element.bounds.y ?? 198;
+  const x = element.bounds.x || 92;
+  const y = element.bounds.y || 198;
   
   // Use date_digit_N.png naming — must match what mockKimiAnalysis generates
   const digitArray = [];
@@ -585,8 +564,8 @@ function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, s
 // Generate IMG_DATE (month) widget with month arrays (12 images)
 // Pattern from working Brushed Steel reference: month_startX/Y, month_sc/tc/en_array, month_is_character
 function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  const x = element.bounds.x ?? 105;
-  const y = element.bounds.y ?? 198;
+  const x = element.bounds.x || 105;
+  const y = element.bounds.y || 198;
   
   // Use month_N.png naming — 12 images for Jan-Dec (0-indexed)
   const monthArray = [];
@@ -613,8 +592,8 @@ function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, 
 
 // Generate IMG_WEEK widget with weekday arrays
 function generateIMGWeekWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  const x = element.bounds.x ?? 33;
-  const y = element.bounds.y ?? 198;
+  const x = element.bounds.x || 33;
+  const y = element.bounds.y || 198;
   
   // Use week_N.png naming — must match what mockKimiAnalysis generates
   const weekArray = [];
@@ -716,8 +695,8 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
   // Handle IMG elements (static images)
   // GAUGE_POINTER - Data-driven rotating needle (IMG_POINTER)
   function generateGaugePointerWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-    const width = element.bounds.width ?? 40;
-    const height = element.bounds.height ?? 120;
+    const width = element.bounds.width || 40;
+    const height = element.bounds.height || 120;
     const pivot = normalizeGaugePivot(element);
     const pivotX = Math.round(width * pivot.pivotX);
     const pivotY = Math.round(height * pivot.pivotY);
@@ -950,12 +929,6 @@ function generateTextWidget(element: WatchFaceElement, widgetIndex: number, show
       textExpr = '`${String(hmSensor.time.day).padStart(2,"0")} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][hmSensor.time.month-1]}`';
     } else if (fmt === 'MMM DD') {
       textExpr = '`${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][hmSensor.time.month-1]} ${String(hmSensor.time.day).padStart(2,"0")}`';
-    } else if (fmt === 'MM') {
-      textExpr = '`${String(hmSensor.time.month).padStart(2,"0")}`';
-    } else if (fmt === 'MMM') {
-      textExpr = '`${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][hmSensor.time.month-1]}`';
-    } else if (fmt === 'MMMM') {
-      textExpr = '`${["January","February","March","April","May","June","July","August","September","October","November","December"][hmSensor.time.month-1]}`';
     } else {
       textExpr = '`${hmSensor.time.day}/${hmSensor.time.month}`';
     }

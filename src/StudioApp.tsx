@@ -3403,10 +3403,10 @@ function StudioApp() {
           const existing = state.elementImages.find((img) => img.name === filename);
           sourceDataUrl = existing?.dataUrl ?? null;
         }
-        if (!sourceDataUrl) {
-          console.warn(`[GaugePointer] No source for "${el.name}" (filename=${filename}); using default needle fallback so watch always renders.`);
-          sourceDataUrl = createDefaultGaugePointerDataUrl(el.bounds.width ?? 40, el.bounds.height ?? 120);
+        if (!sourceDataUrl && filename === DEFAULT_GAUGE_POINTER_FILENAME) {
+          sourceDataUrl = createDefaultGaugePointerDataUrl(el.bounds.width || 40, el.bounds.height || 120);
         }
+        if (!sourceDataUrl) continue;
         const effectedDataUrl = await applyPointerEffectsForZPK(sourceDataUrl, el, 'gauge');
         const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Gauge pointer image ${filename}`);
         const existingIdx = elementFiles.findIndex((f) => f.src === filename);

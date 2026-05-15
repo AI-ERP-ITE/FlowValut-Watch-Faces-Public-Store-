@@ -827,9 +827,6 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           { value: 'DD-MM-YYYY',  label: 'DD-MM-YYYY',   sample: '21-04-2026' },
           { value: 'DD MMM',      label: 'DD MMM',       sample: '21 Apr' },
           { value: 'MMM DD',      label: 'MMM DD',       sample: 'Apr 21' },
-          { value: 'MM',          label: 'MM (month #)', sample: '04' },
-          { value: 'MMM',         label: 'MMM (short)',  sample: 'Apr' },
-          { value: 'MMMM',        label: 'MMMM (full)',  sample: 'April' },
         ] as const;
         const isDateMode = !!element.dateFormat;
         return (
@@ -1468,15 +1465,6 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                   {ws.label}
                 </button>
               ))}
-              {/* Bug #19: discoverability bridge to custom weather sets via Switcher Lab. */}
-              <button
-                onClick={() => onOpenSwitcherLab?.()}
-                disabled={!onOpenSwitcherLab}
-                title="Create or pick a custom weather icon set in the Switcher Lab"
-                className="flex-1 h-7 rounded border text-[10px] border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:border-cyan-500/60 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Custom…
-              </button>
             </div>
             {/* Preview strip: show codes 0,1,2,4,5,8,11,20,28 as samples */}
             <WeatherPreviewStrip style={(element.weatherStyle ?? 'flat') as WeatherStyle} />

@@ -1129,17 +1129,10 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           const dd = String(now.getDate()).padStart(2, '0');
           const mm = String(now.getMonth() + 1).padStart(2, '0');
           const yyyy = String(now.getFullYear());
-          const monthsShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const monthsFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-          const mmm = monthsShort[now.getMonth()];
-          const mmmm = monthsFull[now.getMonth()];
-          // Replace longest tokens first so MMMM/MMM/MM/M don't collide.
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const mmm = months[now.getMonth()];
           text = el.dateFormat
-            .replace('YYYY', yyyy)
-            .replace('MMMM', mmmm)
-            .replace('MMM', mmm)
-            .replace('MM', mm)
-            .replace('DD', dd);
+            .replace('DD', dd).replace('MM', mm).replace('YYYY', yyyy).replace('MMM', mmm);
         } else {
           text = el.text || el.name;
         }
@@ -1183,12 +1176,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           } else {
             const dataUrls = generateWeatherSet(wStyle);
             const clampedIndex = Math.max(0, Math.min(dataUrls.length - 1, simulatedWeatherCode));
-            // Bug #20: el.images can contain bare filenames like 'weather_0.png' (not real URLs).
-            // Loading those as <img src="weather_0.png"> 404s and the preview stays blank.
-            // Only honor sourceFrame when it's a usable URL (data: or http(s):); otherwise fall
-            // back to the freshly-generated builtin data URL for this weather style.
-            const sourceFrameIsUrl = !!sourceFrame && (sourceFrame.startsWith('data:') || /^https?:\/\//i.test(sourceFrame));
-            const candidateSrc = (sourceFrameIsUrl ? sourceFrame : null) || dataUrls[clampedIndex] || dataUrls[0];
+            const candidateSrc = sourceFrame || dataUrls[clampedIndex] || dataUrls[0];
             if (candidateSrc) {
               const img = new Image();
               img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
@@ -1432,12 +1420,7 @@ function getPlaceholderText(el: WatchFaceElement): string {
     return '10'; // hours or legacy single element
   }
   // Check type before name so toggling Date→Week works even if name still says "date"
-  if (el.type === 'IMG_WEEK') {
-    const fmt = el.weekFormat ?? 'short';
-    if (fmt === 'full') return 'Wednesday';
-    if (fmt === 'initial') return 'W';
-    return 'Wed';
-  }
+  if (el.type === 'IMG_WEEK') return 'WED';
   if (el.type === 'IMG_DATE') return '24';
   if (name.includes('month')) return 'APR';
   if (name.includes('week')) return 'WED';
