@@ -1176,7 +1176,8 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           } else {
             const dataUrls = generateWeatherSet(wStyle);
             const clampedIndex = Math.max(0, Math.min(dataUrls.length - 1, simulatedWeatherCode));
-            const candidateSrc = sourceFrame || dataUrls[clampedIndex] || dataUrls[0];
+            const sourceFrameIsUrl = !!sourceFrame && (sourceFrame.startsWith('data:') || /^https?:\/\//i.test(sourceFrame));
+            const candidateSrc = (sourceFrameIsUrl ? sourceFrame : null) || dataUrls[clampedIndex] || dataUrls[0];
             if (candidateSrc) {
               const img = new Image();
               img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };

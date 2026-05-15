@@ -2192,13 +2192,21 @@ function StudioApp() {
         // Legacy GitHub-bridge fallback (disabled by default, kept for migration safety)
         console.debug('[StudioApp] Firestore not available; skipping cloud pull.');
       }
-      const [icons, , loadedFontNames, hands, gaugePointers] = await Promise.all([
+      const [iconsRes, , fontNamesRes, handsRes, gaugeRes] = await Promise.allSettled([
         loadCustomIcons(),
         loadCustomFonts(),
         registerCustomFonts(),
         loadCustomHandStyles(),
         loadCustomGaugePointers(),
       ]);
+      const icons = iconsRes.status === 'fulfilled' ? iconsRes.value : [];
+      const loadedFontNames = fontNamesRes.status === 'fulfilled' ? fontNamesRes.value : [];
+      const hands = handsRes.status === 'fulfilled' ? handsRes.value : [];
+      const gaugePointers = gaugeRes.status === 'fulfilled' ? gaugeRes.value : [];
+      if (iconsRes.status === 'rejected') console.warn('[StudioApp] loadCustomIcons failed:', iconsRes.reason);
+      if (fontNamesRes.status === 'rejected') console.warn('[StudioApp] registerCustomFonts failed:', fontNamesRes.reason);
+      if (handsRes.status === 'rejected') console.warn('[StudioApp] loadCustomHandStyles failed:', handsRes.reason);
+      if (gaugeRes.status === 'rejected') console.warn('[StudioApp] loadCustomGaugePointers failed:', gaugeRes.reason);
       if (icons.length > 0) registerCustomIconsInLibrary(icons);
       if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
       if (hands.length > 0) setCustomHandStyles(hands);
