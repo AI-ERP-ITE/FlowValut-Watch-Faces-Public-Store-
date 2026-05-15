@@ -49,8 +49,8 @@ import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
 import { loadCustomGaugePointers, type CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
 import { getSwitcherDefinition } from '@/lib/imageSwitcherStore';
-import { isLabCloudSyncEnabled } from '@/lib/labCloudSync';
-import { pullLabAssetsFromFirestore, backfillIconsToFirestore, isFirestoreSyncEnabled } from '@/lib/firestoreLabSync';
+
+import { pullLabAssetsFromFirestore, backfillIconsToFirestore } from '@/lib/firestoreLabSync';
 import { subscribeAuthState } from '@/lib/firebaseAuthClient';
 import {
   POINTER_PARITY_TOLERANCE,
@@ -2174,24 +2174,10 @@ function StudioApp() {
   }, []);
 
   // Load custom icons + fonts from IndexedDB on startup and register them.
-  // Firestore pull requires auth — wait for auth to settle first.
+  // Phase 1: load from local IndexedDB immediately — no auth gate needed.
+  // Phase 2: after auth settles, pull from Firestore then re-load to pick up synced data.
   useEffect(() => {
-    const loadAssets = async (_isSignedIn: boolean) => {
-      if (isFirestoreSyncEnabled()) {
-        try {
-          await pullLabAssetsFromFirestore();
-          // Backfill any IDB icons not yet in Storage (retroactive fix for the
-          // storage.rules depth bug — icon keys with '/' were silently denied).
-          backfillIconsToFirestore().catch(err =>
-            console.warn('[StudioApp] icon backfill failed:', err)
-          );
-        } catch (err) {
-          console.warn('[StudioApp] Firestore pull on startup failed:', err);
-        }
-      } else if (isLabCloudSyncEnabled()) {
-        // Legacy GitHub-bridge fallback (disabled by default, kept for migration safety)
-        console.debug('[StudioApp] Firestore not available; skipping cloud pull.');
-      }
+    const applyLocalAssets = async () => {
       const [iconsRes, , fontNamesRes, handsRes, gaugeRes] = await Promise.allSettled([
         loadCustomIcons(),
         loadCustomFonts(),
@@ -2214,14 +2200,25 @@ function StudioApp() {
       if (icons.length > 0) setIconLibraryKey(k => k + 1);
     };
 
-    // Wait for Firebase auth to rehydrate before attempting cloud pull.
-    // onAuthStateChanged fires once immediately with the settled state.
+    // Phase 1: load immediately from IndexedDB
+    applyLocalAssets().catch(err => console.warn('[StudioApp] Local asset load failed:', err));
+
+    // Phase 2: once auth settles, pull Firestore then re-apply (background, non-blocking)
     let settled = false;
     const unsubscribe = subscribeAuthState((user) => {
-      if (settled) return; // only handle first event
+      if (settled) return;
       settled = true;
       unsubscribe();
-      loadAssets(!!user).catch(err => console.warn('[StudioApp] Startup asset load failed:', err));
+      if (!user) return; // not signed in — local load above is sufficient
+      // Firestore pull in background; re-load local IDB after to pick up synced data
+      pullLabAssetsFromFirestore()
+        .then(() => {
+          backfillIconsToFirestore().catch(err =>
+            console.warn('[StudioApp] icon backfill failed:', err)
+          );
+          return applyLocalAssets();
+        })
+        .catch(err => console.warn('[StudioApp] Firestore pull on startup failed:', err));
     });
     return () => { unsubscribe(); };
   }, []);
