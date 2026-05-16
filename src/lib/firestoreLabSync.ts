@@ -227,42 +227,51 @@ async function pullIcons(uid: string): Promise<void> {
   for (const d of snap.docs) {
     const data = d.data();
 
-    // Backward-compat: old docs have `dataUrl` directly — skip (re-pushed on next explicit save)
-    if (!data.downloadURL && data.dataUrl) continue;
-    if (!data.downloadURL) continue;
-
-    const meta = data as IconStorageMeta;
-    const existing = localMap.get(meta.key);
-
-    // Skip if local IDB already has same hash
-    if (existing && (existing as CustomIconRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
-      continue;
-    }
-
-    try {
-      const pngBlob = await downloadBlob(meta.downloadURL);
-      const dataUrl = await blobToDataUrl(pngBlob);
-      let sourceCode: string | undefined;
-      if (meta.sourceURL) {
-        sourceCode = await downloadText(meta.sourceURL).catch(() => undefined);
+    if (data.downloadURL) {
+      // New format: fetch PNG from Firebase Storage
+      const meta = data as IconStorageMeta;
+      const existing = localMap.get(meta.key);
+      if (existing && (existing as CustomIconRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
+        continue;
       }
-      const record: CustomIconRecord = {
-        key: meta.key,
-        name: meta.name,
-        category: meta.category,
-        dataUrl,
-        width: meta.width,
-        height: meta.height,
-        createdAt: meta.createdAt,
-        sourceMode: meta.sourceMode ?? undefined,
-        sourceCode,
-        sourceVersion: meta.bakedVersion,
-        sourceHash: meta.sourceHash,  // persisted so next startup skips re-download
-      };
-      localMap.set(meta.key, record);
-    } catch (err) {
-      console.warn(`[firestoreLabSync] pull icon ${meta.key} failed:`, err);
+      try {
+        const pngBlob = await downloadBlob(meta.downloadURL);
+        const dataUrl = await blobToDataUrl(pngBlob);
+        let sourceCode: string | undefined;
+        if (meta.sourceURL) {
+          sourceCode = await downloadText(meta.sourceURL).catch(() => undefined);
+        }
+        localMap.set(meta.key, {
+          key: meta.key,
+          name: meta.name,
+          category: meta.category,
+          dataUrl,
+          width: meta.width,
+          height: meta.height,
+          createdAt: meta.createdAt,
+          sourceMode: meta.sourceMode ?? undefined,
+          sourceCode,
+          sourceVersion: meta.bakedVersion,
+          sourceHash: meta.sourceHash,
+        });
+      } catch (err) {
+        console.warn(`[firestoreLabSync] pull icon ${meta.key} failed:`, err);
+      }
+    } else if (data.dataUrl && typeof data.dataUrl === 'string') {
+      // Old format: dataUrl stored directly in Firestore doc — restore to IDB
+      const key = (data.key as string) || d.id;
+      if (localMap.has(key)) continue; // prefer existing local copy
+      localMap.set(key, {
+        key,
+        name:     (data.name     as string) || key,
+        category: (data.category as string) || 'system',
+        dataUrl:  data.dataUrl   as string,
+        width:    (data.width    as number) || 48,
+        height:   (data.height   as number) || 48,
+        createdAt:(data.createdAt as number) || Date.now(),
+      });
     }
+    // else: no usable data, skip
   }
 
   await replaceCustomIcons([...localMap.values()]);
@@ -334,36 +343,49 @@ async function pullGaugePointers(uid: string): Promise<void> {
 
   for (const d of snap.docs) {
     const data = d.data();
-    if (!data.downloadURL && data.dataUrl) continue;
-    if (!data.downloadURL) continue;
 
-    const meta = data as GaugePointerStorageMeta;
-    const existing = localMap.get(meta.key);
-    if (existing && (existing as CustomGaugePointerRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
-      continue;
-    }
-
-    try {
-      const pngBlob = await downloadBlob(meta.downloadURL);
-      const dataUrl = await blobToDataUrl(pngBlob);
-      let sourceHtml = '';
-      if (meta.sourceURL) {
-        sourceHtml = await downloadText(meta.sourceURL).catch(() => '');
+    if (data.downloadURL) {
+      // New format: fetch PNG from Firebase Storage
+      const meta = data as GaugePointerStorageMeta;
+      const existing = localMap.get(meta.key);
+      if (existing && (existing as CustomGaugePointerRecord & { sourceHash?: string }).sourceHash === meta.sourceHash) {
+        continue;
       }
-      const record: CustomGaugePointerRecord = {
-        key: meta.key,
-        name: meta.name,
-        sourceHtml,
-        dataUrl,
-        pivotX: meta.pivotX,
-        pivotY: meta.pivotY,
-        createdAt: meta.createdAt,
-        sourceHash: meta.sourceHash,  // persisted so next startup skips re-download
-      };
-      localMap.set(meta.key, record);
-    } catch (err) {
-      console.warn(`[firestoreLabSync] pull gaugePointer ${meta.key} failed:`, err);
+      try {
+        const pngBlob = await downloadBlob(meta.downloadURL);
+        const dataUrl = await blobToDataUrl(pngBlob);
+        let sourceHtml = '';
+        if (meta.sourceURL) {
+          sourceHtml = await downloadText(meta.sourceURL).catch(() => '');
+        }
+        localMap.set(meta.key, {
+          key: meta.key,
+          name: meta.name,
+          sourceHtml,
+          dataUrl,
+          pivotX: meta.pivotX,
+          pivotY: meta.pivotY,
+          createdAt: meta.createdAt,
+          sourceHash: meta.sourceHash,
+        });
+      } catch (err) {
+        console.warn(`[firestoreLabSync] pull gaugePointer ${meta.key} failed:`, err);
+      }
+    } else if (data.dataUrl && typeof data.dataUrl === 'string') {
+      // Old format: dataUrl stored directly in Firestore doc — restore to IDB
+      const key = (data.key as string) || d.id;
+      if (localMap.has(key)) continue;
+      localMap.set(key, {
+        key,
+        name:      (data.name      as string) || key,
+        sourceHtml: '',
+        dataUrl:   data.dataUrl    as string,
+        pivotX:    (data.pivotX    as number) || 0,
+        pivotY:    (data.pivotY    as number) || 0,
+        createdAt: (data.createdAt as number) || Date.now(),
+      });
     }
+    // else: no usable data, skip
   }
 
   await replaceCustomGaugePointers([...localMap.values()]);
@@ -520,29 +542,47 @@ async function pullFonts(uid: string): Promise<void> {
 
   for (const d of snap.docs) {
     const data = d.data();
-    if (!data.downloadURL && data.bufferBase64) continue;
-    if (!data.downloadURL) continue;
 
-    const meta = data as FontStorageMeta;
-    const existing = localMap.get(meta.name);
-    if (existing && (existing as CustomFontRecord & { fileHash?: string }).fileHash === meta.fileHash) {
-      continue;
+    if (data.downloadURL) {
+      // New format: fetch font binary from Firebase Storage
+      const meta = data as FontStorageMeta;
+      const existing = localMap.get(meta.name);
+      if (existing && (existing as CustomFontRecord & { fileHash?: string }).fileHash === meta.fileHash) {
+        continue;
+      }
+      try {
+        const fontBlob = await downloadBlob(meta.downloadURL);
+        const buffer   = await fontBlob.arrayBuffer();
+        localMap.set(meta.name, {
+          name: meta.name,
+          fileName: meta.fileName,
+          buffer,
+          createdAt: meta.createdAt,
+          fileHash: meta.fileHash,
+        });
+      } catch (err) {
+        console.warn(`[firestoreLabSync] pull font ${meta.name} failed:`, err);
+      }
+    } else if (data.bufferBase64 && typeof data.bufferBase64 === 'string') {
+      // Old format: base64-encoded buffer stored in Firestore doc — restore to IDB
+      const name = (data.name as string) || d.id;
+      if (localMap.has(name)) continue;
+      try {
+        const binary = atob(data.bufferBase64 as string);
+        const buf = new ArrayBuffer(binary.length);
+        const view = new Uint8Array(buf);
+        for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+        localMap.set(name, {
+          name,
+          fileName: (data.fileName as string) || name,
+          buffer: buf,
+          createdAt: (data.createdAt as number) || Date.now(),
+        });
+      } catch (err) {
+        console.warn(`[firestoreLabSync] decode old-format font ${name} failed:`, err);
+      }
     }
-
-    try {
-      const fontBlob = await downloadBlob(meta.downloadURL);
-      const buffer   = await fontBlob.arrayBuffer();
-      const record: CustomFontRecord = {
-        name: meta.name,
-        fileName: meta.fileName,
-        buffer,
-        createdAt: meta.createdAt,
-        fileHash: meta.fileHash,  // persisted so next startup skips re-download
-      };
-      localMap.set(meta.name, record);
-    } catch (err) {
-      console.warn(`[firestoreLabSync] pull font ${meta.name} failed:`, err);
-    }
+    // else: no usable data, skip
   }
 
   await replaceCustomFonts([...localMap.values()]);
