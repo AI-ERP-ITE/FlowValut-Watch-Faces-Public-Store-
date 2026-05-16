@@ -1209,7 +1209,17 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
             <input
               type="checkbox"
               checked={!(element.hideSeconds ?? false)}
-              onChange={e => update({ hideSeconds: !e.target.checked })}
+              onChange={e => {
+                const show = e.target.checked;
+                const changes: Partial<WatchFaceElement> = { hideSeconds: !show };
+                if (show && element.handStyle) {
+                  const ch = customHandStyles.find(h => h.key === element.handStyle);
+                  if (ch && typeof ch.secondPosX === 'number' && typeof ch.secondPosY === 'number') {
+                    changes.secondPos = { x: ch.secondPosX, y: ch.secondPosY };
+                  }
+                }
+                update(changes);
+              }}
               className="accent-cyan-400 w-3 h-3"
             />
             <span className="text-[11px] text-white/70">Show seconds hand</span>
