@@ -757,8 +757,8 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
   const centerX = element.center?.x ?? (element.bounds.x + (element.bounds.width || 100) / 2);
   const centerY = element.center?.y ?? (element.bounds.y + (element.bounds.height || 100) / 2);
   const radius = element.radius ?? Math.min(element.bounds.width || 100, element.bounds.height || 100) / 2;
-  const startAngle = element.startAngle ?? 135;
-  const endAngle = element.endAngle ?? 345;
+  const startAngle = element.startAngle ?? -90;
+  const endAngle = element.endAngle ?? 270;
   const lineWidth = element.lineWidth ?? 8;
   const color = element.color ?? '0x00FF00';
   const colorValue = color.startsWith('0x') ? color : `0x${color.replace('#', '')}`;
