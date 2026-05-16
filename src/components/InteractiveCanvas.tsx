@@ -1505,9 +1505,14 @@ function drawArc(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const lineWidth = el.lineWidth ?? 8;
   const color = parseZeppColor(el.color ?? '0x00FF00');
 
+  // Mirror device fill behaviour: ARC_PROGRESS fills from start_angle up to the current sensor level.
+  // Use the same mock levels as gaugeProgress so canvas preview matches device appearance.
+  const mockLevel = el.dataType ? gaugeProgress(el) : 1.0;
+  const filledEndDeg = startDeg + (endDeg - startDeg) * mockLevel;
+
   ctx.save();
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, degToRad(startDeg), degToRad(endDeg));
+  ctx.arc(cx, cy, radius, degToRad(startDeg), degToRad(filledEndDeg));
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';

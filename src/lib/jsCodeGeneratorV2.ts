@@ -702,13 +702,10 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
     const pivotY = Math.round(height * pivot.pivotY);
     const centerX = Math.round(element.bounds.x + pivotX);
     const centerY = Math.round(element.bounds.y + pivotY);
-    // Canvas stores angles in 12=0 convention (image naturally points UP).
-    // Zepp OS IMG_POINTER start_angle/end_angle uses 3=0 convention (same as ARC_PROGRESS).
-    // Convert: device_angle = canvas_angle - 90
-    const canvasStart = element.startAngle ?? -90;
-    const canvasEnd = element.endAngle ?? 90;
-    const startAngle = canvasStart - 90;
-    const endAngle = canvasEnd - 90;
+    // Both canvas and Zepp OS IMG_POINTER use the same 0=12 convention (image points UP at 0°).
+    // No conversion needed — pass through directly.
+    const startAngle = element.startAngle ?? -90;
+    const endAngle = element.endAngle ?? 90;
     const src = gaugePointerAssetName(element);
     const dataType = element.dataType || 'BATTERY';
 

@@ -1105,6 +1105,29 @@ async function applyIconEffectsForZPK(
 }
 
 /**
+ * Resize a dataUrl image to targetW × targetH. Returns original if already the right size.
+ */
+async function resizeDataUrl(dataUrl: string, targetW: number, targetH: number): Promise<string> {
+  if (!targetW || !targetH) return dataUrl;
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = dataUrl;
+  });
+  const nw = img.naturalWidth || img.width;
+  const nh = img.naturalHeight || img.height;
+  if (nw === targetW && nh === targetH) return dataUrl;
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+  return canvas.toDataURL('image/png');
+}
+
+/**
  * Apply pointer image effects to a rendered hand image before packaging into ZPK.
  */
 async function applyPointerEffectsForZPK(
@@ -3420,7 +3443,12 @@ function StudioApp() {
         }
         if (!sourceDataUrl) continue;
         const effectedDataUrl = await applyPointerEffectsForZPK(sourceDataUrl, el, 'gauge');
-        const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Gauge pointer image ${filename}`);
+        // Resize to bounds so device renders at same size as canvas preview.
+        // Without resize, device uses natural image size while canvas scales to bounds.
+        const targetW = Math.max(1, el.bounds.width || 40);
+        const targetH = Math.max(1, el.bounds.height || 120);
+        const resizedDataUrl = await resizeDataUrl(effectedDataUrl, targetW, targetH);
+        const { bytes } = decodeDataUrlToBytes(resizedDataUrl, `Gauge pointer image ${filename}`);
         const existingIdx = elementFiles.findIndex((f) => f.src === filename);
         const nextFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
         if (existingIdx >= 0) elementFiles[existingIdx] = nextFile;
