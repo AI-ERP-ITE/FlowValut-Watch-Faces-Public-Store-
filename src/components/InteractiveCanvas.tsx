@@ -145,7 +145,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
@@ -410,22 +410,26 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const img = new Image();
       img.onload = () => {
         bgImageRef.current = img;
-        draw();
+        requestAnimationFrame(() => draw());
       };
       img.src = backgroundImage;
     } else {
       bgImageRef.current = null;
-      draw();
+      requestAnimationFrame(() => draw());
     }
   }, [backgroundImage, draw]);
 
-  // Redraw when elements or selection changes
+  // Redraw when elements or selection changes — RAF-throttled so rapid state
+  // changes coalesce into at most one draw per animation frame, preventing
+  // main-thread starvation that causes keyboard input drops.
   useEffect(() => {
-    draw();
+    const id = requestAnimationFrame(() => draw());
+    return () => cancelAnimationFrame(id);
   }, [draw]);
 
   useEffect(() => {
-    draw();
+    const id = requestAnimationFrame(() => draw());
+    return () => cancelAnimationFrame(id);
   }, [calibrationEnabled, flickerAnalysisEnabled, flickerOverlayEnabled, draw]);
 
   return (
@@ -862,7 +866,7 @@ function analyzeElementFlickerRiskIsolated(
   if (!options.analysisCanvasRef.current || !options.analysisCtxRef.current) {
     const canvas = document.createElement('canvas');
     options.analysisCanvasRef.current = canvas;
-    options.analysisCtxRef.current = canvas.getContext('2d');
+    options.analysisCtxRef.current = canvas.getContext('2d', { willReadFrequently: true });
   }
 
   const canvas = options.analysisCanvasRef.current;
