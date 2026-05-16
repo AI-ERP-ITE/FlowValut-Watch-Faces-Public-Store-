@@ -1841,7 +1841,8 @@ function drawGaugePointer(
   ctx.save();
   applyShadow(ctx, el);
   ctx.translate(el.bounds.x + pivotX, el.bounds.y + pivotY);
-  ctx.rotate(degToRad(angleDeg));
+  // IMG_POINTER uses 0=12 o'clock convention; subtract 90° to convert to canvas math (0=3 o'clock)
+  ctx.rotate(degToRad(angleDeg - 90));
 
   if (image) {
     const base = hasPointerEffects
