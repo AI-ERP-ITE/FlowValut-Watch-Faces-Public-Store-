@@ -336,6 +336,12 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         x: Math.max(0, Math.min(CANVAS_SIZE, snap.center.x + dx)),
         y: Math.max(0, Math.min(CANVAS_SIZE, snap.center.y + dy)),
       };
+    } else if (snap.type === 'ARC_PROGRESS') {
+      // ARC_PROGRESS without center stored: derive from new bounds midpoint so canvas and device stay in sync
+      changes.center = {
+        x: Math.max(0, Math.min(CANVAS_SIZE, newBounds.x + newBounds.width / 2)),
+        y: Math.max(0, Math.min(CANVAS_SIZE, newBounds.y + newBounds.height / 2)),
+      };
     }
     onUpdateElement?.(snap.id, changes);
   }, [onUpdateElement]);
@@ -392,6 +398,11 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       changes.center = {
         x: Math.max(0, Math.min(CANVAS_SIZE, snap.center.x + dx)),
         y: Math.max(0, Math.min(CANVAS_SIZE, snap.center.y + dy)),
+      };
+    } else if (snap.type === 'ARC_PROGRESS') {
+      changes.center = {
+        x: Math.max(0, Math.min(CANVAS_SIZE, newBounds.x + newBounds.width / 2)),
+        y: Math.max(0, Math.min(CANVAS_SIZE, newBounds.y + newBounds.height / 2)),
       };
     }
     onUpdateElement?.(snap.id, changes);

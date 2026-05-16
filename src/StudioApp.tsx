@@ -2421,7 +2421,7 @@ function StudioApp() {
         ? { images: weatherImageFilenames(), weatherStyle: 'flat' }
         : {}),
       ...(isStatus ? { statusType: addElDataType } : {}),
-      ...(isArc ? { startAngle: -90, endAngle: 270, radius: 190, lineWidth: 10, color: '#00CC88' } : {}),
+      ...(isArc ? { startAngle: -90, endAngle: 270, radius: 80, lineWidth: 10, color: '#00CC88', center: { x: cx, y: cx } } : {}),
       ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cx } } : {}),
       ...(addElType === 'GAUGE_POINTER'
         ? {
