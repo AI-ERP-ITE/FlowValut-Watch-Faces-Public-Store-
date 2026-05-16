@@ -2189,6 +2189,7 @@ function StudioApp() {
       const loadedFontNames = fontNamesRes.status === 'fulfilled' ? fontNamesRes.value : [];
       const hands = handsRes.status === 'fulfilled' ? handsRes.value : [];
       const gaugePointers = gaugeRes.status === 'fulfilled' ? gaugeRes.value : [];
+      console.log(`[StudioApp] applyLocalAssets: icons=${icons.length} fonts=${loadedFontNames.length} hands=${hands.length} gaugePointers=${gaugePointers.length}`);
       if (iconsRes.status === 'rejected') console.warn('[StudioApp] loadCustomIcons failed:', iconsRes.reason);
       if (fontNamesRes.status === 'rejected') console.warn('[StudioApp] registerCustomFonts failed:', fontNamesRes.reason);
       if (handsRes.status === 'rejected') console.warn('[StudioApp] loadCustomHandStyles failed:', handsRes.reason);

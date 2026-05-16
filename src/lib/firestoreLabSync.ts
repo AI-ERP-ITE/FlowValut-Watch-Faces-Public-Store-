@@ -219,7 +219,8 @@ async function pushIcon(uid: string, record: CustomIconRecord): Promise<void> {
 
 async function pullIcons(uid: string): Promise<void> {
   const snap = await getDocs(labCol(uid, 'icons'));
-  if (snap.empty) return;
+  console.log(`[firestoreLabSync] pullIcons: ${snap.size} docs, empty=${snap.empty}`);
+  if (snap.empty) { console.log('[firestoreLabSync] icons Firestore empty — nothing to pull'); return; }
 
   const local = await loadCustomIcons();
   const localMap = new Map<string, CustomIconRecord>(local.map(r => [r.key, r]));
@@ -260,6 +261,7 @@ async function pullIcons(uid: string): Promise<void> {
     } else if (data.dataUrl && typeof data.dataUrl === 'string') {
       // Old format: dataUrl stored directly in Firestore doc — restore to IDB
       const key = (data.key as string) || d.id;
+      console.log(`[firestoreLabSync] icons old-format doc key=${key}`);
       if (localMap.has(key)) continue; // prefer existing local copy
       localMap.set(key, {
         key,
@@ -270,10 +272,13 @@ async function pullIcons(uid: string): Promise<void> {
         height:   (data.height   as number) || 48,
         createdAt:(data.createdAt as number) || Date.now(),
       });
+    } else {
+      console.log(`[firestoreLabSync] icons doc ${d.id} has neither downloadURL nor dataUrl — skipped`);
     }
     // else: no usable data, skip
   }
 
+  console.log(`[firestoreLabSync] pullIcons writing ${localMap.size} icon(s) to IDB`);
   await replaceCustomIcons([...localMap.values()]);
 }
 
@@ -336,7 +341,8 @@ async function pushGaugePointer(uid: string, record: CustomGaugePointerRecord): 
 
 async function pullGaugePointers(uid: string): Promise<void> {
   const snap = await getDocs(labCol(uid, 'gaugePointers'));
-  if (snap.empty) return;
+  console.log(`[firestoreLabSync] pullGaugePointers: ${snap.size} docs, empty=${snap.empty}`);
+  if (snap.empty) { console.log('[firestoreLabSync] gaugePointers Firestore empty'); return; }
 
   const local = await loadCustomGaugePointers();
   const localMap = new Map<string, CustomGaugePointerRecord>(local.map(r => [r.key, r]));
@@ -535,7 +541,8 @@ async function pushFont(uid: string, record: CustomFontRecord): Promise<void> {
 
 async function pullFonts(uid: string): Promise<void> {
   const snap = await getDocs(labCol(uid, 'fonts'));
-  if (snap.empty) return;
+  console.log(`[firestoreLabSync] pullFonts: ${snap.size} docs, empty=${snap.empty}`);
+  if (snap.empty) { console.log('[firestoreLabSync] fonts Firestore empty'); return; }
 
   const local = await loadCustomFonts();
   const localMap = new Map<string, CustomFontRecord>(local.map(r => [r.name, r]));
@@ -598,7 +605,8 @@ async function pullFonts(uid: string): Promise<void> {
  */
 export async function pullLabAssetsFromFirestore(): Promise<void> {
   const uid = getUid();
-  if (!uid) return;
+  console.log('[firestoreLabSync] pullLabAssetsFromFirestore uid=', uid);
+  if (!uid) { console.warn('[firestoreLabSync] no uid — skipping pull'); return; }
 
   try {
     await Promise.all([
@@ -607,6 +615,7 @@ export async function pullLabAssetsFromFirestore(): Promise<void> {
       pullFonts(uid),
       pullGaugePointers(uid),
     ]);
+    console.log('[firestoreLabSync] pull complete');
   } catch (err) {
     console.warn('[firestoreLabSync] pull failed — continuing with local IDB:', err);
   }
