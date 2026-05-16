@@ -260,7 +260,7 @@ function drawSecondHand(
   pal: HandPalette,
 ) {
   const cx = w / 2;
-  const pivotY = h * 0.5;
+  const pivotY = h * 0.75;  // matches HAND_DEFS pivotY:180 (= h - tailLen, tailLen=60)
 
   // Drop shadow
   ctx.save();
