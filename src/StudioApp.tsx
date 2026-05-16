@@ -50,7 +50,7 @@ import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type C
 import { loadCustomGaugePointers, type CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
 import { getSwitcherDefinition } from '@/lib/imageSwitcherStore';
 
-import { pullLabAssetsFromFirestore, backfillIconsToFirestore } from '@/lib/firestoreLabSync';
+import { pullLabAssetsFromFirestore, backfillIconsToFirestore, backfillGaugePointersToFirestore, backfillHandsToFirestore } from '@/lib/firestoreLabSync';
 import { subscribeAuthState } from '@/lib/firebaseAuthClient';
 import {
   POINTER_PARITY_TOLERANCE,
@@ -2216,6 +2216,12 @@ function StudioApp() {
         .then(() => {
           backfillIconsToFirestore().catch(err =>
             console.warn('[StudioApp] icon backfill failed:', err)
+          );
+          backfillGaugePointersToFirestore().catch(err =>
+            console.warn('[StudioApp] gauge pointer backfill failed:', err)
+          );
+          backfillHandsToFirestore().catch(err =>
+            console.warn('[StudioApp] hand backfill failed:', err)
           );
           return applyLocalAssets();
         })

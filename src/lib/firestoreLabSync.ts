@@ -740,6 +740,52 @@ export async function backfillIconsToFirestore(): Promise<void> {
   }
 }
 
+export async function backfillGaugePointersToFirestore(): Promise<void> {
+  const uid = getUid();
+  if (!uid) return;
+  try {
+    const [idbPointers, snap] = await Promise.all([
+      loadCustomGaugePointers(),
+      getDocs(labCol(uid, 'gaugePointers')),
+    ]);
+    if (idbPointers.length === 0) return;
+    const cloudKeys = new Set(snap.docs.map(d => decodeURIComponent(d.id)));
+    const missing = idbPointers.filter(r => !cloudKeys.has(r.key));
+    if (missing.length === 0) return;
+    console.info(`[firestoreLabSync] backfilling ${missing.length} gauge pointer(s) to Storage+Firestore…`);
+    for (const gp of missing) {
+      try { await pushGaugePointer(uid, gp); } catch (err) {
+        console.warn(`[firestoreLabSync] backfill gaugePointer ${gp.key} failed:`, err);
+      }
+    }
+  } catch (err) {
+    console.warn('[firestoreLabSync] gauge pointer backfill failed:', err);
+  }
+}
+
+export async function backfillHandsToFirestore(): Promise<void> {
+  const uid = getUid();
+  if (!uid) return;
+  try {
+    const [idbHands, snap] = await Promise.all([
+      loadCustomHandStyles(),
+      getDocs(labCol(uid, 'hands')),
+    ]);
+    if (idbHands.length === 0) return;
+    const cloudKeys = new Set(snap.docs.map(d => decodeURIComponent(d.id)));
+    const missing = idbHands.filter(r => !cloudKeys.has(r.key));
+    if (missing.length === 0) return;
+    console.info(`[firestoreLabSync] backfilling ${missing.length} hand(s) to Storage+Firestore…`);
+    for (const hand of missing) {
+      try { await pushHand(uid, hand); } catch (err) {
+        console.warn(`[firestoreLabSync] backfill hand ${hand.key} failed:`, err);
+      }
+    }
+  } catch (err) {
+    console.warn('[firestoreLabSync] hand backfill failed:', err);
+  }
+}
+
 // ── Public API — Delete single asset ─────────────────────────────────────────
 
 /**
