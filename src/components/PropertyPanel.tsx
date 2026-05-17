@@ -47,15 +47,18 @@ const WIDGET_TYPES: WatchFaceElement['type'][] = [
 
 const APP_SHORTCUTS = [
   { value: '', label: '— none —' },
-  { value: 'OUTDOOR_RUNNING', label: 'Outdoor Running' },
-  { value: 'WALKING', label: 'Walking' },
-  { value: 'OUTDOOR_CYCLING', label: 'Outdoor Cycling' },
-  { value: 'FREE_TRAINING', label: 'Free Training' },
-  { value: 'POOL_SWIMMING', label: 'Pool Swimming' },
-  { value: 'OPEN_WATER_SWIMMING', label: 'Open Water Swimming' },
-  { value: 'BREATH_TRAIN', label: 'Breath Training' },
-  { value: 'PHN', label: 'Sports Coach' },
+  { value: 'HEART', label: 'Heart Rate' },
+  { value: 'STEP', label: 'Steps / Activity' },
+  { value: 'BATTERY', label: 'Battery' },
+  { value: 'SPO2', label: 'Blood Oxygen' },
+  { value: 'STRESS', label: 'Stress' },
+  { value: 'SLEEP', label: 'Sleep' },
+  { value: 'CAL', label: 'Calories' },
+  { value: 'DISTANCE', label: 'Distance' },
+  { value: 'WEATHER_CURRENT', label: 'Weather' },
   { value: 'MOON', label: 'Moon Phase' },
+  { value: 'PAI_WEEKLY', label: 'PAI Weekly' },
+  { value: 'AQI', label: 'Air Quality' },
 ];
 
 const TYPE_LABELS: Record<string, string> = {

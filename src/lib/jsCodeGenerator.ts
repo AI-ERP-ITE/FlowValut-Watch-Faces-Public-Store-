@@ -685,11 +685,8 @@ function generateButtonWidgetV3(element: WatchFaceElement): string {
   const normalSrc = element.normalSrc || element.src || 'trasparente.png';
   const pressSrc = element.pressSrc || normalSrc;
   const clickAction = element.clickAction || '';
-  const clickFunc = clickAction
-    ? `() => { hmApp.startApp({ url: '${clickAction}', native: true }) }`
-    : `() => {}`;
 
-  return `
+  let result = `
                 // ${element.name} - BUTTON Widget
                 hmUI.createWidget(hmUI.widget.BUTTON, {
                     x: px(${element.bounds.x}),
@@ -699,9 +696,23 @@ function generateButtonWidgetV3(element: WatchFaceElement): string {
                     text: '',
                     press_src: '${pressSrc}',
                     normal_src: '${normalSrc}',
-                    click_func: ${clickFunc},
+                    click_func: () => {},
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
+
+  if (clickAction) {
+    // Spec 009 T014: IMG_CLICK overlay for BUTTON — data_type binds OS to navigate to data screen
+    result += `
+                // ${element.name} - App shortcut IMG_CLICK overlay
+                hmUI.createWidget(hmUI.widget.IMG_CLICK, {
+                    x: px(${element.bounds.x}), y: px(${element.bounds.y}),
+                    w: px(${element.bounds.width || 100}), h: px(${element.bounds.height || 35}),
+                    type: hmUI.data_type.${clickAction},
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
+  }
+
+  return result;
 }
 
 const STATUS_DEFAULT_SRC_V3: Record<string, string> = {

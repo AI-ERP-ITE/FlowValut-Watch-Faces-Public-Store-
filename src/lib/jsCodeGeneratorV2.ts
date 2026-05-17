@@ -1024,17 +1024,7 @@ function generateButtonWidget(element: WatchFaceElement, widgetIndex: number, sh
   const pressSrc = element.pressSrc || normalSrc;
   const clickAction = element.clickAction || '';
 
-  // Build click_func - either launch a native app or empty
-  let clickFunc: string;
-  if (clickAction) {
-    clickFunc = `() => {
-                hmApp.startApp({ url: '${clickAction}', native: true })
-                              }`;
-  } else {
-    clickFunc = `() => {}`;
-  }
-
-  return `
+  let result = `
                 // ${element.name} - BUTTON Widget
                 let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.BUTTON, {
                     x: px(${element.bounds.x}),
@@ -1044,9 +1034,23 @@ function generateButtonWidget(element: WatchFaceElement, widgetIndex: number, sh
                     text: '',
                     press_src: '${pressSrc}',
                     normal_src: '${normalSrc}',
-                    click_func: ${clickFunc},
+                    click_func: () => {},
                     show_level: hmUI.show_level.${showLevel}
                 });`;
+
+  if (clickAction) {
+    // Spec 009 T014: IMG_CLICK overlay for BUTTON — data_type binds OS to navigate to data screen
+    result += `
+                // ${element.name} - App shortcut IMG_CLICK overlay
+                hmUI.createWidget(hmUI.widget.IMG_CLICK, {
+                    x: px(${element.bounds.x}), y: px(${element.bounds.y}),
+                    w: px(${element.bounds.width || 100}), h: px(${element.bounds.height || 35}),
+                    type: hmUI.data_type.${clickAction},
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+  }
+
+  return result;
 }
 
 // ============================================================
