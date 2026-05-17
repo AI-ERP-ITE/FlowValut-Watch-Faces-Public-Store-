@@ -271,18 +271,17 @@ function generateWatchfaceIndexJs(config: WatchFaceConfig): string {
     // Skip types that can't have a sensible static tap rect (see V2 generator for rationale)
     const NO_OVERLAY_V3 = new Set(['BUTTON','TIME_POINTER','DATE_POINTER','ARC_PROGRESS','IMG_TIME','IMG_DATE','IMG_WEEK']);
     if (code && element.clickAction && !NO_OVERLAY_V3.has(element.type)) {
-      // Spec 009 T014: V3 has no widget variable refs — use IMG_CLICK overlay as tap target
+      // Spec 009 T014: IMG_CLICK overlay — data_type binds OS to launch the system app
       const bx = element.bounds.x;
       const by = element.bounds.y;
       const bw = element.bounds.width || 100;
       const bh = element.bounds.height || 100;
       code += `
-                // ${element.name} - App shortcut tap overlay
+                // ${element.name} - App shortcut IMG_CLICK overlay
                 hmUI.createWidget(hmUI.widget.IMG_CLICK, {
                     x: px(${bx}), y: px(${by}),
                     w: px(${bw}), h: px(${bh}),
-                    src: 'trasparente.png',
-                    click_func: () => { hmApp.startApp({ url: '${element.clickAction}', native: true }); },
+                    type: hmUI.data_type.${element.clickAction},
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
     }
@@ -558,8 +557,8 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
     : '';
 
   return `
-                // ${element.name} - Faint full-range background (level:100 = always full, no type binding)
-                hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
+                // ${element.name} - Faint full-range background (setProperty forces level:100 on firmware)
+                const faintArc_v3 = hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
                     radius: px(${radius}),
@@ -570,6 +569,7 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
                     level: 100,
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });
+                faintArc_v3.setProperty(hmUI.prop.MORE, { level: 100 });
                 // ${element.name} - ARC_PROGRESS Widget (data-bound foreground)
                 hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),

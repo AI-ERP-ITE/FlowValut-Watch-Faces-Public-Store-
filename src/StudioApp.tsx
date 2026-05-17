@@ -900,17 +900,6 @@ async function mockKimiAnalysis(
     type: 'IMG_STATUS',
   });
 
-  // Generate transparent button image (1x1 transparent PNG)
-  const transpDataUrl = createCanvasImage(1, 1, () => {
-    // Transparent - no drawing needed
-  });
-  elementImages.push({
-    name: 'trasparente.png',
-    dataUrl: transpDataUrl,
-    bounds: { x: 0, y: 0, width: 1, height: 1 },
-    type: 'BUTTON',
-  });
-
   // Generate clock hand images for TIME_POINTER — use handStyle from the TIME_POINTER element
   const timePointerEl = elements.find(el => el.type === 'TIME_POINTER');
   const handStyle = (timePointerEl?.handStyle ?? 'silver') as HandStyleKey;

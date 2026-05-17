@@ -333,18 +333,17 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
       //  - IMG_TIME / IMG_DATE / IMG_WEEK are dispatched as multi-sub-element widgets
       const NO_OVERLAY = new Set(['BUTTON','TIME_POINTER','DATE_POINTER','ARC_PROGRESS','IMG_TIME','IMG_DATE','IMG_WEEK']);
       if (element.clickAction && !NO_OVERLAY.has(element.type)) {
-        // Spec 009 T014: transparent IMG_CLICK overlay as tap target (works on all widget types)
+        // Spec 009 T014: IMG_CLICK overlay — data_type binds OS to launch the system app
         const bx = element.bounds.x;
         const by = element.bounds.y;
         const bw = element.bounds.width || 100;
         const bh = element.bounds.height || 100;
         finalCode += `
-                // ${element.name} - App shortcut tap overlay
+                // ${element.name} - App shortcut IMG_CLICK overlay
                 hmUI.createWidget(hmUI.widget.IMG_CLICK, {
                     x: px(${bx}), y: px(${by}),
                     w: px(${bw}), h: px(${bh}),
-                    src: 'trasparente.png',
-                    click_func: () => { hmApp.startApp({ url: '${element.clickAction}', native: true }); },
+                    type: hmUI.data_type.${element.clickAction},
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
       }
@@ -801,8 +800,8 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
     : '';
 
   return `
-                // ${element.name} - Faint full-range background (level:100 = always full, no type binding)
-                hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
+                // ${element.name} - Faint full-range background (setProperty forces level:100 on firmware)
+                const faintArc_${widgetIndex} = hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
                     radius: px(${radius}),
@@ -813,6 +812,7 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
                     level: 100,
                     show_level: hmUI.show_level.${showLevel}
                 });
+                faintArc_${widgetIndex}.setProperty(hmUI.prop.MORE, { level: 100 });
                 // ${element.name} - ARC_PROGRESS Widget (data-bound foreground)
                 let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),
