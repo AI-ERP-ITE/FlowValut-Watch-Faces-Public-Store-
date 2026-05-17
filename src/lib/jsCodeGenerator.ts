@@ -553,6 +553,7 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
                     end_angle: ${endAngle},
                     color: ${bgColorValue},
                     line_width: px(${lineWidth}),
+                    show_level: hmUI.show_level.ONLY_NORMAL
                 });
                 // ${element.name} - ARC_PROGRESS Widget
                 hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
