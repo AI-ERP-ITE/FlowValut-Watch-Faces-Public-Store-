@@ -546,34 +546,30 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
   const color = element.color ?? '0x00FF00';
   const colorValue = color.startsWith('0x') ? color : `0x${color.replace('#', '')}`;
 
-  // Derive 35% brightness version of arc color for background track ARC widget
+  // Derive 45% brightness version of arc color for faint background track
   const hexStr = colorValue.slice(2); // strip '0x'
-  const bgR = Math.round(parseInt(hexStr.slice(0, 2), 16) * 0.35).toString(16).padStart(2, '0');
-  const bgG = Math.round(parseInt(hexStr.slice(2, 4), 16) * 0.35).toString(16).padStart(2, '0');
-  const bgB = Math.round(parseInt(hexStr.slice(4, 6), 16) * 0.35).toString(16).padStart(2, '0');
+  const bgR = Math.round(parseInt(hexStr.slice(0, 2), 16) * 0.45).toString(16).padStart(2, '0');
+  const bgG = Math.round(parseInt(hexStr.slice(2, 4), 16) * 0.45).toString(16).padStart(2, '0');
+  const bgB = Math.round(parseInt(hexStr.slice(4, 6), 16) * 0.45).toString(16).padStart(2, '0');
   const bgColorValue = `0x${bgR}${bgG}${bgB}`;
-  const arcX = Math.round(centerX - radius);
-  const arcY = Math.round(centerY - radius);
-  const arcSize = Math.round(radius * 2);
 
   const typeParam = element.dataType
     ? `\n                    type: hmUI.data_type.${element.dataType},`
     : '';
 
   return `
-                // ${element.name} - ARC background track (static full-range at 35% brightness)
-                hmUI.createWidget(hmUI.widget.ARC, {
-                    x: px(${arcX}),
-                    y: px(${arcY}),
-                    w: px(${arcSize}),
-                    h: px(${arcSize}),
+                // ${element.name} - Faint full-range background (ARC_PROGRESS w/o type = always 100%)
+                hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
+                    center_x: px(${centerX}),
+                    center_y: px(${centerY}),
+                    radius: px(${radius}),
                     start_angle: ${startAngle},
                     end_angle: ${endAngle},
                     color: ${bgColorValue},
                     line_width: px(${lineWidth}),
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });
-                // ${element.name} - ARC_PROGRESS Widget
+                // ${element.name} - ARC_PROGRESS Widget (data-bound foreground)
                 hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
