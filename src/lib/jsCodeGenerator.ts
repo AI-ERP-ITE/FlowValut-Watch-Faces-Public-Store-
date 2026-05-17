@@ -267,7 +267,25 @@ function generateWatchfaceIndexJs(config: WatchFaceConfig): string {
   let widgetsCode = '';
   
   for (const element of elements) {
-    const code = generateWidgetCode(element);
+    let code = generateWidgetCode(element);
+    // Skip types that can't have a sensible static tap rect (see V2 generator for rationale)
+    const NO_OVERLAY_V3 = new Set(['BUTTON','TIME_POINTER','DATE_POINTER','ARC_PROGRESS','IMG_TIME','IMG_DATE','IMG_WEEK']);
+    if (code && element.clickAction && !NO_OVERLAY_V3.has(element.type)) {
+      // Spec 009 T014: V3 has no widget variable refs — use IMG_CLICK overlay as tap target
+      const bx = element.bounds.x;
+      const by = element.bounds.y;
+      const bw = element.bounds.width || 100;
+      const bh = element.bounds.height || 100;
+      code += `
+                // ${element.name} - App shortcut tap overlay
+                hmUI.createWidget(hmUI.widget.IMG_CLICK, {
+                    x: px(${bx}), y: px(${by}),
+                    w: px(${bw}), h: px(${bh}),
+                    src: 'trasparente.png',
+                    click_func: () => { hmApp.startApp({ url: '${element.clickAction}', native: true }); },
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
+    }
     widgetsCode += code;
     console.log('[JSGen] Widget code for', element.name, ':\n', code);
   }

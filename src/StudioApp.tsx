@@ -594,78 +594,9 @@ async function mockKimiAnalysis(
       visible: true,
       zIndex: 7,
     },
-    // ===== BUTTON: Battery Shortcut =====
-    {
-      id: generateId(),
-      type: 'BUTTON',
-      name: 'Battery Shortcut',
-      bounds: { x: cx - 50, y: 60, width: 100, height: 100 },
-      normalSrc: 'trasparente.png',
-      pressSrc: 'trasparente.png',
-      clickAction: 'Settings_batteryManagerScreen',
-      visible: true,
-      zIndex: 10,
-    },
-    // ===== BUTTON: Heart Shortcut =====
-    {
-      id: generateId(),
-      type: 'BUTTON',
-      name: 'Heart Shortcut',
-      bounds: { x: 30, y: cy - 50, width: 100, height: 100 },
-      normalSrc: 'trasparente.png',
-      pressSrc: 'trasparente.png',
-      clickAction: 'heart_app_Screen',
-      visible: true,
-      zIndex: 10,
-    },
-    // ===== BUTTON: Steps/Activity Shortcut =====
-    {
-      id: generateId(),
-      type: 'BUTTON',
-      name: 'Activity Shortcut',
-      bounds: { x: resolution.width - 130, y: cy - 50, width: 100, height: 100 },
-      normalSrc: 'trasparente.png',
-      pressSrc: 'trasparente.png',
-      clickAction: 'activityAppScreen',
-      visible: true,
-      zIndex: 10,
-    },
-    // ===== BUTTON: Weather Shortcut =====
-    {
-      id: generateId(),
-      type: 'BUTTON',
-      name: 'Weather Shortcut',
-      bounds: { x: 30, y: resolution.height - 100, width: 90, height: 90 },
-      normalSrc: 'trasparente.png',
-      pressSrc: 'trasparente.png',
-      clickAction: 'WeatherScreen',
-      visible: true,
-      zIndex: 10,
-    },
-    // ===== BUTTON: Stress Shortcut =====
-    {
-      id: generateId(),
-      type: 'BUTTON',
-      name: 'Stress Shortcut',
-      bounds: { x: resolution.width - 120, y: resolution.height - 100, width: 90, height: 90 },
-      normalSrc: 'trasparente.png',
-      pressSrc: 'trasparente.png',
-      clickAction: 'StressHomeScreen',
-      visible: true,
-      zIndex: 10,
-    },
-    // ===== BUTTON: PAI/Bio Charge Shortcut =====
-    {
-      id: generateId(),
-      type: 'BUTTON',
-      name: 'PAI Shortcut',
-      bounds: { x: cx - 45, y: resolution.height - 100, width: 90, height: 90 },
-      normalSrc: 'trasparente.png',
-      pressSrc: 'trasparente.png',
-      clickAction: 'BioChargeHomeScreen',
-      visible: true,
-      zIndex: 10,
-    },
+    // NOTE: Default invisible BUTTON shortcuts removed — shortcuts are now bound per-widget
+    // via PropertyPanel "App Shortcut" dropdown, which emits an IMG_CLICK overlay matching
+    // the widget's own bounds (Spec 009 T014).
   ];
 
   // Generate mock element images - create proper watch hand/element graphics

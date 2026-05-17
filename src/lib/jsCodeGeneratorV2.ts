@@ -325,7 +325,30 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
     }
     const code = generateWidgetCodeV2(element, normalWidgetCounter);
     if (code) {
-      normalWidgetsCode += code;
+      let finalCode = code;
+      // Skip types that can't have a sensible static tap rect:
+      //  - BUTTON has its own click_func
+      //  - TIME_POINTER / DATE_POINTER rotate (hands sweep outside bounds)
+      //  - ARC_PROGRESS visible arc circle wouldn't match a rect overlay
+      //  - IMG_TIME / IMG_DATE / IMG_WEEK are dispatched as multi-sub-element widgets
+      const NO_OVERLAY = new Set(['BUTTON','TIME_POINTER','DATE_POINTER','ARC_PROGRESS','IMG_TIME','IMG_DATE','IMG_WEEK']);
+      if (element.clickAction && !NO_OVERLAY.has(element.type)) {
+        // Spec 009 T014: transparent IMG_CLICK overlay as tap target (works on all widget types)
+        const bx = element.bounds.x;
+        const by = element.bounds.y;
+        const bw = element.bounds.width || 100;
+        const bh = element.bounds.height || 100;
+        finalCode += `
+                // ${element.name} - App shortcut tap overlay
+                hmUI.createWidget(hmUI.widget.IMG_CLICK, {
+                    x: px(${bx}), y: px(${by}),
+                    w: px(${bw}), h: px(${bh}),
+                    src: 'trasparente.png',
+                    click_func: () => { hmApp.startApp({ url: '${element.clickAction}', native: true }); },
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
+      }
+      normalWidgetsCode += finalCode;
       normalWidgetCounter++;
     }
   }
