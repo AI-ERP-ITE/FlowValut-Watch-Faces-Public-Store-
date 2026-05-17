@@ -1519,6 +1519,16 @@ function drawArc(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const canvasEnd = filledEndDeg - 90;
 
   ctx.save();
+  // Background track — full range at 20% opacity
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, degToRad(canvasStart), degToRad(endDeg - 90));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = 0.2;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+  // Filled arc — value portion at full opacity
   ctx.beginPath();
   ctx.arc(cx, cy, radius, degToRad(canvasStart), degToRad(canvasEnd));
   ctx.strokeStyle = color;
