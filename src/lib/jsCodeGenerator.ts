@@ -502,6 +502,7 @@ function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
 
   return `
                 // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
+                // DEBUG: bounds=(${element.bounds.x},${element.bounds.y},${width}x${height}) pivot=(${pivotX},${pivotY}) center=(${centerX},${centerY})
                 hmUI.createWidget(hmUI.widget.IMG_POINTER, {
                     src: '${src}',
                     center_x: px(${centerX}),
