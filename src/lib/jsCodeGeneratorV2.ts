@@ -801,7 +801,7 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
     : '';
 
   return `
-                // ${element.name} - Faint full-range background (ARC_PROGRESS w/o type = always 100%)
+                // ${element.name} - Faint full-range background (level:100 = always full, no type binding)
                 hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
@@ -810,6 +810,7 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
                     end_angle: ${endAngle},
                     color: ${bgColorValue},
                     line_width: px(${lineWidth}),
+                    level: 100,
                     show_level: hmUI.show_level.${showLevel}
                 });
                 // ${element.name} - ARC_PROGRESS Widget (data-bound foreground)
