@@ -302,7 +302,10 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       if (resizeHandleRef.current === 'ARC_RADIUS' || resizeHandleRef.current === 'ARC_START' || resizeHandleRef.current === 'ARC_END') {
         const cx = snap.center?.x ?? CX;
         const cy = snap.center?.y ?? CY;
-        const newAngleDeg = Math.atan2(y - cy, x - cx) * (180 / Math.PI);
+        // atan2 gives angle in canvas convention (0=3PM); stored angles use device convention (0=12PM).
+        // Add 90° when storing so the arc redraws at the exact pixel the user dragged to.
+        const canvasAngleDeg = Math.atan2(y - cy, x - cx) * (180 / Math.PI);
+        const newAngleDeg = canvasAngleDeg + 90;
         if (resizeHandleRef.current === 'ARC_RADIUS') {
           const newRadius = Math.max(10, Math.min(240, Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)));
           const r = newRadius;
@@ -537,8 +540,9 @@ function hitTestArcHandle(x: number, y: number, el: WatchFaceElement): string | 
   const cx = el.center?.x ?? CX;
   const cy = el.center?.y ?? CY;
   const r = el.radius ?? 100;
-  const startDeg = el.startAngle ?? 135;
-  const endDeg = el.endAngle ?? 345;
+  // Stored angles are device convention (0=12PM); subtract 90° to get canvas position (0=3PM).
+  const startDeg = (el.startAngle ?? 135) - 90;
+  const endDeg = (el.endAngle ?? 345) - 90;
   const midDeg = (startDeg + endDeg) / 2;
   const HIT = 10;
 
@@ -603,9 +607,9 @@ function hitTestArc(x: number, y: number, el: WatchFaceElement): boolean {
   const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
   if (Math.abs(dist - radius) > lineWidth / 2 + tolerance) return false;
 
-  // Check angle
-  const startDeg = el.startAngle ?? 135;
-  const endDeg = el.endAngle ?? 345;
+  // Check angle — stored angles are device convention (0=12PM); subtract 90° to get canvas (0=3PM).
+  const startDeg = (el.startAngle ?? 135) - 90;
+  const endDeg = (el.endAngle ?? 345) - 90;
   let clickDeg = Math.atan2(y - cy, x - cx) * (180 / Math.PI);
   // Normalise both to same range as startDeg/endDeg
   if (endDeg > 360) {
@@ -660,8 +664,8 @@ function drawArcSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const cy = el.center?.y ?? CY;
   const radius = el.radius ?? 100;
   const lineWidth = el.lineWidth ?? 8;
-  const startDeg = el.startAngle ?? 135;
-  const endDeg = el.endAngle ?? 345;
+  const startDeg = (el.startAngle ?? 135) - 90;
+  const endDeg = (el.endAngle ?? 345) - 90;
 
   ctx.save();
   ctx.beginPath();
