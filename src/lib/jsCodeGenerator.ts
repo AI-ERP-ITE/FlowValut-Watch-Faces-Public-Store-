@@ -526,6 +526,14 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
   const lineWidth = element.lineWidth ?? 8;
   const color = element.color ?? '0x00FF00';
   const colorValue = color.startsWith('0x') ? color : `0x${color.replace('#', '')}`;
+
+  // Derive ~20% brightness version of arc color for background track (matches canvas preview)
+  const hexStr = colorValue.slice(2); // strip '0x'
+  const bgR = Math.round(parseInt(hexStr.slice(0, 2), 16) * 0.2).toString(16).padStart(2, '0');
+  const bgG = Math.round(parseInt(hexStr.slice(2, 4), 16) * 0.2).toString(16).padStart(2, '0');
+  const bgB = Math.round(parseInt(hexStr.slice(4, 6), 16) * 0.2).toString(16).padStart(2, '0');
+  const bgColorValue = `0x${bgR}${bgG}${bgB}`;
+
   const typeParam = element.dataType
     ? `\n                    type: hmUI.data_type.${element.dataType},`
     : '';
@@ -539,6 +547,7 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
                     start_angle: ${startAngle},
                     end_angle: ${endAngle},
                     color: ${colorValue},
+                    background_color: ${bgColorValue},
                     line_width: px(${lineWidth}),${typeParam}
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
