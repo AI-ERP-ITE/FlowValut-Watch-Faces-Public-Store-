@@ -1505,21 +1505,25 @@ function drawArc(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   const lineWidth = el.lineWidth ?? 8;
   const color = parseZeppColor(el.color ?? '0x00FF00');
 
-  // Mirror device fill behaviour: ARC_PROGRESS fills from start_angle up to the current sensor level.
-  // Use the same mock levels as gaugeProgress so canvas preview matches device appearance.
+  // Device ARC_PROGRESS uses 0=12PM convention; canvas ctx.arc uses 0=3PM.
+  // Subtract 90° from stored angles so the canvas arc appears at the same clock position
+  // as the device (e.g. stored 90° = 3PM on device = 3PM on canvas after correction).
+  // Mirror device fill behaviour: fills from start up to current sensor mock level.
   const mockLevel = el.dataType ? gaugeProgress(el) : 1.0;
   const filledEndDeg = startDeg + (endDeg - startDeg) * mockLevel;
+  const canvasStart = startDeg - 90;
+  const canvasEnd = filledEndDeg - 90;
 
   ctx.save();
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, degToRad(startDeg), degToRad(filledEndDeg));
+  ctx.arc(cx, cy, radius, degToRad(canvasStart), degToRad(canvasEnd));
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
   ctx.stroke();
 
   if (el.dataType) {
-    const midDeg = (startDeg + endDeg) / 2;
+    const midDeg = (startDeg + endDeg) / 2 - 90;
     const labelR = radius + 16;
     const lx = cx + labelR * Math.cos(degToRad(midDeg));
     const ly = cy + labelR * Math.sin(degToRad(midDeg));
@@ -1826,7 +1830,10 @@ function drawGaugePointer(
   const height = Math.max(24, el.bounds.height || 120);
   const startAngle = el.startAngle ?? -90;
   const endAngle = el.endAngle ?? 90;
-  const angleDeg = startAngle + (endAngle - startAngle) * gaugeProgress(el);
+  // Show at midpoint of the range for canvas design preview.
+  // For the standard -90→90 range this gives 0° rotation = natural image orientation,
+  // so horizontal custom images stay horizontal (matches pre-mock-value behaviour).
+  const angleDeg = (startAngle + endAngle) / 2;
   const pivot = normalizeGaugePivot(el);
   const pivotX = width * pivot.pivotX;
   const pivotY = height * pivot.pivotY;
