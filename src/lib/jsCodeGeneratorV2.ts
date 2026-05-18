@@ -776,10 +776,7 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
                       center_y: px(${centerY}),
                       x: px(${pivotX}),
                       y: px(${pivotY}),
-                      angle: ${startAngle},
-                      start_angle: ${startAngle},
-                      end_angle: ${endAngle},
-                      invalid_visible: true,
+                      angle: 0,
                       show_level: hmUI.show_level.${showLevel}
                   });
                   gaugePointers.push({ widget: widget_${widgetIndex}, dataType: '${dataType}', startAngle: ${startAngle}, endAngle: ${endAngle}, dataMin: ${dataMin}, dataMax: ${dataMax} });`;

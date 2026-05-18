@@ -562,10 +562,7 @@ function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
                     center_y: px(${centerY}),
                     x: px(${pivotX}),
                     y: px(${pivotY}),
-                    angle: ${startAngle},
-                    start_angle: ${startAngle},
-                    end_angle: ${endAngle},
-                    invalid_visible: true,
+                    angle: 0,
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });
                 gaugePointers.push({ widget: ${varName}, dataType: '${dataType}', startAngle: ${startAngle}, endAngle: ${endAngle}, dataMin: ${dataMin}, dataMax: ${dataMax} });`;
