@@ -304,6 +304,32 @@ try {
         const h = new DeviceRuntimeCore.WidgetFactory(new DeviceRuntimeCore.HmDomApi(__$$app$$__, __$$module$$__));
         const {px} = __$$app$$__.__globals__;
         const logger = Logger.getLogger('WatchFaceEditor');
+        // Gauge pointer widgets — manually updated in resume_call
+        let gaugePointers = [];
+
+        function readGaugeValue(dataType) {
+            try {
+                if (dataType === 'BATTERY')    { let s = hmSensor.createSensor(hmSensor.id.BATTERY);  return s.current   ?? 0; }
+                if (dataType === 'HEART')      { let s = hmSensor.createSensor(hmSensor.id.HEART);    return s.last      ?? 0; }
+                if (dataType === 'STEP')       { let s = hmSensor.createSensor(hmSensor.id.STEP);     return s.current   ?? 0; }
+                if (dataType === 'CAL')        { let s = hmSensor.createSensor(hmSensor.id.CALORIE);  return s.current   ?? 0; }
+                if (dataType === 'DISTANCE')   { let s = hmSensor.createSensor(hmSensor.id.DISTANCE); return s.current   ?? 0; }
+                if (dataType === 'SPO2')       { let s = hmSensor.createSensor(hmSensor.id.SPO2);     return s.current   ?? 50; }
+                if (dataType === 'STRESS')     { let s = hmSensor.createSensor(hmSensor.id.STRESS);   return s.current   ?? 0; }
+                if (dataType === 'PAI_WEEKLY') { let s = hmSensor.createSensor(hmSensor.id.PAI);      return s.weeklyPai ?? 0; }
+            } catch(e) { logger.log('readGaugeValue err', e); }
+            return 0;
+        }
+        function updateGaugePointers() {
+            gaugePointers.forEach(function(g) {
+                let raw = readGaugeValue(g.dataType);
+                let ratio = (g.dataMax > g.dataMin)
+                    ? Math.min(1, Math.max(0, (raw - g.dataMin) / (g.dataMax - g.dataMin)))
+                    : 0;
+                let angle = Math.round(g.startAngle + (g.endAngle - g.startAngle) * ratio);
+                try { g.widget.setProperty(hmUI.prop.MORE, { angle: angle }); } catch(e) { logger.log('gaugeUpdate err', e); }
+            });
+        }
 
         __$$module$$__.module = DeviceRuntimeCore.WatchFace({
             init_view() {
@@ -320,11 +346,14 @@ try {
                 
                 // Widgets
 ${widgetsCode}
+                // Apply live sensor values to gauge pointers (initial paint)
+                updateGaugePointers();
                 
                 // Widget delegate for lifecycle management
                 const widgetDelegate = hmUI.createWidget(hmUI.widget.WIDGET_DELEGATE, {
                     resume_call() {
                         logger.log('watchface resumed');
+                        updateGaugePointers();
                     },
                     pause_call() {
                         logger.log('watchface paused');
@@ -516,11 +545,18 @@ function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
   const endAngle = element.endAngle ?? 90;
   const src = gaugePointerAssetName(element);
   const dataType = element.dataType || 'BATTERY';
+  const varName = `gaugePtr_${element.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const GAUGE_DATA_RANGE_V3: Record<string, [number, number]> = {
+    BATTERY: [0, 100], HEART: [0, 220], STEP: [0, 10000], CAL: [0, 3000],
+    DISTANCE: [0, 50], SPO2: [50, 100], STRESS: [0, 100], PAI_WEEKLY: [0, 100],
+    AQI: [0, 300], UVI: [0, 11], VO2MAX: [15, 65], ALTIMETER: [0, 1200],
+  };
+  const [dataMin, dataMax] = GAUGE_DATA_RANGE_V3[dataType] ?? [0, 100];
 
   return `
                 // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
                 // DEBUG: bounds=(${element.bounds.x},${element.bounds.y},${width}x${height}) pivot=(${pivotX},${pivotY}) center=(${centerX},${centerY})
-                hmUI.createWidget(hmUI.widget.IMG_POINTER, {
+                let ${varName} = hmUI.createWidget(hmUI.widget.IMG_POINTER, {
                     src: '${src}',
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
@@ -531,7 +567,8 @@ function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
                     type: hmUI.data_type.${dataType},
                     invalid_visible: true,
                     show_level: hmUI.show_level.ONLY_NORMAL
-                });`;
+                });
+                gaugePointers.push({ widget: ${varName}, dataType: '${dataType}', startAngle: ${startAngle}, endAngle: ${endAngle}, dataMin: ${dataMin}, dataMax: ${dataMax} });`;
 }
 
 // ARC_PROGRESS - Arc progress indicator (battery, steps, etc.)

@@ -422,6 +422,32 @@ try {
         
         // Sensor for weather and system info
         let weatherSensor = null;
+        // Gauge pointer widgets — manually updated in resume_call (type binding alone unreliable on V2 firmware)
+        let gaugePointers = [];
+
+        function readGaugeValue(dataType) {
+            try {
+                if (dataType === 'BATTERY')    { let s = hmSensor.createSensor(hmSensor.id.BATTERY);  return s.current   ?? 0; }
+                if (dataType === 'HEART')      { let s = hmSensor.createSensor(hmSensor.id.HEART);    return s.last      ?? 0; }
+                if (dataType === 'STEP')       { let s = hmSensor.createSensor(hmSensor.id.STEP);     return s.current   ?? 0; }
+                if (dataType === 'CAL')        { let s = hmSensor.createSensor(hmSensor.id.CALORIE);  return s.current   ?? 0; }
+                if (dataType === 'DISTANCE')   { let s = hmSensor.createSensor(hmSensor.id.DISTANCE); return s.current   ?? 0; }
+                if (dataType === 'SPO2')       { let s = hmSensor.createSensor(hmSensor.id.SPO2);     return s.current   ?? 50; }
+                if (dataType === 'STRESS')     { let s = hmSensor.createSensor(hmSensor.id.STRESS);   return s.current   ?? 0; }
+                if (dataType === 'PAI_WEEKLY') { let s = hmSensor.createSensor(hmSensor.id.PAI);      return s.weeklyPai ?? 0; }
+            } catch(e) { logger.log('readGaugeValue err', e); }
+            return 0;
+        }
+        function updateGaugePointers() {
+            gaugePointers.forEach(function(g) {
+                let raw = readGaugeValue(g.dataType);
+                let ratio = (g.dataMax > g.dataMin)
+                    ? Math.min(1, Math.max(0, (raw - g.dataMin) / (g.dataMax - g.dataMin)))
+                    : 0;
+                let angle = Math.round(g.startAngle + (g.endAngle - g.startAngle) * ratio);
+                try { g.widget.setProperty(hmUI.prop.MORE, { angle: angle }); } catch(e) { logger.log('gaugeUpdate err', e); }
+            });
+        }
 
         __$$module$$__.module = DeviceRuntimeCore.WatchFace({
             init_view() {
@@ -445,6 +471,8 @@ try {
                 
                 // ========== NORMAL MODE WIDGETS ==========
 ${normalWidgetsCode}
+                // Apply live sensor values to gauge pointers (initial paint)
+                updateGaugePointers();
                 
         ${shouldEmitAodBackground ? `                // ========== AOD MODE BACKGROUND ==========
                 let widget_aod_bg = hmUI.createWidget(hmUI.widget.IMG, {
@@ -467,6 +495,7 @@ ${aodWidgetsCode}
                         let tipoSchermo = hmSetting.getScreenType();
                         if (tipoSchermo === hmSetting.screen_type.WATCHFACE) {
                             // NORMAL MODE updates
+                            updateGaugePointers();
                         } else if (tipoSchermo === hmSetting.screen_type.AOD) {
                             // AOD MODE updates
                         }
@@ -731,6 +760,14 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
     const src = gaugePointerAssetName(element);
     const dataType = element.dataType || 'BATTERY';
 
+    // Data value ranges for angle normalization
+    const GAUGE_DATA_RANGE: Record<string, [number, number]> = {
+      BATTERY: [0, 100], HEART: [0, 220], STEP: [0, 10000], CAL: [0, 3000],
+      DISTANCE: [0, 50], SPO2: [50, 100], STRESS: [0, 100], PAI_WEEKLY: [0, 100],
+      AQI: [0, 300], UVI: [0, 11], VO2MAX: [15, 65], ALTIMETER: [0, 1200],
+    };
+    const [dataMin, dataMax] = GAUGE_DATA_RANGE[dataType] ?? [0, 100];
+
     return `
                   // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
                   let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_POINTER, {
@@ -744,7 +781,8 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
                       type: hmUI.data_type.${dataType},
                       invalid_visible: true,
                       show_level: hmUI.show_level.${showLevel}
-                  });`;
+                  });
+                  gaugePointers.push({ widget: widget_${widgetIndex}, dataType: '${dataType}', startAngle: ${startAngle}, endAngle: ${endAngle}, dataMin: ${dataMin}, dataMax: ${dataMax} });`;
   }
 
   if (element.type === 'IMG') {
