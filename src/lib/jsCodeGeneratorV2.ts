@@ -444,8 +444,10 @@ try {
                 let ratio = (g.dataMax > g.dataMin)
                     ? Math.min(1, Math.max(0, (raw - g.dataMin) / (g.dataMax - g.dataMin)))
                     : 0;
-                let angle = Math.round(g.startAngle + (g.endAngle - g.startAngle) * ratio);
-                try { g.widget.setProperty(hmUI.prop.MORE, { angle: angle }); } catch(e) { logger.log('gaugeUpdate err', e); }
+                let canvasAngle = g.startAngle + (g.endAngle - g.startAngle) * ratio;
+                // Canvas: 0=12PM. Zepp OS IMG_POINTER: 0=3PM. Convert by subtracting 90, normalise [0,360]
+                let zeppAngle = Math.round(((canvasAngle - 90) % 360 + 360) % 360);
+                try { g.widget.setProperty(hmUI.prop.MORE, { angle: zeppAngle }); } catch(e) { logger.log('gaugeUpdate err', e); }
             });
         }
 
@@ -767,6 +769,8 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
       AQI: [0, 300], UVI: [0, 11], VO2MAX: [15, 65], ALTIMETER: [0, 1200],
     };
     const [dataMin, dataMax] = GAUGE_DATA_RANGE[dataType] ?? [0, 100];
+    // Convert canvas startAngle (0=12PM) to Zepp OS angle (0=3PM): subtract 90, normalize to [0,360]
+    const initialZeppAngle = Math.round(((startAngle - 90) % 360 + 360) % 360);
 
     return `
                   // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
@@ -776,7 +780,7 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
                       center_y: px(${centerY}),
                       x: px(${pivotX}),
                       y: px(${pivotY}),
-                      angle: 0,
+                      angle: ${initialZeppAngle},
                       show_level: hmUI.show_level.${showLevel}
                   });
                   gaugePointers.push({ widget: widget_${widgetIndex}, dataType: '${dataType}', startAngle: ${startAngle}, endAngle: ${endAngle}, dataMin: ${dataMin}, dataMax: ${dataMax} });`;
