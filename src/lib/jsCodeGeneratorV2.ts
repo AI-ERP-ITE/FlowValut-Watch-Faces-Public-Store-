@@ -776,9 +776,9 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
                       center_y: px(${centerY}),
                       x: px(${pivotX}),
                       y: px(${pivotY}),
+                      angle: ${startAngle},
                       start_angle: ${startAngle},
                       end_angle: ${endAngle},
-                      type: hmUI.data_type.${dataType},
                       invalid_visible: true,
                       show_level: hmUI.show_level.${showLevel}
                   });
