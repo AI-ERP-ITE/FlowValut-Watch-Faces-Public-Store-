@@ -1897,6 +1897,46 @@ function drawGaugePointer(
 
   clearShadow(ctx);
   ctx.restore();
+
+  // ── Spec 091: Guide Arc overlay (canvas-only, never baked into ZPK) ───────
+  if (el.guideArcVisible) {
+    const pivotAbsX = el.bounds.x + pivotX;
+    const pivotAbsY = el.bounds.y + pivotY;
+    // Radius: half of the shorter dimension, so it fits inside the element bounds
+    const arcRadius = Math.max(10, Math.min(width, height) * 0.45);
+    const startRad = degToRad((el.startAngle ?? -90) - 90); // convert Zepp angle to canvas angle
+    const endRad = degToRad((el.endAngle ?? 90) - 90);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 220, 255, 0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.lineDashOffset = 0;
+    ctx.beginPath();
+    ctx.arc(pivotAbsX, pivotAbsY, arcRadius, startRad, endRad, false);
+    ctx.stroke();
+
+    // Endpoint tick marks
+    ctx.setLineDash([]);
+    ctx.lineWidth = 2;
+    const tickLen = 6;
+    for (const rad of [startRad, endRad]) {
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      ctx.beginPath();
+      ctx.moveTo(pivotAbsX + cos * (arcRadius - tickLen), pivotAbsY + sin * (arcRadius - tickLen));
+      ctx.lineTo(pivotAbsX + cos * (arcRadius + tickLen), pivotAbsY + sin * (arcRadius + tickLen));
+      ctx.stroke();
+    }
+
+    // Pivot dot
+    ctx.fillStyle = 'rgba(0, 220, 255, 0.9)';
+    ctx.beginPath();
+    ctx.arc(pivotAbsX, pivotAbsY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
 }
 
 function drawHand(

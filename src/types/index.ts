@@ -55,6 +55,8 @@ export interface WatchFaceElement {
   pivotY?: number;
   // Optional logical pairing metadata for gauge composition (ARC_PROGRESS + GAUGE_POINTER)
   gaugePairId?: string;
+  // Spec 091: canvas-only guide arc overlay for calibrating needle arc range (never baked into ZPK)
+  guideArcVisible?: boolean;
 
   // BUTTON specific
   clickAction?: string;

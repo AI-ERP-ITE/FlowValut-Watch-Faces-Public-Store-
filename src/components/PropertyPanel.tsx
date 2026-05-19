@@ -24,6 +24,7 @@ import {
 import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { renderHtmlToDataUrl, renderSvgToDataUrl } from '@/lib/customIconStore';
 import { extractFramesFromMarkup } from '@/lib/markupFrameExtractor';
+import { parseAndRenderGaugeSvg } from '@/lib/gaugePointerParser';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -37,6 +38,8 @@ export interface PropertyPanelProps {
   customGaugePointers?: CustomGaugePointerRecord[]; // user-created gauge pointers from IconLab
   switcherDefinitions?: import('@/types/imageSwitcher').ImageSwitcherDefinition[];
   onOpenSwitcherLab?: () => void;
+  /** Spec 091: called when buildGaugeFromMarkup creates a companion background IMG element. */
+  onAddSiblingElement?: (partialEl: Omit<WatchFaceElement, 'id'>) => void;
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -144,7 +147,7 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, onAddSiblingElement }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
@@ -199,15 +202,53 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     }
 
     const frame = extracted.frames[0];
-    const dataUrl = frame.trim().startsWith('<svg')
-      ? await renderSvgToDataUrl(frame, 256)
-      : await renderHtmlToDataUrl(frame, 256);
 
+    // ── Spec 091: intelligent SVG split ────────────────────────────────────
+    // Only attempt auto-split for SVG content (not raw HTML blobs)
+    if (frame.trim().startsWith('<svg') || frame.trim().startsWith('<SVG')) {
+      setCreatorStatus('Parsing gauge SVG…');
+      const result = await parseAndRenderGaugeSvg(frame, 400);
+
+      if (!result.needleDataUrl) {
+        setCreatorStatus('Gauge markup render failed. Ensure SVG includes a valid SVG node.');
+        return;
+      }
+
+      // Update GAUGE_POINTER with needle PNG + auto-detected pivot + arc range
+      const pointerUpdates: Partial<WatchFaceElement> = {
+        src: result.needleDataUrl,
+        assetFilename: `gauge_needle_${element.id}.png`,
+        pivotX: result.pivotX,
+        pivotY: result.pivotY,
+      };
+      if (result.startAngle !== null) pointerUpdates.startAngle = result.startAngle;
+      if (result.endAngle !== null) pointerUpdates.endAngle = result.endAngle;
+      update(pointerUpdates);
+
+      // Create companion background IMG element if needle was found and background rendered
+      if (result.needleFound && result.backgroundDataUrl && onAddSiblingElement) {
+        const bgZIndex = Math.max(1, (element.zIndex ?? 1) - 1);
+        onAddSiblingElement({
+          type: 'IMG',
+          name: `Gauge BG (${element.name})`,
+          bounds: { ...element.bounds },
+          visible: true,
+          zIndex: bgZIndex,
+          src: result.backgroundDataUrl,
+          assetFilename: `gauge_bg_${element.id}.png`,
+        });
+      }
+
+      setCreatorStatus(result.statusMessage);
+      return;
+    }
+
+    // ── Legacy path for raw HTML (non-SVG) content ──────────────────────────
+    const dataUrl = await renderHtmlToDataUrl(frame, 256);
     if (!dataUrl) {
       setCreatorStatus('Gauge markup render failed. Ensure SVG or HTML includes a valid SVG node.');
       return;
     }
-
     update({ src: dataUrl, assetFilename: `gauge_pointer_${element.id}.png` });
     setCreatorStatus(`Gauge pointer built from markup (${extracted.strategy}).`);
   };
@@ -1027,6 +1068,17 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               />
             </FieldRow>
             <p className="text-[9px] text-white/35">Pivot uses normalized values in local pointer box (0..1).</p>
+            <button
+              onClick={() => update({ guideArcVisible: !element.guideArcVisible })}
+              className={cn(
+                'w-full h-7 rounded border text-[11px] transition-colors',
+                element.guideArcVisible
+                  ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200'
+                  : 'border-white/15 bg-white/5 text-white/50 hover:border-cyan-500/40 hover:text-white/80'
+              )}
+            >
+              {element.guideArcVisible ? '⬡ Guide Arc ON' : '⬡ Guide Arc OFF'}
+            </button>
             {customGaugePointers.length > 0 && (
               <div className="pt-2 border-t border-white/10 space-y-1">
                 <p className="text-[9px] text-cyan-400/60 uppercase tracking-wider">My Gauge Pointers</p>
@@ -1037,7 +1089,13 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                       <button
                         key={gp.key}
                         title={gp.name}
-                        onClick={() => update({ src: gp.dataUrl, pivotX: gp.pivotX, pivotY: gp.pivotY })}
+                        onClick={() => update({
+                          src: gp.dataUrl,
+                          pivotX: gp.pivotX,
+                          pivotY: gp.pivotY,
+                          ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
+                          ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
+                        })}
                         className={cn(
                           'flex flex-col items-center gap-1 py-2 px-1 rounded border text-[9px] transition-colors',
                           active

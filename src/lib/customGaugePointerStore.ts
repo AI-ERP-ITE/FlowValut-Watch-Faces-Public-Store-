@@ -20,6 +20,10 @@ export interface CustomGaugePointerRecord {
   pivotX: number;     // 0–1 ratio (horizontal pivot), default 0.5
   pivotY: number;     // 0–1 ratio (vertical pivot), default 0.9
   createdAt: number;  // Unix ms timestamp
+  /** Spec 091: auto-detected or manual arc start angle in degrees */
+  startAngle?: number;
+  /** Spec 091: auto-detected or manual arc end angle in degrees */
+  endAngle?: number;
   /** SHA-256 at last cloud sync — used to skip re-download on pull */
   sourceHash?: string;
 }
@@ -73,6 +77,8 @@ export async function saveCustomGaugePointer(
   dataUrl: string,
   pivotX: number,
   pivotY: number,
+  startAngle?: number,
+  endAngle?: number,
 ): Promise<CustomGaugePointerRecord> {
   const db = await openDB();
   const key = `custom_gauge:${slugify(name)}`;
@@ -84,6 +90,8 @@ export async function saveCustomGaugePointer(
     pivotX: Math.max(0, Math.min(1, pivotX)),
     pivotY: Math.max(0, Math.min(1, pivotY)),
     createdAt: Date.now(),
+    ...(startAngle != null ? { startAngle } : {}),
+    ...(endAngle != null ? { endAngle } : {}),
   };
 
   return new Promise((resolve, reject) => {

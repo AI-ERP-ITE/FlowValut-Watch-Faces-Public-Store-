@@ -4498,6 +4498,10 @@ function StudioApp() {
                         iconLibraryKey={iconLibraryKey}
                         customHandStyles={customHandStyles}
                         customGaugePointers={customGaugePointers}
+                        onAddSiblingElement={(partialEl) => {
+                          addActiveElement({ ...partialEl, id: generateId() } as import('@/types').WatchFaceElement);
+                          // Keep GAUGE_POINTER selected — do NOT call setSelectedElementId
+                        }}
                       />
                     </div>
                     <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] xl:overflow-y-auto 2xl:max-h-[calc(100vh-15rem)]">
