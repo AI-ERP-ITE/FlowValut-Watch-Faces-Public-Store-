@@ -89,32 +89,34 @@ function findMainTranslateGroup(
 }
 
 /**
- * Detect the rotating needle group among the direct children of searchRoot.
+ * Detect the rotating needle group anywhere inside searchRoot (any depth).
  *
- * Heuristic:
- * - Must be a <g> with a transform containing rotate(N)
- * - Must contain at least one <path> (rules out tick groups)
- * - Score is higher when it also contains <circle> elements (hub indicator)
+ * Strategy: flat scan of ALL descendant <g> elements via querySelectorAll.
+ * Scoring — must have:
+ *   - a transform containing rotate(N)         (it rotates)
+ *   - at least one <path> descendant           (rules out bare tick lines)
+ * Score = pathCount × 2 + circleCount          (hub circles boost score)
+ * The highest-scoring candidate wins, so deeply-nested gauges and extra
+ * wrapper groups never prevent detection.
  */
 function detectNeedleGroup(searchRoot: Element): Element | null {
   let bestCandidate: Element | null = null;
   let bestScore = 0;
 
-  for (const child of Array.from(searchRoot.children)) {
-    if (child.tagName.toLowerCase() !== 'g') continue;
-    const t = child.getAttribute('transform') || '';
+  for (const g of Array.from(searchRoot.querySelectorAll('g'))) {
+    const t = g.getAttribute('transform') || '';
     if (!t.includes('rotate(')) continue;
     if (extractRotateAngle(t) === null) continue;
 
-    const pathCount = child.querySelectorAll('path').length;
-    if (pathCount === 0) continue; // must have path elements
+    const pathCount = g.querySelectorAll('path').length;
+    if (pathCount === 0) continue;
 
-    const circleCount = child.querySelectorAll('circle').length;
+    const circleCount = g.querySelectorAll('circle').length;
     const score = pathCount * 2 + circleCount;
 
     if (score > bestScore) {
       bestScore = score;
-      bestCandidate = child;
+      bestCandidate = g;
     }
   }
 
@@ -227,19 +229,15 @@ export async function parseAndRenderGaugeSvg(
   // Remove marker from original immediately
   needleGroup.removeAttribute(NEEDLE_MARKER);
 
-  // ── 10. Needle-only clone: hide siblings, strip rotate from needle ─────────
+  // ── 10. Needle-only clone: REMOVE siblings, strip rotate from needle ────────
   const needleInClone = needleDoc.querySelector(`[${NEEDLE_MARKER}="1"]`);
   if (needleInClone) {
     const parent = needleInClone.parentElement;
     if (parent) {
+      // Snapshot children first so removals don't affect iteration
       for (const sibling of Array.from(parent.children)) {
         if (sibling !== needleInClone) {
-          // SVG presentation attribute approach — more reliable than inline style for SVG
-          const existingStyle = sibling.getAttribute('style') || '';
-          sibling.setAttribute(
-            'style',
-            existingStyle ? `${existingStyle};display:none` : 'display:none',
-          );
+          sibling.remove();
         }
       }
     }
@@ -254,15 +252,10 @@ export async function parseAndRenderGaugeSvg(
     needleInClone.removeAttribute(NEEDLE_MARKER);
   }
 
-  // ── 11. Background clone: hide the needle ────────────────────────────────
+  // ── 11. Background clone: REMOVE the needle entirely ───────────────────────
   const needleInBgClone = bgDoc.querySelector(`[${NEEDLE_MARKER}="1"]`);
   if (needleInBgClone) {
-    const existingStyle = needleInBgClone.getAttribute('style') || '';
-    needleInBgClone.setAttribute(
-      'style',
-      existingStyle ? `${existingStyle};display:none` : 'display:none',
-    );
-    needleInBgClone.removeAttribute(NEEDLE_MARKER);
+    needleInBgClone.remove();
   }
 
   // ── 12. Serialize and render both ─────────────────────────────────────────
