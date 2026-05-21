@@ -55,6 +55,9 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     console.log('[ZPK] Step 1: Generating JS code...');
     const code = generateWatchFaceCode(fixedConfig);
     console.log('[ZPK] Step 2: JS code generated, app.json length:', code.appJson.length);
+    // Extract appId from device app.json to reuse in app-side (must match)
+    const parsedDeviceJson = JSON.parse(code.appJson);
+    const sharedAppId: number = parsedDeviceJson?.app?.appId ?? Math.floor(1000000 + Math.random() * 9000000);
     
     // Create device.zip
     console.log('[ZPK] Step 3: Creating device.zip...');
@@ -62,6 +65,8 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     
     console.log('[ZPK] Step 4: Adding app.json...');
     deviceZip.file('app.json', code.appJson);
+    // Add preview icon (referenced in app.json as anteprima.png)
+    deviceZip.file('anteprima.png', backgroundFile);
     
     console.log('[ZPK] Step 5: Adding app.js...');
     deviceZip.file('app.js', code.appJs);
@@ -143,7 +148,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     const appSideJson = JSON.stringify({
       configVersion: 'v2',
       app: {
-        appId: Math.floor(1000000 + Math.random() * 9000000),
+        appId: sharedAppId,
         appName: config.name,
         appType: 'watchface',
         version: { code: 1, name: '1.0.0' },

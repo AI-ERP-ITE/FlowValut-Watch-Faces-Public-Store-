@@ -252,6 +252,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           images: result.arcFrames,
           imageSwitcherFrameCount: result.arcFrames.length,
           assetFilename: `gauge_arc_${element.id}_frame`,
+          dataType: element.dataType,
         });
       }
 
