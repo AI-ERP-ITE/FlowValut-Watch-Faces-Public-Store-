@@ -57,6 +57,9 @@ export interface WatchFaceElement {
   gaugePairId?: string;
   // Spec 091: canvas-only guide arc overlay for calibrating needle arc range (never baked into ZPK)
   guideArcVisible?: boolean;
+  // Spec 092: canvas preview draw angle — set once at build time from the needle's natural SVG rotate(N).
+  // Changing startAngle/endAngle does NOT update this.
+  previewAngle?: number;
 
   // BUTTON specific
   clickAction?: string;

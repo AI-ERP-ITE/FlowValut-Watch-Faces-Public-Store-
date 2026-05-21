@@ -214,12 +214,13 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         return;
       }
 
-      // Update GAUGE_POINTER with needle PNG + auto-detected pivot + arc range
+      // Update GAUGE_POINTER with needle PNG + auto-detected pivot + arc range + preview angle
       const pointerUpdates: Partial<WatchFaceElement> = {
         src: result.needleDataUrl,
         assetFilename: `gauge_needle_${element.id}.png`,
         pivotX: result.pivotX,
         pivotY: result.pivotY,
+        previewAngle: result.naturalAngle,
       };
       if (result.startAngle !== null) pointerUpdates.startAngle = result.startAngle;
       if (result.endAngle !== null) pointerUpdates.endAngle = result.endAngle;
@@ -236,6 +237,21 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           zIndex: bgZIndex,
           src: result.backgroundDataUrl,
           assetFilename: `gauge_bg_${element.id}.png`,
+        });
+      }
+
+      // Spec 092: Create IMG_LEVEL sibling for arc fill frames if detected
+      if (result.arcFrames.length > 0 && onAddSiblingElement) {
+        const arcZIndex = Math.max(2, (element.zIndex ?? 2) - 1);
+        onAddSiblingElement({
+          type: 'IMG_LEVEL',
+          name: `Gauge Arc Fill (${element.name})`,
+          bounds: { ...element.bounds },
+          visible: true,
+          zIndex: arcZIndex,
+          images: result.arcFrames,
+          imageSwitcherFrameCount: result.arcFrames.length,
+          assetFilename: `gauge_arc_${element.id}_frame`,
         });
       }
 

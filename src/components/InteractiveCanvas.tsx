@@ -1844,10 +1844,10 @@ function drawGaugePointer(
   const height = Math.max(24, el.bounds.height || 120);
   const startAngle = el.startAngle ?? -90;
   const endAngle = el.endAngle ?? 90;
-  // Show at midpoint of the range for canvas design preview.
-  // For the standard -90→90 range this gives 0° rotation = natural image orientation,
-  // so horizontal custom images stay horizontal (matches pre-mock-value behaviour).
-  const angleDeg = (startAngle + endAngle) / 2;
+  // Spec 092: use previewAngle (set at build time from the needle's natural SVG rotate).
+  // This decouples the canvas preview position from start/end range bound changes.
+  // Falls back to midpoint for legacy elements that don't yet have previewAngle.
+  const angleDeg = el.previewAngle ?? (startAngle + endAngle) / 2;
   const pivot = normalizeGaugePivot(el);
   const pivotX = width * pivot.pivotX;
   const pivotY = height * pivot.pivotY;
