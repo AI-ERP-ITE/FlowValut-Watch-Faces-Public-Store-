@@ -38,6 +38,10 @@ export interface GaugeParseResult {
   endAngle: number | null;
   /** Human-readable status message for the PropertyPanel status area. */
   statusMessage: string;
+  /** Natural width of the gauge SVG (from viewBox or width attr), in SVG user units. */
+  naturalWidth: number;
+  /** Natural height of the gauge SVG (from viewBox or height attr), in SVG user units. */
+  naturalHeight: number;
   // ── Spec 092 additions ────────────────────────────────────────────────────
   /** The original rotate(N) value stripped from the needle group. Used as previewAngle. 0 if no needle or no rotate. */
   naturalAngle: number;
@@ -376,7 +380,7 @@ export async function parseAndRenderGaugeSvg(
   svgString: string,
   renderSize = 400,
 ): Promise<GaugeParseResult> {
-  const FALLBACK: Omit<GaugeParseResult, 'needleDataUrl' | 'statusMessage'> = {
+  const FALLBACK: Omit<GaugeParseResult, 'needleDataUrl' | 'statusMessage' | 'naturalWidth' | 'naturalHeight'> = {
     needleFound: false,
     backgroundDataUrl: '',
     pivotX: 0.5,
@@ -398,6 +402,8 @@ export async function parseAndRenderGaugeSvg(
       ...FALLBACK,
       needleDataUrl: await renderSvgToDataUrl(svgString, renderSize).catch(() => ''),
       statusMessage: 'No <svg> element found in markup. Using full image as pointer.',
+      naturalWidth: renderSize,
+      naturalHeight: renderSize,
     };
   }
 
@@ -449,6 +455,8 @@ export async function parseAndRenderGaugeSvg(
       endAngle: arcRange?.endAngle ?? null,
       tickCount: arcRange?.tickAngles.length ?? 0,
       statusMessage: `Needle group not detected — full image used. ${arcMsg} Set pivot + angles manually.`,
+      naturalWidth: vbW,
+      naturalHeight: vbH,
     };
   }
 
@@ -542,5 +550,7 @@ export async function parseAndRenderGaugeSvg(
     naturalAngle,
     arcFrames,
     tickCount: arcRange?.tickAngles.length ?? 0,
+    naturalWidth: vbW,
+    naturalHeight: vbH,
   };
 }

@@ -214,6 +214,20 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         return;
       }
 
+      // Compute correct square bounds from the SVG's natural size, centered on the
+      // current element's center. This prevents the gauge from being squished into
+      // the default 40×120 placeholder bounds — all three layers (needle, bg, arc)
+      // must share identical bounds so they overlay pixel-perfectly on canvas and device.
+      const squareSize = Math.min(result.naturalWidth, result.naturalHeight);
+      const elCx = element.bounds.x + element.bounds.width / 2;
+      const elCy = element.bounds.y + element.bounds.height / 2;
+      const gaugeBounds = {
+        x: Math.round(elCx - squareSize / 2),
+        y: Math.round(elCy - squareSize / 2),
+        width: squareSize,
+        height: squareSize,
+      };
+
       // Update GAUGE_POINTER with needle PNG + auto-detected pivot + arc range + preview angle
       const pointerUpdates: Partial<WatchFaceElement> = {
         src: result.needleDataUrl,
@@ -221,6 +235,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         pivotX: result.pivotX,
         pivotY: result.pivotY,
         previewAngle: result.naturalAngle,
+        bounds: gaugeBounds,
       };
       if (result.startAngle !== null) pointerUpdates.startAngle = result.startAngle;
       if (result.endAngle !== null) pointerUpdates.endAngle = result.endAngle;
@@ -232,7 +247,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         onAddSiblingElement({
           type: 'IMG',
           name: `Gauge BG (${element.name})`,
-          bounds: { ...element.bounds },
+          bounds: { ...gaugeBounds },
           visible: true,
           zIndex: bgZIndex,
           src: result.backgroundDataUrl,
@@ -246,7 +261,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         onAddSiblingElement({
           type: 'IMG_LEVEL',
           name: `Gauge Arc Fill (${element.name})`,
-          bounds: { ...element.bounds },
+          bounds: { ...gaugeBounds },
           visible: true,
           zIndex: arcZIndex,
           images: result.arcFrames,
