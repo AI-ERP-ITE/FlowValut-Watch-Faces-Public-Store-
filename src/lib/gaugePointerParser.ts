@@ -217,73 +217,37 @@ function detectArcFillGroup(searchRoot: Element, excludeEl: Element | null): Ele
 
 // ── Arc frame rendering (Spec 092) ───────────────────────────────────────────
 
-const MAX_ARC_FRAMES = 20;
-
-interface ArcPathComponents {
-  startX: number;
-  startY: number;
-  r: number;
-  startAngleRad: number;
-}
-
 /**
- * Parse the starting point and radius from an SVG arc path's first M and A commands.
- * Returns null if parsing fails.
+ * Compute the arc perimeter for a given radius and angular span (degrees).
+ * This is the LENGTH of the arc stroke — used to set stroke-dasharray correctly.
  */
-function parseArcPathComponents(d: string, cx: number, cy: number): ArcPathComponents | null {
-  // Match: M x1 y1 ...
-  const mMatch = d.match(/[Mm]\s*([-\d.]+)[,\s]+([-\d.]+)/);
-  if (!mMatch) return null;
-  const startX = parseFloat(mMatch[1]);
-  const startY = parseFloat(mMatch[2]);
-  if (!isFinite(startX) || !isFinite(startY)) return null;
-
-  // Match first A command: A rx ry x-rot large-arc sweep x2 y2
-  const aMatch = d.match(/[Aa]\s*([-\d.]+)[,\s]+([-\d.]+)/);
-  if (!aMatch) return null;
-  const rx = parseFloat(aMatch[1]);
-  if (!isFinite(rx) || rx <= 0) return null;
-
-  // Compute the start angle from the start point relative to center
-  const startAngleRad = Math.atan2(startY - cy, startX - cx);
-  return { startX, startY, r: rx, startAngleRad };
+function computeArcLength(radius: number, spanDeg: number): number {
+  return 2 * Math.PI * radius * (Math.abs(spanDeg) / 360);
 }
 
 /**
- * Rewrite an arc path's endpoint to the given SVG angle (radians, 0=right, CW).
- * Preserves the start point and radius. Returns the new d string or null on failure.
+ * Extract the arc stroke radius from a path d attribute (first A command rx value).
+ * Returns null if not parseable.
  */
-function rewriteArcPath(d: string, cx: number, cy: number, endAngleRad: number): string | null {
-  const comps = parseArcPathComponents(d, cx, cy);
-  if (!comps) return null;
-
-  const { startX, startY, r, startAngleRad } = comps;
-  const endX = cx + r * Math.cos(endAngleRad);
-  const endY = cy + r * Math.sin(endAngleRad);
-
-  // Compute the sweep magnitude
-  let sweep = endAngleRad - startAngleRad;
-  // Normalise to [-π, π]
-  while (sweep > Math.PI) sweep -= 2 * Math.PI;
-  while (sweep < -Math.PI) sweep += 2 * Math.PI;
-
-  const largeArcFlag = Math.abs(sweep) > Math.PI ? 1 : 0;
-  const sweepFlag = sweep >= 0 ? 1 : 0;
-
-  return `M ${startX} ${startY} A ${r} ${r} 0 ${largeArcFlag} ${sweepFlag} ${endX.toFixed(3)} ${endY.toFixed(3)}`;
+function extractArcRadius(d: string): number | null {
+  const m = d.match(/[Aa]\s*([\d.]+)/);
+  if (!m) return null;
+  const r = parseFloat(m[1]);
+  return isFinite(r) && r > 0 ? r : null;
 }
 
 /**
- * Render one arc frame: clone the SVG, keep only the arc fill group (+ defs),
- * rewrite the arc endpoint to the given SVG angle, and render to PNG.
+ * Render one arc frame: clone the SVG, isolate the arc fill group,
+ * set stroke-dasharray to show fillRatio (0=empty, 1=full) of the arc.
+ * This approach is DESIGN-based: it reads the arc color/thickness from the SVG
+ * and fills it proportionally — independent of any designer preview values.
  */
 async function renderArcFrame(
   doc: Document,
   arcFillMarker: string,
-  needleMarker: string,
-  cx: number,
-  cy: number,
-  svgAngleRad: number,
+  _needleMarker: string,
+  fillRatio: number,
+  arcLength: number,
   renderSize: number,
 ): Promise<string> {
   const frameDoc = doc.cloneNode(true) as Document;
@@ -291,32 +255,28 @@ async function renderArcFrame(
   if (!svgEl) return '';
 
   const arcEl = frameDoc.querySelector(`[${arcFillMarker}="1"]`);
-  const needleEl = frameDoc.querySelector(`[${needleMarker}="1"]`);
 
-  // Remove everything from the translate group except the arc fill element (and defs)
+  // Remove everything from the translate group except the arc fill element (+ defs)
   const mainGroup = svgEl.querySelector('g[transform*="translate("]');
   if (mainGroup && arcEl) {
     for (const child of Array.from(mainGroup.children)) {
       if (child !== arcEl) child.remove();
     }
-  } else if (needleEl) {
-    needleEl.remove();
   }
 
-  // Rewrite the arc path in the arc element
+  // Set dasharray on the arc path to show fillRatio of the full arc.
+  // fillRatio=0 → invisible, fillRatio=1 → full arc.
+  // We use a large gap number (9999) so only the dash portion matters.
   if (arcEl) {
-    // Prefer direct path; fall back to first descendant path with arc command
     const paths = arcEl.tagName.toLowerCase() === 'path'
-      ? [arcEl]
+      ? [arcEl as Element]
       : Array.from(arcEl.querySelectorAll('path')).filter(p => pathHasArcCommand(p.getAttribute('d') || ''));
     for (const path of paths) {
-      const d = path.getAttribute('d') || '';
-      if (!pathHasArcCommand(d)) continue;
-      const newD = rewriteArcPath(d, cx, cy, svgAngleRad);
-      if (newD) {
-        path.setAttribute('d', newD);
-        break; // rewrite only the primary arc path
-      }
+      if (!pathHasArcCommand(path.getAttribute('d') || '')) continue;
+      const fillLen = (fillRatio * arcLength).toFixed(2);
+      path.setAttribute('stroke-dasharray', `${fillLen} 9999`);
+      path.removeAttribute('stroke-dashoffset');
+      break;
     }
   }
 
@@ -326,37 +286,48 @@ async function renderArcFrame(
 }
 
 /**
- * Generate arc frame PNGs from the SVG.
- * tickAngles in SVG-convention degrees (0=right, CW). Cap at MAX_ARC_FRAMES.
+ * Generate arc frame PNGs from the SVG — design-based, value-agnostic.
+ *
+ * Produces exactly (FRAME_COUNT) frames evenly spread from 0% to 100% fill.
+ * The arc color, thickness, linecap are read directly from the SVG design.
+ * Designer preview values (dasharray, rotate) are ignored entirely.
+ * Works for any gauge design automatically.
  */
 async function generateArcFrames(
   doc: Document,
   arcFillGroup: Element,
   needleGroup: Element | null,
-  cx: number,
-  cy: number,
-  tickAngles: number[],
+  _cx: number,
+  _cy: number,
+  _tickAngles: number[],
   startAngle: number,
   endAngle: number,
   renderSize: number,
 ): Promise<string[]> {
-  // Mark arc fill element
   arcFillGroup.setAttribute(ARC_FILL_MARKER, '1');
   if (needleGroup) needleGroup.setAttribute(NEEDLE_MARKER, '1');
 
-  // Determine frame endpoints
-  let frameAngles: number[];
-  if (tickAngles.length >= 2) {
-    frameAngles = tickAngles.slice(0, MAX_ARC_FRAMES);
-  } else {
-    // Fallback: 10 evenly spaced frames
-    const count = 10;
-    frameAngles = Array.from({ length: count }, (_, i) => startAngle + (endAngle - startAngle) * (i / (count - 1)));
+  // Compute full arc length from design geometry (radius + angular span from ticks).
+  // This is design data — tick positions define the real arc range.
+  const spanDeg = Math.abs(endAngle - startAngle);
+  let arcLength = 0;
+  const arcPaths = arcFillGroup.tagName.toLowerCase() === 'path'
+    ? [arcFillGroup]
+    : Array.from(arcFillGroup.querySelectorAll('path')).filter(p => pathHasArcCommand(p.getAttribute('d') || ''));
+  for (const path of arcPaths) {
+    const r = extractArcRadius(path.getAttribute('d') || '');
+    if (r !== null) { arcLength = computeArcLength(r, spanDeg); break; }
   }
+  // Fallback: generous large number so arc is always fully visible at ratio=1
+  if (arcLength <= 0) arcLength = 1000;
+
+  // 11 frames: 0%, 10%, 20%, …, 100%
+  const FRAME_COUNT = 11;
+  const ratios = Array.from({ length: FRAME_COUNT }, (_, i) => i / (FRAME_COUNT - 1));
 
   const frames = await Promise.all(
-    frameAngles.map(deg =>
-      renderArcFrame(doc, ARC_FILL_MARKER, NEEDLE_MARKER, cx, cy, (deg * Math.PI) / 180, renderSize),
+    ratios.map(ratio =>
+      renderArcFrame(doc, ARC_FILL_MARKER, NEEDLE_MARKER, ratio, arcLength, renderSize),
     ),
   );
 
@@ -420,19 +391,26 @@ export async function parseAndRenderGaugeSvg(
   // ── 4. Needle detection (Detector A) ──────────────────────────────────────
   const needleGroup = mainGroup ? detectNeedleGroup(mainGroup.el) : null;
 
-  // Extract naturalAngle from needle BEFORE cloning anything
+  // naturalAngle = design-agnostic preview angle = midpoint of the detected arc range.
+  // We deliberately IGNORE the SVG rotate() value on the needle — that is a designer's
+  // preview snapshot (example value), not a meaningful widget parameter.
+  // The midpoint ensures the needle previews at the middle of the actual range.
+  // (Resolved after arc range detection below.)
   let naturalAngle = 0;
-  if (needleGroup) {
-    const t = needleGroup.getAttribute('transform') || '';
-    naturalAngle = extractRotateAngle(t) ?? 0;
-  }
 
   // ── 5. Arc fill detection (Detector B) ────────────────────────────────────
   const searchRoot = mainGroup?.el ?? svgEl;
   const arcFillGroup = detectArcFillGroup(searchRoot, needleGroup);
 
   // ── 6. Arc range detection (Detector C) ────────────────────────────────────
+  // Tick positions are DESIGN data (they define the real angular extent of the gauge).
   const arcRange = detectArcRange(svgEl, needleGroup);
+
+  // Now resolve naturalAngle as the midpoint of the detected range (design-agnostic).
+  // Fallback to 0 if no arc range detected.
+  if (arcRange !== null) {
+    naturalAngle = (arcRange.startAngle + arcRange.endAngle) / 2;
+  }
 
   // ── 7. Pivot (normalised) ──────────────────────────────────────────────────
   const rawPivotX = mainGroup ? mainGroup.cx / vbW : 0.5;
