@@ -22,6 +22,12 @@ import {
 } from '@/lib/firebaseAuthClient';
 import { isBackendBridgeConfigured } from '@/lib/backendGitHubBridge';
 
+const BUILD_VERSION: string =
+  typeof import.meta.env.VITE_APP_BUILD_VERSION === 'string' &&
+  import.meta.env.VITE_APP_BUILD_VERSION.trim().length > 0
+    ? import.meta.env.VITE_APP_BUILD_VERSION.trim()
+    : 'dev';
+
 export function Header() {
   const { state, dispatch } = useApp();
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
@@ -96,7 +102,7 @@ export function Header() {
               Watch Face Creator
             </span>
             <span className="text-xs text-zinc-500 hidden sm:block">
-              AI-Powered ZeppOS Designer
+              AI-Powered ZeppOS Designer &nbsp;·&nbsp; <span className="font-mono text-zinc-400">{BUILD_VERSION}</span>
             </span>
           </div>
         </div>
