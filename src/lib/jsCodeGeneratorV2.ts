@@ -734,12 +734,10 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
                   // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
                   let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_POINTER, {
                       src: '${src}',
-                      x: px(${element.bounds.x}),
-                      y: px(${element.bounds.y}),
                       center_x: px(${centerX}),
                       center_y: px(${centerY}),
-                      pos_x: px(${pivotX}),
-                      pos_y: px(${pivotY}),
+                      x: px(${pivotX}),
+                      y: px(${pivotY}),
                       start_angle: ${startAngle},
                       end_angle: ${endAngle},
                       type: hmUI.data_type.${dataType},
