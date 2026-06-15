@@ -51,6 +51,9 @@ import {
   loadCustomGaugePointers,
   type CustomGaugePointerRecord,
 } from '@/lib/customGaugePointerStore';
+import { detectGauge } from '@/lib/gaugeDetector';
+import { renderGaugeAssets } from '@/lib/gaugeRenderer';
+import { extractFramesFromMarkup } from '@/lib/markupFrameExtractor';
 import ImageSwitcherLab from './ImageSwitcherLab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -810,8 +813,46 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setGpSaving(true);
     setGpMsg('');
     try {
-      const dataUrl = await renderHtmlToDataUrl(gpHtml, 128);
-      const record = await saveCustomGaugePointer(gpName.trim(), gpHtml, dataUrl, gpPivotX, gpPivotY);
+      // Extract SVG frame from HTML (same path as PropertyPanel buildGaugeFromMarkup)
+      const extracted = extractFramesFromMarkup(gpHtml);
+      const frame = extracted.frames[0] ?? gpHtml;
+
+      let needleDataUrl: string;
+      let detectedPivotX = gpPivotX;
+      let detectedPivotY = gpPivotY;
+      let detectedStartAngle: number | undefined;
+      let detectedEndAngle: number | undefined;
+
+      if (frame.trim().toLowerCase().startsWith('<svg')) {
+        // Run 3-phase pipeline — save the needle PNG (not the whole gauge)
+        const parsed = detectGauge(frame);
+        if (parsed) {
+          const result = await renderGaugeAssets(parsed, 400);
+          needleDataUrl = result.needlePng || await renderHtmlToDataUrl(gpHtml, 128);
+          detectedPivotX = result.geometry.pivotX;
+          detectedPivotY = result.geometry.pivotY;
+          if (parsed.detected.arcRange) {
+            detectedStartAngle = result.geometry.arcStart;
+            detectedEndAngle   = result.geometry.arcEnd;
+          }
+        } else {
+          // Needle not detected — fall back to full render
+          needleDataUrl = await renderHtmlToDataUrl(gpHtml, 128);
+        }
+      } else {
+        // Non-SVG content — render as-is
+        needleDataUrl = await renderHtmlToDataUrl(gpHtml, 128);
+      }
+
+      const record = await saveCustomGaugePointer(
+        gpName.trim(),
+        gpHtml,
+        needleDataUrl,
+        detectedPivotX,
+        detectedPivotY,
+        detectedStartAngle,
+        detectedEndAngle,
+      );
       setSavedGaugePointers(prev => {
         const filtered = prev.filter(p => p.key !== record.key);
         return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);

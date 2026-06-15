@@ -196,9 +196,10 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     onUpdateElement?.(element.id, changes);
   };
 
-  const buildGaugeFromMarkup = async () => {
+  const buildGaugeFromMarkup = async (markupOverride?: string) => {
     if (!element || element.type !== 'GAUGE_POINTER') return;
-    const extracted = extractFramesFromMarkup(gaugeMarkup);
+    const sourceMarkup = markupOverride ?? gaugeMarkup;
+    const extracted = extractFramesFromMarkup(sourceMarkup);
     if (extracted.frames.length === 0) {
       setCreatorStatus('No frame detected in gauge markup input.');
       return;
@@ -1149,13 +1150,21 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                       <button
                         key={gp.key}
                         title={gp.name}
-                        onClick={() => update({
-                          src: gp.dataUrl,
-                          pivotX: gp.pivotX,
-                          pivotY: gp.pivotY,
-                          ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
-                          ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
-                        })}
+                        onClick={() => {
+                          if (gp.sourceHtml?.trim()) {
+                            // Re-run full 3-phase pipeline so background + arc siblings are created
+                            void buildGaugeFromMarkup(gp.sourceHtml);
+                          } else {
+                            // Fallback: no source stored — just apply the saved needle PNG directly
+                            update({
+                              src: gp.dataUrl,
+                              pivotX: gp.pivotX,
+                              pivotY: gp.pivotY,
+                              ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
+                              ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
+                            });
+                          }
+                        }}
                         className={cn(
                           'flex flex-col items-center gap-1 py-2 px-1 rounded border text-[9px] transition-colors',
                           active
