@@ -91,12 +91,24 @@ async function renderNeedlePng(parsed: ParsedGauge, renderSize: number): Promise
 
 /**
  * Render the background PNG.
- * Contains all sibling nodes EXCEPT the needle and arc fill (already excluded
- * in Phase 1 — backgroundNodes contains only non-needle, non-arc children).
+ * Contains all sibling nodes EXCEPT the needle and arc fill.
+ * Non-visual elements (text labels etc.) are stripped to keep the background clean.
  */
 async function renderBackgroundPng(parsed: ParsedGauge, renderSize: number): Promise<string> {
   if (parsed.backgroundNodes.length === 0) return '';
-  const svgStr = buildSvgFromNodes(parsed.template, parsed.backgroundNodes);
+  // Clone background nodes and strip any text labels that snuck in via group detection
+  const cleaned = parsed.backgroundNodes.map(n => {
+    const clone = n.cloneNode(true) as Element;
+    if (clone.querySelectorAll) {
+      for (const tag of ['title', 'desc', 'metadata', 'script']) {
+        for (const node of Array.from(clone.querySelectorAll(tag))) {
+          node.parentElement?.removeChild(node);
+        }
+      }
+    }
+    return clone;
+  });
+  const svgStr = buildSvgFromNodes(parsed.template, cleaned);
   return renderSvgToDataUrl(svgStr, renderSize).catch(() => '');
 }
 
@@ -116,8 +128,9 @@ function computeArcLength(radius: number, spanDeg: number): number {
 
 /**
  * Render 11 arc fill frame PNGs (0%→100% fill).
- * Each frame: clones arcNode, applies stroke-dasharray to show fillRatio of the arc,
- * renders to PNG. No mutations to parsed.arcNode.
+ * Each frame: clones arcNode, strips non-visual elements (text labels etc.),
+ * applies stroke-dasharray to show fillRatio of the arc, renders to PNG.
+ * No mutations to parsed.arcNode.
  */
 async function renderArcFrames(parsed: ParsedGauge, renderSize: number): Promise<string[]> {
   if (!parsed.arcNode) return [];
@@ -145,6 +158,16 @@ async function renderArcFrames(parsed: ParsedGauge, renderSize: number): Promise
   }
   if (arcLength <= 0) arcLength = 1000; // generous fallback
 
+  /** Strip all non-visual elements from an arc clone so text labels don't leak into frames. */
+  const stripNonVisual = (el: Element) => {
+    const NON_VISUAL = ['text', 'tspan', 'title', 'desc', 'metadata', 'script', 'style'];
+    for (const tag of NON_VISUAL) {
+      for (const node of Array.from(el.querySelectorAll(tag))) {
+        node.parentElement?.removeChild(node);
+      }
+    }
+  };
+
   const FRAME_COUNT = 11;
   const ratios = Array.from({ length: FRAME_COUNT }, (_, i) => i / (FRAME_COUNT - 1));
 
@@ -152,6 +175,9 @@ async function renderArcFrames(parsed: ParsedGauge, renderSize: number): Promise
     ratios.map(async (fillRatio) => {
       // Clone arc node locally — NEVER mutate parsed.arcNode
       const arcClone = parsed.arcNode!.cloneNode(true) as Element;
+
+      // Remove text labels / non-visual nodes that sneak in via parent group detection
+      stripNonVisual(arcClone);
 
       const paths = arcClone.tagName?.toLowerCase() === 'path'
         ? [arcClone]
