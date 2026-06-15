@@ -199,6 +199,8 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
   const buildGaugeFromMarkup = async (markupOverride?: string) => {
     if (!element || element.type !== 'GAUGE_POINTER') return;
     const sourceMarkup = markupOverride ?? gaugeMarkup;
+    setCreatorStatus('Building gauge — do not export until complete…');
+    try {
     const extracted = extractFramesFromMarkup(sourceMarkup);
     if (extracted.frames.length === 0) {
       setCreatorStatus('No frame detected in gauge markup input.');
@@ -215,7 +217,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       // Phase 1: detect — pure read, returns immutable cloned artifacts
       const parsed = detectGauge(frame);
       if (!parsed) {
-        setCreatorStatus('Gauge SVG parse failed — needle not detected. Ensure SVG contains a rotating needle group.');
+        setCreatorStatus('⚠ Needle not detected in SVG. Check that gauge has a rotating <g> with path children.');
         return;
       }
 
@@ -312,6 +314,9 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     }
     update({ src: dataUrl, assetFilename: `gauge_pointer_${element.id}.png` });
     setCreatorStatus(`Gauge pointer built from markup (${extracted.strategy}).`);
+    } catch (err) {
+      setCreatorStatus(`⚠ Gauge build error: ${(err as Error).message}`);
+    }
   };
 
   const buildImageSwitcherFramesFromMarkup = async () => {
@@ -1151,19 +1156,22 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                         key={gp.key}
                         title={gp.name}
                         onClick={() => {
-                          // Step 1: apply needle PNG immediately — always works, no silent failures
-                          update({
-                            src: gp.dataUrl,
-                            assetFilename: `gauge_needle_${element.id}.png`,
-                            pivotX: gp.pivotX,
-                            pivotY: gp.pivotY,
-                            ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
-                            ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
-                          });
-                          // Step 2: if source is available, run full pipeline to also create
-                          // background IMG + arc fill IMG_LEVEL siblings
                           if (gp.sourceHtml?.trim()) {
+                            // Run full 3-phase pipeline — needle PNG + background + arc siblings.
+                            // Do NOT apply gp.dataUrl first: it may be a stale whole-gauge image
+                            // from a pre-093 save. Only the pipeline produces the correct needle PNG.
                             void buildGaugeFromMarkup(gp.sourceHtml);
+                          } else {
+                            // No source HTML — old record with no raw SVG stored.
+                            // Apply stored needle PNG directly (best effort).
+                            update({
+                              src: gp.dataUrl,
+                              assetFilename: `gauge_needle_${element.id}.png`,
+                              pivotX: gp.pivotX,
+                              pivotY: gp.pivotY,
+                              ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
+                              ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
+                            });
                           }
                         }}
                         className={cn(
