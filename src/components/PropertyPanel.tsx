@@ -1151,18 +1151,19 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                         key={gp.key}
                         title={gp.name}
                         onClick={() => {
+                          // Step 1: apply needle PNG immediately — always works, no silent failures
+                          update({
+                            src: gp.dataUrl,
+                            assetFilename: `gauge_needle_${element.id}.png`,
+                            pivotX: gp.pivotX,
+                            pivotY: gp.pivotY,
+                            ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
+                            ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
+                          });
+                          // Step 2: if source is available, run full pipeline to also create
+                          // background IMG + arc fill IMG_LEVEL siblings
                           if (gp.sourceHtml?.trim()) {
-                            // Re-run full 3-phase pipeline so background + arc siblings are created
                             void buildGaugeFromMarkup(gp.sourceHtml);
-                          } else {
-                            // Fallback: no source stored — just apply the saved needle PNG directly
-                            update({
-                              src: gp.dataUrl,
-                              pivotX: gp.pivotX,
-                              pivotY: gp.pivotY,
-                              ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
-                              ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
-                            });
                           }
                         }}
                         className={cn(
