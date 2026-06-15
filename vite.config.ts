@@ -13,7 +13,12 @@ export default defineConfig(({ mode }) => {
       return process.env.VITE_APP_BUILD_VERSION.trim();
     }
     try {
-      return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+      const hash = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+      // Append a short timestamp (MMDD-HHmm) so each build is uniquely identifiable
+      // even when the git hash hasn't changed yet (build runs before commit).
+      const now = new Date();
+      const stamp = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+      return `${hash}@${stamp}`;
     } catch {
       return 'dev-local';
     }
