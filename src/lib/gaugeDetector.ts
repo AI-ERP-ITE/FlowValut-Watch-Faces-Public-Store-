@@ -227,12 +227,64 @@ export function detectGauge(svgString: string): ParsedGauge | null {
   const needleNode = needleEl.cloneNode(true) as Node;
   const arcNode = arcFillEl ? (arcFillEl.cloneNode(true) as Node) : null;
 
-  // Background = all children of mainGroup EXCEPT needle and arc fill
-  const backgroundNodes: Node[] = mainGroup
-    ? Array.from(mainGroup.el.children)
-        .filter(child => child !== needleEl && child !== arcFillEl)
-        .map(child => child.cloneNode(true) as Node)
-    : [];
+  // Background = mainGroup clone with needle and arc surgically removed.
+  //
+  // We use DOM paths (index sequences from mainGroup root to each target)
+  // instead of re-running detection on the clone. This is deterministic:
+  // the same node is removed regardless of any scoring ambiguity in the detector.
+  //
+  // This handles any nesting depth — e.g. mainGroup → wrapper → needle
+  // would be missed by a simple top-level children filter.
+  const backgroundNodes: Node[] = [];
+  if (mainGroup) {
+    // Compute index path from searchRoot to a target element
+    const getDomPath = (root: Element, target: Element): number[] | null => {
+      const path: number[] = [];
+      let cur: Element | null = target;
+      while (cur && cur !== root) {
+        const parentEl: Element | null = cur.parentElement;
+        if (!parentEl) return null;
+        const idx = Array.from(parentEl.children).indexOf(cur);
+        if (idx === -1) return null;
+        path.unshift(idx);
+        cur = parentEl;
+      }
+      return cur === root ? path : null;
+    };
+
+    // Resolve a stored index path from root to node
+    const resolveDomPath = (root: Element, path: number[]): Element | null => {
+      let cur: Element = root;
+      for (const idx of path) {
+        const child = cur.children[idx];
+        if (!child) return null;
+        cur = child;
+      }
+      return cur;
+    };
+
+    const needlePath = getDomPath(searchRoot, needleEl);
+    const arcPath = arcFillEl ? getDomPath(searchRoot, arcFillEl) : null;
+
+    // Clone mainGroup children into a temporary container
+    const bgGroupClone = mainGroup.el.cloneNode(true) as Element;
+
+    // Remove needle from clone using stored path
+    if (needlePath) {
+      const clonedNeedle = resolveDomPath(bgGroupClone, needlePath);
+      clonedNeedle?.parentElement?.removeChild(clonedNeedle);
+    }
+    // Remove arc fill from clone using stored path
+    if (arcPath) {
+      const clonedArc = resolveDomPath(bgGroupClone, arcPath);
+      clonedArc?.parentElement?.removeChild(clonedArc);
+    }
+
+    // Remaining children of the clone = clean background at any depth
+    for (const child of Array.from(bgGroupClone.children)) {
+      backgroundNodes.push(child.cloneNode(true) as Node);
+    }
+  }
 
   // ── 10. Assemble result (doc goes out of scope here → GC) ─────────────────
   const template: SvgTemplate = {

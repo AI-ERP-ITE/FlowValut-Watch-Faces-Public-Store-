@@ -70,28 +70,19 @@ function buildSvgFromNodes(
 
 // ── Needle renderer ───────────────────────────────────────────────────────────
 
-/** Remove rotate(…) from a transform string, keeping any other transforms. */
-function stripRotateFromTransform(transform: string): string {
-  return transform.replace(/rotate\([^)]*\)\s*/g, '').trim();
-}
-
 /**
  * Render the needle-only PNG.
- * Strips rotate() from the needle's transform so the needle sits at its
- * natural 0° orientation (the widget handles rotation at runtime).
+ *
+ * Preserves the needle's original rotate() transform from the SVG as authored.
+ * SVG gauge designers typically apply rotate(-90) to make the needle point UP
+ * (12 o'clock), which is the direction Zepp IMG_POINTER expects at 0° rotation.
+ * Stripping this rotation would misalign the needle by 90° on the watch.
+ *
+ * The SVG rotate value is the author's positioning intent — we keep it.
  */
 async function renderNeedlePng(parsed: ParsedGauge, renderSize: number): Promise<string> {
   // Clone the needle node locally — NEVER mutate parsed.needleNode
-  const clone = parsed.needleNode.cloneNode(true) as Element;
-
-  const t = clone.getAttribute('transform') || '';
-  const stripped = stripRotateFromTransform(t);
-  if (stripped) {
-    clone.setAttribute('transform', stripped);
-  } else {
-    clone.removeAttribute('transform');
-  }
-
+  const clone = parsed.needleNode.cloneNode(true) as Node;
   const svgStr = buildSvgFromNodes(parsed.template, [clone]);
   return renderSvgToDataUrl(svgStr, renderSize).catch(() => '');
 }
