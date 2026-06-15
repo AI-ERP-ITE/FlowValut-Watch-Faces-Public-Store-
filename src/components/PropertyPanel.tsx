@@ -24,7 +24,8 @@ import {
 import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { renderHtmlToDataUrl, renderSvgToDataUrl } from '@/lib/customIconStore';
 import { extractFramesFromMarkup } from '@/lib/markupFrameExtractor';
-import { parseAndRenderGaugeSvg } from '@/lib/gaugePointerParser';
+import { detectGauge } from '@/lib/gaugeDetector';
+import { renderGaugeAssets } from '@/lib/gaugeRenderer';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -205,16 +206,27 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
 
     const frame = extracted.frames[0];
 
-    // ── Spec 091: intelligent SVG split ────────────────────────────────────
+    // ── Spec 093: 3-phase data-model pipeline ─────────────────────────────
     // Only attempt auto-split for SVG content (not raw HTML blobs)
-    if (frame.trim().startsWith('<svg') || frame.trim().startsWith('<SVG')) {
+    if (frame.trim().toLowerCase().startsWith('<svg')) {
       setCreatorStatus('Parsing gauge SVG…');
-      const result = await parseAndRenderGaugeSvg(frame, 400);
 
-      if (!result.needleDataUrl) {
-        setCreatorStatus('Gauge markup render failed. Ensure SVG includes a valid SVG node.');
+      // Phase 1: detect — pure read, returns immutable cloned artifacts
+      const parsed = detectGauge(frame);
+      if (!parsed) {
+        setCreatorStatus('Gauge SVG parse failed — needle not detected. Ensure SVG contains a rotating needle group.');
         return;
       }
+
+      // Phase 2: render — pure functions, no side effects
+      const result = await renderGaugeAssets(parsed, 400);
+
+      if (!result.needlePng) {
+        setCreatorStatus('Gauge render failed. Ensure SVG includes a valid needle group.');
+        return;
+      }
+
+      // Phase 3: React apply ────────────────────────────────────────────────
 
       // Remove stale siblings from a previous "Build from markup" run on this gauge.
       // Identified by assetFilename prefix. Without this, repeated builds stack up duplicates.
@@ -231,7 +243,8 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       // current element's center. This prevents the gauge from being squished into
       // the default 40×120 placeholder bounds — all three layers (needle, bg, arc)
       // must share identical bounds so they overlay pixel-perfectly on canvas and device.
-      const squareSize = Math.min(result.naturalWidth, result.naturalHeight);
+      const { naturalWidth, naturalHeight, pivotX, pivotY, naturalAngle, arcStart, arcEnd } = result.geometry;
+      const squareSize = Math.min(naturalWidth, naturalHeight);
       const elCx = element.bounds.x + element.bounds.width / 2;
       const elCy = element.bounds.y + element.bounds.height / 2;
       const gaugeBounds = {
@@ -243,19 +256,21 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
 
       // Update GAUGE_POINTER with needle PNG + auto-detected pivot + arc range + preview angle
       const pointerUpdates: Partial<WatchFaceElement> = {
-        src: result.needleDataUrl,
+        src: result.needlePng,
         assetFilename: `gauge_needle_${element.id}.png`,
-        pivotX: result.pivotX,
-        pivotY: result.pivotY,
-        previewAngle: result.naturalAngle,
+        pivotX,
+        pivotY,
+        previewAngle: naturalAngle,
         bounds: gaugeBounds,
       };
-      if (result.startAngle !== null) pointerUpdates.startAngle = result.startAngle;
-      if (result.endAngle !== null) pointerUpdates.endAngle = result.endAngle;
+      if (parsed.detected.arcRange) {
+        pointerUpdates.startAngle = arcStart;
+        pointerUpdates.endAngle = arcEnd;
+      }
       update(pointerUpdates);
 
-      // Create companion background IMG element if needle was found and background rendered
-      if (result.needleFound && result.backgroundDataUrl && onAddSiblingElement) {
+      // Create companion background IMG element if background was rendered
+      if (parsed.detected.needle && result.backgroundPng && onAddSiblingElement) {
         const bgZIndex = Math.max(1, (element.zIndex ?? 1) - 1);
         onAddSiblingElement({
           type: 'IMG',
@@ -263,12 +278,12 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           bounds: { ...gaugeBounds },
           visible: true,
           zIndex: bgZIndex,
-          src: result.backgroundDataUrl,
+          src: result.backgroundPng,
           assetFilename: `gauge_bg_${element.id}.png`,
         });
       }
 
-      // Spec 092: Create IMG_LEVEL sibling for arc fill frames if detected
+      // Create IMG_LEVEL sibling for arc fill frames if detected
       if (result.arcFrames.length > 0 && onAddSiblingElement) {
         const arcZIndex = Math.max(2, (element.zIndex ?? 2) - 1);
         onAddSiblingElement({
