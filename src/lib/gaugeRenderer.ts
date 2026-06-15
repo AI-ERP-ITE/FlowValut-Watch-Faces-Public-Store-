@@ -19,8 +19,13 @@ import type { ParsedGauge, GaugeRenderResult } from '@/lib/gaugeModel';
 /**
  * Build a minimal SVG string from a set of nodes.
  *
- * Each node is cloned again here so callers never have to think about
- * whether buildSvgFromNodes mutates its inputs — it does not.
+ * Uses DOMParser to create a proper SVG document context so that nodes
+ * cloned from a DOMParser SVG document keep their namespace intact.
+ * Mixing nodes from DOMParser into document.createElementNS() produces
+ * broken namespace declarations that browsers reject as images.
+ *
+ * Each node is adopted into the SVG document context, so callers never
+ * have to worry about mutations — adoptNode works on a clone.
  *
  * @param template   SVG structural metadata from ParsedGauge
  * @param nodes      Nodes to place inside the main translate <g>
@@ -30,29 +35,37 @@ function buildSvgFromNodes(
   nodes: Node[],
 ): string {
   const svgNs = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNs, 'svg');
-  svg.setAttribute('viewBox', template.viewBox);
-  svg.setAttribute('width', String(template.width));
-  svg.setAttribute('height', String(template.height));
-  svg.setAttribute('xmlns', svgNs);
+  const parser = new DOMParser();
 
-  // Re-attach <defs> if present
+  // Parse a minimal SVG to get a proper SVG namespace document
+  const svgDoc = parser.parseFromString(
+    `<svg xmlns="${svgNs}" viewBox="${template.viewBox}" width="${template.width}" height="${template.height}"></svg>`,
+    'image/svg+xml',
+  );
+  const svgEl = svgDoc.querySelector('svg');
+  if (!svgEl) return '';
+
+  // Re-attach <defs> using the same SVG parser context (preserves SVG namespace)
   if (template.defsHtml) {
-    const tmpDiv = document.createElement('div');
-    tmpDiv.innerHTML = template.defsHtml;
-    const defsEl = tmpDiv.querySelector('defs');
-    if (defsEl) svg.appendChild(defsEl.cloneNode(true));
+    const defsDoc = parser.parseFromString(
+      `<svg xmlns="${svgNs}">${template.defsHtml}</svg>`,
+      'image/svg+xml',
+    );
+    const defsEl = defsDoc.querySelector('defs');
+    if (defsEl) svgEl.appendChild(svgDoc.adoptNode(defsEl.cloneNode(true)));
   }
 
-  // Main centering group
-  const g = document.createElementNS(svgNs, 'g');
+  // Main centering group — created in SVG document context
+  const g = svgDoc.createElementNS(svgNs, 'g');
   g.setAttribute('transform', template.mainTransform);
-  for (const node of nodes) {
-    g.appendChild(node.cloneNode(true));
-  }
-  svg.appendChild(g);
 
-  return new XMLSerializer().serializeToString(svg);
+  for (const node of nodes) {
+    // adoptNode transfers the cloned node into svgDoc's namespace context
+    g.appendChild(svgDoc.adoptNode(node.cloneNode(true)));
+  }
+  svgEl.appendChild(g);
+
+  return new XMLSerializer().serializeToString(svgEl);
 }
 
 // ── Needle renderer ───────────────────────────────────────────────────────────
