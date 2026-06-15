@@ -40,6 +40,8 @@ export interface PropertyPanelProps {
   onOpenSwitcherLab?: () => void;
   /** Spec 091: called when buildGaugeFromMarkup creates a companion background IMG element. */
   onAddSiblingElement?: (partialEl: Omit<WatchFaceElement, 'id'>) => void;
+  /** Called before re-building gauge siblings to remove stale ones (prevents duplicates). */
+  onRemoveSiblingElements?: (ids: string[]) => void;
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -147,7 +149,7 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, onAddSiblingElement }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
@@ -212,6 +214,17 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       if (!result.needleDataUrl) {
         setCreatorStatus('Gauge markup render failed. Ensure SVG includes a valid SVG node.');
         return;
+      }
+
+      // Remove stale siblings from a previous "Build from markup" run on this gauge.
+      // Identified by assetFilename prefix. Without this, repeated builds stack up duplicates.
+      if (onRemoveSiblingElements && elements) {
+        const bgFilename = `gauge_bg_${element.id}.png`;
+        const arcFilename = `gauge_arc_${element.id}_frame`;
+        const staleIds = elements
+          .filter(el => el.assetFilename === bgFilename || (el.assetFilename ?? '').startsWith(arcFilename))
+          .map(el => el.id);
+        if (staleIds.length > 0) onRemoveSiblingElements(staleIds);
       }
 
       // Compute correct square bounds from the SVG's natural size, centered on the
