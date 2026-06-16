@@ -310,7 +310,12 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     const el = elementsRef.current.find(e => e.id === hit);
     if (!el) return;
 
-    onSelectElement?.(hit);
+    // Only re-select if this element is NOT already in the current selection group.
+    // If it is (primary or extra), skip onSelectElement so extraSelectedIds is preserved.
+    const inCurrentGroup = hit === selectedElementIdRef.current || extraSelectedIdsRef.current.includes(hit);
+    if (!inCurrentGroup) {
+      onSelectElement?.(hit);
+    }
     isDraggingRef.current = false; // will become true on first move
     dragStartFiredRef.current = false; // reset per-gesture flag
     dragStartRef.current = { x, y };
