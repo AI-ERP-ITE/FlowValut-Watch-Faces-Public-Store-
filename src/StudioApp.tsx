@@ -1936,6 +1936,7 @@ function StudioApp() {
   const [mainBackgroundTransform, setMainBackgroundTransform] = useState<BackgroundTransform>({ ...DEFAULT_BACKGROUND_TRANSFORM });
   const [aodBackgroundTransform, setAodBackgroundTransform] = useState<BackgroundTransform>({ ...DEFAULT_BACKGROUND_TRANSFORM });
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [extraSelectedIds, setExtraSelectedIds] = useState<string[]>([]);
   const [showGrid, setShowGrid] = useState(false);
   const [calibrationEnabled, setCalibrationEnabled] = useState(true);
   const [calibrationMode, setCalibrationMode] = useState<CalibrationMode>('perceptual-nearest');
@@ -2054,6 +2055,41 @@ function StudioApp() {
     });
   }, [dispatch, editorMode, state.watchFaceConfig]);
 
+  /**
+   * Select an element. If it belongs to a gauge pair (gaugePairId), automatically
+   * also select the sibling layers so they can be moved together.
+   */
+  const handleSelectElement = useCallback((id: string | null) => {
+    setSelectedElementId(id);
+    if (!id) { setExtraSelectedIds([]); return; }
+    const el = activeElements.find(e => e.id === id);
+    if (el?.gaugePairId) {
+      const siblings = activeElements
+        .filter(e => e.gaugePairId === el.gaugePairId && e.id !== id)
+        .map(e => e.id);
+      setExtraSelectedIds(siblings);
+    } else {
+      setExtraSelectedIds([]);
+    }
+  }, [activeElements]);
+
+  /** Ctrl+click: toggle a single element in/out of the extra-selection (no auto-group). */
+  const handleMultiToggle = useCallback((id: string) => {
+    setExtraSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  /** Batch update for multi-element drag (gauge group move). */
+  const handleBatchUpdateElements = useCallback(
+    (updates: Array<{ id: string; changes: Partial<WatchFaceElement> }>) => {
+      for (const { id, changes } of updates) {
+        updateActiveElement(id, changes);
+      }
+    },
+    [updateActiveElement],
+  );
+
   const addActiveElement = useCallback((element: WatchFaceElement) => {
     if (!state.watchFaceConfig) return;
     if (editorMode === 'MAIN') {
@@ -2092,6 +2128,7 @@ function StudioApp() {
     setAodBackgroundTransform(mainBackgroundTransform);
     setEditorMode('AOD');
     setSelectedElementId(null);
+    setExtraSelectedIds([]);
     toast.success('AOD layout synced from main and unlocked for independent editing');
   }, [mainBackgroundTransform, state.watchFaceConfig]);
 
@@ -2300,6 +2337,7 @@ function StudioApp() {
       setAodBackgroundTransform({ ...DEFAULT_BACKGROUND_TRANSFORM });
       setEditorMode('MAIN');
       setSelectedElementId(null);
+      setExtraSelectedIds([]);
       setMainBackgroundSource('image');
       setMainBackgroundHtml('');
       setAodBackgroundSource('image');
@@ -2315,6 +2353,7 @@ function StudioApp() {
     setAodBackgroundFile(null);
     setEditorMode('MAIN');
     setSelectedElementId(null);
+    setExtraSelectedIds([]);
     setAodBackgroundSource('image');
     setAodBackgroundHtml('');
   }, [state.watchFaceConfig?.name]);
@@ -2992,6 +3031,7 @@ function StudioApp() {
 
     // Deselect any selected element so the selection rectangle doesn't appear in the preview
     setSelectedElementId(null);
+    setExtraSelectedIds([]);
     // Temporarily hide grid so it doesn't appear in the preview screenshot
     const gridWasOn = showGrid;
     if (gridWasOn) setShowGrid(false);
@@ -4233,6 +4273,7 @@ function StudioApp() {
                         onClick={() => {
                           setEditorMode('MAIN');
                           setSelectedElementId(null);
+                          setExtraSelectedIds([]);
                         }}
                         className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
                           editorMode === 'MAIN'
@@ -4248,6 +4289,7 @@ function StudioApp() {
                           if (!aodElements) return;
                           setEditorMode('AOD');
                           setSelectedElementId(null);
+                          setExtraSelectedIds([]);
                         }}
                         disabled={!aodElements}
                         className={`px-2.5 py-1.5 rounded-lg border text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -4469,11 +4511,15 @@ function StudioApp() {
                       backgroundTransform={activeBackgroundTransform}
                       elements={activeElements}
                       selectedElementId={selectedElementId}
-                      onSelectElement={setSelectedElementId}
+                      extraSelectedIds={extraSelectedIds}
+                      onSelectElement={handleSelectElement}
+                      onMultiToggle={handleMultiToggle}
                       onUpdateElement={updateActiveElement}
+                      onBatchUpdateElements={handleBatchUpdateElements}
                       onAddElement={(el) => {
                         addActiveElement(el);
                         setSelectedElementId(el.id);
+                        setExtraSelectedIds([]);
                       }}
                       showGrid={showGrid}
                       calibrationEnabled={calibrationEnabled}
@@ -4524,10 +4570,11 @@ function StudioApp() {
                         elementWarnings={flickerAnalysisEnabled ? elementWarnings : {}}
                         onToggleVisibility={handleToggleElement}
                         selectedElementId={selectedElementId}
-                        onSelectElement={setSelectedElementId}
+                        onSelectElement={handleSelectElement}
                         onDeleteElement={(id) => {
                           deleteActiveElement(id);
-                          if (selectedElementId === id) setSelectedElementId(null);
+                          if (selectedElementId === id) { setSelectedElementId(null); setExtraSelectedIds([]); }
+                          else setExtraSelectedIds(prev => prev.filter(x => x !== id));
                         }}
                       />
                     </div>

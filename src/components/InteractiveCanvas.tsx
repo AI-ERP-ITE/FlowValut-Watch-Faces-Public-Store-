@@ -63,7 +63,13 @@ export interface InteractiveCanvasProps {
   selectedElementId?: string | null;
   onSelectElement?: (id: string | null) => void;
   onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
+  /** Batch update for multi-element drag (gauge layer group move). */
+  onBatchUpdateElements?: (updates: Array<{ id: string; changes: Partial<WatchFaceElement> }>) => void;
   onAddElement?: (el: WatchFaceElement) => void;
+  /** Secondary selected element IDs (gauge siblings). Shown with dashed outline; move together with primary during drag. */
+  extraSelectedIds?: string[];
+  /** Ctrl+click callback — toggle an individual element in/out of the multi-selection without auto-grouping. */
+  onMultiToggle?: (id: string) => void;
   showGrid?: boolean;
   calibrationEnabled?: boolean;
   calibrationMode?: CalibrationMode;
@@ -92,7 +98,10 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   selectedElementId,
   onSelectElement,
   onUpdateElement,
+  onBatchUpdateElements,
   onAddElement: _onAddElement,
+  extraSelectedIds,
+  onMultiToggle,
   showGrid,
   calibrationEnabled,
   calibrationMode,
@@ -109,9 +118,12 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   elementsRef.current = elements;
   const customHandStylesRef = useRef(customHandStyles ?? []);
   customHandStylesRef.current = customHandStyles ?? [];
+  const extraSelectedIdsRef = useRef<string[]>([]);
+  extraSelectedIdsRef.current = extraSelectedIds ?? [];
 
   // Drag state (refs to avoid stale closures)
   const isDraggingRef = useRef(false);
+  const dragSnapshotsRef = useRef<Map<string, WatchFaceElement>>(new Map());
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const dragSnapshotRef = useRef<WatchFaceElement | null>(null);
   const resizeHandleRef = useRef<string | null>(null); // 'TL','TC','TR','ML','MR','BL','BC','BR'
@@ -219,7 +231,13 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const sel = elements.find((el) => el.id === selectedElementId);
       if (sel) drawSelection(ctx, sel);
     }
-  }, [backgroundTransform, calibrationEnabled, calibrationMode, elements, flickerAnalysisEnabled, flickerOverlayEnabled, onElementWarningsChange, refreshToken, selectedElementId]);
+    // Secondary selection highlight for gauge siblings
+    for (const xid of (extraSelectedIds ?? [])) {
+      if (xid === selectedElementId) continue;
+      const xel = elements.find(el => el.id === xid);
+      if (xel) drawSecondarySelection(ctx, xel);
+    }
+  }, [backgroundTransform, calibrationEnabled, calibrationMode, elements, extraSelectedIds, flickerAnalysisEnabled, flickerOverlayEnabled, onElementWarningsChange, refreshToken, selectedElementId]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Suppress click after a drag
@@ -232,8 +250,15 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       .filter(el => el.visible)
       .sort((a, b) => b.zIndex - a.zIndex);
     const hit = hitTest(x, y, visible);
+
+    // Ctrl/Cmd+click: toggle individual element into/out of multi-selection (no auto-group)
+    if (e.ctrlKey || e.metaKey) {
+      if (hit) onMultiToggle?.(hit);
+      return;
+    }
+
     onSelectElement?.(hit);
-  }, [onSelectElement]);
+  }, [onSelectElement, onMultiToggle]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -281,6 +306,20 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     isDraggingRef.current = false; // will become true on first move
     dragStartRef.current = { x, y };
     dragSnapshotRef.current = { ...el, bounds: { ...el.bounds }, center: el.center ? { ...el.center } : undefined };
+
+    // Snapshot all extra selected elements so multi-drag can move them in sync
+    dragSnapshotsRef.current = new Map();
+    for (const xid of extraSelectedIdsRef.current) {
+      if (xid === hit) continue;
+      const xel = elementsRef.current.find(e => e.id === xid);
+      if (xel) {
+        dragSnapshotsRef.current.set(xid, {
+          ...xel,
+          bounds: { ...xel.bounds },
+          center: xel.center ? { ...xel.center } : undefined,
+        });
+      }
+    }
   }, [onSelectElement]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -347,11 +386,34 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       };
     }
     onUpdateElement?.(snap.id, changes);
-  }, [onUpdateElement]);
+
+    // Multi-drag: apply the same delta to all gauge-group siblings
+    if (dragSnapshotsRef.current.size > 0) {
+      const batchUpdates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
+      for (const [xid, xsnap] of dragSnapshotsRef.current) {
+        const xBounds = {
+          x: Math.max(0, Math.min(CANVAS_SIZE - xsnap.bounds.width, xsnap.bounds.x + dx)),
+          y: Math.max(0, Math.min(CANVAS_SIZE - xsnap.bounds.height, xsnap.bounds.y + dy)),
+          width: xsnap.bounds.width,
+          height: xsnap.bounds.height,
+        };
+        const xChanges: Partial<WatchFaceElement> = { bounds: xBounds };
+        if (xsnap.center) {
+          xChanges.center = {
+            x: Math.max(0, Math.min(CANVAS_SIZE, xsnap.center.x + dx)),
+            y: Math.max(0, Math.min(CANVAS_SIZE, xsnap.center.y + dy)),
+          };
+        }
+        batchUpdates.push({ id: xid, changes: xChanges });
+      }
+      onBatchUpdateElements?.(batchUpdates);
+    }
+  }, [onUpdateElement, onBatchUpdateElements]);
 
   const handleMouseUp = useCallback(() => {
     dragStartRef.current = null;
     dragSnapshotRef.current = null;
+    dragSnapshotsRef.current.clear();
     resizeHandleRef.current = null;
     setTimeout(() => { isDraggingRef.current = false; }, 0);
   }, []);
@@ -631,6 +693,18 @@ function drawSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   } else {
     drawRectSelection(ctx, el);
   }
+}
+
+/** Dashed outline for secondary (gauge-group sibling) selected elements. No resize handles. */
+function drawSecondarySelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
+  const { x, y, width, height } = el.bounds;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,212,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 4]);
+  ctx.strokeRect(x - 1, y - 1, width + 2, height + 2);
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 function drawRectSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {

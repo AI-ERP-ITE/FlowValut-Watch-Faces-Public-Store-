@@ -1222,6 +1222,24 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 className="w-full h-24 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
                 spellCheck={false}
               />
+              {/* Arc data binding — chooses which data the generated arc layer will track */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/50 shrink-0">Arc data:</span>
+                <Select
+                  value={element.dataType ?? '__none__'}
+                  onValueChange={v => update({ dataType: v === '__none__' ? undefined : v })}
+                >
+                  <SelectTrigger className="h-6 flex-1 text-[10px] bg-white/5 border-white/15">
+                    <SelectValue placeholder="— none —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— none —</SelectItem>
+                    {allowedDataTypes.map(dt => (
+                      <SelectItem key={dt} value={dt}>{getDataTypeLabel(dt)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <button
                 onClick={() => { void buildGaugeFromMarkup(); }}
                 className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
