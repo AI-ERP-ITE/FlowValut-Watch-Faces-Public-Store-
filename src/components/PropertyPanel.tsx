@@ -274,6 +274,11 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       }
       update(pointerUpdates);
 
+      // Shared zIndex values — needle is top, arc is middle, bg is bottom.
+      const needleZ = element.zIndex ?? 10;
+      const bgZIndex = Math.max(0, needleZ - 2);
+      const arcZIndex = Math.max(bgZIndex + 1, needleZ - 1);
+
       // Create companion background IMG element if background was rendered
       if (parsed.detected.needle && result.backgroundPng && onAddSiblingElement) {
         const bl = layerLayouts.background ?? nl;
@@ -283,7 +288,6 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           width: bl.canvasW,
           height: bl.canvasH,
         };
-        const bgZIndex = Math.max(1, (element.zIndex ?? 1) - 1);
         onAddSiblingElement({
           type: 'IMG',
           name: `Gauge BG (${element.name})`,
@@ -304,7 +308,6 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           width: al.canvasW,
           height: al.canvasH,
         };
-        const arcZIndex = Math.max(2, (element.zIndex ?? 2) - 1);
         onAddSiblingElement({
           type: 'IMG_LEVEL',
           name: `Gauge Arc Fill (${element.name})`,

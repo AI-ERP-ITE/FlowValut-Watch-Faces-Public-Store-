@@ -67,7 +67,10 @@ function measureNodesBBox(
   try {
     const bbox = g.getBBox();
     if (!bbox || bbox.width <= 0 || bbox.height <= 0) return null;
-    return { x: bbox.x, y: bbox.y, w: bbox.width, h: bbox.height };
+    // getBBox() on a group returns coords in the parent SVG viewport space
+    // (i.e. AFTER applying the group's own translate(cx,cy)).
+    // Subtract cx/cy to convert to LOCAL gauge-center space (origin = gauge pivot).
+    return { x: bbox.x - cx, y: bbox.y - cy, w: bbox.width, h: bbox.height };
   } catch {
     return null;
   } finally {
@@ -168,6 +171,115 @@ function buildSvgFromNodes(
   return new XMLSerializer().serializeToString(svgEl);
 }
 
+// ── Padding helpers (stroke + filter) ───────────────────────────────────────
+
+/** Parse percentage string "-20%" → -0.20, "140%" → 1.40. Returns null if unparseable. */
+function parsePct(s: string | null): number | null {
+  if (!s) return null;
+  const m = s.trim().match(/^(-?[\d.]+)%$/);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  return isFinite(v) ? v / 100 : null;
+}
+
+/**
+ * Compute half the maximum stroke-width found among all elements in nodes.
+ * getBBox() excludes stroke, so this amount overflows the geometric bbox on each side.
+ */
+function computeStrokePadding(nodes: Node[]): number {
+  let maxStroke = 0;
+  const scanEl = (el: Element) => {
+    const sw = el.getAttribute('stroke-width');
+    if (sw) {
+      const v = parseFloat(sw);
+      if (isFinite(v) && v > 0) maxStroke = Math.max(maxStroke, v);
+    }
+    for (const child of Array.from(el.children)) scanEl(child);
+  };
+  for (const node of nodes) {
+    if (node.nodeType === 1) scanEl(node as Element);
+  }
+  return maxStroke / 2;
+}
+
+/**
+ * Compute exact filter-region padding from filter x/y/width/height attributes in defs.
+ *
+ * SVG filter region percentages are relative to the STROKED element bbox.
+ * Example: metalShadow x="-20%" y="-20%" width="140%" height="140%"
+ *   → padLeft = 20% × strokedW, padRight = 20% × strokedW, etc.
+ *
+ * Formula:
+ *   padLeft   = -xPct × strokedW  (xPct negative e.g. -0.20 → 0.20 × w)
+ *   padTop    = -yPct × strokedH
+ *   padRight  = (widthPct - 1 + xPct) × strokedW
+ *   padBottom = (heightPct - 1 + yPct) × strokedH
+ */
+function computeFilterPadding(
+  nodes: Node[],
+  defsHtml: string,
+  strokedW: number,
+  strokedH: number,
+): { padLeft: number; padTop: number; padRight: number; padBottom: number } {
+  const zero = { padLeft: 0, padTop: 0, padRight: 0, padBottom: 0 };
+  if (!defsHtml) return zero;
+
+  const filterIds = new Set<string>();
+  const scanEl = (el: Element) => {
+    const f = el.getAttribute('filter') || '';
+    const m = f.match(/url\(#([^)]+)\)/);
+    if (m) filterIds.add(m[1].trim());
+    for (const child of Array.from(el.children)) scanEl(child);
+  };
+  for (const node of nodes) {
+    if (node.nodeType === 1) scanEl(node as Element);
+  }
+  if (filterIds.size === 0) return zero;
+
+  const parser = new DOMParser();
+  const defsDoc = parser.parseFromString(
+    `<svg xmlns="http://www.w3.org/2000/svg">${defsHtml}</svg>`,
+    'image/svg+xml',
+  );
+
+  let maxL = 0, maxT = 0, maxR = 0, maxB = 0;
+  for (const id of filterIds) {
+    const filterEl = defsDoc.getElementById(id);
+    if (!filterEl || filterEl.tagName.toLowerCase() !== 'filter') continue;
+    const xPct = parsePct(filterEl.getAttribute('x')) ?? -0.10;
+    const yPct = parsePct(filterEl.getAttribute('y')) ?? -0.10;
+    const wPct = parsePct(filterEl.getAttribute('width')) ?? 1.20;
+    const hPct = parsePct(filterEl.getAttribute('height')) ?? 1.20;
+    maxL = Math.max(maxL, Math.max(0, -xPct * strokedW));
+    maxT = Math.max(maxT, Math.max(0, -yPct * strokedH));
+    maxR = Math.max(maxR, Math.max(0, (wPct - 1 + xPct) * strokedW));
+    maxB = Math.max(maxB, Math.max(0, (hPct - 1 + yPct) * strokedH));
+  }
+  return { padLeft: maxL, padTop: maxT, padRight: maxR, padBottom: maxB };
+}
+
+/**
+ * Expand a geometric bbox (excludes stroke and filter) to the full visual bbox:
+ *   1. Expand by strokePad (uniform on all sides)
+ *   2. Expand by filterPad (exact per-side values, relative to stroked bbox)
+ */
+function expandBBox(
+  bbox: { x: number; y: number; w: number; h: number },
+  strokePad: number,
+  filterPad: { padLeft: number; padTop: number; padRight: number; padBottom: number },
+): { x: number; y: number; w: number; h: number } {
+  const sx = bbox.x - strokePad;
+  const sy = bbox.y - strokePad;
+  const sw = bbox.w + strokePad * 2;
+  const sh = bbox.h + strokePad * 2;
+  return {
+    x: sx - filterPad.padLeft,
+    y: sy - filterPad.padTop,
+    w: sw + filterPad.padLeft + filterPad.padRight,
+    h: sh + filterPad.padTop + filterPad.padBottom,
+  };
+}
+
 // ── Arc utilities ─────────────────────────────────────────────────────────────
 
 function pathHasArcCommand(d: string): boolean {
@@ -236,11 +348,35 @@ export async function renderGaugeAssets(
     h: parsed.template.height,
   };
 
-  // ── 3. Build LayerLayouts ─────────────────────────────────────────────────
+  // ── 3. Expand bboxes by stroke + filter padding ────────────────────────────
+  // getBBox() excludes stroke-width and filter effects.
+  // We expand each layer's bbox by exact stroke and filter-region amounts so
+  // the rendered PNG canvas captures the full visible content without clipping.
 
-  const needleLayout = makeLayerLayout(needleBBox ?? fallbackBBox, scale);
-  const bgLayout = bgBBox ? makeLayerLayout(bgBBox, scale) : null;
-  const arcLayout = arcBBox ? makeLayerLayout(arcBBox, scale) : null;
+  const expandLayer = (
+    geoBBox: { x: number; y: number; w: number; h: number } | null,
+    nodes: Node[],
+  ) => {
+    if (!geoBBox) return null;
+    const sp = computeStrokePadding(nodes);
+    const fp = computeFilterPadding(
+      nodes, parsed.template.defsHtml,
+      geoBBox.w + sp * 2, geoBBox.h + sp * 2,
+    );
+    return expandBBox(geoBBox, sp, fp);
+  };
+
+  const needleBBoxExp = expandLayer(needleBBox, [parsed.needleNode]);
+  const bgBBoxExp     = expandLayer(bgBBox, parsed.backgroundNodes);
+  const arcBBoxExp    = arcBBox
+    ? expandLayer(arcBBox, parsed.arcNode ? [parsed.arcNode] : [])
+    : null;
+
+  // ── 4. Build LayerLayouts ─────────────────────────────────────────────────
+
+  const needleLayout = makeLayerLayout(needleBBoxExp ?? fallbackBBox, scale);
+  const bgLayout = bgBBoxExp ? makeLayerLayout(bgBBoxExp, scale) : null;
+  const arcLayout = arcBBoxExp ? makeLayerLayout(arcBBoxExp, scale) : null;
 
   const layerLayouts: LayerLayouts = {
     needle: needleLayout,
@@ -249,19 +385,20 @@ export async function renderGaugeAssets(
     scale,
   };
 
-  /** Convert local bbox → viewBox override for tight crop. */
+  /** Convert expanded local bbox → viewBox override for tight crop. */
   const makeVP = (
-    localBBox: { x: number; y: number; w: number; h: number },
+    expBBox: { x: number; y: number; w: number; h: number },
     layout: LayerLayout,
   ) => ({
-    viewBox: `${(localBBox.x + cx).toFixed(4)} ${(localBBox.y + cy).toFixed(4)} ${localBBox.w.toFixed(4)} ${localBBox.h.toFixed(4)}`,
+    // Add cx/cy back to convert local coords → SVG viewport coords
+    viewBox: `${(expBBox.x + cx).toFixed(4)} ${(expBBox.y + cy).toFixed(4)} ${expBBox.w.toFixed(4)} ${expBBox.h.toFixed(4)}`,
     width: layout.canvasW,
     height: layout.canvasH,
   });
 
-  // ── 4. Render needle PNG ──────────────────────────────────────────────────
+  // ── 5. Render needle PNG ──────────────────────────────────────────────────
 
-  const needleVP = needleBBox ? makeVP(needleBBox, needleLayout) : undefined;
+  const needleVP = needleBBoxExp ? makeVP(needleBBoxExp, needleLayout) : undefined;
   const needleSvg = buildSvgFromNodes(
     parsed.template,
     [parsed.needleNode.cloneNode(true)],
@@ -273,7 +410,7 @@ export async function renderGaugeAssets(
     needleLayout.canvasH,
   ).catch(() => '');
 
-  // ── 5. Render background PNG ──────────────────────────────────────────────
+  // ── 6. Render background PNG ──────────────────────────────────────────────
 
   let backgroundPng = '';
   if (parsed.backgroundNodes.length > 0) {
@@ -289,14 +426,14 @@ export async function renderGaugeAssets(
       return clone;
     });
     const layout = bgLayout ?? needleLayout;
-    const bgVP = bgBBox ? makeVP(bgBBox, layout) : undefined;
+    const bgVP = bgBBoxExp ? makeVP(bgBBoxExp, layout) : undefined;
     const bgSvg = buildSvgFromNodes(parsed.template, cleaned, bgVP);
     backgroundPng = await renderSvgToDataUrlRect(bgSvg, layout.canvasW, layout.canvasH).catch(
       () => '',
     );
   }
 
-  // ── 6. Render arc fill frames ─────────────────────────────────────────────
+  // ── 7. Render arc fill frames ─────────────────────────────────────────────
 
   let arcFrames: string[] = [];
   if (parsed.arcNode && arcLayout) {
@@ -328,7 +465,7 @@ export async function renderGaugeAssets(
     }
     if (arcLength <= 0) arcLength = 1000;
 
-    const arcVP = arcBBox ? makeVP(arcBBox, arcLayout) : undefined;
+    const arcVP = arcBBoxExp ? makeVP(arcBBoxExp, arcLayout) : undefined;
     const FRAME_COUNT = 11;
     const ratios = Array.from({ length: FRAME_COUNT }, (_, i) => i / (FRAME_COUNT - 1));
 
