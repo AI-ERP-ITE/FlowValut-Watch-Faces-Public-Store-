@@ -16,6 +16,10 @@ interface ElementListProps {
   onDeleteElement?: (id: string) => void;
   selectedElementId?: string | null;
   onSelectElement?: (id: string) => void;
+  /** IDs of elements that are part of the current group selection (gauge siblings). */
+  extraSelectedIds?: string[];
+  /** Ctrl+click callback — toggle an element in/out of the group selection. */
+  onMultiToggle?: (id: string) => void;
   className?: string;
 }
 
@@ -27,6 +31,8 @@ export function ElementList({
   onDeleteElement,
   selectedElementId,
   onSelectElement,
+  extraSelectedIds,
+  onMultiToggle,
   className,
 }: ElementListProps) {
   const getElementIcon = (element: WatchFaceElement) => {
@@ -63,20 +69,30 @@ export function ElementList({
           const warningTitle = warning
             ? `Flicker Risk: contains low RGB values (1-46)\nMay appear unstable or disappear on device\nAffected ratio: ${(warning.ratio * 100).toFixed(1)}%`
             : '';
+          const isPrimary = selectedElementId === element.id;
+          const isExtra = !isPrimary && (extraSelectedIds ?? []).includes(element.id);
 
           return (
             <div
               key={element.id}
-              onClick={() => onSelectElement?.(element.id)}
+              onClick={(e) => {
+                if ((e.ctrlKey || e.metaKey) && onMultiToggle) {
+                  onMultiToggle(element.id);
+                } else {
+                  onSelectElement?.(element.id);
+                }
+              }}
               className={cn(
                 'group flex items-center gap-3 p-2.5 rounded-lg border transition-all',
                 element.engraveFrame
-                  ? selectedElementId === element.id
+                  ? isPrimary
                     ? 'bg-amber-500/10 border-amber-500 border-l-[3px] cursor-default'
                     : 'bg-[#1A1A1A] border-zinc-800 border-l-[3px] border-l-amber-500/60 hover:border-zinc-700'
-                  : selectedElementId === element.id
+                  : isPrimary
                     ? 'bg-cyan-500/10 border-cyan-500 cursor-default'
-                    : 'bg-[#1A1A1A] border-zinc-800 hover:border-zinc-700',
+                    : isExtra
+                      ? 'bg-cyan-500/5 border-cyan-500/40 border-dashed shadow-[0_0_6px_1px_rgba(0,200,255,0.18)]'
+                      : 'bg-[#1A1A1A] border-zinc-800 hover:border-zinc-700',
                 onSelectElement && 'cursor-pointer'
               )}
             >

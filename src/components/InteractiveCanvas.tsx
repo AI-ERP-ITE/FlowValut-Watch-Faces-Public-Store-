@@ -65,6 +65,8 @@ export interface InteractiveCanvasProps {
   onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
   /** Batch update for multi-element drag (gauge layer group move). */
   onBatchUpdateElements?: (updates: Array<{ id: string; changes: Partial<WatchFaceElement> }>) => void;
+  /** Called exactly once when a drag gesture begins (first move past dead zone). Use to snapshot undo state. */
+  onDragStart?: (preSnapElements: WatchFaceElement[]) => void;
   onAddElement?: (el: WatchFaceElement) => void;
   /** Secondary selected element IDs (gauge siblings). Shown with dashed outline; move together with primary during drag. */
   extraSelectedIds?: string[];
@@ -99,6 +101,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   onSelectElement,
   onUpdateElement,
   onBatchUpdateElements,
+  onDragStart,
   onAddElement: _onAddElement,
   extraSelectedIds,
   onMultiToggle,
@@ -123,6 +126,9 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
   // Drag state (refs to avoid stale closures)
   const isDraggingRef = useRef(false);
+  const dragStartFiredRef = useRef(false); // has onDragStart been called for this gesture?
+  const onDragStartRef = useRef(onDragStart);
+  onDragStartRef.current = onDragStart;
   const dragSnapshotsRef = useRef<Map<string, WatchFaceElement>>(new Map());
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const dragSnapshotRef = useRef<WatchFaceElement | null>(null);
@@ -274,6 +280,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         if (handle) {
           resizeHandleRef.current = handle;
           isDraggingRef.current = false;
+          dragStartFiredRef.current = false;
           dragStartRef.current = { x, y };
           dragSnapshotRef.current = { ...selEl, bounds: { ...selEl.bounds } };
           return;
@@ -285,6 +292,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         if (arcHandle) {
           resizeHandleRef.current = arcHandle;
           isDraggingRef.current = false;
+          dragStartFiredRef.current = false;
           dragStartRef.current = { x, y };
           dragSnapshotRef.current = { ...selEl };
           return;
@@ -304,6 +312,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
     onSelectElement?.(hit);
     isDraggingRef.current = false; // will become true on first move
+    dragStartFiredRef.current = false; // reset per-gesture flag
     dragStartRef.current = { x, y };
     dragSnapshotRef.current = { ...el, bounds: { ...el.bounds }, center: el.center ? { ...el.center } : undefined };
 
@@ -331,6 +340,11 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     const dx = x - dragStartRef.current.x;
     const dy = y - dragStartRef.current.y;
     if (!isDraggingRef.current && Math.abs(dx) < 3 && Math.abs(dy) < 3) return; // dead zone
+    if (!isDraggingRef.current && !dragStartFiredRef.current) {
+      // First move past dead zone — commit the pre-drag snapshot onto the undo stack exactly once.
+      dragStartFiredRef.current = true;
+      onDragStartRef.current?.(structuredClone(elementsRef.current));
+    }
     isDraggingRef.current = true;
 
     const snap = dragSnapshotRef.current;
@@ -415,6 +429,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     dragSnapshotRef.current = null;
     dragSnapshotsRef.current.clear();
     resizeHandleRef.current = null;
+    dragStartFiredRef.current = false;
     setTimeout(() => { isDraggingRef.current = false; }, 0);
   }, []);
 

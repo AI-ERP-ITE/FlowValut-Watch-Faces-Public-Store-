@@ -44,6 +44,12 @@ type Action =
   | { type: 'SET_GITHUB_REPO'; payload: string }
   | { type: 'UPDATE_ELEMENT'; payload: { id: string; changes: Partial<WatchFaceElement> } }
   | { type: 'UPDATE_ELEMENTS_BATCH'; payload: Array<{ id: string; changes: Partial<WatchFaceElement> }> }
+  /** Silent update: live state only, no undo stack push. Use during drag mousemove. */
+  | { type: 'UPDATE_ELEMENT_SILENT'; payload: { id: string; changes: Partial<WatchFaceElement> } }
+  /** Silent batch update: live state only, no undo stack push. Use during multi-drag mousemove. */
+  | { type: 'UPDATE_ELEMENTS_BATCH_SILENT'; payload: Array<{ id: string; changes: Partial<WatchFaceElement> }> }
+  /** Commit drag: push a pre-captured snapshot onto the undo stack (call once at drag start). */
+  | { type: 'COMMIT_DRAG'; payload: WatchFaceElement[] }
   | { type: 'ADD_ELEMENT'; payload: WatchFaceElement }
   | { type: 'DELETE_ELEMENT'; payload: string }
   | { type: 'UNDO' }
@@ -171,6 +177,26 @@ function appReducer(state: AppState, action: Action): AppState {
         undoStack: newUndoStack2,
         redoStack: [],
       };
+    }
+    case 'UPDATE_ELEMENT_SILENT': {
+      if (!state.watchFaceConfig) return state;
+      const silentUpdated = state.watchFaceConfig.elements.map(el =>
+        el.id === action.payload.id ? bumpElementVersion({ ...el, ...action.payload.changes }) : el
+      );
+      return { ...state, watchFaceConfig: { ...state.watchFaceConfig, elements: silentUpdated } };
+    }
+    case 'UPDATE_ELEMENTS_BATCH_SILENT': {
+      if (!state.watchFaceConfig) return state;
+      const silentChangeMap = new Map(action.payload.map(p => [p.id, p.changes]));
+      const silentBatchUpdated = state.watchFaceConfig.elements.map(el => {
+        const changes = silentChangeMap.get(el.id);
+        return changes ? bumpElementVersion({ ...el, ...changes }) : el;
+      });
+      return { ...state, watchFaceConfig: { ...state.watchFaceConfig, elements: silentBatchUpdated } };
+    }
+    case 'COMMIT_DRAG': {
+      const newUndoForDrag = [...state.undoStack, action.payload].slice(-30);
+      return { ...state, undoStack: newUndoForDrag, redoStack: [] };
     }
     case 'UNDO': {
       if (state.undoStack.length === 0 || !state.watchFaceConfig) return state;

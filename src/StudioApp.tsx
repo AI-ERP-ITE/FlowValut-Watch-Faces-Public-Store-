@@ -2055,6 +2055,17 @@ function StudioApp() {
     });
   }, [dispatch, editorMode, state.watchFaceConfig]);
 
+  /** Silent version — updates live state but does NOT push to undo stack. Use during drag mousemove. */
+  const updateActiveElementSilent = useCallback((id: string, changes: Partial<WatchFaceElement>) => {
+    if (!state.watchFaceConfig) return;
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'UPDATE_ELEMENT_SILENT', payload: { id, changes } });
+      return;
+    }
+    // AOD: same as normal (AOD doesn't use the undo stack)
+    setAodElements((prev) => (prev ?? []).map((el) => (el.id === id ? { ...el, ...changes } : el)));
+  }, [dispatch, editorMode, state.watchFaceConfig]);
+
   /**
    * Select an element. If it belongs to a gauge pair (gaugePairId), automatically
    * also select the sibling layers so they can be moved together.
@@ -2080,15 +2091,27 @@ function StudioApp() {
     );
   }, []);
 
-  /** Batch update for multi-element drag (gauge group move). */
+  /** Batch update for multi-element drag (gauge group move). Silent — no undo stack push. */
   const handleBatchUpdateElements = useCallback(
     (updates: Array<{ id: string; changes: Partial<WatchFaceElement> }>) => {
+      if (editorMode === 'MAIN') {
+        dispatch({ type: 'UPDATE_ELEMENTS_BATCH_SILENT', payload: updates });
+        return;
+      }
       for (const { id, changes } of updates) {
-        updateActiveElement(id, changes);
+        updateActiveElementSilent(id, changes);
       }
     },
-    [updateActiveElement],
+    [dispatch, editorMode, updateActiveElementSilent],
   );
+
+  /** Called once at drag start — commits pre-drag snapshot to undo stack. */
+  const handleDragStart = useCallback((preSnapElements: WatchFaceElement[]) => {
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'COMMIT_DRAG', payload: preSnapElements });
+    }
+    // AOD has no undo stack — nothing to do
+  }, [dispatch, editorMode]);
 
   const addActiveElement = useCallback((element: WatchFaceElement) => {
     if (!state.watchFaceConfig) return;
@@ -4514,8 +4537,9 @@ function StudioApp() {
                       extraSelectedIds={extraSelectedIds}
                       onSelectElement={handleSelectElement}
                       onMultiToggle={handleMultiToggle}
-                      onUpdateElement={updateActiveElement}
+                      onUpdateElement={updateActiveElementSilent}
                       onBatchUpdateElements={handleBatchUpdateElements}
+                      onDragStart={handleDragStart}
                       onAddElement={(el) => {
                         addActiveElement(el);
                         setSelectedElementId(el.id);
@@ -4571,6 +4595,8 @@ function StudioApp() {
                         onToggleVisibility={handleToggleElement}
                         selectedElementId={selectedElementId}
                         onSelectElement={handleSelectElement}
+                        extraSelectedIds={extraSelectedIds}
+                        onMultiToggle={handleMultiToggle}
                         onDeleteElement={(id) => {
                           deleteActiveElement(id);
                           if (selectedElementId === id) { setSelectedElementId(null); setExtraSelectedIds([]); }
