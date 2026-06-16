@@ -67,10 +67,11 @@ function measureNodesBBox(
   try {
     const bbox = g.getBBox();
     if (!bbox || bbox.width <= 0 || bbox.height <= 0) return null;
-    // getBBox() on a group returns coords in the parent SVG viewport space
-    // (i.e. AFTER applying the group's own translate(cx,cy)).
-    // Subtract cx/cy to convert to LOCAL gauge-center space (origin = gauge pivot).
-    return { x: bbox.x - cx, y: bbox.y - cy, w: bbox.width, h: bbox.height };
+    // getBBox() on a <g transform="translate(cx,cy)"> returns coords in the group's
+    // OWN local coordinate space — the translate on the group itself is NOT included.
+    // Content inside the group is already expressed in gauge-local space
+    // (origin = gauge center), so these values are already correct as-is.
+    return { x: bbox.x, y: bbox.y, w: bbox.width, h: bbox.height };
   } catch {
     return null;
   } finally {

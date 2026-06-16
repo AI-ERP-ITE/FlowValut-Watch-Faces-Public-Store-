@@ -1278,6 +1278,27 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
             }
             drawPlaceholder(ctx, el);
           }
+        } else if (Array.isArray(el.images) && el.images.length > 0 && iconCache) {
+          // Non-weather IMG_LEVEL (e.g. gauge arc frames from Spec 093).
+          // Only render if frames are data: URLs — Firebase Storage URLs are
+          // not renderable cross-origin and must stay as placeholder.
+          const midIdx = Math.floor(el.images.length / 2);
+          const frameSrc = el.images[midIdx];
+          const isDataUrl = typeof frameSrc === 'string' && frameSrc.startsWith('data:');
+          if (isDataUrl) {
+            const cacheKey = `__imglvl_${el.id}_mid_${midIdx}`;
+            const cached = iconCache.get(cacheKey);
+            if (cached) {
+              ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+            } else {
+              const img = new Image();
+              img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
+              img.src = frameSrc;
+              drawPlaceholder(ctx, el);
+            }
+          } else {
+            drawPlaceholder(ctx, el);
+          }
         } else {
           drawPlaceholder(ctx, el);
         }

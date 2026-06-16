@@ -260,6 +260,8 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
 
       // Update GAUGE_POINTER with needle PNG + tight-bbox pivot + arc range + preview angle
       const { naturalAngle, arcStart, arcEnd } = result.geometry;
+      // Shared gaugePairId so all 3 sibling layers can be auto-selected as a group.
+      const gaugePairId = `gauge_group_${element.id}`;
       const pointerUpdates: Partial<WatchFaceElement> = {
         src: result.needlePng,
         assetFilename: `gauge_needle_${element.id}.png`,
@@ -267,6 +269,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         pivotY: nl.pivotFracY,
         previewAngle: naturalAngle,
         bounds: needleBounds,
+        gaugePairId,
       };
       if (parsed.detected.arcRange) {
         pointerUpdates.startAngle = arcStart;
@@ -296,6 +299,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           zIndex: bgZIndex,
           src: result.backgroundPng,
           assetFilename: `gauge_bg_${element.id}.png`,
+          gaugePairId,
         });
       }
 
@@ -318,6 +322,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           imageSwitcherFrameCount: result.arcFrames.length,
           assetFilename: `gauge_arc_${element.id}_frame`,
           dataType: element.dataType,
+          gaugePairId,
         });
       }
 
