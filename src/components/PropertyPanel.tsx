@@ -242,29 +242,31 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         if (staleIds.length > 0) onRemoveSiblingElements(staleIds);
       }
 
-      // Compute correct square bounds from the SVG's natural size, centered on the
-      // current element's center. This prevents the gauge from being squished into
-      // the default 40×120 placeholder bounds — all three layers (needle, bg, arc)
-      // must share identical bounds so they overlay pixel-perfectly on canvas and device.
-      const { naturalWidth, naturalHeight, pivotX, pivotY, naturalAngle, arcStart, arcEnd } = result.geometry;
-      const squareSize = Math.min(naturalWidth, naturalHeight);
-      const elCx = element.bounds.x + element.bounds.width / 2;
-      const elCy = element.bounds.y + element.bounds.height / 2;
-      const gaugeBounds = {
-        x: Math.round(elCx - squareSize / 2),
-        y: Math.round(elCy - squareSize / 2),
-        width: squareSize,
-        height: squareSize,
+      // Gauge center: preserve the current element's visual center on canvas.
+      // All three layers are placed so their own center-of-rotation pixel lands
+      // exactly on this point, keeping them pixel-aligned with each other.
+      const gaugeCx = Math.round(element.bounds.x + element.bounds.width / 2);
+      const gaugeCy = Math.round(element.bounds.y + element.bounds.height / 2);
+
+      const { layerLayouts } = result;
+      const nl = layerLayouts.needle;
+
+      const needleBounds = {
+        x: gaugeCx + nl.offsetX,
+        y: gaugeCy + nl.offsetY,
+        width: nl.canvasW,
+        height: nl.canvasH,
       };
 
-      // Update GAUGE_POINTER with needle PNG + auto-detected pivot + arc range + preview angle
+      // Update GAUGE_POINTER with needle PNG + tight-bbox pivot + arc range + preview angle
+      const { naturalAngle, arcStart, arcEnd } = result.geometry;
       const pointerUpdates: Partial<WatchFaceElement> = {
         src: result.needlePng,
         assetFilename: `gauge_needle_${element.id}.png`,
-        pivotX,
-        pivotY,
+        pivotX: nl.pivotFracX,
+        pivotY: nl.pivotFracY,
         previewAngle: naturalAngle,
-        bounds: gaugeBounds,
+        bounds: needleBounds,
       };
       if (parsed.detected.arcRange) {
         pointerUpdates.startAngle = arcStart;
@@ -274,11 +276,18 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
 
       // Create companion background IMG element if background was rendered
       if (parsed.detected.needle && result.backgroundPng && onAddSiblingElement) {
+        const bl = layerLayouts.background ?? nl;
+        const bgBounds = {
+          x: gaugeCx + bl.offsetX,
+          y: gaugeCy + bl.offsetY,
+          width: bl.canvasW,
+          height: bl.canvasH,
+        };
         const bgZIndex = Math.max(1, (element.zIndex ?? 1) - 1);
         onAddSiblingElement({
           type: 'IMG',
           name: `Gauge BG (${element.name})`,
-          bounds: { ...gaugeBounds },
+          bounds: bgBounds,
           visible: true,
           zIndex: bgZIndex,
           src: result.backgroundPng,
@@ -288,11 +297,18 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
 
       // Create IMG_LEVEL sibling for arc fill frames if detected
       if (result.arcFrames.length > 0 && onAddSiblingElement) {
+        const al = layerLayouts.arc ?? nl;
+        const arcBounds = {
+          x: gaugeCx + al.offsetX,
+          y: gaugeCy + al.offsetY,
+          width: al.canvasW,
+          height: al.canvasH,
+        };
         const arcZIndex = Math.max(2, (element.zIndex ?? 2) - 1);
         onAddSiblingElement({
           type: 'IMG_LEVEL',
           name: `Gauge Arc Fill (${element.name})`,
-          bounds: { ...gaugeBounds },
+          bounds: arcBounds,
           visible: true,
           zIndex: arcZIndex,
           images: result.arcFrames,

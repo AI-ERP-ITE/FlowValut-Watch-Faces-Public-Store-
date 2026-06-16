@@ -2,50 +2,153 @@
  * gaugeRenderer.ts
  * Spec 093 — Gauge Pipeline Phase 2: Render
  *
- * Pure rendering functions. Takes an immutable ParsedGauge, returns PNGs.
+ * Ratio-based sizing (revised):
+ *   1. Each layer's tight bounding box is measured via getBBox() in the live DOM.
+ *   2. The background is the anchor: scaled to ANCHOR_SIZE (145 px).
+ *   3. Needle and arc are scaled by the SAME ratio → correct relative sizes.
+ *   4. Each layer gets its own cropped SVG viewBox and non-square PNG canvas.
+ *   5. LayerLayouts in the result carries per-layer placement data for Phase 3.
  *
  * CONTRACT: parsed.needleNode / parsed.arcNode / parsed.backgroundNodes are
- * NEVER mutated. Every sub-function clones before touching anything.
+ * NEVER mutated. Every function clones before touching anything.
  * Calling renderGaugeAssets twice on the same ParsedGauge is safe and idempotent.
  *
- * NO DOM markers. NO React. NO side effects.
+ * NO DOM attribute markers. NO React. No global state.
  */
 
-import { renderSvgToDataUrl } from '@/lib/customIconStore';
-import type { ParsedGauge, GaugeRenderResult } from '@/lib/gaugeModel';
+// (renderSvgToDataUrl from customIconStore no longer used — replaced by renderSvgToDataUrlRect)
+import type { ParsedGauge, GaugeRenderResult, LayerLayout, LayerLayouts } from '@/lib/gaugeModel';
 
-// ── SVG builder ───────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** Target background size on the watch face in pixels (anchor for all layer ratios). */
+const ANCHOR_SIZE = 145;
+
+// ── Geometry helpers ──────────────────────────────────────────────────────────
+
+/** Extract translate(x,y) from a transform string. Returns {x:0,y:0} if not found. */
+function extractTranslateXY(transform: string): { x: number; y: number } {
+  const m = transform.match(/translate\(\s*(-?[\d.]+)[,\s]+(-?[\d.]+)/);
+  if (!m) return { x: 0, y: 0 };
+  return { x: parseFloat(m[1]) || 0, y: parseFloat(m[2]) || 0 };
+}
+
+/**
+ * Measure tight bounding box of a set of SVG nodes by inserting them into the
+ * live DOM under a hidden SVG, then calling getBBox().
+ *
+ * Returns bbox in the mainGroup LOCAL coordinate space (before the translate),
+ * i.e. the same space in which gauge geometry is expressed (origin = gauge center).
+ * Returns null if getBBox fails or returns zero area.
+ *
+ * Side effect: temporarily appends and removes a hidden <svg> from document.body.
+ */
+function measureNodesBBox(
+  template: ParsedGauge['template'],
+  nodes: Node[],
+  cx: number,
+  cy: number,
+): { x: number; y: number; w: number; h: number } | null {
+  if (nodes.length === 0) return null;
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNs, 'svg') as SVGSVGElement;
+  svg.setAttribute('viewBox', template.viewBox);
+  svg.setAttribute('width', String(template.width));
+  svg.setAttribute('height', String(template.height));
+  svg.style.cssText =
+    'position:absolute;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none;';
+  const g = document.createElementNS(svgNs, 'g') as SVGGElement;
+  g.setAttribute('transform', `translate(${cx},${cy})`);
+  for (const node of nodes) {
+    g.appendChild(document.adoptNode(node.cloneNode(true)));
+  }
+  svg.appendChild(g);
+  document.body.appendChild(svg);
+  try {
+    const bbox = g.getBBox();
+    if (!bbox || bbox.width <= 0 || bbox.height <= 0) return null;
+    return { x: bbox.x, y: bbox.y, w: bbox.width, h: bbox.height };
+  } catch {
+    return null;
+  } finally {
+    document.body.removeChild(svg);
+  }
+}
+
+/**
+ * Build a LayerLayout from a local-space bbox and a scale factor.
+ *
+ * pivotFracX/Y: gauge center (local 0,0) as fraction of canvas size.
+ * offsetX/Y: element.bounds.x = gaugeCenterScreenX + offsetX.
+ */
+function makeLayerLayout(
+  localBBox: { x: number; y: number; w: number; h: number },
+  scale: number,
+): LayerLayout {
+  const canvasW = Math.max(1, Math.round(localBBox.w * scale));
+  const canvasH = Math.max(1, Math.round(localBBox.h * scale));
+  return {
+    canvasW,
+    canvasH,
+    pivotFracX: (-localBBox.x) / localBBox.w,
+    pivotFracY: (-localBBox.y) / localBBox.h,
+    offsetX: Math.round(localBBox.x * scale),
+    offsetY: Math.round(localBBox.y * scale),
+  };
+}
+
+// ── Rendering helpers ─────────────────────────────────────────────────────────
+
+/** Render an SVG string to a PNG data URL at explicit (possibly non-square) dimensions. */
+function renderSvgToDataUrlRect(svgString: string, w: number, h: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('SVG render failed'));
+    };
+    img.src = url;
+  });
+}
 
 /**
  * Build a minimal SVG string from a set of nodes.
+ * viewportOverride: when provided, overrides viewBox/width/height for tight cropping.
  *
- * Uses DOMParser to create a proper SVG document context so that nodes
- * cloned from a DOMParser SVG document keep their namespace intact.
- * Mixing nodes from DOMParser into document.createElementNS() produces
- * broken namespace declarations that browsers reject as images.
- *
- * Each node is adopted into the SVG document context, so callers never
- * have to worry about mutations — adoptNode works on a clone.
- *
- * @param template   SVG structural metadata from ParsedGauge
- * @param nodes      Nodes to place inside the main translate <g>
+ * Uses DOMParser to create a proper SVG document context so nodes cloned from a
+ * DOMParser SVG document keep their namespace intact. Mixing namespaces produces
+ * broken declarations that browsers reject as images.
  */
 function buildSvgFromNodes(
   template: ParsedGauge['template'],
   nodes: Node[],
+  viewportOverride?: { viewBox: string; width: number; height: number },
 ): string {
   const svgNs = 'http://www.w3.org/2000/svg';
   const parser = new DOMParser();
+  const vb = viewportOverride?.viewBox ?? template.viewBox;
+  const vw = viewportOverride?.width ?? template.width;
+  const vh = viewportOverride?.height ?? template.height;
 
-  // Parse a minimal SVG to get a proper SVG namespace document
   const svgDoc = parser.parseFromString(
-    `<svg xmlns="${svgNs}" viewBox="${template.viewBox}" width="${template.width}" height="${template.height}"></svg>`,
+    `<svg xmlns="${svgNs}" viewBox="${vb}" width="${vw}" height="${vh}"></svg>`,
     'image/svg+xml',
   );
   const svgEl = svgDoc.querySelector('svg');
   if (!svgEl) return '';
 
-  // Re-attach <defs> using the same SVG parser context (preserves SVG namespace)
   if (template.defsHtml) {
     const defsDoc = parser.parseFromString(
       `<svg xmlns="${svgNs}">${template.defsHtml}</svg>`,
@@ -55,12 +158,9 @@ function buildSvgFromNodes(
     if (defsEl) svgEl.appendChild(svgDoc.adoptNode(defsEl.cloneNode(true)));
   }
 
-  // Main centering group — created in SVG document context
   const g = svgDoc.createElementNS(svgNs, 'g');
   g.setAttribute('transform', template.mainTransform);
-
   for (const node of nodes) {
-    // adoptNode transfers the cloned node into svgDoc's namespace context
     g.appendChild(svgDoc.adoptNode(node.cloneNode(true)));
   }
   svgEl.appendChild(g);
@@ -68,137 +168,23 @@ function buildSvgFromNodes(
   return new XMLSerializer().serializeToString(svgEl);
 }
 
-// ── Needle renderer ───────────────────────────────────────────────────────────
-
-/**
- * Render the needle-only PNG.
- *
- * Preserves the needle's original rotate() transform from the SVG as authored.
- * SVG gauge designers typically apply rotate(-90) to make the needle point UP
- * (12 o'clock), which is the direction Zepp IMG_POINTER expects at 0° rotation.
- * Stripping this rotation would misalign the needle by 90° on the watch.
- *
- * The SVG rotate value is the author's positioning intent — we keep it.
- */
-async function renderNeedlePng(parsed: ParsedGauge, renderSize: number): Promise<string> {
-  // Clone the needle node locally — NEVER mutate parsed.needleNode
-  const clone = parsed.needleNode.cloneNode(true) as Node;
-  const svgStr = buildSvgFromNodes(parsed.template, [clone]);
-  return renderSvgToDataUrl(svgStr, renderSize).catch(() => '');
-}
-
-// ── Background renderer ───────────────────────────────────────────────────────
-
-/**
- * Render the background PNG.
- * Contains all sibling nodes EXCEPT the needle and arc fill.
- * Non-visual elements (text labels etc.) are stripped to keep the background clean.
- */
-async function renderBackgroundPng(parsed: ParsedGauge, renderSize: number): Promise<string> {
-  if (parsed.backgroundNodes.length === 0) return '';
-  // Clone background nodes and strip any text labels that snuck in via group detection
-  const cleaned = parsed.backgroundNodes.map(n => {
-    const clone = n.cloneNode(true) as Element;
-    if (clone.querySelectorAll) {
-      for (const tag of ['title', 'desc', 'metadata', 'script']) {
-        for (const node of Array.from(clone.querySelectorAll(tag))) {
-          node.parentElement?.removeChild(node);
-        }
-      }
-    }
-    return clone;
-  });
-  const svgStr = buildSvgFromNodes(parsed.template, cleaned);
-  return renderSvgToDataUrl(svgStr, renderSize).catch(() => '');
-}
-
-// ── Arc frame renderer ────────────────────────────────────────────────────────
+// ── Arc utilities ─────────────────────────────────────────────────────────────
 
 function pathHasArcCommand(d: string): boolean {
   return /[Aa]/.test(d);
 }
 
-/**
- * Compute the full arc perimeter for dasharray math.
- * Uses the stored radius and angular span from geometry.
- */
 function computeArcLength(radius: number, spanDeg: number): number {
   return 2 * Math.PI * radius * (Math.abs(spanDeg) / 360);
 }
 
-/**
- * Render 11 arc fill frame PNGs (0%→100% fill).
- * Each frame: clones arcNode, strips non-visual elements (text labels etc.),
- * applies stroke-dasharray to show fillRatio of the arc, renders to PNG.
- * No mutations to parsed.arcNode.
- */
-async function renderArcFrames(parsed: ParsedGauge, renderSize: number): Promise<string[]> {
-  if (!parsed.arcNode) return [];
-
-  const { arcStart, arcEnd, arcRadius } = parsed.geometry;
-  const spanDeg = Math.abs(arcEnd - arcStart);
-  let arcLength = arcRadius > 0 ? computeArcLength(arcRadius, spanDeg) : 0;
-
-  // Fallback: if we couldn't compute from stored radius, scan arc paths in the node
-  if (arcLength <= 0) {
-    const tmpEl = parsed.arcNode.cloneNode(true) as Element;
-    const arcPaths = tmpEl.tagName?.toLowerCase() === 'path'
-      ? [tmpEl]
-      : Array.from(tmpEl.querySelectorAll?.('path') ?? []).filter(p => pathHasArcCommand(p.getAttribute('d') || ''));
-    for (const path of arcPaths) {
-      const d = path.getAttribute('d') || '';
-      if (pathHasArcCommand(d)) {
-        const m = d.match(/[Aa]\s*([\d.]+)/);
-        if (m) {
-          const r = parseFloat(m[1]);
-          if (isFinite(r) && r > 0) { arcLength = computeArcLength(r, spanDeg); break; }
-        }
-      }
+/** Remove non-visual / text elements from a clone in-place. */
+function stripNonVisual(el: Element): void {
+  for (const tag of ['text', 'tspan', 'title', 'desc', 'metadata', 'script', 'style']) {
+    for (const node of Array.from(el.querySelectorAll(tag))) {
+      node.parentElement?.removeChild(node);
     }
   }
-  if (arcLength <= 0) arcLength = 1000; // generous fallback
-
-  /** Strip all non-visual elements from an arc clone so text labels don't leak into frames. */
-  const stripNonVisual = (el: Element) => {
-    const NON_VISUAL = ['text', 'tspan', 'title', 'desc', 'metadata', 'script', 'style'];
-    for (const tag of NON_VISUAL) {
-      for (const node of Array.from(el.querySelectorAll(tag))) {
-        node.parentElement?.removeChild(node);
-      }
-    }
-  };
-
-  const FRAME_COUNT = 11;
-  const ratios = Array.from({ length: FRAME_COUNT }, (_, i) => i / (FRAME_COUNT - 1));
-
-  const frames = await Promise.all(
-    ratios.map(async (fillRatio) => {
-      // Clone arc node locally — NEVER mutate parsed.arcNode
-      const arcClone = parsed.arcNode!.cloneNode(true) as Element;
-
-      // Remove text labels / non-visual nodes that sneak in via parent group detection
-      stripNonVisual(arcClone);
-
-      const paths = arcClone.tagName?.toLowerCase() === 'path'
-        ? [arcClone]
-        : Array.from(arcClone.querySelectorAll?.('path') ?? []).filter(p =>
-            pathHasArcCommand(p.getAttribute('d') || ''),
-          );
-
-      for (const path of paths) {
-        if (!pathHasArcCommand(path.getAttribute('d') || '')) continue;
-        const fillLen = (fillRatio * arcLength).toFixed(2);
-        path.setAttribute('stroke-dasharray', `${fillLen} 9999`);
-        path.removeAttribute('stroke-dashoffset');
-        break;
-      }
-
-      const svgStr = buildSvgFromNodes(parsed.template, [arcClone]);
-      return renderSvgToDataUrl(svgStr, renderSize).catch(() => '');
-    }),
-  );
-
-  return frames.filter(f => f.length > 0);
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -206,23 +192,175 @@ async function renderArcFrames(parsed: ParsedGauge, renderSize: number): Promise
 /**
  * Phase 2: Render all gauge asset PNGs from an immutable ParsedGauge.
  *
- * Returns a GaugeRenderResult with needle PNG, background PNG, arc frames,
- * geometry pass-through, and a status message for the UI.
+ * Algorithm:
+ *   1. Measure tight bbox per layer via getBBox() (hidden DOM node, always cleaned up).
+ *   2. Scale = ANCHOR_SIZE / bg_natural_size.
+ *   3. Build LayerLayouts: canvas size + pivot fractions + screen offsets per layer.
+ *   4. Render each layer with a cropped viewBox at its own canvas size.
  *
- * This function is IDEMPOTENT: calling it multiple times with the same
- * ParsedGauge produces identical results.
+ * All three layers share the same scale so they are physically proportional on
+ * the watch face, with the gauge center as the common anchor point.
  */
 export async function renderGaugeAssets(
   parsed: ParsedGauge,
-  renderSize = 400,
+  _renderSize = 400, // kept for API compatibility only
 ): Promise<GaugeRenderResult> {
-  const [needlePng, backgroundPng, arcFrames] = await Promise.all([
-    renderNeedlePng(parsed, renderSize),
-    renderBackgroundPng(parsed, renderSize),
-    renderArcFrames(parsed, renderSize),
-  ]);
+  const { mainTransform } = parsed.template;
+  const { x: cx, y: cy } = extractTranslateXY(mainTransform);
 
-  // Build status message
+  // ── 1. Measure tight bboxes (local space, origin = gauge center) ──────────
+
+  const bgBBox = measureNodesBBox(parsed.template, parsed.backgroundNodes, cx, cy);
+  const needleBBox = measureNodesBBox(parsed.template, [parsed.needleNode], cx, cy);
+
+  // Strip text labels from arc before measuring (same as render path)
+  let arcBBox: { x: number; y: number; w: number; h: number } | null = null;
+  if (parsed.arcNode) {
+    const arcForMeasure = parsed.arcNode.cloneNode(true) as Element;
+    stripNonVisual(arcForMeasure);
+    arcBBox = measureNodesBBox(parsed.template, [arcForMeasure], cx, cy);
+  }
+
+  // ── 2. Scale anchored on background ───────────────────────────────────────
+
+  const bgNatural = bgBBox
+    ? Math.max(bgBBox.w, bgBBox.h)
+    : Math.max(parsed.template.width, parsed.template.height);
+  const scale = ANCHOR_SIZE / bgNatural;
+
+  // Fallback bbox when measurement fails: full viewBox centered on gauge pivot
+  const fallbackBBox = {
+    x: -(parsed.template.width / 2),
+    y: -(parsed.template.height / 2),
+    w: parsed.template.width,
+    h: parsed.template.height,
+  };
+
+  // ── 3. Build LayerLayouts ─────────────────────────────────────────────────
+
+  const needleLayout = makeLayerLayout(needleBBox ?? fallbackBBox, scale);
+  const bgLayout = bgBBox ? makeLayerLayout(bgBBox, scale) : null;
+  const arcLayout = arcBBox ? makeLayerLayout(arcBBox, scale) : null;
+
+  const layerLayouts: LayerLayouts = {
+    needle: needleLayout,
+    background: bgLayout,
+    arc: arcLayout,
+    scale,
+  };
+
+  /** Convert local bbox → viewBox override for tight crop. */
+  const makeVP = (
+    localBBox: { x: number; y: number; w: number; h: number },
+    layout: LayerLayout,
+  ) => ({
+    viewBox: `${(localBBox.x + cx).toFixed(4)} ${(localBBox.y + cy).toFixed(4)} ${localBBox.w.toFixed(4)} ${localBBox.h.toFixed(4)}`,
+    width: layout.canvasW,
+    height: layout.canvasH,
+  });
+
+  // ── 4. Render needle PNG ──────────────────────────────────────────────────
+
+  const needleVP = needleBBox ? makeVP(needleBBox, needleLayout) : undefined;
+  const needleSvg = buildSvgFromNodes(
+    parsed.template,
+    [parsed.needleNode.cloneNode(true)],
+    needleVP,
+  );
+  const needlePng = await renderSvgToDataUrlRect(
+    needleSvg,
+    needleLayout.canvasW,
+    needleLayout.canvasH,
+  ).catch(() => '');
+
+  // ── 5. Render background PNG ──────────────────────────────────────────────
+
+  let backgroundPng = '';
+  if (parsed.backgroundNodes.length > 0) {
+    const cleaned = parsed.backgroundNodes.map(n => {
+      const clone = n.cloneNode(true) as Element;
+      if (clone.querySelectorAll) {
+        for (const tag of ['title', 'desc', 'metadata', 'script']) {
+          for (const node of Array.from(clone.querySelectorAll(tag))) {
+            node.parentElement?.removeChild(node);
+          }
+        }
+      }
+      return clone;
+    });
+    const layout = bgLayout ?? needleLayout;
+    const bgVP = bgBBox ? makeVP(bgBBox, layout) : undefined;
+    const bgSvg = buildSvgFromNodes(parsed.template, cleaned, bgVP);
+    backgroundPng = await renderSvgToDataUrlRect(bgSvg, layout.canvasW, layout.canvasH).catch(
+      () => '',
+    );
+  }
+
+  // ── 6. Render arc fill frames ─────────────────────────────────────────────
+
+  let arcFrames: string[] = [];
+  if (parsed.arcNode && arcLayout) {
+    const { arcStart, arcEnd, arcRadius } = parsed.geometry;
+    const spanDeg = Math.abs(arcEnd - arcStart);
+    let arcLength = arcRadius > 0 ? computeArcLength(arcRadius, spanDeg) : 0;
+
+    if (arcLength <= 0) {
+      const tmpEl = parsed.arcNode.cloneNode(true) as Element;
+      const arcPaths =
+        tmpEl.tagName?.toLowerCase() === 'path'
+          ? [tmpEl]
+          : Array.from(tmpEl.querySelectorAll?.('path') ?? []).filter(p =>
+              pathHasArcCommand(p.getAttribute('d') || ''),
+            );
+      for (const path of arcPaths) {
+        const d = path.getAttribute('d') || '';
+        if (pathHasArcCommand(d)) {
+          const m = d.match(/[Aa]\s*([\d.]+)/);
+          if (m) {
+            const r = parseFloat(m[1]);
+            if (isFinite(r) && r > 0) {
+              arcLength = computeArcLength(r, spanDeg);
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (arcLength <= 0) arcLength = 1000;
+
+    const arcVP = arcBBox ? makeVP(arcBBox, arcLayout) : undefined;
+    const FRAME_COUNT = 11;
+    const ratios = Array.from({ length: FRAME_COUNT }, (_, i) => i / (FRAME_COUNT - 1));
+
+    arcFrames = (
+      await Promise.all(
+        ratios.map(async fillRatio => {
+          const arcClone = parsed.arcNode!.cloneNode(true) as Element;
+          stripNonVisual(arcClone);
+          const paths =
+            arcClone.tagName?.toLowerCase() === 'path'
+              ? [arcClone]
+              : Array.from(arcClone.querySelectorAll?.('path') ?? []).filter(p =>
+                  pathHasArcCommand(p.getAttribute('d') || ''),
+                );
+          for (const path of paths) {
+            if (!pathHasArcCommand(path.getAttribute('d') || '')) continue;
+            const fillLen = (fillRatio * arcLength).toFixed(2);
+            path.setAttribute('stroke-dasharray', `${fillLen} 9999`);
+            path.removeAttribute('stroke-dashoffset');
+            break;
+          }
+          const svgStr = buildSvgFromNodes(parsed.template, [arcClone], arcVP);
+          return renderSvgToDataUrlRect(svgStr, arcLayout.canvasW, arcLayout.canvasH).catch(
+            () => '',
+          );
+        }),
+      )
+    ).filter(f => f.length > 0);
+  }
+
+  // ── 7. Status message ─────────────────────────────────────────────────────
+
   const parts: string[] = ['Needle auto-detected.'];
   if (parsed.detected.arcRange) {
     const { arcStart, arcEnd, tickAngles } = parsed.geometry;
@@ -233,15 +371,21 @@ export async function renderGaugeAssets(
   if (parsed.detected.arc && arcFrames.length > 0) {
     parts.push(`Arc fill detected → ${arcFrames.length} IMG_LEVEL frames.`);
   }
-  const { pivotX, pivotY } = parsed.geometry;
-  parts.push(`Pivot: (${pivotX.toFixed(2)}, ${pivotY.toFixed(2)}).`);
-  if (backgroundPng) parts.push('Background IMG created below.');
+  const bgSz = bgLayout ? `${bgLayout.canvasW}×${bgLayout.canvasH}` : '?';
+  const nSz = `${needleLayout.canvasW}×${needleLayout.canvasH}`;
+  const arcSz = arcLayout ? `${arcLayout.canvasW}×${arcLayout.canvasH}` : 'n/a';
+  parts.push(
+    `Layers (px): bg ${bgSz}, needle ${nSz}, arc ${arcSz}. Scale ${scale.toFixed(3)}.`,
+  );
 
   return {
     needlePng,
     backgroundPng,
     arcFrames,
     geometry: parsed.geometry,
+    layerLayouts,
     statusMessage: parts.join(' '),
   };
 }
+
+

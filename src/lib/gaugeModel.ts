@@ -85,6 +85,51 @@ export interface ParsedGauge {
   };
 }
 
+// ── Layer layout (Phase 2 → Phase 3) ─────────────────────────────────────────
+
+/**
+ * Sizing and placement data for one rendered gauge layer.
+ * Computed from the layer's tight bounding box scaled to ANCHOR_SIZE.
+ */
+export interface LayerLayout {
+  /** PNG canvas width in pixels. */
+  canvasW: number;
+  /** PNG canvas height in pixels. */
+  canvasH: number;
+  /**
+   * Gauge rotation center as fraction of canvas width (0–1).
+   * Used as pivotX for GAUGE_POINTER (IMG_POINTER) widget.
+   */
+  pivotFracX: number;
+  /**
+   * Gauge rotation center as fraction of canvas height (0–1).
+   * Used as pivotY for GAUGE_POINTER (IMG_POINTER) widget.
+   */
+  pivotFracY: number;
+  /**
+   * Horizontal placement offset from gauge screen center.
+   * element.bounds.x = gaugeCenterScreenX + offsetX
+   */
+  offsetX: number;
+  /**
+   * Vertical placement offset from gauge screen center.
+   * element.bounds.y = gaugeCenterScreenY + offsetY
+   */
+  offsetY: number;
+}
+
+/** Per-layer layouts for all three gauge layers. */
+export interface LayerLayouts {
+  /** Needle layer. Always present (needle is required). */
+  needle: LayerLayout;
+  /** Background layer. Null if no background nodes detected or measurement failed. */
+  background: LayerLayout | null;
+  /** Arc fill layer. Null if no arc fill detected or measurement failed. */
+  arc: LayerLayout | null;
+  /** Scale factor applied: ANCHOR_SIZE / bg_natural_size. */
+  scale: number;
+}
+
 // ── Phase 2 output ───────────────────────────────────────────────────────────
 
 /**
@@ -92,14 +137,20 @@ export interface ParsedGauge {
  * Produced by Phase 2 (renderGaugeAssets). Consumed by Phase 3 (PropertyPanel).
  */
 export interface GaugeRenderResult {
-  /** Needle-only PNG — rotate() stripped so needle is at 0° natural orientation. */
+  /** Needle-only PNG. */
   needlePng: string;
-  /** Background PNG — gauge body with needle and arc fill removed. Empty string if detection failed. */
+  /** Background PNG — gauge body with needle and arc fill removed. Empty string if not present. */
   backgroundPng: string;
   /** 11 arc fill frame PNGs (0%→100% fill). Empty array if no arc detected. */
   arcFrames: string[];
   /** Geometry pass-through from ParsedGauge for Phase 3 element updates. */
   geometry: GaugeGeometry;
+  /**
+   * Per-layer sizing and placement data.
+   * Each layer has its own tight-cropped canvas size and screen offset,
+   * all derived from the same scale factor anchored on the background layer.
+   */
+  layerLayouts: LayerLayouts;
   /** Human-readable status message for the PropertyPanel status area. */
   statusMessage: string;
 }
