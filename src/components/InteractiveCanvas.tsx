@@ -1297,11 +1297,14 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           // Non-weather IMG_LEVEL (e.g. gauge arc frames from Spec 093).
           // Only render if frames are data: URLs — Firebase Storage URLs are
           // not renderable cross-origin and must stay as placeholder.
-          const midIdx = Math.floor(el.images.length / 2);
-          const frameSrc = el.images[midIdx];
+          // Use gaugeProgress so this arc visually matches the GAUGE_POINTER needle angle.
+          const frameIdx = el.dataType
+            ? Math.round(gaugeProgress(el) * (el.images.length - 1))
+            : Math.floor(el.images.length / 2);
+          const frameSrc = el.images[frameIdx];
           const isDataUrl = typeof frameSrc === 'string' && frameSrc.startsWith('data:');
           if (isDataUrl) {
-            const cacheKey = `__imglvl_${el.id}_mid_${midIdx}`;
+            const cacheKey = `__imglvl_${el.id}_f${frameIdx}`;
             const cached = iconCache.get(cacheKey);
             if (cached) {
               ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
@@ -1955,9 +1958,12 @@ function drawGaugePointer(
   const startAngle = el.startAngle ?? -90;
   const endAngle = el.endAngle ?? 90;
   // Spec 092: use previewAngle (set at build time from the needle's natural SVG rotate).
-  // This decouples the canvas preview position from start/end range bound changes.
-  // Falls back to midpoint for legacy elements that don't yet have previewAngle.
-  const angleDeg = el.previewAngle ?? (startAngle + endAngle) / 2;
+  // If dataType is set, compute the angle from the simulated sensor value so the
+  // canvas needle stays visually consistent with the arc fill preview.
+  // Falls back to previewAngle / midpoint for legacy elements without dataType.
+  const angleDeg = el.dataType
+    ? startAngle + gaugeProgress(el) * (endAngle - startAngle)
+    : (el.previewAngle ?? (startAngle + endAngle) / 2);
   const pivot = normalizeGaugePivot(el);
   const pivotX = width * pivot.pivotX;
   const pivotY = height * pivot.pivotY;

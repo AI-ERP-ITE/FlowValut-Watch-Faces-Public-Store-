@@ -3438,6 +3438,21 @@ function StudioApp() {
         else elementFiles.push(nextFile);
       }
 
+      // Inject inline IMG assets — any IMG element with a data URL src (e.g. gauge background PNG).
+      // These are not handled by the icon-effects loop above (no iconKey, no effects).
+      for (const el of allEditorElements) {
+        if (el.type !== 'IMG' || el.iconKey || !el.src?.startsWith('data:')) continue;
+        const filename = el.assetFilename || `img_inline_${el.id}.png`;
+        const { bytes } = decodeDataUrlToBytes(el.src, `Inline IMG ${filename}`);
+        const existingIdx = elementFiles.findIndex((f) => f.src === filename);
+        const nextFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
+        if (existingIdx >= 0) elementFiles[existingIdx] = nextFile;
+        else elementFiles.push(nextFile);
+        // Replace data URL with filename so JS code generator emits a proper path
+        el.src = filename;
+        el.assetFilename = filename;
+      }
+
       // Inject curved text PNGs for TEXT elements with curvedText
       for (const el of allEditorElements) {
         if (el.type === 'TEXT' && el.curvedText) {

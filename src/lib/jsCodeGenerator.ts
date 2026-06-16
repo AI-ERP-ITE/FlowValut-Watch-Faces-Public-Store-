@@ -511,10 +511,13 @@ function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
   const pivotY = Math.round(height * pivot.pivotY);
   const centerX = Math.round(element.bounds.x + pivotX);
   const centerY = Math.round(element.bounds.y + pivotY);
-  const startAngle = element.startAngle ?? -90;
-  const endAngle = element.endAngle ?? 90;
   const src = gaugePointerAssetName(element);
   const dataType = element.dataType || 'BATTERY';
+  // Stored angles use 0=12PM convention (same as canvas rotate reference).
+  // IMG_POINTER on device uses 0=3PM convention (same as ARC_PROGRESS per Manual).
+  // Convert: deviceAngle = storedAngle - 90.
+  const startAngle = (element.startAngle ?? -90) - 90;
+  const endAngle = (element.endAngle ?? 90) - 90;
   return `
                 // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
                 // DEBUG: bounds=(${element.bounds.x},${element.bounds.y},${width}x${height}) pivot=(${pivotX},${pivotY}) center=(${centerX},${centerY})
