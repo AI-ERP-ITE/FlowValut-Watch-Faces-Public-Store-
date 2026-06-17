@@ -398,20 +398,15 @@ export async function renderGaugeAssets(
   });
 
   // ── 5. Render needle PNG ──────────────────────────────────────────────────
-  // Strip any rotate() from the needle node so the PNG shows the needle pointing
-  // straight up (12PM = 0°). The firmware rotates it at runtime using start/end angle.
-  // Leaving the original rotate baked in would offset the needle by its natural resting angle.
+  // Strip rotate() ONLY from the top-level needle element so the PNG shows the needle
+  // pointing straight up (12PM). Children keep their own transforms intact.
   const needleNodeStripped = parsed.needleNode.cloneNode(true) as Element;
-  const stripRotate = (el: Element) => {
-    const t = el.getAttribute('transform') || '';
-    if (t) {
-      const stripped = t.replace(/rotate\([^)]*\)\s*/g, '').trim();
-      if (stripped) el.setAttribute('transform', stripped);
-      else el.removeAttribute('transform');
-    }
-    for (const child of Array.from(el.children ?? [])) stripRotate(child as Element);
-  };
-  stripRotate(needleNodeStripped);
+  const topTransform = needleNodeStripped.getAttribute?.('transform') || '';
+  if (topTransform) {
+    const stripped = topTransform.replace(/rotate\([^)]*\)\s*/g, '').trim();
+    if (stripped) needleNodeStripped.setAttribute('transform', stripped);
+    else needleNodeStripped.removeAttribute('transform');
+  }
 
   const needleVP = needleBBoxExp ? makeVP(needleBBoxExp, needleLayout) : undefined;
   const needleSvg = buildSvgFromNodes(
