@@ -491,6 +491,17 @@ export async function renderGaugeAssets(
           }
         }
       }
+      // Circle-arc technique: use full circumference (SVG mask handles the visual gap).
+      if (arcLength <= 0) {
+        const circleEl: Element | null =
+          tmpEl.tagName?.toLowerCase() === 'circle'
+            ? tmpEl
+            : (tmpEl.querySelector?.('circle') ?? null);
+        if (circleEl) {
+          const r = parseFloat(circleEl.getAttribute('r') || '0');
+          if (isFinite(r) && r > 0) arcLength = 2 * Math.PI * r;
+        }
+      }
     }
     if (arcLength <= 0) arcLength = 1000;
 
@@ -533,7 +544,7 @@ export async function renderGaugeAssets(
             line.parentElement?.removeChild(line);
           }
 
-          // Set arc fill dasharray
+          // Set arc fill dasharray on path-based arcs
           const paths =
             arcClone.tagName?.toLowerCase() === 'path'
               ? [arcClone]
@@ -546,6 +557,22 @@ export async function renderGaugeAssets(
             path.setAttribute('stroke-dasharray', `${fillLen} 9999`);
             path.removeAttribute('stroke-dashoffset');
             break;
+          }
+
+          // Set arc fill dasharray on circle-based arcs (stroke-dasharray technique)
+          const circleArcs = arcClone.tagName?.toLowerCase() === 'circle'
+            ? [arcClone]
+            : Array.from(arcClone.querySelectorAll?.('circle') ?? []).filter((c: Element) => {
+                const da = c.getAttribute('stroke-dasharray') || '';
+                if (!da) return false;
+                const firstDash = parseFloat(da.split(/[\s,]+/)[0] ?? '0');
+                const r = parseFloat(c.getAttribute('r') || '0');
+                if (!isFinite(firstDash) || !isFinite(r) || r <= 0) return false;
+                return (firstDash / (2 * Math.PI * r)) > 0.05;
+              });
+          for (const circle of circleArcs) {
+            const fillLen = (fillRatio * arcLength).toFixed(2);
+            circle.setAttribute('stroke-dasharray', `${fillLen} 9999`);
           }
 
           // Re-inject 11 ticks at calculated positions using borrowed styles

@@ -108,6 +108,7 @@ function pathHasArcCommand(d: string): boolean {
  * Detect arc fill group.
  * Priority 1: keyword match on <g> or <path> without rotate(N).
  * Priority 2: <g> containing a path with arc commands, without rotate(N).
+ * Priority 3: <circle> with stroke-dasharray used as arc fill (may have rotate()).
  */
 function detectArcFillGroup(searchRoot: Element, excludeEl: Element | null): Element | null {
   for (const el of Array.from(searchRoot.querySelectorAll('g, path'))) {
@@ -124,6 +125,21 @@ function detectArcFillGroup(searchRoot: Element, excludeEl: Element | null): Ele
       const d = path.getAttribute('d') || '';
       if (pathHasArcCommand(d)) return g;
     }
+  }
+  // Priority 3: <circle> with stroke-dasharray — circle-arc technique.
+  // These often have rotate() to set start angle, so we do NOT skip on rotate().
+  for (const circle of Array.from(searchRoot.querySelectorAll('circle'))) {
+    if (excludeEl && (excludeEl === circle || excludeEl.contains(circle))) continue;
+    const dasharray = circle.getAttribute('stroke-dasharray') || '';
+    if (!dasharray) continue;
+    const firstDash = parseFloat(dasharray.split(/[\s,]+/)[0] ?? '0');
+    const r = parseFloat(circle.getAttribute('r') || '0');
+    if (!isFinite(firstDash) || !isFinite(r) || r <= 0) continue;
+    const circumference = 2 * Math.PI * r;
+    // Arc fill: first dash is a meaningful fraction of circumference (5%–95%).
+    // Tiny first-dash values are tick/segment separators — skip those.
+    const ratio = firstDash / circumference;
+    if (ratio > 0.05 && ratio < 0.95) return circle;
   }
   return null;
 }
@@ -230,15 +246,21 @@ export function detectGauge(svgString: string): ParsedGauge | null {
   const pivotY = Math.max(0, Math.min(1, cy / vbH));
   const naturalAngle = arcRange ? (arcRange.startAngle + arcRange.endAngle) / 2 : 0;
 
-  // Arc radius from the arc fill group's path
+  // Arc radius from arc fill element (path-based or circle-based)
   let arcRadius = 0;
   if (arcFillEl) {
-    const arcPaths = arcFillEl.tagName.toLowerCase() === 'path'
-      ? [arcFillEl]
-      : Array.from(arcFillEl.querySelectorAll('path')).filter(p => pathHasArcCommand(p.getAttribute('d') || ''));
-    for (const p of arcPaths) {
-      const r = extractArcRadius(p.getAttribute('d') || '');
-      if (r !== null) { arcRadius = r; break; }
+    if (arcFillEl.tagName.toLowerCase() === 'circle') {
+      // Circle-arc technique: radius is the r attribute
+      const r = parseFloat(arcFillEl.getAttribute('r') || '0');
+      if (isFinite(r) && r > 0) arcRadius = r;
+    } else {
+      const arcPaths = arcFillEl.tagName.toLowerCase() === 'path'
+        ? [arcFillEl]
+        : Array.from(arcFillEl.querySelectorAll('path')).filter(p => pathHasArcCommand(p.getAttribute('d') || ''));
+      for (const p of arcPaths) {
+        const r = extractArcRadius(p.getAttribute('d') || '');
+        if (r !== null) { arcRadius = r; break; }
+      }
     }
   }
 
