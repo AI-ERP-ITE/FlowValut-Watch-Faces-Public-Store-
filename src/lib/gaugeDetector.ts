@@ -268,28 +268,44 @@ export function detectGauge(svgString: string): ParsedGauge | null {
   // After this point the original doc is no longer referenced.
   const needleNode: Node | null = needleEl ? needleEl.cloneNode(true) as Node : null;
 
-  // Collect arc fill + any sibling elements that sit between arcFillEl and needleEl in DOM order.
-  // These are overlay elements (ticks, glows, etc.) that belong visually ON the arc layer.
-  // We wrap them in a synthetic <g> so the renderer gets one arcNode containing the full arc section.
+  // Collect arc fill + sibling elements that visually belong ON the arc layer.
+  // These include ticks/glows AFTER arcFillEl (between arc and needle) AND
+  // tick groups BEFORE arcFillEl (common pattern: ticks drawn before the active arc).
+  // All of these get moved into arcNode and removed from background.
   let arcNode: Node | null = null;
-  const arcOverlayEls: Element[] = []; // siblings after arcFillEl, before needleEl, not the needle
+  const arcOverlayEls: Element[] = [];
   if (arcFillEl) {
     const parent = arcFillEl.parentElement;
     if (parent) {
-      let afterArc = false;
+      // Helper: is this element a tick/line group (not text-only, not background geometry)?
+      const isTickOrGlowGroup = (el: Element): boolean => {
+        const tag = el.tagName.toLowerCase();
+        // Pure text → background
+        if (tag === 'text') return false;
+        if (tag === 'g' && el.querySelectorAll('text').length > 0 && el.querySelectorAll('path, line, circle, rect').length === 0) return false;
+        // Has lines with rotate() → tick group
+        const lines: Element[] = el.tagName === 'line' ? [el] : Array.from(el.querySelectorAll('line'));
+        if (lines.some(l => (l.getAttribute('transform') || '').includes('rotate('))) return true;
+        return false;
+      };
+
+      let reachedArc = false;
       for (const child of Array.from(parent.children)) {
-        if (child === arcFillEl) { afterArc = true; continue; }
-        if (!afterArc) continue;
-        if (child === needleEl) break; // stop at needle
-        // Skip text/typography siblings — those belong to background
-        const isText = child.tagName.toLowerCase() === 'text' ||
-          (child.tagName.toLowerCase() === 'g' && child.querySelectorAll('text').length > 0 && child.querySelectorAll('path, line, circle, rect').length === 0);
-        if (!isText) arcOverlayEls.push(child);
+        if (child === arcFillEl) { reachedArc = true; continue; }
+        if (child === needleEl) break;
+        if (!reachedArc) {
+          // Before arc fill: only collect tick/glow groups
+          if (isTickOrGlowGroup(child)) arcOverlayEls.push(child);
+        } else {
+          // After arc fill: collect all non-text siblings
+          const isText = child.tagName.toLowerCase() === 'text' ||
+            (child.tagName.toLowerCase() === 'g' && child.querySelectorAll('text').length > 0 && child.querySelectorAll('path, line, circle, rect').length === 0);
+          if (!isText) arcOverlayEls.push(child);
+        }
       }
     }
 
     if (arcOverlayEls.length > 0) {
-      // Wrap arcFillEl + overlays in a synthetic <g>
       const wrapper = doc.createElementNS('http://www.w3.org/2000/svg', 'g');
       wrapper.appendChild(arcFillEl.cloneNode(true));
       for (const overlay of arcOverlayEls) wrapper.appendChild(overlay.cloneNode(true));

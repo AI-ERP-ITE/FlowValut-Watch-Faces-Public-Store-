@@ -514,11 +514,8 @@ export async function renderGaugeAssets(
     const { tickStyles } = parsed.geometry;
     const hasTicks = tickStyles.length > 0;
     const svgNsUri = 'http://www.w3.org/2000/svg';
-
-    // SVG-space to canvas-space scale (for tick length rescaling)
-    const svgNaturalSize = parsed.template.width; // viewBox width
-    const canvasSize = arcLayout.canvasW;
-    const tickScale = svgNaturalSize > 0 ? canvasSize / svgNaturalSize : 1;
+    // Ticks use original SVG coordinate values — the viewBox crop scales them automatically.
+    // No manual tickScale needed.
 
     // For each of the 11 positions, find closest HTML tick by angle difference
     const calcTick11: Array<{ angle: number; style: typeof tickStyles[0] } | null> = ratios.map((ratio) => {
@@ -583,10 +580,10 @@ export async function renderGaugeAssets(
               if (!tickDef) continue;
               const { angle, style } = tickDef;
               const lineEl = (arcClone.ownerDocument ?? document).createElementNS(svgNsUri, 'line');
-              lineEl.setAttribute('y1', (style.y1 * tickScale).toFixed(2));
-              lineEl.setAttribute('y2', (style.y2 * tickScale).toFixed(2));
+              lineEl.setAttribute('y1', style.y1.toFixed(2));
+              lineEl.setAttribute('y2', style.y2.toFixed(2));
               lineEl.setAttribute('stroke', style.stroke);
-              lineEl.setAttribute('stroke-width', (style.strokeWidth * tickScale).toFixed(2));
+              lineEl.setAttribute('stroke-width', style.strokeWidth.toFixed(2));
               lineEl.setAttribute('stroke-linecap', style.linecap);
               if (style.filter) lineEl.setAttribute('filter', style.filter);
               lineEl.setAttribute('transform', `rotate(${angle})`);
