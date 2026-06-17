@@ -358,20 +358,15 @@ export function detectGauge(svgString: string): ParsedGauge | null {
     // Clone mainGroup children into a temporary container
     const bgGroupClone = mainGroup.el.cloneNode(true) as Element;
 
-    // Remove needle from clone using stored path
-    if (needlePath) {
-      const clonedNeedle = resolveDomPath(bgGroupClone, needlePath);
-      clonedNeedle?.parentElement?.removeChild(clonedNeedle);
-    }
-    // Remove arc fill from clone using stored path
-    if (arcPath) {
-      const clonedArc = resolveDomPath(bgGroupClone, arcPath);
-      clonedArc?.parentElement?.removeChild(clonedArc);
-    }
-    // Remove arc overlay siblings from clone (ticks etc. baked into arc frames instead)
-    for (const overlayPath of overlayPaths) {
-      const clonedOverlay = resolveDomPath(bgGroupClone, overlayPath);
-      clonedOverlay?.parentElement?.removeChild(clonedOverlay);
+    // Resolve ALL elements first (before any removal), then remove.
+    // Removing one element shifts sibling indices — resolving upfront avoids hitting wrong nodes.
+    const toRemove: (Element | null)[] = [
+      needlePath ? resolveDomPath(bgGroupClone, needlePath) : null,
+      arcPath ? resolveDomPath(bgGroupClone, arcPath) : null,
+      ...overlayPaths.map(p => resolveDomPath(bgGroupClone, p)),
+    ];
+    for (const el of toRemove) {
+      el?.parentElement?.removeChild(el);
     }
 
     // Remaining children of the clone = clean background at any depth
