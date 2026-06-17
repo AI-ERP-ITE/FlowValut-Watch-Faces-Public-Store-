@@ -322,10 +322,10 @@ export async function renderGaugeAssets(
   const { x: cx, y: cy } = extractTranslateXY(mainTransform);
 
   // ── 0. Strip needle rotation BEFORE measurement (so bbox matches rendered PNG) ─
-  // Needle PNG is rendered without the top-level rotate() so it points straight up (12PM).
-  // We must measure the STRIPPED needle so needleVP matches what is actually rendered.
-  const needleNodeStripped = parsed.needleNode.cloneNode(true) as Element;
-  {
+  // Only applies when needle is present. Arc-only gauges skip this step.
+  let needleNodeStripped: Element | null = null;
+  if (parsed.needleNode) {
+    needleNodeStripped = parsed.needleNode.cloneNode(true) as Element;
     const topT = needleNodeStripped.getAttribute?.('transform') || '';
     if (topT) {
       const stripped = topT.replace(/rotate\([^)]*\)\s*/g, '').trim();
@@ -337,7 +337,9 @@ export async function renderGaugeAssets(
   // ── 1. Measure tight bboxes (local space, origin = gauge center) ──────────
 
   const bgBBox = measureNodesBBox(parsed.template, parsed.backgroundNodes, cx, cy);
-  const needleBBox = measureNodesBBox(parsed.template, [needleNodeStripped], cx, cy);
+  const needleBBox = needleNodeStripped
+    ? measureNodesBBox(parsed.template, [needleNodeStripped], cx, cy)
+    : null;
 
   // Strip text labels from arc before measuring (same as render path)
   let arcBBox: { x: number; y: number; w: number; h: number } | null = null;
@@ -347,15 +349,17 @@ export async function renderGaugeAssets(
     arcBBox = measureNodesBBox(parsed.template, [arcForMeasure], cx, cy);
   }
 
-  // ── 2. Scale anchored on background ───────────────────────────────────────
-
-  const bgNatural = bgBBox
-    ? Math.max(bgBBox.w, bgBBox.h)
+  // ── 2. Scale anchored on best available layer ────────────────────────────────
+  // Prefer bg bbox, fallback to arc, then needle, then viewBox.
+  const anchorBBox = bgBBox ?? arcBBox ?? needleBBox;
+  const bgNatural = anchorBBox
+    ? Math.max(anchorBBox.w, anchorBBox.h)
     : Math.max(parsed.template.width, parsed.template.height);
   const scale = ANCHOR_SIZE / bgNatural;
 
   // Fallback bbox when measurement fails: full viewBox centered on gauge pivot
-  const fallbackBBox = {
+  // (kept for potential future use)
+  void {
     x: -(parsed.template.width / 2),
     y: -(parsed.template.height / 2),
     w: parsed.template.width,
@@ -380,7 +384,9 @@ export async function renderGaugeAssets(
     return expandBBox(geoBBox, sp, fp);
   };
 
-  const needleBBoxExp = expandLayer(needleBBox, [needleNodeStripped]);
+  const needleBBoxExp = needleBBox && needleNodeStripped
+    ? expandLayer(needleBBox, [needleNodeStripped])
+    : null;
   const bgBBoxExp     = expandLayer(bgBBox, parsed.backgroundNodes);
   const arcBBoxExp    = arcBBox
     ? expandLayer(arcBBox, parsed.arcNode ? [parsed.arcNode] : [])
@@ -388,9 +394,12 @@ export async function renderGaugeAssets(
 
   // ── 4. Build LayerLayouts ─────────────────────────────────────────────────
 
-  const needleLayout = makeLayerLayout(needleBBoxExp ?? fallbackBBox, scale);
+  const needleLayout = needleBBoxExp ? makeLayerLayout(needleBBoxExp, scale) : null;
   const bgLayout = bgBBoxExp ? makeLayerLayout(bgBBoxExp, scale) : null;
   const arcLayout = arcBBoxExp ? makeLayerLayout(arcBBoxExp, scale) : null;
+
+  // Fallback layout for when no specific layer has a bbox (rare edge case)
+  void (needleLayout ?? arcLayout ?? bgLayout);
 
   const layerLayouts: LayerLayouts = {
     needle: needleLayout,
@@ -411,19 +420,22 @@ export async function renderGaugeAssets(
   });
 
   // ── 5. Render needle PNG ──────────────────────────────────────────────────
-  // needleNodeStripped was already prepared in step 0 (rotation stripped, bbox measured from it).
+  // Skipped for arc-only gauges (needleNodeStripped is null).
 
-  const needleVP = needleBBoxExp ? makeVP(needleBBoxExp, needleLayout) : undefined;
-  const needleSvg = buildSvgFromNodes(
-    parsed.template,
-    [needleNodeStripped],
-    needleVP,
-  );
-  const needlePng = await renderSvgToDataUrlRect(
-    needleSvg,
-    needleLayout.canvasW,
-    needleLayout.canvasH,
-  ).catch(() => '');
+  let needlePng = '';
+  if (needleNodeStripped && needleLayout) {
+    const needleVP = needleBBoxExp ? makeVP(needleBBoxExp, needleLayout) : undefined;
+    const needleSvg = buildSvgFromNodes(
+      parsed.template,
+      [needleNodeStripped],
+      needleVP,
+    );
+    needlePng = await renderSvgToDataUrlRect(
+      needleSvg,
+      needleLayout.canvasW,
+      needleLayout.canvasH,
+    ).catch(() => '');
+  }
 
   // ── 6. Render background PNG ──────────────────────────────────────────────
 
@@ -440,12 +452,14 @@ export async function renderGaugeAssets(
       }
       return clone;
     });
-    const layout = bgLayout ?? needleLayout;
-    const bgVP = bgBBoxExp ? makeVP(bgBBoxExp, layout) : undefined;
-    const bgSvg = buildSvgFromNodes(parsed.template, cleaned, bgVP);
-    backgroundPng = await renderSvgToDataUrlRect(bgSvg, layout.canvasW, layout.canvasH).catch(
-      () => '',
-    );
+    const layout = bgLayout ?? needleLayout ?? arcLayout;
+    if (layout) {
+      const bgVP = bgBBoxExp ? makeVP(bgBBoxExp, layout) : undefined;
+      const bgSvg = buildSvgFromNodes(parsed.template, cleaned, bgVP);
+      backgroundPng = await renderSvgToDataUrlRect(bgSvg, layout.canvasW, layout.canvasH).catch(
+        () => '',
+      );
+    }
   }
 
   // ── 7. Render arc fill frames ─────────────────────────────────────────────
@@ -576,7 +590,7 @@ export async function renderGaugeAssets(
     parts.push(`Arc fill detected → ${arcFrames.length} IMG_LEVEL frames.`);
   }
   const bgSz = bgLayout ? `${bgLayout.canvasW}×${bgLayout.canvasH}` : '?';
-  const nSz = `${needleLayout.canvasW}×${needleLayout.canvasH}`;
+  const nSz = needleLayout ? `${needleLayout.canvasW}×${needleLayout.canvasH}` : 'n/a';
   const arcSz = arcLayout ? `${arcLayout.canvasW}×${arcLayout.canvasH}` : 'n/a';
   parts.push(
     `Layers (px): bg ${bgSz}, needle ${nSz}, arc ${arcSz}. Scale ${scale.toFixed(3)}.`,

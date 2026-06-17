@@ -83,8 +83,8 @@ export interface GaugeGeometry {
  * all rendering sub-functions clone them again before any manipulation.
  */
 export interface ParsedGauge {
-  /** Deep clone of the detected needle <g> element. */
-  needleNode: Node;
+  /** Deep clone of the detected needle <g> element. Null for arc-only gauges. */
+  needleNode: Node | null;
   /** Deep clone of the detected arc fill <g> or <path>. Null if not found. */
   arcNode: Node | null;
   /**
@@ -140,8 +140,8 @@ export interface LayerLayout {
 
 /** Per-layer layouts for all three gauge layers. */
 export interface LayerLayouts {
-  /** Needle layer. Always present (needle is required). */
-  needle: LayerLayout;
+  /** Needle layer. Null for arc-only gauges. */
+  needle: LayerLayout | null;
   /** Background layer. Null if no background nodes detected or measurement failed. */
   background: LayerLayout | null;
   /** Arc fill layer. Null if no arc fill detected or measurement failed. */
@@ -157,7 +157,7 @@ export interface LayerLayouts {
  * Produced by Phase 2 (renderGaugeAssets). Consumed by Phase 3 (PropertyPanel).
  */
 export interface GaugeRenderResult {
-  /** Needle-only PNG. */
+  /** Needle-only PNG. Empty string for arc-only gauges. */
   needlePng: string;
   /** Background PNG — gauge body with needle and arc fill removed. Empty string if not present. */
   backgroundPng: string;

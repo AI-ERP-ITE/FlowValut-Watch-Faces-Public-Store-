@@ -217,15 +217,15 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       // Phase 1: detect — pure read, returns immutable cloned artifacts
       const parsed = detectGauge(frame);
       if (!parsed) {
-        setCreatorStatus('⚠ Needle not detected in SVG. Check that gauge has a rotating <g> with path children.');
+        setCreatorStatus('⚠ No needle or arc detected in SVG. Ensure the gauge has a rotating group or arc fill path.');
         return;
       }
 
       // Phase 2: render — pure functions, no side effects
       const result = await renderGaugeAssets(parsed, 400);
 
-      if (!result.needlePng) {
-        setCreatorStatus('Gauge render failed. Ensure SVG includes a valid needle group.');
+      if (!result.needlePng && result.arcFrames.length === 0) {
+        setCreatorStatus('Gauge render failed. No needle or arc fill could be rendered.');
         return;
       }
 
@@ -247,83 +247,97 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       // exactly on this point, keeping them pixel-aligned with each other.
       const gaugeCx = Math.round(element.bounds.x + element.bounds.width / 2);
       const gaugeCy = Math.round(element.bounds.y + element.bounds.height / 2);
+      // Shared gaugePairId so all sibling layers auto-select as a group.
+      const gaugePairId = `gauge_group_${element.id}`;
 
       const { layerLayouts } = result;
       const nl = layerLayouts.needle;
+      // For arc-only gauges nl may be null — fall back to arc layout.
+      const refLayout = nl ?? layerLayouts.arc ?? { canvasW: 400, canvasH: 400, pivotFracX: 0.5, pivotFracY: 0.5, offsetX: -200, offsetY: -200 };
 
-      const needleBounds = {
-        x: gaugeCx + nl.offsetX,
-        y: gaugeCy + nl.offsetY,
-        width: nl.canvasW,
-        height: nl.canvasH,
-      };
-
-      // Update GAUGE_POINTER with needle PNG + tight-bbox pivot + arc range + preview angle
-      const { naturalAngle, arcStart, arcEnd } = result.geometry;
-      // Shared gaugePairId so all 3 sibling layers can be auto-selected as a group.
-      const gaugePairId = `gauge_group_${element.id}`;
-      const pointerUpdates: Partial<WatchFaceElement> = {
-        src: result.needlePng,
-        assetFilename: `gauge_needle_${element.id}.png`,
-        pivotX: nl.pivotFracX,
-        pivotY: nl.pivotFracY,
-        previewAngle: naturalAngle,
-        bounds: needleBounds,
-        gaugePairId,
-      };
-      if (parsed.detected.arcRange) {
-        pointerUpdates.startAngle = arcStart;
-        pointerUpdates.endAngle = arcEnd;
+      // Only update needle bounds / src if needle was actually rendered
+      if (result.needlePng && nl) {
+        const needleBounds = {
+          x: gaugeCx + nl.offsetX,
+          y: gaugeCy + nl.offsetY,
+          width: nl.canvasW,
+          height: nl.canvasH,
+        };
+        const { naturalAngle, arcStart, arcEnd } = result.geometry;
+        const pointerUpdates: Partial<WatchFaceElement> = {
+          src: result.needlePng,
+          assetFilename: `gauge_needle_${element.id}.png`,
+          pivotX: nl.pivotFracX,
+          pivotY: nl.pivotFracY,
+          previewAngle: naturalAngle,
+          bounds: needleBounds,
+          gaugePairId,
+        };
+        if (parsed.detected.arcRange) {
+          pointerUpdates.startAngle = arcStart;
+          pointerUpdates.endAngle = arcEnd;
+        }
+        update(pointerUpdates);
+      } else {
+        // Arc-only: still store arc range on the GAUGE_POINTER element (for ZPK metadata)
+        if (parsed.detected.arcRange) {
+          const { arcStart, arcEnd } = result.geometry;
+          update({ startAngle: arcStart, endAngle: arcEnd, gaugePairId });
+        }
       }
-      update(pointerUpdates);
 
-      // Shared zIndex values — needle is top, arc is middle, bg is bottom.
+      // Shared zIndex values
       const needleZ = element.zIndex ?? 10;
       const bgZIndex = Math.max(0, needleZ - 2);
       const arcZIndex = Math.max(bgZIndex + 1, needleZ - 1);
+      void refLayout; // used below via layerLayouts
 
       // Create companion background IMG element if background was rendered
-      if (parsed.detected.needle && result.backgroundPng && onAddSiblingElement) {
-        const bl = layerLayouts.background ?? nl;
-        const bgBounds = {
-          x: gaugeCx + bl.offsetX,
-          y: gaugeCy + bl.offsetY,
-          width: bl.canvasW,
-          height: bl.canvasH,
-        };
-        onAddSiblingElement({
-          type: 'IMG',
-          name: `Gauge BG (${element.name})`,
-          bounds: bgBounds,
-          visible: true,
-          zIndex: bgZIndex,
-          src: result.backgroundPng,
-          assetFilename: `gauge_bg_${element.id}.png`,
-          gaugePairId,
-        });
+      if (result.backgroundPng && onAddSiblingElement) {
+        const bl = layerLayouts.background ?? layerLayouts.needle ?? layerLayouts.arc;
+        if (bl) {
+          const bgBounds = {
+            x: gaugeCx + bl.offsetX,
+            y: gaugeCy + bl.offsetY,
+            width: bl.canvasW,
+            height: bl.canvasH,
+          };
+          onAddSiblingElement({
+            type: 'IMG',
+            name: `Gauge BG (${element.name})`,
+            bounds: bgBounds,
+            visible: true,
+            zIndex: bgZIndex,
+            src: result.backgroundPng,
+            assetFilename: `gauge_bg_${element.id}.png`,
+            gaugePairId,
+          });
+        }
       }
 
       // Create IMG_LEVEL sibling for arc fill frames if detected
       if (result.arcFrames.length > 0 && onAddSiblingElement) {
-        const al = layerLayouts.arc ?? nl;
-        const arcBounds = {
-          x: gaugeCx + al.offsetX,
-          y: gaugeCy + al.offsetY,
-          width: al.canvasW,
-          height: al.canvasH,
-        };
-        onAddSiblingElement({
-          type: 'IMG_LEVEL',
-          name: `Gauge Arc Fill (${element.name})`,
-          bounds: arcBounds,
-          visible: true,
-          zIndex: arcZIndex,
-          images: result.arcFrames,
-          imageSwitcherFrameCount: result.arcFrames.length,
-          assetFilename: `gauge_arc_${element.id}_frame`,
-          dataType: element.dataType,
-          gaugePairId,
-        });
+        const al = layerLayouts.arc ?? layerLayouts.needle ?? layerLayouts.background;
+        if (al) {
+          const arcBounds = {
+            x: gaugeCx + al.offsetX,
+            y: gaugeCy + al.offsetY,
+            width: al.canvasW,
+            height: al.canvasH,
+          };
+          onAddSiblingElement({
+            type: 'IMG_LEVEL',
+            name: `Gauge Arc Fill (${element.name})`,
+            bounds: arcBounds,
+            visible: true,
+            zIndex: arcZIndex,
+            images: result.arcFrames,
+            imageSwitcherFrameCount: result.arcFrames.length,
+            assetFilename: `gauge_arc_${element.id}_frame`,
+            dataType: element.dataType,
+            gaugePairId,
+          });
+        }
       }
 
       setCreatorStatus(result.statusMessage);

@@ -212,10 +212,15 @@ export function detectGauge(svgString: string): ParsedGauge | null {
   // ── 5. Detect needle ──────────────────────────────────────────────────────
   const searchRoot = mainGroup?.el ?? svgEl;
   const needleEl = detectNeedleGroup(searchRoot);
-  if (!needleEl) return null;
+  // Allow arc-only gauges — needleEl may be null.
+  // But we need at least one of needle or arc, otherwise there's nothing to detect.
+  const arcFillElEarly = needleEl ? null : detectArcFillGroup(searchRoot, null);
+  if (!needleEl && !arcFillElEarly) return null;
 
   // ── 6. Detect arc fill ────────────────────────────────────────────────────
-  const arcFillEl = detectArcFillGroup(searchRoot, needleEl);
+  const arcFillEl = needleEl
+    ? detectArcFillGroup(searchRoot, needleEl)
+    : arcFillElEarly;
 
   // ── 7. Detect arc range ───────────────────────────────────────────────────
   const arcRange = detectArcRange(svgEl, needleEl);
@@ -239,7 +244,7 @@ export function detectGauge(svgString: string): ParsedGauge | null {
 
   // ── 9. Deep-clone nodes IMMEDIATELY ──────────────────────────────────────
   // After this point the original doc is no longer referenced.
-  const needleNode = needleEl.cloneNode(true) as Node;
+  const needleNode: Node | null = needleEl ? needleEl.cloneNode(true) as Node : null;
 
   // Collect arc fill + any sibling elements that sit between arcFillEl and needleEl in DOM order.
   // These are overlay elements (ticks, glows, etc.) that belong visually ON the arc layer.
@@ -308,7 +313,7 @@ export function detectGauge(svgString: string): ParsedGauge | null {
       return cur;
     };
 
-    const needlePath = getDomPath(searchRoot, needleEl);
+    const needlePath = needleEl ? getDomPath(searchRoot, needleEl) : null;
     const arcPath = arcFillEl ? getDomPath(searchRoot, arcFillEl) : null;
     const overlayPaths = arcOverlayEls.map(el => getDomPath(searchRoot, el)).filter((p): p is number[] => p !== null);
 
@@ -366,7 +371,7 @@ export function detectGauge(svgString: string): ParsedGauge | null {
     template,
     geometry,
     detected: {
-      needle: true,
+      needle: needleEl !== null,
       arc: arcFillEl !== null,
       arcRange: arcRange !== null,
     },
