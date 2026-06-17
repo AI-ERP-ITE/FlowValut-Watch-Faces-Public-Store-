@@ -279,8 +279,35 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         }
         update(pointerUpdates);
       } else {
-        // Arc-only: still store arc range on the GAUGE_POINTER element (for ZPK metadata)
-        if (parsed.detected.arcRange) {
+        // Arc-only (no needle): update bounds + arc range on the GAUGE_POINTER element.
+        // Use arc layout if available, fallback to bg layout.
+        const al = layerLayouts.arc ?? layerLayouts.background;
+        if (al) {
+          const arcBoundsForPointer = {
+            x: gaugeCx + al.offsetX,
+            y: gaugeCy + al.offsetY,
+            width: al.canvasW,
+            height: al.canvasH,
+          };
+          const arcOnlyUpdates: Partial<WatchFaceElement> = {
+            bounds: arcBoundsForPointer,
+            pivotX: al.pivotFracX,
+            pivotY: al.pivotFracY,
+            gaugePairId,
+          };
+          // Use first arc frame or background as preview src so canvas shows something.
+          const previewSrc = result.arcFrames[0] || result.backgroundPng;
+          if (previewSrc) {
+            arcOnlyUpdates.src = previewSrc;
+            arcOnlyUpdates.assetFilename = `gauge_arc_preview_${element.id}.png`;
+          }
+          if (parsed.detected.arcRange) {
+            const { arcStart, arcEnd } = result.geometry;
+            arcOnlyUpdates.startAngle = arcStart;
+            arcOnlyUpdates.endAngle = arcEnd;
+          }
+          update(arcOnlyUpdates);
+        } else if (parsed.detected.arcRange) {
           const { arcStart, arcEnd } = result.geometry;
           update({ startAngle: arcStart, endAngle: arcEnd, gaugePairId });
         }
