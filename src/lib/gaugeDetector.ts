@@ -292,7 +292,7 @@ export function detectGauge(svgString: string): ParsedGauge | null {
       let reachedArc = false;
       for (const child of Array.from(parent.children)) {
         if (child === arcFillEl) { reachedArc = true; continue; }
-        if (child === needleEl) break;
+        if (child === needleEl) continue; // skip needle but keep scanning for remaining ticks
         if (!reachedArc) {
           // Before arc fill: only collect tick/glow groups
           if (isTickOrGlowGroup(child)) arcOverlayEls.push(child);
