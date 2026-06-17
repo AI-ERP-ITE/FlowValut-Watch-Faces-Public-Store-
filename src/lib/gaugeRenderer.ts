@@ -321,10 +321,23 @@ export async function renderGaugeAssets(
   const { mainTransform } = parsed.template;
   const { x: cx, y: cy } = extractTranslateXY(mainTransform);
 
+  // ── 0. Strip needle rotation BEFORE measurement (so bbox matches rendered PNG) ─
+  // Needle PNG is rendered without the top-level rotate() so it points straight up (12PM).
+  // We must measure the STRIPPED needle so needleVP matches what is actually rendered.
+  const needleNodeStripped = parsed.needleNode.cloneNode(true) as Element;
+  {
+    const topT = needleNodeStripped.getAttribute?.('transform') || '';
+    if (topT) {
+      const stripped = topT.replace(/rotate\([^)]*\)\s*/g, '').trim();
+      if (stripped) needleNodeStripped.setAttribute('transform', stripped);
+      else needleNodeStripped.removeAttribute('transform');
+    }
+  }
+
   // ── 1. Measure tight bboxes (local space, origin = gauge center) ──────────
 
   const bgBBox = measureNodesBBox(parsed.template, parsed.backgroundNodes, cx, cy);
-  const needleBBox = measureNodesBBox(parsed.template, [parsed.needleNode], cx, cy);
+  const needleBBox = measureNodesBBox(parsed.template, [needleNodeStripped], cx, cy);
 
   // Strip text labels from arc before measuring (same as render path)
   let arcBBox: { x: number; y: number; w: number; h: number } | null = null;
@@ -367,7 +380,7 @@ export async function renderGaugeAssets(
     return expandBBox(geoBBox, sp, fp);
   };
 
-  const needleBBoxExp = expandLayer(needleBBox, [parsed.needleNode]);
+  const needleBBoxExp = expandLayer(needleBBox, [needleNodeStripped]);
   const bgBBoxExp     = expandLayer(bgBBox, parsed.backgroundNodes);
   const arcBBoxExp    = arcBBox
     ? expandLayer(arcBBox, parsed.arcNode ? [parsed.arcNode] : [])
@@ -398,15 +411,7 @@ export async function renderGaugeAssets(
   });
 
   // ── 5. Render needle PNG ──────────────────────────────────────────────────
-  // Strip rotate() ONLY from the top-level needle element so the PNG shows the needle
-  // pointing straight up (12PM). Children keep their own transforms intact.
-  const needleNodeStripped = parsed.needleNode.cloneNode(true) as Element;
-  const topTransform = needleNodeStripped.getAttribute?.('transform') || '';
-  if (topTransform) {
-    const stripped = topTransform.replace(/rotate\([^)]*\)\s*/g, '').trim();
-    if (stripped) needleNodeStripped.setAttribute('transform', stripped);
-    else needleNodeStripped.removeAttribute('transform');
-  }
+  // needleNodeStripped was already prepared in step 0 (rotation stripped, bbox measured from it).
 
   const needleVP = needleBBoxExp ? makeVP(needleBBoxExp, needleLayout) : undefined;
   const needleSvg = buildSvgFromNodes(
