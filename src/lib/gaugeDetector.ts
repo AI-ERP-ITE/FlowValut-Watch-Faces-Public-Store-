@@ -351,9 +351,9 @@ export function detectGauge(svgString: string): ParsedGauge | null {
       return cur;
     };
 
-    const needlePath = needleEl ? getDomPath(searchRoot, needleEl) : null;
-    const arcPath = arcFillEl ? getDomPath(searchRoot, arcFillEl) : null;
-    const overlayPaths = arcOverlayEls.map(el => getDomPath(searchRoot, el)).filter((p): p is number[] => p !== null);
+    const needlePath = needleEl ? getDomPath(mainGroup.el, needleEl) : null;
+    const arcPath = arcFillEl ? getDomPath(mainGroup.el, arcFillEl) : null;
+    const overlayPaths = arcOverlayEls.map(el => getDomPath(mainGroup.el, el)).filter((p): p is number[] => p !== null);
 
     // Clone mainGroup children into a temporary container
     const bgGroupClone = mainGroup.el.cloneNode(true) as Element;
