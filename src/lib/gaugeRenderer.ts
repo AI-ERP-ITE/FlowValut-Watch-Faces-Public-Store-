@@ -479,11 +479,42 @@ export async function renderGaugeAssets(
     const FRAME_COUNT = 11;
     const ratios = Array.from({ length: FRAME_COUNT }, (_, i) => i / (FRAME_COUNT - 1));
 
+    // Precompute 11 tick styles by nearest-angle matching from parsed HTML ticks.
+    // We discard HTML tick positions and re-place ticks at mathematically correct % positions.
+    const { tickStyles } = parsed.geometry;
+    const hasTicks = tickStyles.length > 0;
+    const svgNsUri = 'http://www.w3.org/2000/svg';
+
+    // SVG-space to canvas-space scale (for tick length rescaling)
+    const svgNaturalSize = parsed.template.width; // viewBox width
+    const canvasSize = arcLayout.canvasW;
+    const tickScale = svgNaturalSize > 0 ? canvasSize / svgNaturalSize : 1;
+
+    // For each of the 11 positions, find closest HTML tick by angle difference
+    const calcTick11: Array<{ angle: number; style: typeof tickStyles[0] } | null> = ratios.map((ratio) => {
+      if (!hasTicks) return null;
+      const targetAngle = arcStart + ratio * (arcEnd - arcStart);
+      let closest = tickStyles[0];
+      let minDiff = Math.abs(targetAngle - tickStyles[0].angle);
+      for (const ts of tickStyles) {
+        const diff = Math.abs(targetAngle - ts.angle);
+        if (diff < minDiff) { minDiff = diff; closest = ts; }
+      }
+      return { angle: targetAngle, style: closest };
+    });
+
     arcFrames = (
       await Promise.all(
-        ratios.map(async fillRatio => {
+        ratios.map(async (fillRatio) => {
           const arcClone = parsed.arcNode!.cloneNode(true) as Element;
           stripNonVisual(arcClone);
+
+          // Remove all <line> elements from arcClone — we re-inject recalculated ones
+          for (const line of Array.from(arcClone.querySelectorAll?.('line') ?? [])) {
+            line.parentElement?.removeChild(line);
+          }
+
+          // Set arc fill dasharray
           const paths =
             arcClone.tagName?.toLowerCase() === 'path'
               ? [arcClone]
@@ -497,6 +528,27 @@ export async function renderGaugeAssets(
             path.removeAttribute('stroke-dashoffset');
             break;
           }
+
+          // Re-inject 11 ticks at calculated positions using borrowed styles
+          if (hasTicks) {
+            const tickGroup = arcClone.ownerDocument?.createElementNS(svgNsUri, 'g')
+              ?? document.createElementNS(svgNsUri, 'g');
+            for (const tickDef of calcTick11) {
+              if (!tickDef) continue;
+              const { angle, style } = tickDef;
+              const lineEl = (arcClone.ownerDocument ?? document).createElementNS(svgNsUri, 'line');
+              lineEl.setAttribute('y1', (style.y1 * tickScale).toFixed(2));
+              lineEl.setAttribute('y2', (style.y2 * tickScale).toFixed(2));
+              lineEl.setAttribute('stroke', style.stroke);
+              lineEl.setAttribute('stroke-width', (style.strokeWidth * tickScale).toFixed(2));
+              lineEl.setAttribute('stroke-linecap', style.linecap);
+              if (style.filter) lineEl.setAttribute('filter', style.filter);
+              lineEl.setAttribute('transform', `rotate(${angle})`);
+              tickGroup.appendChild(lineEl);
+            }
+            arcClone.appendChild(tickGroup);
+          }
+
           const svgStr = buildSvgFromNodes(parsed.template, [arcClone], arcVP);
           return renderSvgToDataUrlRect(svgStr, arcLayout.canvasW, arcLayout.canvasH).catch(
             () => '',

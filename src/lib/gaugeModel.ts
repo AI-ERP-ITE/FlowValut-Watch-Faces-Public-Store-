@@ -28,6 +28,24 @@ export interface SvgTemplate {
 
 // ── Gauge geometry ───────────────────────────────────────────────────────────
 
+/** Visual style of one detected tick mark, parsed from the source SVG. */
+export interface ParsedTickStyle {
+  /** Rotation angle of this tick (degrees, 0=12PM). */
+  angle: number;
+  /** Tick stroke color (e.g. "#d32f2f"). */
+  stroke: string;
+  /** Tick stroke-width in SVG user units. */
+  strokeWidth: number;
+  /** y1 attribute (inner radius offset, usually negative). */
+  y1: number;
+  /** y2 attribute (outer radius offset). */
+  y2: number;
+  /** stroke-linecap value, e.g. "round" or "butt". */
+  linecap: string;
+  /** Optional filter id reference (e.g. "url(#tickShadow)"). */
+  filter: string;
+}
+
 /** Pure geometry extracted from the SVG during detection. */
 export interface GaugeGeometry {
   /** SVG viewBox width (SVG user units). */
@@ -45,6 +63,8 @@ export interface GaugeGeometry {
   arcEnd: number;
   /** All unique tick rotation angles (sorted ascending). */
   tickAngles: number[];
+  /** Visual style per tick, sorted by angle. Used by renderer to re-inject at calculated positions. */
+  tickStyles: ParsedTickStyle[];
   /** Normalised pivot X position (0–1) derived from the main translate center. */
   pivotX: number;
   /** Normalised pivot Y position (0–1) derived from the main translate center. */

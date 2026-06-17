@@ -12,7 +12,7 @@
  * NO rendering. NO React. NO side effects.
  */
 
-import type { ParsedGauge, SvgTemplate, GaugeGeometry } from '@/lib/gaugeModel';
+import type { ParsedGauge, SvgTemplate, GaugeGeometry, ParsedTickStyle } from '@/lib/gaugeModel';
 
 // ── SVG geometry helpers ─────────────────────────────────────────────────────
 
@@ -130,25 +130,40 @@ function detectArcFillGroup(searchRoot: Element, excludeEl: Element | null): Ele
 
 /**
  * Detect arc range from <line> elements with rotate(N) transforms.
+ * Also captures the visual style of each tick for later re-injection at calculated positions.
  * Elements inside excludeEl are skipped.
  */
 function detectArcRange(
   svgEl: Element,
   excludeEl: Element | null,
-): { startAngle: number; endAngle: number; tickAngles: number[] } | null {
-  const angles: number[] = [];
+): { startAngle: number; endAngle: number; tickAngles: number[]; tickStyles: ParsedTickStyle[] } | null {
+  const stylesByAngle = new Map<number, ParsedTickStyle>();
   for (const line of Array.from(svgEl.querySelectorAll('line'))) {
     if (excludeEl && excludeEl.contains(line)) continue;
     const t = line.getAttribute('transform') || '';
     const angle = extractRotateAngle(t);
-    if (angle !== null) angles.push(angle);
+    if (angle === null) continue;
+    if (!stylesByAngle.has(angle)) {
+      const y1 = parseFloat(line.getAttribute('y1') || '0');
+      const y2 = parseFloat(line.getAttribute('y2') || '0');
+      stylesByAngle.set(angle, {
+        angle,
+        stroke: line.getAttribute('stroke') || '#ffffff',
+        strokeWidth: parseFloat(line.getAttribute('stroke-width') || '1'),
+        y1: isFinite(y1) ? y1 : 0,
+        y2: isFinite(y2) ? y2 : 0,
+        linecap: line.getAttribute('stroke-linecap') || 'butt',
+        filter: line.getAttribute('filter') || '',
+      });
+    }
   }
-  const unique = [...new Set(angles)].sort((a, b) => a - b);
+  const unique = [...stylesByAngle.keys()].sort((a, b) => a - b);
   if (unique.length < 2) return null;
   return {
     startAngle: unique[0],
     endAngle: unique[unique.length - 1],
     tickAngles: unique,
+    tickStyles: unique.map(a => stylesByAngle.get(a)!),
   };
 }
 
@@ -338,6 +353,7 @@ export function detectGauge(svgString: string): ParsedGauge | null {
     arcStart: arcRange?.startAngle ?? -90,
     arcEnd: arcRange?.endAngle ?? 90,
     tickAngles: arcRange?.tickAngles ?? [],
+    tickStyles: arcRange?.tickStyles ?? [],
     pivotX,
     pivotY,
     arcRadius,
