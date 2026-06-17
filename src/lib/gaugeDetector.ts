@@ -225,9 +225,39 @@ export function detectGauge(svgString: string): ParsedGauge | null {
   // ── 9. Deep-clone nodes IMMEDIATELY ──────────────────────────────────────
   // After this point the original doc is no longer referenced.
   const needleNode = needleEl.cloneNode(true) as Node;
-  const arcNode = arcFillEl ? (arcFillEl.cloneNode(true) as Node) : null;
 
-  // Background = mainGroup clone with needle and arc surgically removed.
+  // Collect arc fill + any sibling elements that sit between arcFillEl and needleEl in DOM order.
+  // These are overlay elements (ticks, glows, etc.) that belong visually ON the arc layer.
+  // We wrap them in a synthetic <g> so the renderer gets one arcNode containing the full arc section.
+  let arcNode: Node | null = null;
+  const arcOverlayEls: Element[] = []; // siblings after arcFillEl, before needleEl, not the needle
+  if (arcFillEl) {
+    const parent = arcFillEl.parentElement;
+    if (parent) {
+      let afterArc = false;
+      for (const child of Array.from(parent.children)) {
+        if (child === arcFillEl) { afterArc = true; continue; }
+        if (!afterArc) continue;
+        if (child === needleEl) break; // stop at needle
+        // Skip text/typography siblings — those belong to background
+        const isText = child.tagName.toLowerCase() === 'text' ||
+          (child.tagName.toLowerCase() === 'g' && child.querySelectorAll('text').length > 0 && child.querySelectorAll('path, line, circle, rect').length === 0);
+        if (!isText) arcOverlayEls.push(child);
+      }
+    }
+
+    if (arcOverlayEls.length > 0) {
+      // Wrap arcFillEl + overlays in a synthetic <g>
+      const wrapper = doc.createElementNS('http://www.w3.org/2000/svg', 'g');
+      wrapper.appendChild(arcFillEl.cloneNode(true));
+      for (const overlay of arcOverlayEls) wrapper.appendChild(overlay.cloneNode(true));
+      arcNode = wrapper;
+    } else {
+      arcNode = arcFillEl.cloneNode(true) as Node;
+    }
+  }
+
+  // Background = mainGroup clone with needle, arc fill, AND arc overlay siblings removed.
   //
   // We use DOM paths (index sequences from mainGroup root to each target)
   // instead of re-running detection on the clone. This is deterministic:
@@ -265,6 +295,7 @@ export function detectGauge(svgString: string): ParsedGauge | null {
 
     const needlePath = getDomPath(searchRoot, needleEl);
     const arcPath = arcFillEl ? getDomPath(searchRoot, arcFillEl) : null;
+    const overlayPaths = arcOverlayEls.map(el => getDomPath(searchRoot, el)).filter((p): p is number[] => p !== null);
 
     // Clone mainGroup children into a temporary container
     const bgGroupClone = mainGroup.el.cloneNode(true) as Element;
@@ -278,6 +309,11 @@ export function detectGauge(svgString: string): ParsedGauge | null {
     if (arcPath) {
       const clonedArc = resolveDomPath(bgGroupClone, arcPath);
       clonedArc?.parentElement?.removeChild(clonedArc);
+    }
+    // Remove arc overlay siblings from clone (ticks etc. baked into arc frames instead)
+    for (const overlayPath of overlayPaths) {
+      const clonedOverlay = resolveDomPath(bgGroupClone, overlayPath);
+      clonedOverlay?.parentElement?.removeChild(clonedOverlay);
     }
 
     // Remaining children of the clone = clean background at any depth
