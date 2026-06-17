@@ -283,6 +283,12 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
           dragStartFiredRef.current = false;
           dragStartRef.current = { x, y };
           dragSnapshotRef.current = { ...selEl, bounds: { ...selEl.bounds } };
+          // Snapshot siblings so resize propagation has initial bounds
+          dragSnapshotsRef.current = new Map();
+          for (const xid of extraSelectedIdsRef.current) {
+            const xel = elementsRef.current.find(e => e.id === xid);
+            if (xel) dragSnapshotsRef.current.set(xid, { ...xel, bounds: { ...xel.bounds }, center: xel.center ? { ...xel.center } : undefined });
+          }
           return;
         }
       }
@@ -378,9 +384,45 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         }
         return;
       }
-      // Rect handles
+      // Rect handles — scale primary, then proportionally scale all siblings
       const nb = applyResize(snap.bounds, resizeHandleRef.current, dx, dy);
       onUpdateElement?.(snap.id, { bounds: nb });
+
+      // Propagate scale ratio to siblings in the multi-selection group
+      if (dragSnapshotsRef.current.size > 0) {
+        const oldW = snap.bounds.width;
+        const oldH = snap.bounds.height;
+        const scaleX = oldW > 0 ? nb.width / oldW : 1;
+        const scaleY = oldH > 0 ? nb.height / oldH : 1;
+        // Anchor: primary layer old center
+        const anchorX = snap.bounds.x + oldW / 2;
+        const anchorY = snap.bounds.y + oldH / 2;
+        const siblingUpdates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
+        for (const [xid, xsnap] of dragSnapshotsRef.current) {
+          const xCx = xsnap.bounds.x + xsnap.bounds.width / 2;
+          const xCy = xsnap.bounds.y + xsnap.bounds.height / 2;
+          const newXCx = anchorX + (xCx - anchorX) * scaleX;
+          const newXCy = anchorY + (xCy - anchorY) * scaleY;
+          const newW = Math.max(4, xsnap.bounds.width * scaleX);
+          const newH = Math.max(4, xsnap.bounds.height * scaleY);
+          const xChanges: Partial<WatchFaceElement> = {
+            bounds: {
+              x: Math.round(newXCx - newW / 2),
+              y: Math.round(newXCy - newH / 2),
+              width: Math.round(newW),
+              height: Math.round(newH),
+            },
+          };
+          if (xsnap.center) {
+            xChanges.center = {
+              x: Math.round(anchorX + (xsnap.center.x - anchorX) * scaleX),
+              y: Math.round(anchorY + (xsnap.center.y - anchorY) * scaleY),
+            };
+          }
+          siblingUpdates.push({ id: xid, changes: xChanges });
+        }
+        onBatchUpdateElements?.(siblingUpdates);
+      }
       return;
     }
 
