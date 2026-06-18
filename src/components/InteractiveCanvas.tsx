@@ -427,6 +427,10 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
               y: Math.round(anchorY + (xsnap.center.y - anchorY) * scaleY),
             };
           }
+          if (xsnap.radius != null) {
+            // ARC_PROGRESS is circular — scale radius by average of both axes
+            xChanges.radius = Math.max(1, xsnap.radius * (scaleX + scaleY) / 2);
+          }
           siblingUpdates.push({ id: xid, changes: xChanges });
         }
         onBatchUpdateElements?.(siblingUpdates);
