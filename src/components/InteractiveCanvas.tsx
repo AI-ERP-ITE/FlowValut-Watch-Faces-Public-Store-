@@ -404,25 +404,15 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         const oldH = snap.bounds.height;
         const scaleX = oldW > 0 ? nb.width / oldW : 1;
         const scaleY = oldH > 0 ? nb.height / oldH : 1;
-        // Anchor: combined bbox center of primary + all siblings (consistent for gauge group and generic multi-select)
-        let minX = snap.bounds.x, minY = snap.bounds.y;
-        let maxX = snap.bounds.x + oldW, maxY = snap.bounds.y + oldH;
-        for (const [, xsnap] of dragSnapshotsRef.current) {
-          // ARC_PROGRESS uses center+radius for real visual bounds; its stored bounds cover the full canvas
-          if (xsnap.center && xsnap.radius != null) {
-            minX = Math.min(minX, xsnap.center.x - xsnap.radius);
-            minY = Math.min(minY, xsnap.center.y - xsnap.radius);
-            maxX = Math.max(maxX, xsnap.center.x + xsnap.radius);
-            maxY = Math.max(maxY, xsnap.center.y + xsnap.radius);
-          } else {
-            minX = Math.min(minX, xsnap.bounds.x);
-            minY = Math.min(minY, xsnap.bounds.y);
-            maxX = Math.max(maxX, xsnap.bounds.x + xsnap.bounds.width);
-            maxY = Math.max(maxY, xsnap.bounds.y + xsnap.bounds.height);
-          }
-        }
-        const anchorX = (minX + maxX) / 2;
-        const anchorY = (minY + maxY) / 2;
+        // Anchor = the fixed point of the resize on the PRIMARY layer (opposite edge from handle).
+        // L handle fixes right edge, R fixes left, T fixes bottom, B fixes top.
+        const handle = resizeHandleRef.current!;
+        const anchorX = handle.includes('L')
+          ? snap.bounds.x + oldW   // right edge fixed
+          : snap.bounds.x;          // left edge fixed (R or center)
+        const anchorY = handle.includes('T')
+          ? snap.bounds.y + oldH   // bottom edge fixed
+          : snap.bounds.y;          // top edge fixed (B or center)
         const siblingUpdates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
         for (const [xid, xsnap] of dragSnapshotsRef.current) {
           const xCx = xsnap.bounds.x + xsnap.bounds.width / 2;
