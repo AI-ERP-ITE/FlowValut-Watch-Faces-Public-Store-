@@ -386,7 +386,17 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       }
       // Rect handles — scale primary, then proportionally scale all siblings
       const nb = applyResize(snap.bounds, resizeHandleRef.current, dx, dy);
-      onUpdateElement?.(snap.id, { bounds: nb });
+      const primaryChanges: Partial<WatchFaceElement> = { bounds: nb };
+      // Scale hourPos (GAUGE_POINTER pixel pivot) proportionally with bounds
+      if (snap.hourPos) {
+        const pScaleX = snap.bounds.width > 0 ? nb.width / snap.bounds.width : 1;
+        const pScaleY = snap.bounds.height > 0 ? nb.height / snap.bounds.height : 1;
+        primaryChanges.hourPos = {
+          x: snap.hourPos.x * pScaleX,
+          y: snap.hourPos.y * pScaleY,
+        };
+      }
+      onUpdateElement?.(snap.id, primaryChanges);
 
       // Propagate scale ratio to siblings in the multi-selection group
       if (dragSnapshotsRef.current.size > 0) {
@@ -430,6 +440,13 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
           if (xsnap.radius != null) {
             // ARC_PROGRESS is circular — scale radius by average of both axes
             xChanges.radius = Math.max(1, xsnap.radius * (scaleX + scaleY) / 2);
+          }
+          if (xsnap.hourPos) {
+            // GAUGE_POINTER: scale pixel pivot position with bounds
+            xChanges.hourPos = {
+              x: xsnap.hourPos.x * scaleX,
+              y: xsnap.hourPos.y * scaleY,
+            };
           }
           siblingUpdates.push({ id: xid, changes: xChanges });
         }
