@@ -394,9 +394,17 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         const oldH = snap.bounds.height;
         const scaleX = oldW > 0 ? nb.width / oldW : 1;
         const scaleY = oldH > 0 ? nb.height / oldH : 1;
-        // Anchor: primary layer old center
-        const anchorX = snap.bounds.x + oldW / 2;
-        const anchorY = snap.bounds.y + oldH / 2;
+        // Anchor: combined bbox center of primary + all siblings (consistent for gauge group and generic multi-select)
+        let minX = snap.bounds.x, minY = snap.bounds.y;
+        let maxX = snap.bounds.x + oldW, maxY = snap.bounds.y + oldH;
+        for (const [, xsnap] of dragSnapshotsRef.current) {
+          minX = Math.min(minX, xsnap.bounds.x);
+          minY = Math.min(minY, xsnap.bounds.y);
+          maxX = Math.max(maxX, xsnap.bounds.x + xsnap.bounds.width);
+          maxY = Math.max(maxY, xsnap.bounds.y + xsnap.bounds.height);
+        }
+        const anchorX = (minX + maxX) / 2;
+        const anchorY = (minY + maxY) / 2;
         const siblingUpdates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
         for (const [xid, xsnap] of dragSnapshotsRef.current) {
           const xCx = xsnap.bounds.x + xsnap.bounds.width / 2;

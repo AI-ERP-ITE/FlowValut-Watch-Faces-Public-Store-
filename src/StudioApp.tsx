@@ -3323,10 +3323,16 @@ function StudioApp() {
           const generatedName = `imglvl_${sanitizedBase}_${i}.png`;
 
           if (configuredFrame && configuredFrame.startsWith('data:')) {
-            const { bytes } = decodeDataUrlToBytes(configuredFrame, `IMG_LEVEL inline frame ${el.name}#${i}`);
+            // Resize frame to canvas bounds so manual resizes transfer to device.
+            const frameW = Math.max(1, el.bounds.width || 1);
+            const frameH = Math.max(1, el.bounds.height || 1);
+            const resizedFrame = await resizeDataUrl(configuredFrame, frameW, frameH);
+            const { bytes } = decodeDataUrlToBytes(resizedFrame, `IMG_LEVEL inline frame ${el.name}#${i}`);
             const existingInline = elementFiles.find((f) => f.src === generatedName);
             if (!existingInline) {
               elementFiles.push({ src: generatedName, file: new File([bytes], generatedName, { type: 'image/png' }) });
+            } else {
+              existingInline.file = new File([bytes], generatedName, { type: 'image/png' });
             }
             normalizedFrames.push(generatedName);
             continue;
@@ -3443,7 +3449,11 @@ function StudioApp() {
       for (const el of allEditorElements) {
         if (el.type !== 'IMG' || el.iconKey || !el.src?.startsWith('data:')) continue;
         const filename = el.assetFilename || `img_inline_${el.id}.png`;
-        const { bytes } = decodeDataUrlToBytes(el.src, `Inline IMG ${filename}`);
+        // Resize to canvas bounds so manual resizes are respected on device (same as GAUGE_POINTER needle).
+        const targetW = Math.max(1, el.bounds.width || 1);
+        const targetH = Math.max(1, el.bounds.height || 1);
+        const resizedSrc = await resizeDataUrl(el.src, targetW, targetH);
+        const { bytes } = decodeDataUrlToBytes(resizedSrc, `Inline IMG ${filename}`);
         const existingIdx = elementFiles.findIndex((f) => f.src === filename);
         const nextFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
         if (existingIdx >= 0) elementFiles[existingIdx] = nextFile;
