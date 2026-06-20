@@ -12,7 +12,7 @@ export function SuccessPage() {
   const entry = id ? getById(id) : null;
 
   // Build direct download URL
-  const zpkUrl = entry ? `${baseUrl}${entry.zpkPath}` : null;
+  const zpkUrl = entry ? (/^https?:\/\//i.test(entry.zpkPath) ? entry.zpkPath : `${baseUrl}${entry.zpkPath}`) : null;
 
   // Auto-trigger download for free watchfaces
   const triggerDownload = useCallback(() => {
@@ -92,7 +92,7 @@ export function SuccessPage() {
           {entry.previewPath && (
             <div className="aspect-square w-full overflow-hidden bg-[#1a1f29]">
               <img
-                src={`${baseUrl}${entry.previewPath}`}
+                src={/^https?:\/\//i.test(entry.previewPath) ? entry.previewPath : `${baseUrl}${entry.previewPath}`}
                 alt={entry.name}
                 className="w-full h-full object-cover"
                 loading="lazy"
@@ -115,7 +115,7 @@ export function SuccessPage() {
             </p>
             <div className="rounded-xl border border-[#2f3743] bg-white p-3 w-36 h-36">
               <img
-                src={`${baseUrl}${entry.qrPath}`}
+                src={/^https?:\/\//i.test(entry.qrPath) ? entry.qrPath : `${baseUrl}${entry.qrPath}`}
                 alt="Install QR code"
                 className="w-full h-full object-contain"
               />

@@ -89,7 +89,7 @@ export function ProductPage() {
             <div className="aspect-square rounded-2xl overflow-hidden bg-[#121418] border border-[#2f3743] flex items-center justify-center">
               {entry.previewPath ? (
                 <img
-                  src={`${baseUrl}${entry.previewPath}`}
+                  src={/^https?:\/\//i.test(entry.previewPath) ? entry.previewPath : `${baseUrl}${entry.previewPath}`}
                   alt={`${entry.name} preview`}
                   className="w-full h-full object-contain"
                 />
@@ -103,7 +103,7 @@ export function ProductPage() {
               <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#121418] border border-[#2f3743]">
                 <p className="text-xs text-[#8E9196]">Scan on your phone to install</p>
                 <img
-                  src={`${baseUrl}${entry.qrPath}`}
+                  src={/^https?:\/\//i.test(entry.qrPath) ? entry.qrPath : `${baseUrl}${entry.qrPath}`}
                   alt="Install QR code"
                   className="w-28 h-28 rounded-lg bg-white p-1"
                 />

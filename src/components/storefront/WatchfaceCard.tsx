@@ -7,8 +7,12 @@ interface WatchfaceCardProps {
   baseUrl: string;
 }
 
+function assetUrl(baseUrl: string, path: string): string {
+  return /^https?:\/\//i.test(path) ? path : `${baseUrl}${path}`;
+}
+
 export function WatchfaceCard({ entry, baseUrl }: WatchfaceCardProps) {
-  const previewSrc = `${baseUrl}${entry.previewPath}`;
+  const previewSrc = assetUrl(baseUrl, entry.previewPath);
   const isFree = entry.price === 0;
 
   return (

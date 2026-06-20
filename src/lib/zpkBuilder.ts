@@ -78,25 +78,43 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       if (w === 402 && h === 476) return { w: 273, h: 316 };
       return { w: Math.round(w * 0.675), h: Math.round(h * 0.675) }; // generic ~67.5%
     })();
-    let anteprimaFile: File | Blob = backgroundFile;
-    if (options.previewDataUrl) {
+    // Always resize thumbnail to the exact target size, regardless of source.
+    const resizeToThumb = (src: string): Promise<Blob> => new Promise<Blob>((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = thumbSize.w; c.height = thumbSize.h;
+        const ctx = c.getContext('2d');
+        if (!ctx) { rej(new Error('no ctx')); return; }
+        ctx.drawImage(img, 0, 0, thumbSize.w, thumbSize.h);
+        c.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/png');
+      };
+      img.onerror = (e) => rej(e);
+      img.src = src;
+    });
+
+    // Convert File to data URL helper
+    const fileToDataUrl = (f: File | Blob): Promise<string> => new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.onerror = rej;
+      reader.readAsDataURL(f);
+    });
+
+    let anteprimaFile: Blob;
+    const thumbSrc = options.previewDataUrl ?? await fileToDataUrl(backgroundFile);
+    try {
+      anteprimaFile = await resizeToThumb(thumbSrc);
+      console.log('[ZPK] anteprima.png created:', thumbSize.w, 'x', thumbSize.h, 'blob size:', anteprimaFile.size);
+    } catch (e) {
+      console.warn('[ZPK] Thumbnail resize failed, trying background fallback:', e);
       try {
-        const thumbBlob = await new Promise<Blob>((res, rej) => {
-          const img = new Image();
-          img.onload = () => {
-            const c = document.createElement('canvas');
-            c.width = thumbSize.w; c.height = thumbSize.h;
-            const ctx = c.getContext('2d');
-            if (!ctx) { rej(new Error('no ctx')); return; }
-            ctx.drawImage(img, 0, 0, thumbSize.w, thumbSize.h);
-            c.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png');
-          };
-          img.onerror = rej;
-          img.src = options.previewDataUrl!;
-        });
-        anteprimaFile = thumbBlob;
-      } catch (e) {
-        console.warn('[ZPK] Failed to render preview thumbnail, using background:', e);
+        const bgDataUrl = await fileToDataUrl(backgroundFile);
+        anteprimaFile = await resizeToThumb(bgDataUrl);
+        console.log('[ZPK] anteprima.png fallback created:', anteprimaFile.size);
+      } catch (e2) {
+        console.warn('[ZPK] All thumbnail attempts failed, packing raw background:', e2);
+        anteprimaFile = backgroundFile;
       }
     }
     deviceZip.file('anteprima.png', anteprimaFile);

@@ -185,7 +185,7 @@ export function BuyPage() {
           {entry.previewPath && (
             <div className="aspect-square w-full overflow-hidden bg-[#1a1f29]">
               <img
-                src={`${baseUrl}${entry.previewPath}`}
+                src={/^https?:\/\//i.test(entry.previewPath) ? entry.previewPath : `${baseUrl}${entry.previewPath}`}
                 alt={entry.name}
                 className="w-full h-full object-cover"
                 loading="lazy"
