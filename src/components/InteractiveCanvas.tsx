@@ -386,7 +386,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         return;
       }
       // Rect handles — scale primary, then proportionally scale all siblings
-      const nb = applyResize(snap.bounds, resizeHandleRef.current, dx, dy);
+      const nb = applyResize(snap.bounds, resizeHandleRef.current, dx, dy, e.shiftKey && CORNER_HANDLES.has(resizeHandleRef.current));
       const primaryChanges: Partial<WatchFaceElement> = { bounds: nb };
       // Scale hourPos (GAUGE_POINTER pixel pivot) proportionally with bounds
       if (snap.hourPos) {
@@ -408,12 +408,17 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         // Anchor = the fixed point of the resize on the PRIMARY layer (opposite edge from handle).
         // L handle fixes right edge, R fixes left, T fixes bottom, B fixes top.
         const handle = resizeHandleRef.current!;
-        const anchorX = handle.includes('L')
-          ? snap.bounds.x + oldW   // right edge fixed
-          : snap.bounds.x;          // left edge fixed (R or center)
-        const anchorY = handle.includes('T')
-          ? snap.bounds.y + oldH   // bottom edge fixed
-          : snap.bounds.y;          // top edge fixed (B or center)
+        const useCenter = e.shiftKey && CORNER_HANDLES.has(handle);
+        const anchorX = useCenter
+          ? snap.bounds.x + oldW / 2  // center-anchor (shift+corner)
+          : handle.includes('L')
+            ? snap.bounds.x + oldW   // right edge fixed
+            : snap.bounds.x;          // left edge fixed (R or center)
+        const anchorY = useCenter
+          ? snap.bounds.y + oldH / 2  // center-anchor (shift+corner)
+          : handle.includes('T')
+            ? snap.bounds.y + oldH   // bottom edge fixed
+            : snap.bounds.y;          // top edge fixed (B or center)
         const siblingUpdates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
         for (const [xid, xsnap] of dragSnapshotsRef.current) {
           const xCx = xsnap.bounds.x + xsnap.bounds.width / 2;
@@ -679,6 +684,7 @@ function applyResize(
   snap: { x: number; y: number; width: number; height: number },
   handle: string,
   dx: number, dy: number,
+  fromCenter = false,
 ) {
   let { x, y, width, height } = snap;
   const MIN = 20;
@@ -699,8 +705,16 @@ function applyResize(
       newH = Math.max(MIN, snap.height + dh);
       newW = Math.max(MIN, newH * aspect);
     }
-    if (handle.includes('L')) { x = snap.x + snap.width - newW; }
-    if (handle.includes('T')) { y = snap.y + snap.height - newH; }
+    if (fromCenter) {
+      // Shift+corner: keep element center fixed, grow equally in all directions
+      const cx = snap.x + snap.width / 2;
+      const cy = snap.y + snap.height / 2;
+      x = cx - newW / 2;
+      y = cy - newH / 2;
+    } else {
+      if (handle.includes('L')) { x = snap.x + snap.width - newW; }
+      if (handle.includes('T')) { y = snap.y + snap.height - newH; }
+    }
     width = newW;
     height = newH;
     return { x: Math.max(0, x), y: Math.max(0, y), width, height };
@@ -1734,9 +1748,9 @@ function drawDigitElement(
   ctx.save();
   ctx.fillStyle = color;
   ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, x + w / 2, y + h / 2, w);
+  ctx.fillText(text, x, y + h / 2, w);
   ctx.restore();
 }
 
