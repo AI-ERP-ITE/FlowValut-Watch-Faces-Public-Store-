@@ -945,6 +945,7 @@ function drawImageWithDeterministicIconEffects(
 ) {
   const { x, y, width: w, height: h } = el.bounds;
   const baked = bakeDeterministicIconEffects(img, w, h, {
+    photoEdit: el.iconPhotoEdit,
     hueDeg: el.iconHue ?? 0,
     saturationPercent: el.iconSaturation ?? 100,
     colorize: el.iconColorize,

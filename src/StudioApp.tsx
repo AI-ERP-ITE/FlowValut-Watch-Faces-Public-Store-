@@ -1020,6 +1020,7 @@ async function applyIconEffectsForZPK(
     saturationPercent: el.iconSaturation ?? 100,
     colorize: el.iconColorize,
     colorizeOpacity: el.iconColorizeOpacity ?? 1,
+    photoEdit: el.iconPhotoEdit,
   });
   return canvas.toDataURL('image/png');
 }

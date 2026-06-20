@@ -1877,6 +1877,48 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                   Reset all effects
                 </button>
               )}
+              {/* Extended photo-edit sliders */}
+              {(() => {
+                const pe = element.iconPhotoEdit ?? {};
+                const setPE = (key: string, val: number) =>
+                  update({ iconPhotoEdit: { ...pe, [key]: val } });
+                const v = (k: string) => Number((pe as Record<string,number>)[k] ?? 0);
+                const photoSliders: Array<{ key: string; label: string; min: number; max: number }> = [
+                  { key: 'exposure',    label: 'Exposure',    min: -100, max: 100 },
+                  { key: 'brightness',  label: 'Brightness',  min: -100, max: 100 },
+                  { key: 'contrast',    label: 'Contrast',    min: -100, max: 100 },
+                  { key: 'highlights',  label: 'Highlights',  min: -100, max: 100 },
+                  { key: 'shadows',     label: 'Shadows',     min: -100, max: 100 },
+                  { key: 'temperature', label: 'Temperature', min: -100, max: 100 },
+                  { key: 'tint',        label: 'Tint',        min: -100, max: 100 },
+                  { key: 'sharpness',   label: 'Sharpness',   min: 0,    max: 100 },
+                  { key: 'vignette',    label: 'Vignette',    min: 0,    max: 100 },
+                ];
+                const hasPhoto = photoSliders.some(s => v(s.key) !== 0);
+                return (
+                  <>
+                    {photoSliders.map(({ key, label, min, max }) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="text-[10px] text-white/40 w-20 shrink-0">{label}</span>
+                        <input type="range" min={min} max={max} step={1} value={v(key)}
+                          onChange={e => setPE(key, Number(e.target.value))}
+                          className="flex-1 accent-cyan-500 h-1" />
+                        <span
+                          className="text-[10px] text-white/30 w-10 text-right cursor-pointer hover:text-cyan-400"
+                          title="Double-click to reset"
+                          onDoubleClick={() => setPE(key, 0)}
+                        >{v(key) > 0 && min < 0 ? `+${v(key)}` : `${v(key)}`}</span>
+                      </div>
+                    ))}
+                    {hasPhoto && (
+                      <button
+                        onClick={() => update({ iconPhotoEdit: {} })}
+                        className="w-full h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/50 hover:text-white hover:border-white/30 transition-colors"
+                      >Reset photo edit</button>
+                    )}
+                  </>
+                );
+              })()}
               <p className="text-[9px] text-amber-500/60">Effects are baked into ZPK export</p>
             </div>
           </Section>

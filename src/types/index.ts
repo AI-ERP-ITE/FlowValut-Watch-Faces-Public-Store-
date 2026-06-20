@@ -103,6 +103,18 @@ export interface WatchFaceElement {
   iconSaturation?: number;    // saturation % (100 = normal)
   iconColorize?: string;      // CSS color overlay (source-in blend)
   iconColorizeOpacity?: number; // 0–1 opacity for colorize layer
+  // Extended photo-edit pipeline for image elements (preview + ZPK bake)
+  iconPhotoEdit?: {
+    exposure?: number;    // -100..+100
+    brightness?: number;  // -100..+100
+    contrast?: number;    // -100..+100
+    highlights?: number;  // -100..+100
+    shadows?: number;     // -100..+100
+    temperature?: number; // -100..+100
+    tint?: number;        // -100..+100
+    sharpness?: number;   //    0..100
+    vignette?: number;    //    0..100
+  };
 
   // Weather IMG_LEVEL style
   weatherStyle?: string;
