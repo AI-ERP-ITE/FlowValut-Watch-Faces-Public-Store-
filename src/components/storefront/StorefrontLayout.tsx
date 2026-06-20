@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { SearchBar } from './SearchBar';
+import { CookieConsentBanner } from './legal/CookieConsentBanner';
 
 export function StorefrontLayout() {
   const location = useLocation();
@@ -53,24 +54,73 @@ export function StorefrontLayout() {
 
       {/* ── Footer ─────────────────────────────────────────────────────── */}
       <footer className="border-t border-[#20252f] mt-16 bg-[#0b0d11]/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[#9198a4]">
-          <div className="flex items-center gap-2">
-            <img
-              src={logoSrc}
-              alt="Flowvault"
-              className="h-5 w-auto object-contain"
-            />
-            <span className="font-sans font-light text-[#E1E4EA]">Flowvault</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-8">
+
+          {/* Top row: brand + nav columns */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
+            {/* Brand */}
+            <div className="col-span-2 sm:col-span-1">
+              <div className="flex items-center gap-2 mb-3">
+                <img src={logoSrc} alt="Flowvault" className="h-5 w-auto object-contain" />
+                <span className="font-sans font-light text-[#E1E4EA]">Flowvault</span>
+              </div>
+              <p className="text-xs text-[#5a6373] leading-relaxed">
+                Premium watchfaces for Amazfit &amp; ZeppOS devices.
+              </p>
+            </div>
+
+            {/* Store */}
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[#5a6373] mb-3">Store</p>
+              <ul className="space-y-2 text-xs">
+                <li><Link to="/" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Browse</Link></li>
+                <li><Link to="/category/premium" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Premium</Link></li>
+                <li><Link to="/category/simple" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Simple</Link></li>
+                <li><Link to="/category/funny" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Funny</Link></li>
+                <li><Link to="/support" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Support</Link></li>
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[#5a6373] mb-3">Legal</p>
+              <ul className="space-y-2 text-xs">
+                <li><Link to="/terms" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Terms of Service</Link></li>
+                <li><Link to="/privacy" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/eula" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">EULA</Link></li>
+                <li><Link to="/refunds" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Refund Policy</Link></li>
+                <li><Link to="/cookies" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Cookie Policy</Link></li>
+                <li><Link to="/legal" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Legal Notices</Link></li>
+              </ul>
+            </div>
+
+            {/* Policies */}
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[#5a6373] mb-3">Policies</p>
+              <ul className="space-y-2 text-xs">
+                <li><Link to="/acceptable-use" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Acceptable Use</Link></li>
+                <li><Link to="/copyright" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Copyright / DMCA</Link></li>
+                <li><Link to="/support" className="text-[#8f9aac] hover:text-[#E1E4EA] transition-colors">Support Policy</Link></li>
+              </ul>
+            </div>
           </div>
-          <p className="font-mono text-xs text-[#9198a4]">
-            Premium watchfaces for Amazfit &amp; ZeppOS devices
-          </p>
-          <div className="flex items-center gap-4 text-xs font-sans">
-            <Link to="/" className="hover:text-[#E1E4EA] transition-colors">Browse</Link>
-            <Link to="/category/premium" className="hover:text-[#E1E4EA] transition-colors">Premium</Link>
+
+          {/* Bottom bar */}
+          <div className="border-t border-[#1a1f28] pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#4a5363]">
+            <p className="font-mono">© {new Date().getFullYear()} Flowvault. All rights reserved.</p>
+            <div className="flex items-center gap-4">
+              <Link to="/privacy" className="hover:text-[#8f9aac] transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-[#8f9aac] transition-colors">Terms</Link>
+              <Link to="/cookies" className="hover:text-[#8f9aac] transition-colors">Cookies</Link>
+              <Link to="/copyright" className="hover:text-[#8f9aac] transition-colors">© Report</Link>
+            </div>
           </div>
+
         </div>
       </footer>
+
+      {/* ── Cookie consent banner ──────────────────────────────────────── */}
+      <CookieConsentBanner />
     </div>
   );
 }

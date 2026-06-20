@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { useCatalog } from '@/context/CatalogContext';
+import { useParams, Link } from 'react-router-dom';import { useCatalog } from '@/context/CatalogContext';
 import { ExternalLink } from 'lucide-react';
 import {
   createPaddleCheckout,
@@ -19,6 +18,11 @@ export function BuyPage() {
   const [buyerEmail, setBuyerEmail] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [agreedPrivacy, setAgreedPrivacy] = useState(false);
+  const [agreedEula, setAgreedEula] = useState(false);
+  const [agreedRefunds, setAgreedRefunds] = useState(false);
+  const allAgreed = agreedTerms && agreedPrivacy && agreedEula && agreedRefunds;
   const [orderId, setOrderId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [regenerationKey, setRegenerationKey] = useState<string | null>(null);
@@ -225,13 +229,47 @@ export function BuyPage() {
           </div>
         )}
 
+        {/* ── Legal consent checkboxes ─────────────────────────────────── */}
+        {!orderId && (
+          <div className="space-y-2 rounded-xl border border-[#1e2530] bg-[#0d1117] px-4 py-4">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-[#5a6373] mb-3">Required agreements</p>
+            {[
+              { state: agreedTerms,   set: setAgreedTerms,   label: 'Terms of Service',            to: '/terms'   },
+              { state: agreedPrivacy, set: setAgreedPrivacy, label: 'Privacy Policy',               to: '/privacy' },
+              { state: agreedEula,    set: setAgreedEula,    label: 'End User License Agreement',   to: '/eula'    },
+              { state: agreedRefunds, set: setAgreedRefunds, label: 'Refund Policy',                to: '/refunds' },
+            ].map(({ state, set, label, to }) => (
+              <label key={to} className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={state}
+                  onChange={(e) => set(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[#bc9456] cursor-pointer"
+                />
+                <span className="text-xs text-[#7a8899] group-hover:text-[#9ba6b8] transition-colors leading-relaxed">
+                  I agree to the{' '}
+                  <Link
+                    to={to}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#c4aa7a] underline underline-offset-2 hover:text-[#e0c98a]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {label}
+                  </Link>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+
         {/* CTA */}
         {!orderId && (
           <button
             type="button"
             onClick={handleContinue}
-            disabled={startingCheckout}
-            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#bc9456] text-[#17120a] font-semibold text-sm hover:bg-[#d2af78] transition-colors"
+            disabled={startingCheckout || !allAgreed}
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#bc9456] text-[#17120a] font-semibold text-sm hover:bg-[#d2af78] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {startingCheckout
               ? 'Starting...'
