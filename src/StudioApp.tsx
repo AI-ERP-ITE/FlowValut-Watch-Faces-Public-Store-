@@ -2404,7 +2404,29 @@ function StudioApp() {
       TIME_POINTER: { w: canvas, h: canvas },
     };
     const { w = 120, h = 60 } = defaults[addElType] ?? {};
-    const x = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : cx - Math.floor(w / 2);
+    // Auto-size TEXT_IMG / IMG_TIME / IMG_DATE / IMG_WEEK width to fit max digit count tightly
+    const autoW = (() => {
+      const digitAspect = 0.62; // typical digit width / height ratio
+      const digitW = Math.round(h * digitAspect);
+      const mock = (() => {
+        if (addElType === 'IMG_TIME') return addElSubtype === 'minutes' || addElSubtype === 'seconds' ? '58' : '10';
+        if (addElType === 'IMG_WEEK') return 'WED';
+        if (addElType === 'IMG_DATE') return '31';
+        if (addElType !== 'TEXT_IMG') return null;
+        switch (addElDataType) {
+          case 'STEP': return '88888';
+          case 'BATTERY': case 'HEART': case 'SPO2': case 'STRESS': case 'HUMIDITY': case 'PAI_WEEKLY': case 'AQI': case 'TRAINING_LOAD': case 'WIND': case 'WEATHER_CURRENT': return '888';
+          case 'CAL': case 'ALTIMETER': return '8888';
+          case 'VO2MAX': return '65';
+          case 'UVI': return '5';
+          case 'SLEEP': case 'SUN_RISE': case 'SUN_SET': return '00:00';
+          default: return '888';
+        }
+      })();
+      if (!mock) return w;
+      return mock.length * digitW;
+    })();
+    const x = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : cx - Math.floor(autoW / 2);
     const y = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : Math.floor(canvas * 0.4) - Math.floor(h / 2);
     const needsDataType = addAllowedDataTypes.length > 0;
     const isStatus = addElType === 'IMG_STATUS';
@@ -2419,7 +2441,7 @@ function StudioApp() {
       name: addElSubtype
         ? addElSubtype.charAt(0).toUpperCase() + addElSubtype.slice(1)
         : (needsDataType || isStatus ? addElDataType.charAt(0) + addElDataType.slice(1).toLowerCase() : addElType),
-      bounds: { x, y, width: w, height: h },
+      bounds: { x, y, width: autoW, height: h },
       visible: true,
       zIndex: maxZ + 1,
       ...(needsDataType && normalizedAddDataType ? { dataType: normalizedAddDataType } : {}),
@@ -3381,16 +3403,15 @@ function StudioApp() {
       for (const el of allEditorElements) {
         const supportsIconEffects = el.type === 'IMG' || el.type === 'IMG_STATUS';
         if (!supportsIconEffects) continue;
-        const hasEffects = (el.iconHue ?? 0) !== 0 || (el.iconSaturation ?? 100) !== 100 || !!el.iconColorize;
+        const hasEffects = (el.iconHue ?? 0) !== 0 || (el.iconSaturation ?? 100) !== 100 || !!el.iconColorize || !!el.iconPhotoEdit;
 
         if (el.iconKey) {
           const iconEntry = getIconByKey(el.iconKey);
           if (iconEntry) {
             const safeKey = el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_');
             const filename = `icon_${safeKey}.png`;
-            const finalDataUrl = hasEffects
-              ? await applyIconEffectsForZPK(iconEntry.dataUrl, el, el.bounds.width || 48, el.bounds.height || 48)
-              : iconEntry.dataUrl;
+            // Always resize to element bounds — Zepp OS IMG renders at native PNG size (w/h ignored).
+            const finalDataUrl = await applyIconEffectsForZPK(iconEntry.dataUrl, el, el.bounds.width || 48, el.bounds.height || 48);
             const { bytes } = decodeDataUrlToBytes(finalDataUrl, `Icon image ${filename}`);
             elementFiles.push({ src: filename, file: new File([bytes], filename, { type: 'image/png' }) });
             if (el.type === 'IMG_STATUS') {

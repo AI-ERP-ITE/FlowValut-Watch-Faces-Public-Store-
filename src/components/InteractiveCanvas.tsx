@@ -1688,25 +1688,47 @@ function getCachedImage(src: string, cache: Map<string, HTMLImageElement>, onLoa
   return null; // Will be ready on next frame after onLoad fires
 }
 
+/** Max-digit mock values — always show widest realistic value so bounding box = tight fit */
+export function getMaxDigitMock(dataType: string | undefined, type: WatchFaceElement['type'], subtype?: string): string {
+  if (type === 'IMG_TIME') {
+    if (subtype === 'minutes') return '58';
+    if (subtype === 'seconds') return '58';
+    return '10'; // hours
+  }
+  if (type === 'IMG_WEEK') return 'WED';
+  if (type === 'IMG_DATE') return '31';
+  switch (dataType) {
+    case 'STEP':            return '88888'; // 99999 max → 5 digits
+    case 'BATTERY':         return '100';   // 3 digits
+    case 'HEART':           return '188';   // 3 digits
+    case 'CAL':             return '8888';  // 9999 max → 4 digits
+    case 'DISTANCE':        return '99.9';  // 4 chars
+    case 'SPO2':            return '100';   // 3 digits
+    case 'STRESS':          return '100';   // 3 digits
+    case 'HUMIDITY':        return '100';   // 3 digits
+    case 'PAI_WEEKLY':      return '525';   // 3 digits
+    case 'AQI':             return '888';   // 3 digits
+    case 'ALTIMETER':       return '1200';  // 4 digits
+    case 'VO2MAX':          return '65';    // 2 digits
+    case 'TRAINING_LOAD':   return '888';   // 3 digits
+    case 'WIND':            return '888';   // 3 digits
+    case 'WEATHER_CURRENT': return '-20';   // 3 chars (negative temp)
+    case 'UVI':             return '5';     // 1 digit
+    case 'SLEEP':           return '8:88';  // HH:MM
+    case 'SUN_RISE':
+    case 'SUN_SET':         return '06:28'; // HH:MM
+    default:                return '888';   // fallback 3 digits
+  }
+}
+
 function getPlaceholderText(el: WatchFaceElement): string {
   const name = el.name.toLowerCase();
-  if (el.type === 'IMG_TIME') {
-    if (el.subtype === 'minutes') return '28';
-    if (el.subtype === 'seconds') return '36';
-    return '10'; // hours or legacy single element
-  }
-  // Check type before name so toggling Date→Week works even if name still says "date"
-  if (el.type === 'IMG_WEEK') return 'WED';
-  if (el.type === 'IMG_DATE') return '24';
+  const mock = getMaxDigitMock(el.dataType, el.type, el.subtype);
+  if (mock) return mock;
   if (name.includes('month')) return 'APR';
   if (name.includes('week')) return 'WED';
-  if (name.includes('date')) return '24';
-  if (el.dataType === 'BATTERY') return '85%';
-  if (el.dataType === 'STEP') return '8432';
-  if (el.dataType === 'HEART') return '72';
-  if (el.dataType === 'WEATHER_CURRENT') return '24°';
-  if (el.dataType === 'WEATHER_STATUS') return '☀';
-  return el.dataType ?? '123';
+  if (name.includes('date')) return '31';
+  return el.dataType ?? '888';
 }
 
 function drawDigitElement(
