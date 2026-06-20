@@ -3847,6 +3847,7 @@ function StudioApp() {
         backgroundFile: state.backgroundFile,
         aodBackgroundFile: preparedAodBackgroundFile,
         elementFiles,
+        previewDataUrl,
       });
       console.log('[App] ZPK built successfully, size:', zpkResult.size);
 

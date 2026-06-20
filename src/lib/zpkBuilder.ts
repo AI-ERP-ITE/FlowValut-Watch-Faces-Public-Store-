@@ -9,6 +9,8 @@ export interface ZPKBuildOptions {
   backgroundFile: File;
   aodBackgroundFile?: File | null;
   elementFiles: { src: string; file: File }[];
+  /** Full canvas screenshot data URL — used as 324×324 thumbnail (anteprima.png) */
+  previewDataUrl?: string | null;
 }
 
 export interface ZPKBuildResult {
@@ -65,8 +67,39 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     
     console.log('[ZPK] Step 4: Adding app.json...');
     deviceZip.file('app.json', code.appJson);
-    // Add preview icon (referenced in app.json as anteprima.png)
-    deviceZip.file('anteprima.png', backgroundFile);
+    // Add preview thumbnail (anteprima.png) — resolution-matched size per Zepp OS spec.
+    // Falls back to background image if no canvas screenshot is provided.
+    const thumbSize = (() => {
+      const w = config.resolution.width;
+      const h = config.resolution.height;
+      if (w === 480 && h === 480) return { w: 324, h: 324 };
+      if (w === 454 && h === 454) return { w: 306, h: 306 };
+      if (w === 390 && h === 450) return { w: 266, h: 306 };
+      if (w === 402 && h === 476) return { w: 273, h: 316 };
+      return { w: Math.round(w * 0.675), h: Math.round(h * 0.675) }; // generic ~67.5%
+    })();
+    let anteprimaFile: File | Blob = backgroundFile;
+    if (options.previewDataUrl) {
+      try {
+        const thumbBlob = await new Promise<Blob>((res, rej) => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = thumbSize.w; c.height = thumbSize.h;
+            const ctx = c.getContext('2d');
+            if (!ctx) { rej(new Error('no ctx')); return; }
+            ctx.drawImage(img, 0, 0, thumbSize.w, thumbSize.h);
+            c.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png');
+          };
+          img.onerror = rej;
+          img.src = options.previewDataUrl!;
+        });
+        anteprimaFile = thumbBlob;
+      } catch (e) {
+        console.warn('[ZPK] Failed to render preview thumbnail, using background:', e);
+      }
+    }
+    deviceZip.file('anteprima.png', anteprimaFile);
     
     console.log('[ZPK] Step 5: Adding app.js...');
     deviceZip.file('app.js', code.appJs);
