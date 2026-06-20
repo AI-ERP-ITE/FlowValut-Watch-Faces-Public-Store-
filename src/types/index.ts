@@ -3,7 +3,7 @@
 export interface WatchFaceElement {
   id: string;
   version?: number;
-  type: 'TIME_POINTER' | 'GAUGE_POINTER' | 'IMG_LEVEL' | 'TEXT' | 'IMG' | 'ARC_PROGRESS' | 'CIRCLE' | 'TEXT_IMG' | 'BUTTON' | 'IMG_STATUS' | 'IMG_TIME' | 'IMG_DATE' | 'IMG_WEEK' | 'FILL_RECT' | 'STROKE_RECT' | 'IMG_ANIM' | 'IMG_PROGRESS' | 'DATE_POINTER' | 'IMG_CLICK';
+  type: 'TIME_POINTER' | 'GAUGE_POINTER' | 'IMG_LEVEL' | 'TEXT' | 'IMG' | 'ARC_PROGRESS' | 'CIRCLE' | 'TEXT_IMG' | 'BUTTON' | 'IMG_STATUS' | 'IMG_TIME' | 'IMG_DATE' | 'IMG_WEEK' | 'FILL_RECT' | 'STROKE_RECT' | 'IMG_ANIM' | 'IMG_PROGRESS' | 'DATE_POINTER' | 'IMG_CLICK' | 'image_layer';
   subtype?: string;
   name: string;
   bounds: {
@@ -175,6 +175,9 @@ export interface WatchFaceElement {
     padding: number;              // px — positive expands frame beyond parent bounds
     linked?: boolean;             // true (default) = auto-sync to parent bounds; false = independent
   };
+
+  // image_layer element extra params
+  params?: Record<string, unknown>;
 
   // Universal drop shadow (canvas preview + ZPK PNG baking for simple elements)
   dropShadow?: {
