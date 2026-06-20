@@ -18,7 +18,7 @@ import { PropertyPanel } from '@/components/PropertyPanel';
 import { useApp, actions } from '@/context/AppContext';
 import { buildZPK } from '@/lib/zpkBuilder';
 import { FONT_STYLES } from '@/lib/fontLibrary';
-import { uploadStudioArtifactsToFirebase, fetchAdminCatalogFromFirebase, type StudioUploadResult } from '@/lib/studioFirebasePublishApi';
+import { uploadStudioArtifactsToFirebase, publishStudioWatchfaceToFirebase, fetchAdminCatalogFromFirebase, type StudioUploadResult } from '@/lib/studioFirebasePublishApi';
 import { generateQRCode } from '@/lib/qrGenerator';
 import { getIconByKey } from '@/lib/iconLibrary';
 import { testApiKey, type AIProvider } from '@/lib/aiService';
@@ -3928,6 +3928,22 @@ function StudioApp() {
       dispatch(actions.setGithubUrl(uploadResult.downloadUrl || ''));
       dispatch(actions.setQrCode(qrDataUrl));
       dispatch(actions.setStep('success'));
+
+      // Auto-save as OFFLINE draft so the face appears in /admin even if PublishForm is skipped
+      if (!isRepublishExisting) {
+        publishStudioWatchfaceToFirebase({
+          id: watchfaceId,
+          name: configForBuild.name || watchfaceId,
+          specGroup: derivedSpecGroup || 'unknown',
+          categories: [],
+          hashtags: [],
+          basePrice: 0,
+          discountPercent: 0,
+          price: 0,
+          stripeLink: null,
+          draft: true,
+        }).catch(() => { /* silent — draft is best-effort */ });
+      }
       if (investigationRunIdRef.current) {
         parityCaptureSession.completeRun({ runId: investigationRunIdRef.current });
       }

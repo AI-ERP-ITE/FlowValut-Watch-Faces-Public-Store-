@@ -119,6 +119,7 @@ export async function publishStudioWatchfaceToFirebase(entry: {
   stripeLink: string | null;
   publishMode?: 'KEEP_QR' | 'REGENERATE_ALL';
   replacedAssets?: Array<'zpk' | 'source' | 'preview' | 'qr'>;
+  draft?: boolean;
 }): Promise<{
   ok: boolean;
   id: string;

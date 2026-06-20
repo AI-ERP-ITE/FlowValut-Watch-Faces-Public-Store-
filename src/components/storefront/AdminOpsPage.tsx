@@ -18,6 +18,13 @@ import type { CatalogEntry } from '@/context/CatalogContext';
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
+  const functionsBase = (
+    (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined) ||
+    (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined) || ''
+  ).replace(/\/$/, '');
+  function previewUrl(id: string) {
+    return functionsBase ? `${functionsBase}/publicAsset?kind=preview&id=${encodeURIComponent(id)}` : '';
+  }
 
   const [patching, setPatching] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
@@ -271,7 +278,7 @@ export function AdminOpsPage() {
               <table className="w-full text-xs">
                 <thead className="bg-[#161d27] text-[#9ba6b8]">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">ID</th>
+                    <th className="px-3 py-2 text-left font-medium">Preview</th>
                     <th className="px-3 py-2 text-left font-medium">Name</th>
                     <th className="px-3 py-2 text-left font-medium">Status</th>
                     <th className="px-3 py-2 text-right font-medium">Actions</th>
@@ -283,8 +290,21 @@ export function AdminOpsPage() {
                     const rowBusy = updatingCatalogId === entry.id;
                     return (
                       <tr key={entry.id} className="border-t border-[#202632] text-[#e9edf5]">
-                        <td className="px-3 py-2 font-mono">{entry.id}</td>
-                        <td className="px-3 py-2">{entry.name}</td>
+                        <td className="px-3 py-2">
+                          {previewUrl(entry.id) ? (
+                            <img
+                              src={previewUrl(entry.id)}
+                              alt={entry.name}
+                              className="h-12 w-12 rounded object-cover bg-[#1a2030]"
+                            />
+                          ) : (
+                            <div className="h-12 w-12 rounded bg-[#1a2030]" />
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{entry.name}</div>
+                          <div className="text-[10px] text-[#6b7a8d] font-mono">{entry.id}</div>
+                        </td>
                         <td className="px-3 py-2">
                           <span className={`rounded px-2 py-0.5 ${status === 'ENABLED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
                             {status}
