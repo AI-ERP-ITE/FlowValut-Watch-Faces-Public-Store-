@@ -2591,13 +2591,18 @@ function StudioApp() {
   const [republishMode, setRepublishMode] = useState<'KEEP_QR' | 'REGENERATE_ALL'>('REGENERATE_ALL');
   const [latestUploadResult, setLatestUploadResult] = useState<StudioUploadResult | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
+  const [watchModels, setWatchModels] = useState<Record<string, { specGroup?: string }>>({});
 
-  // Fetch spec groups from same-origin static asset.
+  // Fetch spec groups and models from same-origin static assets.
   useEffect(() => {
     fetch('/specGroups.json')
       .then((r) => r.ok ? r.json() : {})
       .then((data) => setSpecGroups(data as Record<string, SpecGroup>))
       .catch(() => setSpecGroups({}));
+    fetch('/models.json')
+      .then((r) => r.ok ? r.json() : {})
+      .then((data) => setWatchModels(data as Record<string, { specGroup?: string }>))
+      .catch(() => setWatchModels({}));
   }, []);
 
   useEffect(() => {
@@ -3892,7 +3897,9 @@ function StudioApp() {
       const qrDataUrl = shouldGenerateQr && expectedZpkUrl ? await generateQRCode(expectedZpkUrl) : null;
 
       // Build source.json for safe future regeneration
-      const sourceJson = buildSourceJson(withNormalizedPointerEffects(configForBuild));
+      // Derive specGroup from watchModel so adminPatchSpecGroups batch can repair catalog entries.
+      const derivedSpecGroup = watchModels[configForBuild.watchModel]?.specGroup ?? null;
+      const sourceJson = buildSourceJson(withNormalizedPointerEffects(configForBuild), derivedSpecGroup);
 
       const uploadResult = await uploadStudioArtifactsToFirebase({
         watchfaceId,
