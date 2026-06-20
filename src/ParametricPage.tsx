@@ -8781,6 +8781,57 @@ export default function ParametricPage() {
                           </label>
                         ))}
                       </div>
+
+                      {/* Photo Edit */}
+                      {(() => {
+                        const pe = (typeof imgParams.photoEdit === 'object' && imgParams.photoEdit !== null
+                          ? imgParams.photoEdit
+                          : {}) as Record<string, number>;
+                        const setPE = (key: string, val: number) =>
+                          setImgParam('photoEdit', { ...pe, [key]: val });
+                        const v = (k: string, def = 0) => Number(pe[k] ?? def);
+                        const sliders: Array<{ key: string; label: string; min: number; max: number; unit?: string }> = [
+                          { key: 'exposure',    label: 'Exposure',    min: -100, max: 100 },
+                          { key: 'brightness',  label: 'Brightness',  min: -100, max: 100 },
+                          { key: 'contrast',    label: 'Contrast',    min: -100, max: 100 },
+                          { key: 'highlights',  label: 'Highlights',  min: -100, max: 100 },
+                          { key: 'shadows',     label: 'Shadows',     min: -100, max: 100 },
+                          { key: 'saturation',  label: 'Saturation',  min: -100, max: 100 },
+                          { key: 'hue',         label: 'Hue',         min: 0,    max: 360, unit: '°' },
+                          { key: 'temperature', label: 'Temperature', min: -100, max: 100 },
+                          { key: 'tint',        label: 'Tint',        min: -100, max: 100 },
+                          { key: 'sharpness',   label: 'Sharpness',   min: 0,    max: 100 },
+                          { key: 'vignette',    label: 'Vignette',    min: 0,    max: 100 },
+                        ];
+                        return (
+                          <div className="space-y-2 border-t border-zinc-800 pt-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[11px] uppercase tracking-wide text-zinc-400">Photo Edit</p>
+                              <button
+                                type="button"
+                                onClick={() => setImgParam('photoEdit', {})}
+                                className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-800"
+                              >Reset all</button>
+                            </div>
+                            {sliders.map(({ key, label, min, max, unit }) => (
+                              <div key={key} className="flex items-center gap-2">
+                                <span className="w-20 flex-shrink-0 text-[11px] text-zinc-400">{label}</span>
+                                <input
+                                  type="range" min={min} max={max} step={1}
+                                  value={v(key)}
+                                  onChange={e => setPE(key, Number(e.target.value))}
+                                  className="flex-1"
+                                />
+                                <span
+                                  className="w-10 flex-shrink-0 cursor-pointer select-none text-right text-[11px] text-zinc-300 transition-colors hover:text-sky-400"
+                                  title="Double-click to reset"
+                                  onDoubleClick={() => setPE(key, 0)}
+                                >{v(key) > 0 && min < 0 ? `+${v(key)}` : `${v(key)}`}{unit ?? ''}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })()}

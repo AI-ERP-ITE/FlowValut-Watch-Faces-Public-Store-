@@ -13,6 +13,7 @@ import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/poin
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
 import { normalizeDropShadowForBake, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import { analyzeFlicker } from '@/utils/flickerEngine';
+import { drawImageWithPhotoEdit, DEFAULT_PHOTO_EDIT } from '@/lib/photoEditUtils';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
   createDefaultGaugePointerDataUrl,
@@ -672,6 +673,8 @@ function hitTestRectHandle(
 }
 
 /** Apply resize delta to bounds based on which handle is dragged */
+const CORNER_HANDLES = new Set(['TL', 'TR', 'BL', 'BR']);
+
 function applyResize(
   snap: { x: number; y: number; width: number; height: number },
   handle: string,
@@ -679,6 +682,31 @@ function applyResize(
 ) {
   let { x, y, width, height } = snap;
   const MIN = 20;
+
+  // Corners: lock aspect ratio (Option A — always proportional)
+  if (CORNER_HANDLES.has(handle)) {
+    const aspect = snap.width > 0 ? snap.width / snap.height : 1;
+    // Use whichever drag delta has larger absolute movement to drive the resize
+    const dw = handle.includes('L') ? -dx : dx;
+    const dh = handle.includes('T') ? -dy : dy;
+    // Pick dominant axis: whichever has larger abs change, then derive the other
+    let newW: number;
+    let newH: number;
+    if (Math.abs(dw) >= Math.abs(dh)) {
+      newW = Math.max(MIN, snap.width + dw);
+      newH = Math.max(MIN, newW / aspect);
+    } else {
+      newH = Math.max(MIN, snap.height + dh);
+      newW = Math.max(MIN, newH * aspect);
+    }
+    if (handle.includes('L')) { x = snap.x + snap.width - newW; }
+    if (handle.includes('T')) { y = snap.y + snap.height - newH; }
+    width = newW;
+    height = newH;
+    return { x: Math.max(0, x), y: Math.max(0, y), width, height };
+  }
+
+  // Sides: free stretch
   if (handle.includes('L')) { x = Math.min(snap.x + dx, snap.x + snap.width - MIN); width = snap.width - (x - snap.x); }
   if (handle.includes('R')) { width = Math.max(MIN, snap.width + dx); }
   if (handle.includes('T')) { y = Math.min(snap.y + dy, snap.y + snap.height - MIN); height = snap.height - (y - snap.y); }
@@ -1591,6 +1619,32 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
           ctx.restore();
         }
         break;
+      case 'image_layer': {
+        const p = el.params && typeof el.params === 'object' ? el.params as Record<string, unknown> : {};
+        const dataUrl = typeof p.imageDataUrl === 'string' ? p.imageDataUrl : '';
+        if (!dataUrl) { drawPlaceholder(ctx, el); break; }
+        const { x: ilx, y: ily, width: ilw, height: ilh } = el.bounds;
+        const opacity = typeof p.opacity === 'number' ? p.opacity : 1;
+        const photoEdit = (p.photoEdit && typeof p.photoEdit === 'object'
+          ? { ...DEFAULT_PHOTO_EDIT, ...(p.photoEdit as object) }
+          : DEFAULT_PHOTO_EDIT);
+        const cacheKey = `image_layer:${el.id}:${dataUrl.length}`;
+        if (!iconCache) { drawPlaceholder(ctx, el); break; }
+        const cached = iconCache.get(cacheKey);
+        if (cached) {
+          ctx.save();
+          ctx.globalAlpha = opacity;
+          drawImageWithPhotoEdit(ctx, cached, photoEdit, ilx, ily, ilw, ilh);
+          ctx.globalAlpha = 1;
+          ctx.restore();
+        } else {
+          const img = new Image();
+          img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
+          img.src = dataUrl;
+          drawPlaceholder(ctx, el);
+        }
+        break;
+      }
       default:
         ctx.save();
         applyShadow(ctx, el);
