@@ -1674,16 +1674,12 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       {element.type === 'IMG_LEVEL' && (element.dataType === 'WEATHER_CURRENT' || element.dataType === 'WEATHER_STATUS') && (
         <Section label="Weather Style">
           <div className="space-y-2">
-            {element.dataType === 'WEATHER_CURRENT' && (
-              <p className="text-[9px] text-amber-400/80 leading-tight">
-                WEATHER_CURRENT on IMG_LEVEL is preview-only in many firmware builds. Use Weather Status for reliable on-device weather icons.
-              </p>
-            )}
+            {element.dataType === 'WEATHER_CURRENT' && null}
             <div className="flex gap-2">
               {WEATHER_STYLES.map(ws => (
                 <button
                   key={ws.key}
-                  onClick={() => update({ weatherStyle: ws.key })}
+                  onClick={() => update({ weatherStyle: ws.key, images: generateWeatherSet(ws.key as WeatherStyle) })}
                   className={cn(
                     'flex-1 h-7 rounded border text-[10px]',
                     (element.weatherStyle ?? 'flat') === ws.key

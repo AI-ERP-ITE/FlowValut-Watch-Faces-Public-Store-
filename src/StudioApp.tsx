@@ -28,7 +28,7 @@ import { generatePipelineAssets, generateCurvedTextImage } from '@/pipeline/asse
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { generateWeatherSet } from '@/lib/weatherIconSets';
-import type { WeatherStyle } from '@/lib/weatherIconSets';
+
 import { buildSourceJson } from '@/lib/sourceJsonGenerator';
 import { PublishForm } from '@/components/PublishForm';
 import { AdminPanel } from '@/components/AdminPanel';
@@ -120,10 +120,6 @@ function normalizeBackgroundTransform(input?: BackgroundTransform | null): Backg
     flipH: !!input?.flipH,
     flipV: !!input?.flipV,
   };
-}
-
-function weatherImageFilenames(): string[] {
-  return Array.from({ length: 29 }, (_, i) => `weather_${i}.png`);
 }
 
 function weatherTempDigitFilenames(): string[] {
@@ -478,8 +474,9 @@ async function mockKimiAnalysis(
       type: 'IMG_LEVEL',
       name: 'Weather Icon',
       bounds: { x: 60, y: resolution.height - 60, width: 40, height: 40 },
-      images: Array.from({length: 29}, (_, i) => `weather_${i}.png`),
+      images: generateWeatherSet('flat'),
       dataType: 'WEATHER_STATUS',
+      weatherStyle: 'flat',
       visible: true,
       zIndex: 6,
     },
@@ -2446,7 +2443,7 @@ function StudioApp() {
       zIndex: maxZ + 1,
       ...(needsDataType && normalizedAddDataType ? { dataType: normalizedAddDataType } : {}),
       ...(addElType === 'IMG_LEVEL' && isWeatherImgLevelDataType(normalizedAddDataType)
-        ? { images: weatherImageFilenames(), weatherStyle: 'flat' }
+        ? { images: generateWeatherSet('flat'), weatherStyle: 'flat' }
         : {}),
       ...(isStatus ? { statusType: addElDataType } : {}),
       ...(isArc ? { startAngle: -90, endAngle: 270, radius: 80, lineWidth: 10, color: '#00CC88', center: { x: cx, y: cx } } : {}),
@@ -3260,68 +3257,11 @@ function StudioApp() {
       }
       console.log('[App] Digit images regenerated with current colors/fonts:', freshDigits.length, 'files updated');
 
-      // Ensure weather IMG_LEVEL elements always ship a full 29-image set and image_array filenames.
-      const weatherFilesByStyle = new Set<string>();
+      // Resolve all IMG_LEVEL assets (weather and non-weather use the same loop).
+      // Weather elements carry data: URLs in el.images (set at creation / style change).
       const resolvedImgLevelFrames = new Map<string, string[]>();
       for (const el of allEditorElements) {
-        if (el.type !== 'IMG_LEVEL' || !isWeatherImgLevelDataType(el.dataType)) continue;
-        const weatherStyle = ((el.weatherStyle ?? 'flat') as WeatherStyle);
-        const weatherFiles = weatherImageFilenames();
-        const configuredFrames = Array.isArray(el.images)
-          ? el.images.map((frame) => (typeof frame === 'string' ? frame.trim() : '')).filter((frame) => frame.length > 0)
-          : [];
-
-        if (configuredFrames.length > 0) {
-          const safeBase = (el.name || el.id).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase() || 'weather_custom';
-          const normalizedFrames: string[] = [];
-
-          for (let i = 0; i < weatherFiles.length; i += 1) {
-            const configuredFrame = configuredFrames[i] ?? configuredFrames[configuredFrames.length - 1];
-            if (!configuredFrame) continue;
-
-            if (configuredFrame.startsWith('data:')) {
-              const generatedName = `weather_${safeBase}_${i}.png`;
-              const { bytes } = decodeDataUrlToBytes(configuredFrame, `Weather custom frame ${generatedName}`);
-              const newFile = { src: generatedName, file: new File([bytes], generatedName, { type: 'image/png' }) };
-              const existingIndex = elementFiles.findIndex((f) => f.src === generatedName);
-              if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
-              else elementFiles.push(newFile);
-              normalizedFrames.push(generatedName);
-            } else {
-              normalizedFrames.push(configuredFrame);
-            }
-          }
-
-          if (normalizedFrames.length > 0) {
-            resolvedImgLevelFrames.set(el.id, normalizedFrames);
-            continue;
-          }
-        }
-
-        const styleKey = `weather_${weatherStyle}`;
-        if (!weatherFilesByStyle.has(styleKey)) {
-          const dataUrls = generateWeatherSet(weatherStyle);
-          for (let i = 0; i < weatherFiles.length; i++) {
-            const filename = weatherFiles[i];
-            const dataUrl = dataUrls[i] ?? dataUrls[0];
-            const { bytes } = decodeDataUrlToBytes(dataUrl, `Weather image ${filename}`);
-            const newFile = { src: filename, file: new File([bytes], filename, { type: 'image/png' }) };
-            const existingIndex = elementFiles.findIndex(f => f.src === filename);
-            if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
-            else elementFiles.push(newFile);
-          }
-          weatherFilesByStyle.add(styleKey);
-        }
-
-        resolvedImgLevelFrames.set(el.id, weatherFiles);
-      }
-      if (weatherFilesByStyle.size > 0) {
-        console.log('[App] Weather IMG_LEVEL assets regenerated:', weatherFilesByStyle.size, 'style set(s)');
-      }
-
-      // Resolve non-weather IMG_LEVEL assets with flexible frame counts.
-      for (const el of allEditorElements) {
-        if (el.type !== 'IMG_LEVEL' || isWeatherImgLevelDataType(el.dataType)) continue;
+        if (el.type !== 'IMG_LEVEL') continue;
 
         const configuredFrames = Array.isArray(el.images)
           ? el.images.map((name) => (typeof name === 'string' ? name.trim() : '')).filter((name) => name.length > 0)
@@ -3539,14 +3479,7 @@ function StudioApp() {
       const exportAodElements = aodEditorElements ? prepareExportElements(aodEditorElements) : null;
       const exportCombinedElements = exportAodElements ? [...exportElements, ...exportAodElements] : exportElements;
       for (const el of exportElements) {
-        if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
-          const resolvedFrames = resolvedImgLevelFrames.get(el.id);
-          if (resolvedFrames) {
-            el.images = [...resolvedFrames];
-          } else {
-            el.images = weatherImageFilenames();
-          }
-        } else if (el.type === 'IMG_LEVEL') {
+        if (el.type === 'IMG_LEVEL') {
           const resolvedFrames = resolvedImgLevelFrames.get(el.id);
           if (resolvedFrames) {
             el.images = [...resolvedFrames];
@@ -3558,14 +3491,7 @@ function StudioApp() {
       }
       if (exportAodElements) {
         for (const el of exportAodElements) {
-          if (el.type === 'IMG_LEVEL' && isWeatherImgLevelDataType(el.dataType)) {
-            const resolvedFrames = resolvedImgLevelFrames.get(el.id);
-            if (resolvedFrames) {
-              el.images = [...resolvedFrames];
-            } else {
-              el.images = weatherImageFilenames();
-            }
-          } else if (el.type === 'IMG_LEVEL') {
+          if (el.type === 'IMG_LEVEL') {
             const resolvedFrames = resolvedImgLevelFrames.get(el.id);
             if (resolvedFrames) {
               el.images = [...resolvedFrames];
