@@ -52,6 +52,23 @@ async function adminFetch<T>(endpoint: string, init: RequestInit): Promise<T> {
   return payload as T;
 }
 
+export async function fetchPublicConfig<T>(file: 'models' | 'specGroups'): Promise<T> {
+  const base = requirePublicBaseUrl();
+  const res = await fetch(`${base}/publicConfig?file=${file}`);
+  if (!res.ok) throw new Error(`Failed to load ${file}.json from config`);
+  return res.json() as Promise<T>;
+}
+
+export async function adminUpdateConfigInFirebase(input: {
+  file: 'models' | 'specGroups';
+  data: Record<string, unknown>;
+}): Promise<{ ok: boolean; file: string }> {
+  return adminFetch<{ ok: boolean; file: string }>('adminUpdateConfig', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

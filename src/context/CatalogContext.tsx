@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react';
-import { fetchCatalogFromFirebase } from '@/lib/studioFirebasePublishApi';
+import { fetchCatalogFromFirebase, fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -198,20 +198,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const [catalogRes, modelsRes, specGroupsRes] = await Promise.all([
-          fetch(buildAssetUrl('catalog.json')),
-          fetch(buildAssetUrl('models.json')),
-          fetch(buildAssetUrl('specGroups.json')),
-        ]);
-
+        const catalogRes = await fetch(buildAssetUrl('catalog.json'));
         if (!catalogRes.ok) throw new Error('Failed to load catalog.json');
-        if (!modelsRes.ok) throw new Error('Failed to load models.json');
-        if (!specGroupsRes.ok) throw new Error('Failed to load specGroups.json');
 
         const [catalogData, modelsData, specGroupsData] = await Promise.all([
           catalogRes.json(),
-          modelsRes.json(),
-          specGroupsRes.json(),
+          fetchPublicConfig<Record<string, ModelEntry>>('models'),
+          fetchPublicConfig<Record<string, SpecGroup>>('specGroups'),
         ]);
 
         const hydratedCatalog = await hydrateCatalogSpecGroups(

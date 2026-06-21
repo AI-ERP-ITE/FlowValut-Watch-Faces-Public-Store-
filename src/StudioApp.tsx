@@ -30,6 +30,7 @@ import type { HandStyleKey } from '@/lib/handStyles';
 import { generateWeatherSet } from '@/lib/weatherIconSets';
 
 import { buildSourceJson } from '@/lib/sourceJsonGenerator';
+import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 import { PublishForm } from '@/components/PublishForm';
 import { AdminPanel } from '@/components/AdminPanel';
 import type { CatalogEntry, SpecGroup } from '@/context/CatalogContext';
@@ -2590,15 +2591,13 @@ function StudioApp() {
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
   const [watchModels, setWatchModels] = useState<Record<string, { specGroup?: string }>>({});
 
-  // Fetch spec groups and models from same-origin static assets.
+  // Fetch spec groups and models from Firebase Storage (single source of truth).
   useEffect(() => {
-    fetch('/specGroups.json')
-      .then((r) => r.ok ? r.json() : {})
-      .then((data) => setSpecGroups(data as Record<string, SpecGroup>))
+    fetchPublicConfig<Record<string, SpecGroup>>('specGroups')
+      .then((data) => setSpecGroups(data))
       .catch(() => setSpecGroups({}));
-    fetch('/models.json')
-      .then((r) => r.ok ? r.json() : {})
-      .then((data) => setWatchModels(data as Record<string, { specGroup?: string }>))
+    fetchPublicConfig<Record<string, { specGroup?: string }>>('models')
+      .then((data) => setWatchModels(data))
       .catch(() => setWatchModels({}));
   }, []);
 

@@ -6,14 +6,16 @@ import { AdminPanel } from '@/components/AdminPanel';
 import {
   fetchAdminCatalogFromFirebase,
   fetchCatalogFromFirebase,
+  fetchPublicConfig,
   fetchStorefrontConfigFromFirebase,
+  adminUpdateConfigInFirebase,
   patchCatalogSpecGroupsInFirebase,
   setCatalogStatusInFirebase,
   writeStorefrontConfigToFirebase,
 } from '@/lib/studioFirebasePublishApi';
 import { Button } from '@/components/ui/button';
 import { isFirebaseAuthConfigured } from '@/lib/firebaseAuthClient';
-import type { CatalogEntry } from '@/context/CatalogContext';
+import type { CatalogEntry, SpecGroup } from '@/context/CatalogContext';
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -27,6 +29,7 @@ export function AdminOpsPage() {
   }
 
   const [patching, setPatching] = useState(false);
+  const [uploadingConfig, setUploadingConfig] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [catalogOptions, setCatalogOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [featuredFaceId, setFeaturedFaceId] = useState<string>('');
@@ -66,12 +69,12 @@ export function AdminOpsPage() {
 
     setPatching(true);
     try {
-      const specGroupsResponse = await fetch(`${import.meta.env.BASE_URL}specGroups.json`);
-      const specGroupsJson = specGroupsResponse.ok
-        ? (await specGroupsResponse.json()) as Record<string, unknown>
-        : {};
+      // validSpecGroups — load from Firebase Storage (canonical source)
+      const specGroupsJson = await fetchPublicConfig<Record<string, SpecGroup>>('specGroups').catch(() => ({}));
       const validSpecGroups = Object.keys(specGroupsJson);
 
+      // The patch function now loads models.json internally from Storage.
+      // No need to pass watchModelMap from the UI.
       const result = await patchCatalogSpecGroupsInFirebase({ validSpecGroups });
       if (result.patched > 0) {
         toast.success(`Patched ${result.patched} entries. Unknown left: ${result.unknownAfter}.`);
@@ -101,6 +104,28 @@ export function AdminOpsPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to save featured watchface');
     } finally {
       setSavingFeatured(false);
+    }
+  }
+
+  async function handleUploadConfig() {
+    if (!canRun) { toast.error('Configure Firebase auth/backend first.'); return; }
+    setUploadingConfig(true);
+    try {
+      const [modelsRes, specGroupsRes] = await Promise.all([
+        fetch(`${import.meta.env.BASE_URL}models.json`),
+        fetch(`${import.meta.env.BASE_URL}specGroups.json`),
+      ]);
+      if (!modelsRes.ok || !specGroupsRes.ok) throw new Error('Could not read local models/specGroups.json');
+      const [modelsData, specGroupsData] = await Promise.all([modelsRes.json(), specGroupsRes.json()]);
+      await Promise.all([
+        adminUpdateConfigInFirebase({ file: 'models', data: modelsData }),
+        adminUpdateConfigInFirebase({ file: 'specGroups', data: specGroupsData }),
+      ]);
+      toast.success('models.json and specGroups.json uploaded to Firebase Storage.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Config upload failed');
+    } finally {
+      setUploadingConfig(false);
     }
   }
 
@@ -222,6 +247,23 @@ export function AdminOpsPage() {
             className="h-10 bg-[#1d2736] hover:bg-[#263448] text-[#ecf2ff] border border-[#3b4d68]"
           >
             {savingFeatured ? 'Saving Featured Face...' : 'Save Featured Face'}
+          </Button>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">
+          <div className="flex items-center gap-2 text-[#dce3ee] text-sm font-medium">
+            <Database className="h-4 w-4 text-[#d2b37a]" />
+            Config Files (Firebase Storage — Single Source of Truth)
+          </div>
+          <p className="text-xs text-[#8f9aac]">
+            Uploads the bundled <code>models.json</code> and <code>specGroups.json</code> to Firebase Storage (<code>config/</code>). Run this after any model matrix changes.
+          </p>
+          <Button
+            onClick={handleUploadConfig}
+            disabled={!canRun || uploadingConfig}
+            className="h-10 bg-[#1d2736] hover:bg-[#263448] text-[#ecf2ff] border border-[#3b4d68]"
+          >
+            {uploadingConfig ? 'Uploading Config...' : 'Upload Config to Storage'}
           </Button>
         </div>
 

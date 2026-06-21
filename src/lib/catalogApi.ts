@@ -1,4 +1,5 @@
 import { uploadToGitHub, type GitHubConfig } from './githubApi';
+import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 import type { CatalogEntry, ModelEntry, SpecGroup } from '@/context/CatalogContext';
 import {
   bridgeReadContent,
@@ -225,15 +226,15 @@ export async function patchCatalogSpecGroups(
 ): Promise<SpecGroupPatchResult> {
   const [catalog, models, specGroups] = await Promise.all([
     fetchCatalogFromGitHub(config),
-    fetchJsonFromGitHub<Record<string, ModelEntry>>(config, 'docs/models.json'),
-    fetchJsonFromGitHub<Record<string, SpecGroup>>(config, 'docs/specGroups.json'),
+    fetchPublicConfig<Record<string, ModelEntry>>('models'),
+    fetchPublicConfig<Record<string, SpecGroup>>('specGroups'),
   ]);
 
-  if (!models) {
-    throw new Error('docs/models.json not found in repository');
+  if (!models || Object.keys(models).length === 0) {
+    throw new Error('models.json not found in config storage');
   }
-  if (!specGroups) {
-    throw new Error('docs/specGroups.json not found in repository');
+  if (!specGroups || Object.keys(specGroups).length === 0) {
+    throw new Error('specGroups.json not found in config storage');
   }
 
   const unknownBefore = catalog.filter(
