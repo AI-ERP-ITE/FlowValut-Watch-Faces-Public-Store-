@@ -3,6 +3,7 @@
 // Routes based on device model selection
 
 import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
+import modelsData from '../../models.json';
 import { generateWatchFaceCodeV2 } from './jsCodeGeneratorV2';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
@@ -159,25 +160,13 @@ function generateAppJson(config: WatchFaceConfig): string {
   return JSON.stringify(json, null, 2);
 }
 
-// Get device sources for different watch models
+// Get device sources by matching watchModel name against models.json
 function getDeviceSources(watchModel: string): number[] {
-  const sources: Record<string, number[]> = {
-    'Balance 2': [8519936, 8519937, 8519939],
-    'Balance': [8519936, 8519937, 8519939],
-    'Active Max': [8519936, 8519937, 8519939],
-    'Active 3 Premium': [8388608, 8388609],
-    'Active 2 Round': [8388608, 8388609],
-    'Active 2 Square': [8388610, 8388611],
-    'Active': [8388608, 8388609],
-    'Pop 3S (PIB)': [8388608, 8388609],
-    'GTR4': [8388608, 8388609],
-    'GTS4': [8388610, 8388611],
-    'Cheetah Pro': [8388608, 8388609],
-    'T-Rex 2': [8388608, 8388609],
-    'Falcon': [8388608, 8388609],
-  };
-  
-  return sources[watchModel] || [8519936, 8519937, 8519939];
+  const models = modelsData as Record<string, { name: string; deviceSources: number[] }>;
+  const entry = Object.values(models).find(
+    (m) => m.name === watchModel || m.name.toLowerCase() === watchModel.toLowerCase()
+  );
+  return entry?.deviceSources ?? [8519936, 8519937, 8519939];
 }
 
 // Generate app.js - Matching working ZPK structure (comes from Brushed_Steel_Petroleum)

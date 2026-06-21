@@ -71,7 +71,7 @@ export function ModelPage() {
                 <h1 className="font-sans font-light text-3xl tracking-tight text-[#E1E4EA]">{model.name}</h1>
               {specGroup && (
                   <p className="font-mono text-xs text-[#8E9196] mt-2">
-                  {specGroup.resolution} · {specGroup.shape} · API {specGroup.apiVersion.toUpperCase()}
+                  {specGroup.resolution} · {specGroup.shape} · {specGroup.supportedConfigVersions.map((v) => v.toUpperCase()).join(' + ')}
                 </p>
               )}
             </div>

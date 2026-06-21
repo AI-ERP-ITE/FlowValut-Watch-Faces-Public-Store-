@@ -3,6 +3,7 @@
 // Compatible with Amazfit Balance 2, Balance, Active Max (older Zepp OS)
 
 import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
+import modelsData from '../../models.json';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
@@ -127,15 +128,13 @@ function generateAppJsonV2(config: WatchFaceConfig): string {
   return JSON.stringify(json, null, 2);
 }
 
-// Get device sources for v2 (Balance 2 & related models)
+// Get device sources for v2 by matching watchModel name against models.json
 function getDeviceSourcesV2(watchModel: string): number[] {
-  const sources: Record<string, number[]> = {
-    'Balance 2': [8519936, 8519937, 8519939],
-    'Balance': [8519936, 8519937, 8519939],
-    'Active Max': [8519936, 8519937, 8519939],
-  };
-  
-  return sources[watchModel] || [8519936, 8519937, 8519939];
+  const models = modelsData as Record<string, { name: string; deviceSources: number[] }>;
+  const entry = Object.values(models).find(
+    (m) => m.name === watchModel || m.name.toLowerCase() === watchModel.toLowerCase()
+  );
+  return entry?.deviceSources ?? [8519936, 8519937, 8519939];
 }
 
 // Generate app.js - V2 format (EXACT copy of working reference app.js)

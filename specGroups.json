@@ -1,68 +1,46 @@
 {
-  "480-round-v2": {
+  "480-round": {
     "resolution": "480x480",
     "shape": "round",
-    "apiVersion": "v2",
-    "deviceSources": [8519936, 8519937, 8519939]
+    "supportedConfigVersions": ["v2", "v3"],
+    "thumbnail": "324x324"
   },
-  "454-round-v2": {
-    "resolution": "454x454",
-    "shape": "round",
-    "apiVersion": "v2",
-    "deviceSources": [8519936, 8519937, 8519939]
-  },
-  "416-round-v2": {
-    "resolution": "416x416",
-    "shape": "round",
-    "apiVersion": "v2",
-    "deviceSources": [8519936, 8519937, 8519939]
-  },
-  "320x380-square-v2": {
-    "resolution": "320x380",
-    "shape": "square",
-    "apiVersion": "v2",
-    "deviceSources": [8519936, 8519937, 8519939]
-  },
-  "480-round-v3": {
-    "resolution": "480x480",
-    "shape": "round",
-    "apiVersion": "v3",
-    "deviceSources": [8388608, 8388609]
-  },
-  "466-round-v3": {
+  "466-round": {
     "resolution": "466x466",
     "shape": "round",
-    "apiVersion": "v3",
-    "deviceSources": [8388608, 8388609]
+    "supportedConfigVersions": ["v2", "v3"],
+    "thumbnail": "314x314"
   },
-  "454-round-v3": {
+  "454-round": {
     "resolution": "454x454",
     "shape": "round",
-    "apiVersion": "v3",
-    "deviceSources": [8388608, 8388609]
+    "supportedConfigVersions": ["v2"],
+    "thumbnail": "306x306"
   },
-  "416-round-v3": {
+  "416-round": {
     "resolution": "416x416",
     "shape": "round",
-    "apiVersion": "v3",
-    "deviceSources": [8388608, 8388609]
+    "supportedConfigVersions": ["v2"],
+    "thumbnail": "280x280"
   },
-  "390x450-square-v3": {
+  "390x450-square": {
     "resolution": "390x450",
     "shape": "square",
-    "apiVersion": "v3",
-    "deviceSources": [8388610, 8388611]
+    "cornerRadius": 86,
+    "supportedConfigVersions": ["v2", "v3"],
+    "thumbnail": "266x307"
   },
-  "360-round-v3": {
+  "360-round": {
     "resolution": "360x360",
     "shape": "round",
-    "apiVersion": "v3",
-    "deviceSources": [8388608, 8388609]
+    "supportedConfigVersions": ["v3"],
+    "thumbnail": "243x243"
   },
-  "320x380-square-v3": {
+  "320x380-square": {
     "resolution": "320x380",
     "shape": "square",
-    "apiVersion": "v3",
-    "deviceSources": [8388610, 8388611]
+    "cornerRadius": 69,
+    "supportedConfigVersions": ["v2", "v3"],
+    "thumbnail": "200x238"
   }
 }

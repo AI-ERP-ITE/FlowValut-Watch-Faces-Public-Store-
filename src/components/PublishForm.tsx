@@ -29,8 +29,6 @@ export interface PublishFormProps {
   onPublished: (entry: CatalogEntry) => void;
   /** Called when the user clicks Cancel */
   onCancel: () => void;
-  /** Detected API version from the generator context */
-  apiVersion?: 'v2' | 'v3';
   /** All spec groups (from docs/specGroups.json) */
   specGroups?: Record<string, SpecGroup>;
   publishMode?: 'KEEP_QR' | 'REGENERATE_ALL';
@@ -44,7 +42,6 @@ export function PublishForm({
   watchfaceId,
   onPublished,
   onCancel,
-  apiVersion = 'v3',
   specGroups = {},
   publishMode = 'REGENERATE_ALL',
   replacedAssets = ['zpk', 'source', 'preview', 'qr'],
@@ -70,11 +67,11 @@ export function PublishForm({
     [name, existingIds]
   );
 
-  // specGroup detection from canvas resolution + apiVersion
+  // specGroup detection from canvas resolution
   const detectedSpecGroupKey = useMemo(() => {
     const { width, height } = watchFaceConfig.resolution;
-    return detectSpecGroup(width, height, apiVersion, specGroups);
-  }, [watchFaceConfig.resolution, apiVersion, specGroups]);
+    return detectSpecGroup(width, height, specGroups);
+  }, [watchFaceConfig.resolution, specGroups]);
 
   const detectedSpecGroupLabel = useMemo(() => {
     if (!detectedSpecGroupKey) return null;

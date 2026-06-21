@@ -4919,7 +4919,6 @@ function StudioApp() {
               <PublishForm
                 watchFaceConfig={state.watchFaceConfig}
                 watchfaceId={uploadedWatchfaceId}
-                apiVersion="v3"
                 specGroups={specGroups}
                 publishMode={republishMode}
                 replacedAssets={latestUploadResult?.replacedAssets ?? ['zpk', 'source', 'preview', ...(republishMode === 'REGENERATE_ALL' ? (['qr'] as const) : [])]}

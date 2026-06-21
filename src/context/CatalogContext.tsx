@@ -27,13 +27,15 @@ export interface ModelEntry {
   name: string;
   brand: string;
   specGroup: string;
+  deviceSources: number[];
 }
 
 export interface SpecGroup {
   resolution: string;
   shape: 'round' | 'square';
-  apiVersion: 'v2' | 'v3';
-  deviceSources: number[];
+  supportedConfigVersions: ('v2' | 'v3')[];
+  thumbnail?: string;
+  cornerRadius?: number;
 }
 
 interface SourceMetadata {

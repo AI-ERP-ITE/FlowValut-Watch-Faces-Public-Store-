@@ -173,7 +173,9 @@ export function ProductPage() {
                 <div className="flex gap-2 flex-wrap">
                   <SpecBadge label={specGroup.resolution} />
                   <SpecBadge label={specGroup.shape} />
-                  <SpecBadge label={`API ${specGroup.apiVersion.toUpperCase()}`} />
+                  {specGroup.supportedConfigVersions.map((v) => (
+                    <SpecBadge key={v} label={v.toUpperCase()} />
+                  ))}
                 </div>
               </div>
             )}
