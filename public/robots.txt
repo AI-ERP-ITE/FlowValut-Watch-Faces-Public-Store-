@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /studio
+Disallow: /studio/
+
+Sitemap: https://www.fvwatchfaces.com/sitemap.xml

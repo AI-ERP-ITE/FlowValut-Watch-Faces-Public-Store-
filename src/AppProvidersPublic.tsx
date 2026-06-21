@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 
 export default function AppProvidersPublic({ children }: PropsWithChildren) {
-  return <>{children}</>;
+  return <HelmetProvider>{children}</HelmetProvider>;
 }

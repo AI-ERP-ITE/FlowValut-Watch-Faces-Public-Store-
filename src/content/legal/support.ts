@@ -1,0 +1,29 @@
+export const SUPPORT_CONTENT = `
+# Support Policy
+
+**Version:** 1.0 · **Effective Date:** June 18, 2026 · **Last Updated:** June 18, 2026
+
+## 1. Support Channels and Scope
+
+Flow Vault is dedicated to assisting our users. Customer service, billing inquiries, and technical support regarding our platform, digital watchfaces, and future digital assets are provided exclusively via asynchronous email communication. Users requiring assistance must submit their inquiries to [support@fvwatchfaces.com](mailto:support@fvwatchfaces.com).
+
+## 2. Response Expectations
+
+All support inquiries are reviewed and handled strictly on a case-by-case basis. While we strive to assist our customers efficiently, Flow Vault explicitly does not promise, warrant, or guarantee any specific response times, resolution timeframes, or formal Service Level Agreements (SLAs) regarding support ticket resolution. Abusive behavior or harassment directed at our customer support staff will result in immediate license revocation and account termination.
+
+## 3. Software Compatibility Limitations
+
+Due to the fragmented nature of smartwatch hardware and evolving operating systems, we do not guarantee that our digital products will maintain uninterrupted compatibility with every device, future firmware updates, or third-party software environments. Technical support and refunds will not be guaranteed for issues arising exclusively from inherent third-party hardware limitations or third-party software incompatibilities.
+
+## 4. Product Lifecycle and End-of-Support
+
+Flow Vault is under no obligation to continue selling, updating, or supporting any specific product indefinitely. While purchased assets may occasionally receive bug fixes or minor enhancements, older versions of products may eventually reach end-of-life and be discontinued from sale. Where technically feasible, Flow Vault will endeavor to keep discontinued files available for download by existing purchasers, but we disavow any obligation to provide perpetual technical support for legacy products.
+
+---
+
+**Contact**
+
+Business Email: [business@fvwatchfaces.com](mailto:business@fvwatchfaces.com)
+
+Support Email: [support@fvwatchfaces.com](mailto:support@fvwatchfaces.com)
+`;

@@ -1,32 +1,19 @@
-import { Link } from 'react-router-dom';
-import { LegalLayout, LegalSection, LegalTodo, LEGAL_LINKS } from './LegalLayout';
+﻿import { Link } from 'react-router-dom';
+import { LEGAL_NOTICES_CONTENT } from '@/content/legal/legal-notices';
+import { LegalLayout, LEGAL_LINKS } from './LegalLayout';
+import { LegalMarkdown } from './LegalMarkdown';
 
 export function LegalIndexPage() {
   return (
     <LegalLayout
       title="Legal Notices"
-      subtitle="Company information, registered details, and index of all legal documents."
-      lastUpdated="[DATE PENDING]"
+      description="Company information, governing law, merchant of record, and index of all legal documents."
+      content={LEGAL_NOTICES_CONTENT}
     >
-      <LegalSection heading="Company Information">
-        <LegalTodo id="legal.company-info" />
-        {/* TODO: Legal entity name, registration number, registered address, VAT/tax ID */}
-      </LegalSection>
-
-      <LegalSection heading="Contact Information">
-        <LegalTodo id="legal.contact" />
-        {/* TODO: Legal contact email, Data Protection Officer contact if required by GDPR */}
-      </LegalSection>
-
-      <LegalSection heading="Governing Jurisdiction">
-        <LegalTodo id="legal.jurisdiction" />
-      </LegalSection>
-
-      {/* ── Document Index ─────────────────────────────────────────── */}
-      <section>
-        <h2 className="text-base font-semibold text-[#dce3ee] mb-4">Legal Document Index</h2>
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold text-[#dce3ee] mb-4">Legal Document Index</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {LEGAL_LINKS.filter(l => l.to !== '/legal').map((l) => (
+          {LEGAL_LINKS.filter((l) => l.to !== '/legal').map((l) => (
             <Link
               key={l.to}
               to={l.to}
@@ -38,15 +25,7 @@ export function LegalIndexPage() {
           ))}
         </div>
       </section>
-
-      <LegalSection heading="Disclaimer">
-        <LegalTodo id="legal.disclaimer" />
-      </LegalSection>
-
-      <LegalSection heading="Future Products and Services">
-        <LegalTodo id="legal.future" />
-        {/* TODO: Placeholder for AI tools, marketplace, enterprise, subscriptions notices */}
-      </LegalSection>
+      <LegalMarkdown content={LEGAL_NOTICES_CONTENT} />
     </LegalLayout>
   );
 }
