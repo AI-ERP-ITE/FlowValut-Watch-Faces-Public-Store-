@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle } from 'lucide-react';
+import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -77,6 +77,22 @@ import {
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import type { PointerParityResult, PointerParityStage } from '@/types';
+
+/** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
+function downloadProjectFile(config: WatchFaceConfig): void {
+  const json = JSON.stringify(config, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const date = new Date().toISOString().slice(0, 10);
+  const safeName = (config.name || 'watchface').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeName}_${date}.fvwf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig {
   const normalizeSet = (input: WatchFaceElement[]) => input.map((el) => {
@@ -3070,6 +3086,28 @@ function StudioApp() {
     matchesHtmlSlot,
   ]);
 
+  // Load a .fvwf project file from disk and restore watchface onto canvas
+  const handleLoadProject = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.fvwf,.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const config = JSON.parse(text) as WatchFaceConfig;
+        if (!config || !config.elements) throw new Error('Invalid project file');
+        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects(config)));
+        dispatch(actions.setStep('preview'));
+        toast.success(`Project loaded: ${config.name || file.name}`);
+      } catch (e) {
+        toast.error('Failed to load project file. Make sure it is a valid .fvwf file.');
+      }
+    };
+    input.click();
+  }, [dispatch]);
+
   // Handle regenerate ZPK (local download, no GitHub upload)
   // Handle generate ZPK
   const handleGenerate = useCallback(async () => {
@@ -3804,6 +3842,13 @@ function StudioApp() {
       }
 
       dispatch(actions.setZpkBlob(zpkResult.blob));
+
+      // Auto-save project file alongside ZPK export.
+      try {
+        downloadProjectFile(state.watchFaceConfig);
+      } catch (e) {
+        console.warn('[App] Project file download failed:', e);
+      }
 
       // Upload to Firebase storage through backend bridge.
       dispatch(actions.setLoadingMessage('Uploading to Firebase...'));
@@ -4809,6 +4854,15 @@ function StudioApp() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3 pt-4 xl:sticky xl:bottom-0 xl:z-20 xl:bg-[#1A1A1A]/95 xl:backdrop-blur xl:pb-2">
+              <Button
+                onClick={handleLoadProject}
+                variant="outline"
+                className="h-12 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                title="Load a saved .fvwf project file"
+              >
+                <FolderOpen className="h-5 w-5 mr-2" />
+                Load Project
+              </Button>
               <Button
                 onClick={handleGenerateClick}
                 className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"

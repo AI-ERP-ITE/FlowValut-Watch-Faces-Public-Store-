@@ -230,6 +230,15 @@ export async function setCatalogStatusInFirebase(input: {
   });
 }
 
+export async function deleteZpkEntryInFirebase(input: {
+  watchfaceId: string;
+}): Promise<{ ok: boolean; watchfaceId: string }> {
+  return adminFetch<{ ok: boolean; watchfaceId: string }>('adminCatalogDelete', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function fetchParametricLibraryFromFirebase(): Promise<Array<Record<string, unknown>>> {
   return adminFetch<{ entries?: Array<Record<string, unknown>> }>('userParametricLibraryGet', {
     method: 'GET',

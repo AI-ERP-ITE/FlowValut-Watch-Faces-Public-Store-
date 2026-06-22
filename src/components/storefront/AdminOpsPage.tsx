@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Wrench, Database, Star } from 'lucide-react';
+import { Wrench, Database, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPanel } from '@/components/AdminPanel';
 import {
@@ -11,6 +11,7 @@ import {
   adminUpdateConfigInFirebase,
   patchCatalogSpecGroupsInFirebase,
   setCatalogStatusInFirebase,
+  deleteZpkEntryInFirebase,
   writeStorefrontConfigToFirebase,
 } from '@/lib/studioFirebasePublishApi';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ export function AdminOpsPage() {
   const [adminCatalog, setAdminCatalog] = useState<CatalogEntry[]>([]);
   const [loadingAdminCatalog, setLoadingAdminCatalog] = useState(false);
   const [updatingCatalogId, setUpdatingCatalogId] = useState<string | null>(null);
+  const [deletingCatalogId, setDeletingCatalogId] = useState<string | null>(null);
   const [catalogFilter, setCatalogFilter] = useState<'ALL' | 'ENABLED' | 'OFFLINE'>('ALL');
 
   const canRun = Boolean(backendMode);
@@ -162,6 +164,26 @@ export function AdminOpsPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to update catalog status');
     } finally {
       setUpdatingCatalogId(null);
+    }
+  }
+
+  async function deleteZpkEntry(watchfaceId: string, currentStatus: 'ENABLED' | 'OFFLINE') {
+    if (!canRun) return;
+    if (currentStatus !== 'OFFLINE') {
+      toast.error('Set the watchface to Offline before deleting.');
+      return;
+    }
+    if (!window.confirm(`Delete "${watchfaceId}" permanently? This cannot be undone.`)) return;
+
+    setDeletingCatalogId(watchfaceId);
+    try {
+      await deleteZpkEntryInFirebase({ watchfaceId });
+      setAdminCatalog((prev) => prev.filter((entry) => entry.id !== watchfaceId));
+      toast.success(`${watchfaceId} deleted.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete entry');
+    } finally {
+      setDeletingCatalogId(null);
     }
   }
 
@@ -329,7 +351,7 @@ export function AdminOpsPage() {
                 <tbody>
                   {filteredAdminCatalog.map((entry) => {
                     const status = entry.storeStatus ?? (entry.published === false ? 'OFFLINE' : 'ENABLED');
-                    const rowBusy = updatingCatalogId === entry.id;
+                    const rowBusy = updatingCatalogId === entry.id || deletingCatalogId === entry.id;
                     return (
                       <tr key={entry.id} className="border-t border-[#202632] text-[#e9edf5]">
                         <td className="px-3 py-2">
@@ -368,6 +390,16 @@ export function AdminOpsPage() {
                             className="h-8 border-[#5a4631] text-[#f5dfc2] hover:bg-[#3a2c1f]"
                           >
                             Set Offline
+                          </Button>
+                          <Button
+                            onClick={() => deleteZpkEntry(entry.id, status)}
+                            disabled={!canRun || rowBusy || status !== 'OFFLINE'}
+                            variant="outline"
+                            title={status !== 'OFFLINE' ? 'Set to Offline before deleting' : 'Delete permanently'}
+                            className="h-8 border-red-900 text-red-400 hover:bg-red-950 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Delete
                           </Button>
                         </td>
                       </tr>
