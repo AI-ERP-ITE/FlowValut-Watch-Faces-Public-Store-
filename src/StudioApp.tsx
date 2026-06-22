@@ -3539,6 +3539,10 @@ function StudioApp() {
             const imgEl = await imageFromElementFile(existingFile.src, elementFiles);
             if (imgEl) bakeResult = renderImgWithShadowToPng(el, imgEl);
           }
+        } else if (el.type === 'IMG' && !el.iconKey && el.src) {
+          // Plain IMG (e.g. gauge BG, inline image) — load from elementFiles or data URL directly
+          const imgEl = await imageFromElementFile(el.src, elementFiles);
+          if (imgEl) bakeResult = renderImgWithShadowToPng(el, imgEl);
         } else if (el.type === 'IMG_STATUS' && el.src) {
           const imgEl = await imageFromElementFile(el.src, elementFiles);
           if (imgEl) bakeResult = renderImgWithShadowToPng(el, imgEl);
