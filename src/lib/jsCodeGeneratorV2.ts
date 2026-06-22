@@ -638,8 +638,10 @@ function generateIMGWeekWidget(element: WatchFaceElement, widgetIndex: number, s
 function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, isAod: boolean = false): string {
   console.log(`[JSGenV2] generateWidgetCodeV2: element=${element.name}, type=${element.type}, src=${element.src}`);
   
-  // Skip background element - already handled
-  if (element.name === 'Background' || element.type === 'IMG' && element.bounds.x === 0 && element.bounds.y === 0 && element.bounds.width === 480 && element.bounds.height === 480) {
+  // Skip background element - already handled.
+  // Exception: gauge pair siblings (gaugePairId set) must never be skipped even if they
+  // happen to cover the full screen (e.g. centered gauge on 480px face → bounds 0,0,480,480).
+  if (!element.gaugePairId && (element.name === 'Background' || element.type === 'IMG' && element.bounds.x === 0 && element.bounds.y === 0 && element.bounds.width === 480 && element.bounds.height === 480)) {
     return '';
   }
   
