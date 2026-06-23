@@ -1377,7 +1377,13 @@ function regenerateDigitFilesFromElements(
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = color;
-    ctx.font = `${fontWeight} ${Math.floor(h * 0.6)}px ${fontFamily}`;
+    // Auto-fit: start at 80% of height, reduce until text fits width (prevents clipping on device)
+    let fontSize = Math.floor(h * 0.8);
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    while (fontSize > 6 && ctx.measureText(label).width > w * 0.95) {
+      fontSize--;
+      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, w / 2, h / 2);
@@ -1409,7 +1415,7 @@ function regenerateDigitFilesFromElements(
     } else if (el.type === 'IMG_WEEK') {
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-      const WEEK_INITIAL = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+      const WEEK_INITIAL = ['Mo.', 'Tu.', 'We.', 'Th.', 'Fr.', 'Sa.', 'Su.'];
       const fmt = el.weekFormat ?? 'full';
       const days = fmt === 'full' ? WEEK_FULL : fmt === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
@@ -1418,11 +1424,15 @@ function regenerateDigitFilesFromElements(
         results.push({ filename: `week_${i}.png`, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
       }
     } else if (el.type === 'IMG_DATE' && el.subtype === 'month') {
-      const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const MONTH_FULL    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const MONTH_SHORT   = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const MONTH_INITIAL = ['Jan.','Feb.','Mar.','Apr.','May.','Jun.','Jul.','Aug.','Sep.','Oct.','Nov.','Dec.'];
+      const mfmt = (el as { monthFormat?: string }).monthFormat ?? 'short';
+      const monthNames = mfmt === 'full' ? MONTH_FULL : mfmt === 'initial' ? MONTH_INITIAL : MONTH_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
       const h = Math.max(el.bounds.height || 20, 12);
       for (let i = 0; i < 12; i++) {
-        results.push({ filename: `month_${i}.png`, dataUrl: makeLabelCanvas(MONTH_NAMES[i], color, fontFamily, fontWeight, w, h) });
+        results.push({ filename: `month_${i}.png`, dataUrl: makeLabelCanvas(monthNames[i], color, fontFamily, fontWeight, w, h) });
       }
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
       const prefix = getTextImgPrefixForDataType(el.dataType);

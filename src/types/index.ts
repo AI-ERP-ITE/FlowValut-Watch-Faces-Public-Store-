@@ -87,6 +87,9 @@ export interface WatchFaceElement {
   // IMG_WEEK specific
   weekFormat?: 'full' | 'short' | 'initial';
 
+  // IMG_DATE month specific
+  monthFormat?: 'full' | 'short' | 'initial';
+
   // TEXT date-format mode (TEXT elements bound to date)
   dateFormat?: string; // e.g. 'DD/MM', 'MM/DD', 'DD/MM/YYYY', 'DD MMM', 'MMM DD'
 

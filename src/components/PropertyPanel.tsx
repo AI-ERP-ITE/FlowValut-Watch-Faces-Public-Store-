@@ -1989,6 +1989,33 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* Name format — IMG_DATE month only */}
+      {element.type === 'IMG_DATE' && element.subtype === 'month' && (
+        <Section label="Name Format">
+          <div className="space-y-1">
+            {([
+              { value: 'full',    label: 'Full',    example: 'April' },
+              { value: 'short',   label: 'Short',   example: 'APR' },
+              { value: 'initial', label: 'Initial', example: 'Apr.' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => update({ monthFormat: opt.value } as Partial<WatchFaceElement>)}
+                className={cn(
+                  'w-full flex items-center justify-between px-2.5 py-1.5 rounded border text-[11px] transition-colors',
+                  ((element as { monthFormat?: string }).monthFormat ?? 'short') === opt.value
+                    ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                    : 'border-white/10 bg-white/5 text-white/60 hover:border-white/30'
+                )}
+              >
+                <span className="font-medium">{opt.label}</span>
+                <span className="text-white/35">{opt.example}</span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* Font style picker — text/digit elements */}
       {['IMG_TIME', 'TEXT_IMG', 'TEXT', 'IMG_DATE', 'IMG_WEEK'].includes(element.type) && (
         <Section label="Font Style">
