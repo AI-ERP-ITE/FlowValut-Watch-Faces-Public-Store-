@@ -916,8 +916,10 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       if (key !== 'hub') {
         const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 };
         setLayerAnchor(key, anchor);
-        // Auto-initialize the pivot slider to the SVG's natural pivot position.
-        setComposerAxis(prev => ({ ...prev, [key]: anchor.yRatio }));
+        // NOTE: Do NOT auto-set composerAxis here. The slider keeps its user-set value
+        // (or DEFAULT_AXIS). Overriding with anchor.yRatio (= 0.5 fallback for SVGs
+        // without explicit pivot markers) corrupts the slider and localStorage,
+        // causing all saved hands to get wrong pivotNorm = 0.5.
       }
     } catch (err) {
       setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
