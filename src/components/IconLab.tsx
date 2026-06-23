@@ -94,6 +94,21 @@ const POINTER_COMPOSER_AXIS_KEY = 'zepp-pointer-composer-axis-v3';
 const DEFAULT_AXIS: PointerAxisAdjustments = { hour: 0.843, minute: 0.860, second: 0.750 };
 const COMPOSER_PREVIEW_RASTER_SIZE = 512;
 
+// ── Stage 3: single source of truth for tip/tail pivot resolution (Spec 106) ──
+// Resolves the initial tip/tail axis (0–1) for a hand from its parsed SVG anchor.
+// A clock hand's rotation pivot is never at its exact vertical center, and the SVG
+// parser returns yRatio === 0.5 precisely when NO usable pivot marker was found.
+// So treat 0.5 as "no marker → use the per-hand base default", and any other value
+// as a real detected marker. This is the ONLY place that decides the markerless
+// default — used by both validation paths and the Reset action.
+function resolveInitialAxis(
+  handKey: 'hour' | 'minute' | 'second',
+  anchorYRatio: number,
+): number {
+  const hasUsableMarker = anchorYRatio !== 0.5;
+  return hasUsableMarker ? anchorYRatio : DEFAULT_AXIS[handKey];
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -479,7 +494,20 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         setLayerValidation(key, { state: 'valid', message: svgLayer ? 'Valid SVG layer' : 'Valid HTML layer' });
         setLayerPng(key, layerSrc);
         if (key !== 'hub') {
-          setLayerAnchor(key, svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 });
+          const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 };
+          setLayerAnchor(key, anchor);
+          // Spec 106: auto-validate must initialize the tip/tail pivot too, exactly
+          // like the manual "Validate All" path — otherwise a hand pasted and saved
+          // without clicking Validate keeps a stale composerAxis (the 0.5 center bug).
+          const handKey = key as 'hour' | 'minute' | 'second';
+          setComposerAxisInitialized(prev => {
+            if (prev[handKey] !== raw) {
+              const initY = resolveInitialAxis(handKey, anchor.yRatio);
+              setComposerAxis(axPrev => ({ ...axPrev, [handKey]: initY }));
+              return { ...prev, [handKey]: raw };
+            }
+            return prev;
+          });
         }
       } catch (err) {
         setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
@@ -934,11 +962,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         const handKey = key as 'hour' | 'minute' | 'second';
         setComposerAxisInitialized(prev => {
           if (prev[handKey] !== raw) {
-            // New HTML — init pivot to the SVG's own detected pivot, or DEFAULT_AXIS if none.
-            const hasPivotMarker = svgLayer && anchor.yRatio !== 0.5;
-            const initY = hasPivotMarker
-              ? anchor.yRatio
-              : DEFAULT_AXIS[handKey];
+            // New HTML — resolve pivot via the single Stage 3 resolver (Spec 106).
+            const initY = resolveInitialAxis(handKey, anchor.yRatio);
             setComposerAxis(axPrev => ({ ...axPrev, [handKey]: initY }));
             return { ...prev, [handKey]: raw };
           }
@@ -974,10 +999,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   };
 
   const resetAxisAdjustment = (hand: 'hour' | 'minute' | 'second') => {
-    // Reset to the SVG-parsed anchor for this layer (the natural pivot).
+    // Spec 106: reset to the resolved natural pivot — the SVG marker if present,
+    // else the per-hand base default. Never the raw 0.5 center anchor.
     setComposerAxis(prev => ({
       ...prev,
-      [hand]: composerLayerAnchor[hand].yRatio,
+      [hand]: resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio),
     }));
   };
 
