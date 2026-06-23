@@ -108,6 +108,17 @@ interface HandStorageMeta {
   bakedVersion: number;
 }
 
+function isValidPivotOffsets(
+  value: CustomHandRecord['pivotOffsets'] | undefined,
+): value is NonNullable<CustomHandRecord['pivotOffsets']> {
+  if (!value) return false;
+  const hands: Array<'hour' | 'minute' | 'second'> = ['hour', 'minute', 'second'];
+  return hands.every((hand) => {
+    const point = value[hand];
+    return !!point && Number.isFinite(point.x) && Number.isFinite(point.y);
+  });
+}
+
 interface FontStorageMeta {
   name: string;
   fileName: string;
@@ -649,7 +660,6 @@ async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
     createdAt: record.createdAt,
     updatedAt: Date.now(),
     handRenderVersion: record.handRenderVersion ?? 4,
-    pivotOffsets: record.pivotOffsets,
     sourcePaths: {
       hour:   `${base}/source_hour.html`,
       minute: `${base}/source_minute.html`,
@@ -667,6 +677,7 @@ async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
     },
     downloadURLs,
     bakedVersion,
+    ...(isValidPivotOffsets(record.pivotOffsets) ? { pivotOffsets: record.pivotOffsets } : {}),
   };
 
   await setDoc(labDocRef(uid, 'hands', record.key), meta);
