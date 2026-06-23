@@ -298,9 +298,9 @@ async function mockKimiAnalysis(
       minuteHandSrc: 'minute_hand.png',
       secondHandSrc: 'second_hand.png',
       coverSrc: 'hand_cover.png',
-      hourPos: { x: 11, y: 70 },
-      minutePos: { x: 8, y: 100 },
-      secondPos: { x: 3, y: 120 },
+      hourPos: { x: 11, y: 118 },
+      minutePos: { x: 8, y: 172 },
+      secondPos: { x: 4, y: 180 },
       visible: true,
       zIndex: 15,
     },
@@ -1266,14 +1266,16 @@ async function preparePointerGeometryForExport(
     pivotX = baseW * (sourcePivotRatio?.x ?? 0.5);
     pivotY = baseH * (sourcePivotRatio?.y ?? 0.5);
   } else if (layer === 'hour') {
-    pivotX = el.hourPos?.x ?? customHand?.hourPosX ?? base.pivotX;
-    pivotY = el.hourPos?.y ?? customHand?.hourPosY ?? base.pivotY;
+    // Use IDB custom pivot or POINTER_BASE_METRICS default.
+    // el.hourPos is NOT used — it may contain stale initial values (was y:70 at creation).
+    pivotX = customHand?.hourPosX ?? base.pivotX;
+    pivotY = customHand?.hourPosY ?? base.pivotY;
   } else if (layer === 'minute') {
-    pivotX = el.minutePos?.x ?? customHand?.minutePosX ?? base.pivotX;
-    pivotY = el.minutePos?.y ?? customHand?.minutePosY ?? base.pivotY;
+    pivotX = customHand?.minutePosX ?? base.pivotX;
+    pivotY = customHand?.minutePosY ?? base.pivotY;
   } else if (layer === 'second') {
-    pivotX = el.secondPos?.x ?? customHand?.secondPosX ?? base.pivotX;
-    pivotY = el.secondPos?.y ?? customHand?.secondPosY ?? base.pivotY;
+    pivotX = customHand?.secondPosX ?? base.pivotX;
+    pivotY = customHand?.secondPosY ?? base.pivotY;
   }
 
   const targetW = Math.max(1, Math.round(baseW * wid));

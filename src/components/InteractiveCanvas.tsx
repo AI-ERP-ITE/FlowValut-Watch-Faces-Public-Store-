@@ -1974,17 +1974,17 @@ function drawTimePointer(
         pivotX = def.pivotX;
         pivotY = def.pivotY;
         if (def.key === 'hour') {
-          // customRecord (IDB) takes priority: its pivot is always consistent with the
-          // baked PNG currently in IDB. el.hourPos is the fallback for built-in styles
-          // or when no custom record exists.
-          pivotX = customRecord?.hourPosX ?? el.hourPos?.x ?? def.pivotX;
-          pivotY = customRecord?.hourPosY ?? el.hourPos?.y ?? def.pivotY;
+          // customRecord (IDB) pivot always matches its baked PNG coordinate space.
+          // def.pivotX/Y are the correct HAND_DEFS defaults for built-in styles.
+          // el.hourPos is NOT used — it may contain stale initial values (was y:70).
+          pivotX = customRecord?.hourPosX ?? def.pivotX;
+          pivotY = customRecord?.hourPosY ?? def.pivotY;
         } else if (def.key === 'minute') {
-          pivotX = customRecord?.minutePosX ?? el.minutePos?.x ?? def.pivotX;
-          pivotY = customRecord?.minutePosY ?? el.minutePos?.y ?? def.pivotY;
+          pivotX = customRecord?.minutePosX ?? def.pivotX;
+          pivotY = customRecord?.minutePosY ?? def.pivotY;
         } else if (def.key === 'second') {
-          pivotX = customRecord?.secondPosX ?? el.secondPos?.x ?? def.pivotX;
-          pivotY = customRecord?.secondPosY ?? el.secondPos?.y ?? def.pivotY;
+          pivotX = customRecord?.secondPosX ?? def.pivotX;
+          pivotY = customRecord?.secondPosY ?? def.pivotY;
         } else if (def.key === 'cover') {
           // Cover pivot is always its own center (matches the v2/v3 ZPK overlay
           // emitter which centers the cap at centerX/centerY).
