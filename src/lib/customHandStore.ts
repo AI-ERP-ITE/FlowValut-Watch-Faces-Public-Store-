@@ -453,27 +453,22 @@ export async function saveCustomHandStyle(
   const pivotNormOverrides = options?.pivotNormOverrides;
 
   // ── Helper: normalize a canvas-px pivot into [0,1] within the art bounds ──
-  // If art bounds are unavailable, fall back to canvas-fraction.
+  // Pivot norm is a canvas-fraction: 0 = top of baked PNG, 1 = bottom.
+  // artBoundsY is NOT the right reference frame (it's art-relative, not box-relative).
   function toPivotNorm(
     posY: number,
-    artBoundsY: { minY: number; maxY: number } | null,
+    _artBoundsY: { minY: number; maxY: number } | null,
     canvasH: number,
   ): number {
-    if (artBoundsY && artBoundsY.maxY > artBoundsY.minY) {
-      return clamp((posY - artBoundsY.minY) / (artBoundsY.maxY - artBoundsY.minY), 0, 1);
-    }
     return clamp(posY / canvasH, 0, 1);
   }
 
   // ── Helper: reconstruct canvas-px pivot from normalized position ──
   function fromPivotNorm(
     norm: number,
-    artBoundsY: { minY: number; maxY: number } | null,
+    _artBoundsY: { minY: number; maxY: number } | null,
     canvasH: number,
   ): number {
-    if (artBoundsY && artBoundsY.maxY > artBoundsY.minY) {
-      return Math.round(artBoundsY.minY + clamp(norm, 0, 1) * (artBoundsY.maxY - artBoundsY.minY));
-    }
     return Math.round(clamp(norm, 0, 1) * canvasH);
   }
 
