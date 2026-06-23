@@ -307,11 +307,17 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       // Validate values are in [0,1] — old v2 values were in [-0.45, 0.45].
       const valid = (v: unknown, def: number) =>
         typeof v === 'number' && v >= 0 && v <= 1 ? v : def;
-      return {
+      const result = {
         hour: valid(parsed.hour, DEFAULT_AXIS.hour),
         minute: valid(parsed.minute, DEFAULT_AXIS.minute),
         second: valid(parsed.second, DEFAULT_AXIS.second),
       };
+      // Auto-heal: if all three are exactly 0.5 it's the old corruption pattern
+      // (validateLayer used to reset every hand to anchor.yRatio = 0.5 fallback).
+      if (result.hour === 0.5 && result.minute === 0.5 && result.second === 0.5) {
+        return DEFAULT_AXIS;
+      }
+      return result;
     } catch {
       return DEFAULT_AXIS;
     }
