@@ -327,9 +327,12 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         minute: valid(parsed.minute, DEFAULT_AXIS.minute),
         second: valid(parsed.second, DEFAULT_AXIS.second),
       };
-      // Auto-heal: if all three are exactly 0.5 it's the old corruption pattern
-      // (validateLayer used to reset every hand to anchor.yRatio = 0.5 fallback).
-      if (result.hour === 0.5 && result.minute === 0.5 && result.second === 0.5) {
+      // Auto-heal: if all three pivots sit near the vertical center it's the old
+      // corruption pattern (pivot stuck at ~0.5). Real base pivots are ~0.75-0.86,
+      // so a near-center value on ALL THREE clock hands is never legitimate. This
+      // also catches the {0.5, 0.495, 0.5} drift that the exact-0.5 check missed.
+      const nearCenter = (v: number) => Math.abs(v - 0.5) <= 0.02;
+      if (nearCenter(result.hour) && nearCenter(result.minute) && nearCenter(result.second)) {
         return DEFAULT_AXIS;
       }
       return result;
@@ -348,6 +351,14 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   const [, setComposerAxisInitialized] = useState<
     Partial<Record<'hour' | 'minute' | 'second', string>>
   >({});
+  // Spec 106: tracks whether the user DELIBERATELY dragged each hand's tip/tail slider
+  // this session. The save trusts composerAxis ONLY for touched hands; untouched hands
+  // resolve deterministically from the layer marker/base, so a stale persisted
+  // composerAxis (e.g. {0.5, 0.495, 0.5}) can never bake a center pivot. Session-only
+  // (never persisted) so a fresh load always re-derives from the art.
+  const [composerAxisTouched, setComposerAxisTouched] = useState<
+    Record<'hour' | 'minute' | 'second', boolean>
+  >({ hour: false, minute: false, second: false });
 
   // ── Gauge Pointer tab state ────────────────────────────────────────────────
   const [savedGaugePointers, setSavedGaugePointers] = useState<CustomGaugePointerRecord[]>([]);
@@ -504,6 +515,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
             if (prev[handKey] !== raw) {
               const initY = resolveInitialAxis(handKey, anchor.yRatio);
               setComposerAxis(axPrev => ({ ...axPrev, [handKey]: initY }));
+              // New HTML clears any prior drag flag so the save re-derives from the art.
+              setComposerAxisTouched(t => ({ ...t, [handKey]: false }));
               return { ...prev, [handKey]: raw };
             }
             return prev;
@@ -703,10 +716,18 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavingHand(true);
     setSaveHandMsg('');
     try {
+      // Spec 106: resolve the pivot deterministically at save. Honor composerAxis ONLY
+      // for hands the user dragged this session; otherwise re-derive from the layer
+      // marker/base. This makes saves immune to a stale persisted composerAxis (the
+      // {0.5, 0.495, 0.5} center-pivot pollution observed in IndexedDB records).
+      const resolveSaveAxis = (hand: 'hour' | 'minute' | 'second') =>
+        composerAxisTouched[hand]
+          ? composerAxis[hand]
+          : resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio);
       const pivotNormOverrides = {
-        hour: composerAxis.hour,
-        minute: composerAxis.minute,
-        second: composerAxis.second,
+        hour: resolveSaveAxis('hour'),
+        minute: resolveSaveAxis('minute'),
+        second: resolveSaveAxis('second'),
       };
       const seedCode = hasComposedSources ? composerDraft.hourHtml : code;
       const record = await saveCustomHandStyle(
@@ -965,6 +986,8 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
             // New HTML — resolve pivot via the single Stage 3 resolver (Spec 106).
             const initY = resolveInitialAxis(handKey, anchor.yRatio);
             setComposerAxis(axPrev => ({ ...axPrev, [handKey]: initY }));
+            // New HTML clears any prior drag flag so the save re-derives from the art.
+            setComposerAxisTouched(t => ({ ...t, [handKey]: false }));
             return { ...prev, [handKey]: raw };
           }
           return prev; // same HTML — keep user's adjustment
@@ -996,6 +1019,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       ...prev,
       [hand]: value,
     }));
+    // Spec 106: an explicit slider drag marks this hand as user-adjusted, so the save
+    // will honor this value instead of re-deriving from the marker/base.
+    setComposerAxisTouched(prev => ({ ...prev, [hand]: true }));
   };
 
   const resetAxisAdjustment = (hand: 'hour' | 'minute' | 'second') => {
@@ -1005,6 +1031,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       ...prev,
       [hand]: resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio),
     }));
+    setComposerAxisTouched(prev => ({ ...prev, [hand]: false }));
   };
 
   useEffect(() => {
