@@ -4276,6 +4276,16 @@ function StudioApp() {
             >
               Skip widgets — go to canvas with background
             </Button>
+
+            {/* Load saved .fvwf project — skips upload step entirely */}
+            <Button
+              onClick={handleLoadProject}
+              variant="outline"
+              className="w-full h-10 border-zinc-600 text-zinc-400 hover:border-zinc-400 hover:text-white hover:bg-zinc-800 text-xs"
+            >
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Load saved project (.fvwf)
+            </Button>
           </div>
         );
 
@@ -4856,15 +4866,6 @@ function StudioApp() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3 pt-4 xl:sticky xl:bottom-0 xl:z-20 xl:bg-[#1A1A1A]/95 xl:backdrop-blur xl:pb-2">
-              <Button
-                onClick={handleLoadProject}
-                variant="outline"
-                className="h-12 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                title="Load a saved .fvwf project file"
-              >
-                <FolderOpen className="h-5 w-5 mr-2" />
-                Load Project
-              </Button>
               <Button
                 onClick={handleGenerateClick}
                 className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"
