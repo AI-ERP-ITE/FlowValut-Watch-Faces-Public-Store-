@@ -327,6 +327,12 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     minute: { xRatio: 0.5, yRatio: 0.5 },
     second: { xRatio: 0.5, yRatio: 0.5 },
   });
+  // Tracks which HTML string was used to auto-init composerAxis for each hand.
+  // When the HTML changes (new paste), composerAxis is re-initialized to the
+  // detected pivot. When the HTML is the same (re-validate), user's adjustment is kept.
+  const [, setComposerAxisInitialized] = useState<
+    Partial<Record<'hour' | 'minute' | 'second', string>>
+  >({});
 
   // ── Gauge Pointer tab state ────────────────────────────────────────────────
   const [savedGaugePointers, setSavedGaugePointers] = useState<CustomGaugePointerRecord[]>([]);
@@ -922,10 +928,22 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       if (key !== 'hub') {
         const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 };
         setLayerAnchor(key, anchor);
-        // NOTE: Do NOT auto-set composerAxis here. The slider keeps its user-set value
-        // (or DEFAULT_AXIS). Overriding with anchor.yRatio (= 0.5 fallback for SVGs
-        // without explicit pivot markers) corrupts the slider and localStorage,
-        // causing all saved hands to get wrong pivotNorm = 0.5.
+
+        // Auto-init composerAxis ONLY when the HTML for this slot has changed.
+        // If same HTML (re-validate), keep the user's manual tip/tail adjustment.
+        const handKey = key as 'hour' | 'minute' | 'second';
+        setComposerAxisInitialized(prev => {
+          if (prev[handKey] !== raw) {
+            // New HTML — init pivot to the SVG's own detected pivot, or DEFAULT_AXIS if none.
+            const hasPivotMarker = svgLayer && anchor.yRatio !== 0.5;
+            const initY = hasPivotMarker
+              ? anchor.yRatio
+              : DEFAULT_AXIS[handKey];
+            setComposerAxis(axPrev => ({ ...axPrev, [handKey]: initY }));
+            return { ...prev, [handKey]: raw };
+          }
+          return prev; // same HTML — keep user's adjustment
+        });
       }
     } catch (err) {
       setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });

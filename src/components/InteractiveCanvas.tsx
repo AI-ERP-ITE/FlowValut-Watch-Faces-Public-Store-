@@ -1957,10 +1957,24 @@ function drawTimePointer(
       const srcH = Math.max(1, img.naturalHeight || img.height || def.h);
       // For the cover/hub layer, always honor the baked PNG's natural size.
       // Custom hands derive cover dimensions from the source SVG (see
-      // resolveHubBakeSize in customHandStore), so the baked image carries the
-      // intended size — using def.w/def.h (30) would force a square scale-down.
-      const baseW = sourceMode ? srcW : (def.key === 'cover' ? srcW : def.w);
-      const baseH = sourceMode ? srcH : (def.key === 'cover' ? srcH : def.h);
+      // Spec 104: if ratio geometry is present, derive hand size from hub reference.
+      // hubRef = longest side of the hub (coverWidth/Height). All hand dimensions
+      // are stored as ratios to hubRef so the full set scales proportionally.
+      const hubRef = customRecord?.hourWidthRatio !== undefined
+        ? Math.max(1, customRecord.coverWidth ?? 30, customRecord.coverHeight ?? 30)
+        : 0;
+      const baseW = sourceMode ? srcW
+        : (def.key === 'cover' ? srcW
+          : (hubRef > 0 && def.key === 'hour'   ? Math.max(1, Math.round(hubRef * (customRecord!.hourWidthRatio   ?? 1)))
+            : hubRef > 0 && def.key === 'minute' ? Math.max(1, Math.round(hubRef * (customRecord!.minuteWidthRatio ?? 1)))
+            : hubRef > 0 && def.key === 'second' ? Math.max(1, Math.round(hubRef * (customRecord!.secondWidthRatio ?? 1)))
+            : def.w));
+      const baseH = sourceMode ? srcH
+        : (def.key === 'cover' ? srcH
+          : (hubRef > 0 && def.key === 'hour'   ? Math.max(1, Math.round(hubRef * (customRecord!.hourHeightRatio   ?? 1)))
+            : hubRef > 0 && def.key === 'minute' ? Math.max(1, Math.round(hubRef * (customRecord!.minuteHeightRatio ?? 1)))
+            : hubRef > 0 && def.key === 'second' ? Math.max(1, Math.round(hubRef * (customRecord!.secondHeightRatio ?? 1)))
+            : def.h));
 
       let pivotX: number;
       let pivotY: number;
@@ -1968,6 +1982,18 @@ function drawTimePointer(
         const ratio = sourcePivot?.[def.key] ?? { x: 0.5, y: 0.5 };
         pivotX = baseW * ratio.x;
         pivotY = baseH * ratio.y;
+      } else if (hubRef > 0 && def.key !== 'cover') {
+        // Spec 104 ratio path: pivot as fraction of derived hand size
+        if (def.key === 'hour') {
+          pivotX = baseW * (customRecord!.hourPivotXRatio   ?? 0.5);
+          pivotY = baseH * (customRecord!.hourPivotYRatio   ?? 0.85);
+        } else if (def.key === 'minute') {
+          pivotX = baseW * (customRecord!.minutePivotXRatio ?? 0.5);
+          pivotY = baseH * (customRecord!.minutePivotYRatio ?? 0.86);
+        } else {
+          pivotX = baseW * (customRecord!.secondPivotXRatio ?? 0.5);
+          pivotY = baseH * (customRecord!.secondPivotYRatio ?? 0.75);
+        }
       } else {
         pivotX = def.pivotX;
         pivotY = def.pivotY;

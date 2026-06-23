@@ -43,6 +43,22 @@ export interface CustomHandRecord {
   secondPivotNorm?: number;
   secondArtMinY?: number;
   secondArtMaxY?: number;
+  // ── Spec 104: Hub-ratio proportional geometry ──────────────────────────────
+  // All ratios are relative to the hub natural art size (hubArtW × hubArtH).
+  // Present only on records saved after Spec 104. Old records fall back to
+  // the hourPosX/Y + def.w/h path in the canvas renderer.
+  hourWidthRatio?: number;    // hourArtW / hubArtW
+  hourHeightRatio?: number;   // hourArtH / hubArtH
+  hourPivotXRatio?: number;   // pivot X within hour art (0–1)
+  hourPivotYRatio?: number;   // pivot Y within hour art (0–1) = composerAxis.hour at save time
+  minuteWidthRatio?: number;
+  minuteHeightRatio?: number;
+  minutePivotXRatio?: number;
+  minutePivotYRatio?: number;
+  secondWidthRatio?: number;
+  secondHeightRatio?: number;
+  secondPivotXRatio?: number;
+  secondPivotYRatio?: number;
   // Optional composer metadata for separated HTML workflow.
   sourceHourHtml?: string;
   sourceMinuteHtml?: string;
@@ -414,6 +430,12 @@ export async function saveCustomHandStyle(
   // so a 17px cap drawn inside a 120×120 viewBox bakes as ~34×34, not 120×120.
   // Falls back to 30×30 if measurement fails.
   const hubSize = await measureHubArtSize(hubSvg);
+  // Spec 104: measure natural art size of each hand for hub-ratio computation
+  const [hourArtSize, minuteArtSize, secondArtSize] = await Promise.all([
+    measureHandArtSize(hourSvg),
+    measureHandArtSize(minuteSvg),
+    measureHandArtSize(secondSvg),
+  ]);
   const [hourLayer, minuteLayer, secondLayer, coverDataUrl, swatchDataUrl] =
     await Promise.all([
       renderHandToPngWithPivot(hourSvg, 22, 140, hourPivotSource),
@@ -515,6 +537,30 @@ export async function saveCustomHandStyle(
     ? clamp(Math.round(baseSecond.x + pivotOffsets.second.x), 0, 8)
     : baseSecond.x;
 
+  // ── Spec 104: Hub-ratio proportional geometry ──────────────────────────────
+  // Reference: hub natural art dimensions. All hand sizes stored as ratios to hub.
+  const hubRefW = Math.max(1, hubSize.width);
+  const hubRefH = Math.max(1, hubSize.height);
+  const hubRef = Math.max(hubRefW, hubRefH); // use longest side as scalar reference
+  // pivotXRatio = 0.5 (center horizontally) unless marker data provides otherwise
+  const hourPivotYRatio  = pivotNormOverrides?.hour    !== undefined ? clamp(pivotNormOverrides.hour, 0, 1)    : hourPivotNorm;
+  const minutePivotYRatio = pivotNormOverrides?.minute !== undefined ? clamp(pivotNormOverrides.minute, 0, 1)  : minutePivotNorm;
+  const secondPivotYRatio = pivotNormOverrides?.second !== undefined ? clamp(pivotNormOverrides.second, 0, 1)  : secondPivotNorm;
+  const ratioGeometry = hubRef > 0 ? {
+    hourWidthRatio:    hourArtSize.w   / hubRef,
+    hourHeightRatio:   hourArtSize.h   / hubRef,
+    hourPivotXRatio:   0.5,
+    hourPivotYRatio,
+    minuteWidthRatio:  minuteArtSize.w / hubRef,
+    minuteHeightRatio: minuteArtSize.h / hubRef,
+    minutePivotXRatio: 0.5,
+    minutePivotYRatio,
+    secondWidthRatio:  secondArtSize.w / hubRef,
+    secondHeightRatio: secondArtSize.h / hubRef,
+    secondPivotXRatio: 0.5,
+    secondPivotYRatio,
+  } : {};
+
   const record: CustomHandRecord = {
     key: `custom_hand:${slugify(name)}`,
     name,
@@ -547,6 +593,8 @@ export async function saveCustomHandStyle(
       hubRenderVersion: HUB_RENDER_VERSION,
     } : {}),
     ...(pivotOffsets ? { pivotOffsets } : {}),
+    // Spec 104: hub-ratio geometry (all hand sizes + pivots relative to hub)
+    ...ratioGeometry,
     createdAt: Date.now(),
   };
 
@@ -852,6 +900,46 @@ export function resolveHubBakeSize(svg: string): { width: number; height: number
  * (e.g. r=17 → ~34px). Returns dimensions clamped to [HUB_MIN_SIDE, HUB_MAX_SIDE]
  * with aspect ratio preserved. Falls back to viewBox-based sizing on error.
  */
+/**
+ * Spec 104: Measure the natural opaque art dimensions of a hand SVG.
+ * Returns { w, h } in natural SVG pixels (no clamping).
+ * Used to compute hub-ratio proportional geometry.
+ */
+function measureHandArtSize(code: string): Promise<{ w: number; h: number }> {
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  const svgCode = svgMatch ? svgMatch[0] : code;
+  return new Promise((resolve) => {
+    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const nw = Math.max(1, img.naturalWidth || 22);
+      const nh = Math.max(1, img.naturalHeight || 140);
+      const maxSide = 1024;
+      const downscale = Math.min(1, maxSide / Math.max(nw, nh));
+      const sampleW = Math.max(1, Math.round(nw * downscale));
+      const sampleH = Math.max(1, Math.round(nh * downscale));
+      const canvas = document.createElement('canvas');
+      canvas.width = sampleW;
+      canvas.height = sampleH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { URL.revokeObjectURL(url); resolve({ w: nw, h: nh }); return; }
+      ctx.clearRect(0, 0, sampleW, sampleH);
+      ctx.drawImage(img, 0, 0, sampleW, sampleH);
+      URL.revokeObjectURL(url);
+      const bounds = findOpaqueBounds(canvas);
+      if (!bounds) { resolve({ w: nw, h: nh }); return; }
+      // Back-project to natural coords
+      resolve({
+        w: Math.max(1, Math.round((bounds.maxX - bounds.minX + 1) / downscale)),
+        h: Math.max(1, Math.round((bounds.maxY - bounds.minY + 1) / downscale)),
+      });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve({ w: 22, h: 140 }); };
+    img.src = url;
+  });
+}
+
 export function measureHubArtSize(code: string): Promise<{ width: number; height: number }> {
   const fallback = resolveHubBakeSize(code);
   const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
