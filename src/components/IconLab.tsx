@@ -1003,14 +1003,22 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       deg: number,
       anchor: PointerLayerAnchor,
       axisShiftRatio = 0,
+      // canonicalH: the bake canvas height for this hand (140/200/240).
+      // The preview scales the image to this height so the pivot calibration
+      // matches saveCustomHandStyle which stores hourPosY = norm * canonicalH.
+      canonicalH?: number,
     ) => {
       const rad = (deg * Math.PI) / 180;
-      // True no-resize preview: draw source at its native dimensions.
-      const drawW = Math.max(1, img.width);
-      const drawH = Math.max(1, img.height);
+      const naturalH = Math.max(1, img.height);
+      // Scale image so its height equals canonicalH (matching the baked PNG dimensions).
+      // This ensures axisShiftRatio * canonicalH is the same pivot point in both
+      // the preview and the saved IDB record.
+      const drawH = canonicalH ?? naturalH;
+      const scale = drawH / naturalH;
+      const drawW = Math.max(1, img.width) * scale;
       const anchorX = drawW * anchor.xRatio;
-      // axisShiftRatio is now an absolute [0,1] pivot position within image height.
-      // Position the image so this pivot aligns with the canvas center.
+      // Pivot Y within the scaled image, matching saveCustomHandStyle's formula:
+      // hourPosY = Math.round(axisShiftRatio * canonicalH)
       const pivotYInImg = drawH * axisShiftRatio;
       ctx.save();
       ctx.translate(cx, cy);
@@ -1036,9 +1044,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       drawGuide();
       // Default angles requested in spec
       // hour=2PM (60deg), minute=10PM mark (300deg), second=12AM (0deg)
-      if (hourImg) drawRotatedLayer(hourImg, 60, composerLayerAnchor.hour, composerAxis.hour);
-      if (minuteImg) drawRotatedLayer(minuteImg, 300, composerLayerAnchor.minute, composerAxis.minute);
-      if (secondImg) drawRotatedLayer(secondImg, 0, composerLayerAnchor.second, composerAxis.second);
+      // Pass canonical heights (matching bake canvas sizes in customHandStore) so
+      // the pivot calibration in the preview is identical to the saved IDB pivot.
+      if (hourImg) drawRotatedLayer(hourImg, 60, composerLayerAnchor.hour, composerAxis.hour, 140);
+      if (minuteImg) drawRotatedLayer(minuteImg, 300, composerLayerAnchor.minute, composerAxis.minute, 200);
+      if (secondImg) drawRotatedLayer(secondImg, 0, composerLayerAnchor.second, composerAxis.second, 240);
 
       if (hubImg) {
         const hubW = Math.max(1, hubImg.width);

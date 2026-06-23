@@ -443,18 +443,6 @@ export async function saveCustomHandStyle(
     return clamp(posY / canvasH, 0, 1);
   }
 
-  // ── Helper: reconstruct canvas-px pivot from normalized position ──
-  function fromPivotNorm(
-    norm: number,
-    artBoundsY: { minY: number; maxY: number } | null,
-    canvasH: number,
-  ): number {
-    if (artBoundsY && artBoundsY.maxY > artBoundsY.minY) {
-      return Math.round(artBoundsY.minY + clamp(norm, 0, 1) * (artBoundsY.maxY - artBoundsY.minY));
-    }
-    return Math.round(clamp(norm, 0, 1) * canvasH);
-  }
-
   // Effective hand positions for TIME_POINTER selection/export.
   // If no marker-derived pivot exists, fall back to known stable defaults.
   const baseHour = hourPivot ?? { x: 11, y: 118 };
@@ -466,9 +454,13 @@ export async function saveCustomHandStyle(
   let hourPosY: number;
   let hourPivotNorm: number;
   if (pivotNormOverrides?.hour !== undefined) {
-    // Slider sends a direct normalized position within the art bounds.
+    // Slider sends a normalized pivot position calibrated against the canonical
+    // bake height (140px). Use norm * 140 directly — this matches the preview
+    // formula (drawH * axisShiftRatio where drawH = canonicalH = 140) exactly.
+    // Do NOT use fromPivotNorm(norm, artBoundsY, 140): artBoundsY maps within
+    // the detected art region which is a different coordinate space from the preview.
     hourPivotNorm = clamp(pivotNormOverrides.hour, 0, 1);
-    hourPosY = fromPivotNorm(hourPivotNorm, hourLayer.artBoundsY, 140);
+    hourPosY = Math.round(hourPivotNorm * 140);
   } else if (pivotOffsets) {
     // Legacy pixel-offset path (backward compat — old records without norm data).
     hourPosY = clamp(Math.round(baseHour.y + pivotOffsets.hour.y), 0, 140);
@@ -486,7 +478,7 @@ export async function saveCustomHandStyle(
   let minutePivotNorm: number;
   if (pivotNormOverrides?.minute !== undefined) {
     minutePivotNorm = clamp(pivotNormOverrides.minute, 0, 1);
-    minutePosY = fromPivotNorm(minutePivotNorm, minuteLayer.artBoundsY, 200);
+    minutePosY = Math.round(minutePivotNorm * 200);
   } else if (pivotOffsets) {
     minutePosY = clamp(Math.round(baseMinute.y + pivotOffsets.minute.y), 0, 200);
     minutePivotNorm = toPivotNorm(minutePosY, minuteLayer.artBoundsY, 200);
@@ -503,7 +495,7 @@ export async function saveCustomHandStyle(
   let secondPivotNorm: number;
   if (pivotNormOverrides?.second !== undefined) {
     secondPivotNorm = clamp(pivotNormOverrides.second, 0, 1);
-    secondPosY = fromPivotNorm(secondPivotNorm, secondLayer.artBoundsY, 240);
+    secondPosY = Math.round(secondPivotNorm * 240);
   } else if (pivotOffsets) {
     secondPosY = clamp(Math.round(baseSecond.y + pivotOffsets.second.y), 0, 240);
     secondPivotNorm = toPivotNorm(secondPosY, secondLayer.artBoundsY, 240);
