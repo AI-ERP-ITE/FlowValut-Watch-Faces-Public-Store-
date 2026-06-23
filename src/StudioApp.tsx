@@ -3165,6 +3165,15 @@ function StudioApp() {
     console.log('[App] All checks passed, starting generation...');
     console.log('[App] Background file:', state.backgroundFile.name, 'size:', state.backgroundFile.size);
 
+    // Save project file NOW — before any mutations to element src/assetFilename fields.
+    // After export pipeline runs, el.src is mutated to filenames (not data: URLs) and the
+    // saved JSON would be unloadable. Saving here captures the pristine config.
+    try {
+      downloadProjectFile(state.watchFaceConfig);
+    } catch (e) {
+      console.warn('[App] Project file download failed:', e);
+    }
+
     dispatch(actions.setLoading(true));
     dispatch(actions.setLoadingMessage('Generating ZPK file...'));
     dispatch(actions.setStep('generating'));
@@ -3842,13 +3851,6 @@ function StudioApp() {
       }
 
       dispatch(actions.setZpkBlob(zpkResult.blob));
-
-      // Auto-save project file alongside ZPK export.
-      try {
-        downloadProjectFile(state.watchFaceConfig);
-      } catch (e) {
-        console.warn('[App] Project file download failed:', e);
-      }
 
       // Upload to Firebase storage through backend bridge.
       dispatch(actions.setLoadingMessage('Uploading to Firebase...'));
