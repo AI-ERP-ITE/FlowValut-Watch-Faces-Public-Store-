@@ -1972,17 +1972,16 @@ function drawTimePointer(
         pivotX = def.pivotX;
         pivotY = def.pivotY;
         if (def.key === 'hour') {
-          // customRecord is always fresh from IDB (refreshed on every save via labAssetsChanged).
-          // hourPosY is the canonical pivot pixel in baked PNG space — computed with the
-          // art-bounds geometry model at save time, so it is already correct.
-          pivotX = customRecord?.hourPosX ?? el.hourPos?.x ?? def.pivotX;
-          pivotY = customRecord?.hourPosY ?? el.hourPos?.y ?? def.pivotY;
+          // Element-stored pos takes priority (matches ZPK export order in StudioApp.tsx).
+          // customRecord is the fallback for elements that never had an explicit pivot set.
+          pivotX = el.hourPos?.x ?? customRecord?.hourPosX ?? def.pivotX;
+          pivotY = el.hourPos?.y ?? customRecord?.hourPosY ?? def.pivotY;
         } else if (def.key === 'minute') {
-          pivotX = customRecord?.minutePosX ?? el.minutePos?.x ?? def.pivotX;
-          pivotY = customRecord?.minutePosY ?? el.minutePos?.y ?? def.pivotY;
+          pivotX = el.minutePos?.x ?? customRecord?.minutePosX ?? def.pivotX;
+          pivotY = el.minutePos?.y ?? customRecord?.minutePosY ?? def.pivotY;
         } else if (def.key === 'second') {
-          pivotX = customRecord?.secondPosX ?? el.secondPos?.x ?? def.pivotX;
-          pivotY = customRecord?.secondPosY ?? el.secondPos?.y ?? def.pivotY;
+          pivotX = el.secondPos?.x ?? customRecord?.secondPosX ?? def.pivotX;
+          pivotY = el.secondPos?.y ?? customRecord?.secondPosY ?? def.pivotY;
         } else if (def.key === 'cover') {
           // Cover pivot is always its own center (matches the v2/v3 ZPK overlay
           // emitter which centers the cap at centerX/centerY).
