@@ -90,23 +90,20 @@ type ComposerLayerValidation = {
 
 const POINTER_COMPOSER_DRAFT_KEY = 'zepp-pointer-composer-draft-v1';
 const POINTER_COMPOSER_AXIS_KEY = 'zepp-pointer-composer-axis-v3';
-// Typical normalized pivot positions (art-space) for fresh hands.
-const DEFAULT_AXIS: PointerAxisAdjustments = { hour: 0.843, minute: 0.860, second: 0.750 };
+// Composer baseline when no prior local state exists.
+// For markerless HTML/SVG, parser returns yRatio=0.5 and we keep it as-is.
+const DEFAULT_AXIS: PointerAxisAdjustments = { hour: 0.5, minute: 0.5, second: 0.5 };
 const COMPOSER_PREVIEW_RASTER_SIZE = 512;
 
 // ── Stage 3: single source of truth for tip/tail pivot resolution (Spec 106) ──
-// Resolves the initial tip/tail axis (0–1) for a hand from its parsed SVG anchor.
-// A clock hand's rotation pivot is never at its exact vertical center, and the SVG
-// parser returns yRatio === 0.5 precisely when NO usable pivot marker was found.
-// So treat 0.5 as "no marker → use the per-hand base default", and any other value
-// as a real detected marker. This is the ONLY place that decides the markerless
-// default — used by both validation paths and the Reset action.
+// Resolves the initial tip/tail axis (0–1) from parsed HTML/SVG pivot data.
+// If no explicit marker exists, parseLayerAnchorFromSvg returns 0.5 and we KEEP it.
+// Tip/tail remains a user override layered on top before save.
 function resolveInitialAxis(
-  handKey: 'hour' | 'minute' | 'second',
+  _handKey: 'hour' | 'minute' | 'second',
   anchorYRatio: number,
 ): number {
-  const hasUsableMarker = anchorYRatio !== 0.5;
-  return hasUsableMarker ? anchorYRatio : DEFAULT_AXIS[handKey];
+  return clamp01(anchorYRatio);
 }
 
 interface Props {
@@ -327,14 +324,6 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         minute: valid(parsed.minute, DEFAULT_AXIS.minute),
         second: valid(parsed.second, DEFAULT_AXIS.second),
       };
-      // Auto-heal: if all three pivots sit near the vertical center it's the old
-      // corruption pattern (pivot stuck at ~0.5). Real base pivots are ~0.75-0.86,
-      // so a near-center value on ALL THREE clock hands is never legitimate. This
-      // also catches the {0.5, 0.495, 0.5} drift that the exact-0.5 check missed.
-      const nearCenter = (v: number) => Math.abs(v - 0.5) <= 0.02;
-      if (nearCenter(result.hour) && nearCenter(result.minute) && nearCenter(result.second)) {
-        return DEFAULT_AXIS;
-      }
       return result;
     } catch {
       return DEFAULT_AXIS;
@@ -716,10 +705,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     setSavingHand(true);
     setSaveHandMsg('');
     try {
-      // Spec 106: resolve the pivot deterministically at save. Honor composerAxis ONLY
-      // for hands the user dragged this session; otherwise re-derive from the layer
-      // marker/base. This makes saves immune to a stale persisted composerAxis (the
-      // {0.5, 0.495, 0.5} center-pivot pollution observed in IndexedDB records).
+      // Spec 106: resolve pivot deterministically at save. Honor composerAxis ONLY
+      // for hands the user dragged this session; otherwise use parsed HTML/SVG pivot
+      // (marker value if present, else parser fallback 0.5).
       const resolveSaveAxis = (hand: 'hour' | 'minute' | 'second') =>
         composerAxisTouched[hand]
           ? composerAxis[hand]
@@ -1025,8 +1013,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   };
 
   const resetAxisAdjustment = (hand: 'hour' | 'minute' | 'second') => {
-    // Spec 106: reset to the resolved natural pivot — the SVG marker if present,
-    // else the per-hand base default. Never the raw 0.5 center anchor.
+    // Reset to the parsed natural pivot from HTML/SVG (marker value or 0.5 fallback).
     setComposerAxis(prev => ({
       ...prev,
       [hand]: resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio),
