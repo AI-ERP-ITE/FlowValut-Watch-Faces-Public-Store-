@@ -3120,6 +3120,33 @@ function StudioApp() {
     input.click();
   }, [dispatch]);
 
+  // Load widgets-only from a .fvwf file — keeps current background image intact
+  const handleLoadWidgetsOnly = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.fvwf,.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const config: WatchFaceConfig = parsed.watchFaceConfig ?? parsed;
+        if (!config || !config.elements) throw new Error('Invalid project file');
+        // Patch Background element src to match current state.backgroundImage so canvas stays consistent
+        const currentBg = state.backgroundImage;
+        const patchedElements = config.elements.map((el: WatchFaceElement) =>
+          el.name === 'Background' && currentBg ? { ...el, src: currentBg } : el
+        );
+        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects({ ...config, elements: patchedElements })));
+        toast.success(`Widgets loaded: ${file.name}`);
+      } catch {
+        toast.error('Failed to load project file. Make sure it is a valid .fvwf file.');
+      }
+    };
+    input.click();
+  }, [dispatch, state.backgroundImage]);
+
   // Handle regenerate ZPK (local download, no GitHub upload)
   // Handle generate ZPK
   const handleGenerate = useCallback(async () => {
@@ -4878,6 +4905,15 @@ function StudioApp() {
               </div>
             </div>
             <div className="flex flex-wrap gap-3 pt-4 xl:sticky xl:bottom-0 xl:z-20 xl:bg-[#1A1A1A]/95 xl:backdrop-blur xl:pb-2">
+              <Button
+                onClick={handleLoadWidgetsOnly}
+                variant="outline"
+                className="h-12 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                title="Load widgets from a .fvwf project — keeps current background"
+              >
+                <FolderOpen className="h-4 w-4 mr-1.5" />
+                Load Widgets (.fvwf)
+              </Button>
               <Button
                 onClick={handleGenerateClick}
                 className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"
