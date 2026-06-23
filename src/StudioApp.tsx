@@ -79,8 +79,8 @@ import {
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
-function downloadProjectFile(config: WatchFaceConfig): void {
-  const json = JSON.stringify(config, null, 2);
+function downloadProjectFile(config: WatchFaceConfig, backgroundImage: string | null): void {
+  const json = JSON.stringify({ version: 1, backgroundImage, watchFaceConfig: config }, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const date = new Date().toISOString().slice(0, 10);
@@ -3096,9 +3096,21 @@ function StudioApp() {
       if (!file) return;
       try {
         const text = await file.text();
-        const config = JSON.parse(text) as WatchFaceConfig;
+        const parsed = JSON.parse(text);
+        // Support both wrapped format { version, backgroundImage, watchFaceConfig } and bare WatchFaceConfig
+        const config: WatchFaceConfig = parsed.watchFaceConfig ?? parsed;
+        const bgImage: string | null = parsed.backgroundImage ?? null;
         if (!config || !config.elements) throw new Error('Invalid project file');
         dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects(config)));
+        if (bgImage) {
+          dispatch(actions.setBackgroundImage(bgImage));
+          // Build a backgroundFile so ZPK export works if user re-exports
+          try {
+            const res = await fetch(bgImage);
+            const blob = await res.blob();
+            dispatch(actions.setBackgroundFile(new File([blob], 'background.png', { type: blob.type || 'image/png' })));
+          } catch { /* non-critical */ }
+        }
         dispatch(actions.setStep('preview'));
         toast.success(`Project loaded: ${config.name || file.name}`);
       } catch (e) {
@@ -3169,7 +3181,7 @@ function StudioApp() {
     // After export pipeline runs, el.src is mutated to filenames (not data: URLs) and the
     // saved JSON would be unloadable. Saving here captures the pristine config.
     try {
-      downloadProjectFile(state.watchFaceConfig);
+      downloadProjectFile(state.watchFaceConfig, state.backgroundImage);
     } catch (e) {
       console.warn('[App] Project file download failed:', e);
     }
