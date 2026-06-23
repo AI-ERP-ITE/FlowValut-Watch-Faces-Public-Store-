@@ -1410,11 +1410,19 @@ function regenerateDigitFilesFromElements(
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
       const WEEK_INITIAL = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-      const days = el.weekFormat === 'full' ? WEEK_FULL : el.weekFormat === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
+      const fmt = el.weekFormat ?? 'full';
+      const days = fmt === 'full' ? WEEK_FULL : fmt === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
       const h = Math.max(el.bounds.height || 20, 12);
       for (let i = 0; i < 7; i++) {
         results.push({ filename: `week_${i}.png`, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
+      }
+    } else if (el.type === 'IMG_DATE' && el.subtype === 'month') {
+      const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const w = Math.max(el.bounds.width || 40, 20);
+      const h = Math.max(el.bounds.height || 20, 12);
+      for (let i = 0; i < 12; i++) {
+        results.push({ filename: `month_${i}.png`, dataUrl: makeLabelCanvas(MONTH_NAMES[i], color, fontFamily, fontWeight, w, h) });
       }
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
       const prefix = getTextImgPrefixForDataType(el.dataType);

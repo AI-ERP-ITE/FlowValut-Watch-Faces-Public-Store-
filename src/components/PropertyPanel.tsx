@@ -1921,24 +1921,43 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         );
       })()}
 
-      {/* Widget type toggle — DATE/WEEKDAY conversion */}
+      {/* Widget type toggle — DATE/MONTH/WEEKDAY conversion */}
       {(element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') && (
         <Section label="Widget Type">
-          <div className="grid grid-cols-2 gap-1">
-            {(['IMG_DATE', 'IMG_WEEK'] as const).map(wt => (
-              <button
-                key={wt}
-                onClick={() => update({ type: wt })}
-                className={cn(
-                  'py-1.5 rounded border text-[11px] font-medium transition-colors',
-                  element.type === wt
-                    ? 'border-cyan-500 bg-cyan-500/15 text-white'
-                    : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
-                )}
-              >
-                {wt === 'IMG_DATE' ? 'Date Digit' : 'Weekday Name'}
-              </button>
-            ))}
+          <div className="grid grid-cols-3 gap-1">
+            <button
+              onClick={() => update({ type: 'IMG_DATE', subtype: undefined })}
+              className={cn(
+                'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                element.type === 'IMG_DATE' && element.subtype !== 'month'
+                  ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+              )}
+            >
+              Date Digit
+            </button>
+            <button
+              onClick={() => update({ type: 'IMG_DATE', subtype: 'month' })}
+              className={cn(
+                'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                element.type === 'IMG_DATE' && element.subtype === 'month'
+                  ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+              )}
+            >
+              Month Name
+            </button>
+            <button
+              onClick={() => update({ type: 'IMG_WEEK' })}
+              className={cn(
+                'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                element.type === 'IMG_WEEK'
+                  ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+              )}
+            >
+              Weekday Name
+            </button>
           </div>
         </Section>
       )}
@@ -1971,7 +1990,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       )}
 
       {/* Font style picker — text/digit elements */}
-      {['IMG_TIME', 'TEXT_IMG', 'TEXT', 'IMG_DATE'].includes(element.type) && (
+      {['IMG_TIME', 'TEXT_IMG', 'TEXT', 'IMG_DATE', 'IMG_WEEK'].includes(element.type) && (
         <Section label="Font Style">
           <div className="rounded-md border border-white/10 overflow-hidden">
             {/* Selected font preview */}

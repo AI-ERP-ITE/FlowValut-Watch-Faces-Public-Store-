@@ -1762,7 +1762,11 @@ function drawDigitElement(
   const style = el.fontStyle ? getFontStyle(el.fontStyle) : undefined;
   const fontFamily = style?.fontFamily ?? 'Arial';
   const fontWeight = style?.fontWeight ?? 'bold';
-  const text = getPlaceholderText(el);
+  const weekFmt = el.type === 'IMG_WEEK' ? (el.weekFormat ?? 'full') : undefined;
+  const text = el.type === 'IMG_WEEK'
+    ? (weekFmt === 'full' ? 'Wednesday' : weekFmt === 'initial' ? 'Mo.' : 'WED')
+    : (el.type === 'IMG_DATE' && el.subtype === 'month') ? 'APR'
+    : getPlaceholderText(el);
   const color = el.color ? parseZeppColor(el.color) : (style?.color ?? '#FFFFFF');
   // Fit font size to bounds height, but also ensure it doesn't overflow width
   const maxFontSize = Math.min(Math.floor(h * 0.8), Math.floor(w / (text.length * 0.6)));
