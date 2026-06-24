@@ -207,11 +207,15 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
         version: { code: 1, name: '1.0.0' },
         vender: 'AI-WatchFace-Creator',
         description: `Custom watch face - ${config.name}`,
-        icon: 'assets/background.png',
+        icon: 'anteprima.png',
+        cover: ['anteprima.png'],
       },
       permissions: [],
     }, null, 2);
     appSideZip.file('app.json', appSideJson);
+    // Ensure app-side metadata points to an existing thumbnail file.
+    appSideZip.file('anteprima.png', anteprimaFile);
+    appSideZip.file('icon.png', anteprimaFile);
     
     console.log('[ZPK] Step 13: Generating app-side.zip blob...');
     const appSideBlob = await appSideZip.generateAsync({ 
