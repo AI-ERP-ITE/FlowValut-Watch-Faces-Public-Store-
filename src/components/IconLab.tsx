@@ -80,6 +80,7 @@ interface PointerAxisAdjustments {
 interface PointerLayerAnchor {
   xRatio: number;
   yRatio: number;
+  markerFound: boolean;
 }
 
 type ComposerLayerKey = 'hour' | 'minute' | 'second' | 'hub';
@@ -91,18 +92,21 @@ type ComposerLayerValidation = {
 const POINTER_COMPOSER_DRAFT_KEY = 'zepp-pointer-composer-draft-v1';
 const POINTER_COMPOSER_AXIS_KEY = 'zepp-pointer-composer-axis-v3';
 // Composer baseline when no prior local state exists.
-// For markerless HTML/SVG, parser returns yRatio=0.5 and we keep it as-is.
-const DEFAULT_AXIS: PointerAxisAdjustments = { hour: 0.5, minute: 0.5, second: 0.5 };
+// For markerless HTML/SVG, fall back to stock hand pivot ratios so the hand
+// rotates near its base (not its center) by default.
+const DEFAULT_AXIS: PointerAxisAdjustments = { hour: 0.843, minute: 0.860, second: 0.750 };
 const COMPOSER_PREVIEW_RASTER_SIZE = 512;
 
 // ── Stage 3: single source of truth for tip/tail pivot resolution (Spec 106) ──
 // Resolves the initial tip/tail axis (0–1) from parsed HTML/SVG pivot data.
-// If no explicit marker exists, parseLayerAnchorFromSvg returns 0.5 and we KEEP it.
-// Tip/tail remains a user override layered on top before save.
+// If an explicit marker (data-pivot-y or magenta circle) was found, use its ratio.
+// Otherwise fall back to stock hand defaults so the hand rotates near its base.
 function resolveInitialAxis(
-  _handKey: 'hour' | 'minute' | 'second',
+  handKey: 'hour' | 'minute' | 'second',
   anchorYRatio: number,
+  markerFound: boolean,
 ): number {
+  if (!markerFound) return DEFAULT_AXIS[handKey];
   return clamp01(anchorYRatio);
 }
 
@@ -149,14 +153,15 @@ function clamp01(v: number): number {
 }
 
 function parseLayerAnchorFromSvg(svgRaw: string): PointerLayerAnchor {
+  const noMarker: PointerLayerAnchor = { xRatio: 0.5, yRatio: 0.5, markerFound: false };
   const svgMatch = svgRaw.match(/<svg\b[^>]*>/i)?.[0] ?? '';
   const vbMatch = svgMatch.match(/viewBox\s*=\s*["']([^"']+)["']/i);
-  if (!vbMatch) return { xRatio: 0.5, yRatio: 0.5 };
+  if (!vbMatch) return noMarker;
 
   const parts = vbMatch[1].trim().split(/[\s,]+/).map(Number);
-  if (parts.length < 4 || parts.some(Number.isNaN)) return { xRatio: 0.5, yRatio: 0.5 };
+  if (parts.length < 4 || parts.some(Number.isNaN)) return noMarker;
   const [minX, minY, width, height] = parts;
-  if (width <= 0 || height <= 0) return { xRatio: 0.5, yRatio: 0.5 };
+  if (width <= 0 || height <= 0) return noMarker;
 
   const dataX = svgMatch.match(/\bdata-pivot-x\s*=\s*["']([^"']+)["']/i);
   const dataY = svgMatch.match(/\bdata-pivot-y\s*=\s*["']([^"']+)["']/i);
@@ -168,12 +173,13 @@ function parseLayerAnchorFromSvg(svgRaw: string): PointerLayerAnchor {
   const pivotY = Number(dataY?.[1] ?? legacyCy?.[1]);
 
   if (Number.isNaN(pivotX) || Number.isNaN(pivotY)) {
-    return { xRatio: 0.5, yRatio: 0.5 };
+    return noMarker;
   }
 
   return {
     xRatio: clamp01((pivotX - minX) / width),
     yRatio: clamp01((pivotY - minY) / height),
+    markerFound: true,
   };
 }
 
@@ -330,9 +336,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     }
   });
   const [composerLayerAnchor, setComposerLayerAnchor] = useState<Record<'hour' | 'minute' | 'second', PointerLayerAnchor>>({
-    hour: { xRatio: 0.5, yRatio: 0.5 },
-    minute: { xRatio: 0.5, yRatio: 0.5 },
-    second: { xRatio: 0.5, yRatio: 0.5 },
+    hour: { xRatio: 0.5, yRatio: 0.5, markerFound: false },
+    minute: { xRatio: 0.5, yRatio: 0.5, markerFound: false },
+    second: { xRatio: 0.5, yRatio: 0.5, markerFound: false },
   });
   // Tracks which HTML string was used to auto-init composerAxis for each hand.
   // When the HTML changes (new paste), composerAxis is re-initialized to the
@@ -477,7 +483,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       if (!raw) {
         setLayerValidation(key, { state: 'error', message: 'Empty input' });
         setLayerPng(key, '');
-        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
+        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5, markerFound: false });
         return;
       }
       try {
@@ -488,13 +494,13 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         if (!layerSrc || !layerSrc.startsWith('data:image/')) {
           setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
           setLayerPng(key, '');
-          if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
+          if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5, markerFound: false });
           return;
         }
         setLayerValidation(key, { state: 'valid', message: svgLayer ? 'Valid SVG layer' : 'Valid HTML layer' });
         setLayerPng(key, layerSrc);
         if (key !== 'hub') {
-          const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 };
+          const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5, markerFound: false };
           setLayerAnchor(key, anchor);
           // Spec 106: auto-validate must initialize the tip/tail pivot too, exactly
           // like the manual "Validate All" path — otherwise a hand pasted and saved
@@ -502,7 +508,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
           const handKey = key as 'hour' | 'minute' | 'second';
           setComposerAxisInitialized(prev => {
             if (prev[handKey] !== raw) {
-              const initY = resolveInitialAxis(handKey, anchor.yRatio);
+              const initY = resolveInitialAxis(handKey, anchor.yRatio, anchor.markerFound);
               setComposerAxis(axPrev => ({ ...axPrev, [handKey]: initY }));
               // New HTML clears any prior drag flag so the save re-derives from the art.
               setComposerAxisTouched(t => ({ ...t, [handKey]: false }));
@@ -514,7 +520,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       } catch (err) {
         setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
         setLayerPng(key, '');
-        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
+        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5, markerFound: false });
       }
     };
     const t = setTimeout(() => {
@@ -711,7 +717,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       const resolveSaveAxis = (hand: 'hour' | 'minute' | 'second') =>
         composerAxisTouched[hand]
           ? composerAxis[hand]
-          : resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio);
+          : resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio, composerLayerAnchor[hand].markerFound);
       const pivotNormOverrides = {
         hour: resolveSaveAxis('hour'),
         minute: resolveSaveAxis('minute'),
@@ -945,7 +951,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     if (!raw) {
       setLayerValidation(key, { state: 'error', message: 'Empty input' });
       setLayerPng(key, '');
-      if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
+      if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5, markerFound: false });
       return;
     }
 
@@ -957,13 +963,13 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       if (!layerSrc || !layerSrc.startsWith('data:image/')) {
         setLayerValidation(key, { state: 'error', message: 'Render failed (invalid SVG/HTML content)' });
         setLayerPng(key, '');
-        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
+        if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5, markerFound: false });
         return;
       }
       setLayerValidation(key, { state: 'valid', message: svgLayer ? 'Valid SVG layer' : 'Valid HTML layer' });
       setLayerPng(key, layerSrc);
       if (key !== 'hub') {
-        const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5 };
+        const anchor = svgLayer ? parseLayerAnchorFromSvg(svgLayer) : { xRatio: 0.5, yRatio: 0.5, markerFound: false } as PointerLayerAnchor;
         setLayerAnchor(key, anchor);
 
         // Auto-init composerAxis ONLY when the HTML for this slot has changed.
@@ -972,7 +978,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         setComposerAxisInitialized(prev => {
           if (prev[handKey] !== raw) {
             // New HTML — resolve pivot via the single Stage 3 resolver (Spec 106).
-            const initY = resolveInitialAxis(handKey, anchor.yRatio);
+            const initY = resolveInitialAxis(handKey, anchor.yRatio, anchor.markerFound);
             setComposerAxis(axPrev => ({ ...axPrev, [handKey]: initY }));
             // New HTML clears any prior drag flag so the save re-derives from the art.
             setComposerAxisTouched(t => ({ ...t, [handKey]: false }));
@@ -984,7 +990,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     } catch (err) {
       setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Render failed' });
       setLayerPng(key, '');
-      if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5 });
+      if (key !== 'hub') setLayerAnchor(key, { xRatio: 0.5, yRatio: 0.5, markerFound: false });
     }
   };
 
@@ -1016,7 +1022,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     // Reset to the parsed natural pivot from HTML/SVG (marker value or 0.5 fallback).
     setComposerAxis(prev => ({
       ...prev,
-      [hand]: resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio),
+      [hand]: resolveInitialAxis(hand, composerLayerAnchor[hand].yRatio, composerLayerAnchor[hand].markerFound),
     }));
     setComposerAxisTouched(prev => ({ ...prev, [hand]: false }));
   };
