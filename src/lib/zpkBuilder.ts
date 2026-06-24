@@ -73,7 +73,9 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       const w = config.resolution.width;
       const h = config.resolution.height;
       if (w === 480 && h === 480) return { w: 324, h: 324 };
+      if (w === 466 && h === 466) return { w: 314, h: 314 };
       if (w === 454 && h === 454) return { w: 306, h: 306 };
+      if (w === 416 && h === 416) return { w: 280, h: 280 };
       if (w === 390 && h === 450) return { w: 266, h: 306 };
       if (w === 402 && h === 476) return { w: 273, h: 316 };
       return { w: Math.round(w * 0.675), h: Math.round(h * 0.675) }; // generic ~67.5%
@@ -195,7 +197,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     });
     console.log('[ZPK] Step 11: device.zip generated, size:', deviceBlob.size);
     
-    // Create app-side.zip - Matching working ZPK structure
+    // Create app-side.zip — kept minimal and reference-style (no thumbnail blobs).
     console.log('[ZPK] Step 12: Creating app-side.zip...');
     const appSideZip = new JSZip();
     const appSideJson = JSON.stringify({
@@ -207,15 +209,11 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
         version: { code: 1, name: '1.0.0' },
         vender: 'AI-WatchFace-Creator',
         description: `Custom watch face - ${config.name}`,
-        icon: 'anteprima.png',
-        cover: ['anteprima.png'],
+        icon: 'assets/background.png',
       },
       permissions: [],
     }, null, 2);
     appSideZip.file('app.json', appSideJson);
-    // Ensure app-side metadata points to an existing thumbnail file.
-    appSideZip.file('anteprima.png', anteprimaFile);
-    appSideZip.file('icon.png', anteprimaFile);
     
     console.log('[ZPK] Step 13: Generating app-side.zip blob...');
     const appSideBlob = await appSideZip.generateAsync({ 
@@ -227,9 +225,18 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     // Create final ZPK
     console.log('[ZPK] Step 15: Creating final ZPK...');
     const zpkZip = new JSZip();
-    // Mirror Zepp outer-package expectations: keep a global manifest and preview
-    // image at the root of the final package next to the inner archives.
-    zpkZip.file('app.json', code.appJson);
+    // Outer root: global manifest + thumbnails alongside inner archives.
+    // The Zepp installer reads this root before opening any inner zip.
+    // app.json here uses icon=icon.png and cover=preview_en.png per Zepp spec.
+    const outerAppJson = JSON.parse(code.appJson);
+    outerAppJson.app.icon = 'icon.png';
+    outerAppJson.app.cover = ['preview_en.png'];
+    if (outerAppJson.i18n) {
+      for (const lang of Object.keys(outerAppJson.i18n)) {
+        if (outerAppJson.i18n[lang]) outerAppJson.i18n[lang].icon = 'icon.png';
+      }
+    }
+    zpkZip.file('app.json', JSON.stringify(outerAppJson, null, 2));
     zpkZip.file('anteprima.png', anteprimaFile);
     zpkZip.file('icon.png', anteprimaFile);
     zpkZip.file('preview_en.png', anteprimaFile);
