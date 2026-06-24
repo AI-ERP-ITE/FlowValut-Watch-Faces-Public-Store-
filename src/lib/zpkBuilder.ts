@@ -227,6 +227,12 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     // Create final ZPK
     console.log('[ZPK] Step 15: Creating final ZPK...');
     const zpkZip = new JSZip();
+    // Mirror Zepp outer-package expectations: keep a global manifest and preview
+    // image at the root of the final package next to the inner archives.
+    zpkZip.file('app.json', code.appJson);
+    zpkZip.file('anteprima.png', anteprimaFile);
+    zpkZip.file('icon.png', anteprimaFile);
+    zpkZip.file('preview_en.png', anteprimaFile);
     zpkZip.file('device.zip', deviceBlob);
     zpkZip.file('app-side.zip', appSideBlob);
     
