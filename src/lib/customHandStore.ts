@@ -416,15 +416,35 @@ export async function saveCustomHandStyle(
   const minuteSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.minuteHtml) : sourceSvg;
   const secondSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.secondHtml) : sourceSvg;
 
-  const hourPivotSource = hasComposedSources
+  const extractedHourPivot = hasComposedSources
     ? (extractPivotFromSvg(hourSourceSvg) ?? inferCenteredPivot(hourSourceSvg))
     : parsedPivot;
-  const minutePivotSource = hasComposedSources
+  const extractedMinutePivot = hasComposedSources
     ? (extractPivotFromSvg(minuteSourceSvg) ?? inferCenteredPivot(minuteSourceSvg))
     : parsedPivot;
-  const secondPivotSource = hasComposedSources
+  const extractedSecondPivot = hasComposedSources
     ? (extractPivotFromSvg(secondSourceSvg) ?? inferCenteredPivot(secondSourceSvg))
     : parsedPivot;
+
+  // If the user adjusted the tip/tail slider, inject that ratio as the pivotSource so it
+  // passes through the same cover-crop transform as a marker-derived pivot. This ensures
+  // the saved hourPosY pixel exactly matches the rotation point shown in the composer preview.
+  const pivotNormOverridesEarly = options?.pivotNormOverrides;
+  const hourPivotSource: ParsedPivot | null = pivotNormOverridesEarly?.hour !== undefined && extractedHourPivot
+    ? { ...extractedHourPivot, yRatio: pivotNormOverridesEarly.hour }
+    : pivotNormOverridesEarly?.hour !== undefined
+    ? { xRatio: 0.5, yRatio: pivotNormOverridesEarly.hour, sourceW: 0, sourceH: 0 }
+    : extractedHourPivot;
+  const minutePivotSource: ParsedPivot | null = pivotNormOverridesEarly?.minute !== undefined && extractedMinutePivot
+    ? { ...extractedMinutePivot, yRatio: pivotNormOverridesEarly.minute }
+    : pivotNormOverridesEarly?.minute !== undefined
+    ? { xRatio: 0.5, yRatio: pivotNormOverridesEarly.minute, sourceW: 0, sourceH: 0 }
+    : extractedMinutePivot;
+  const secondPivotSource: ParsedPivot | null = pivotNormOverridesEarly?.second !== undefined && extractedSecondPivot
+    ? { ...extractedSecondPivot, yRatio: pivotNormOverridesEarly.second }
+    : pivotNormOverridesEarly?.second !== undefined
+    ? { xRatio: 0.5, yRatio: pivotNormOverridesEarly.second, sourceW: 0, sourceH: 0 }
+    : extractedSecondPivot;
 
   // Derive cap dimensions from the actual rendered art (not the SVG viewBox),
   // so a 17px cap drawn inside a 120×120 viewBox bakes as ~34×34, not 120×120.
@@ -450,7 +470,6 @@ export async function saveCustomHandStyle(
   const secondPivot = secondLayer.pivot;
 
   const pivotOffsets = options?.pivotOffsets;
-  const pivotNormOverrides = options?.pivotNormOverrides;
 
   // ── Helper: normalize a canvas-px pivot into [0,1] within the art bounds ──
   // Pivot norm is a canvas-fraction: 0 = top of baked PNG, 1 = bottom.
@@ -463,15 +482,6 @@ export async function saveCustomHandStyle(
     return clamp(posY / canvasH, 0, 1);
   }
 
-  // ── Helper: reconstruct canvas-px pivot from normalized position ──
-  function fromPivotNorm(
-    norm: number,
-    _artBoundsY: { minY: number; maxY: number } | null,
-    canvasH: number,
-  ): number {
-    return Math.round(clamp(norm, 0, 1) * canvasH);
-  }
-
   // Effective hand positions for TIME_POINTER selection/export.
   // If no marker-derived pivot exists, fall back to known stable defaults.
   const baseHour = hourPivot ?? { x: 11, y: 118 };
@@ -479,14 +489,11 @@ export async function saveCustomHandStyle(
   const baseSecond = secondPivot ?? { x: 4, y: 180 };
 
   // ── Hour ──
-  // Priority: pivotNormOverrides > pivotOffsets (legacy pixel offset) > marker-derived
+  // Pivot was already baked correctly via pivotSource in renderHandToPngWithPivot.
+  // Use the crop-transformed pixel value directly; no separate post-bake override needed.
   let hourPosY: number;
   let hourPivotNorm: number;
-  if (pivotNormOverrides?.hour !== undefined) {
-    // Slider sends a direct normalized position within the art bounds.
-    hourPivotNorm = clamp(pivotNormOverrides.hour, 0, 1);
-    hourPosY = fromPivotNorm(hourPivotNorm, hourLayer.artBoundsY, 140);
-  } else if (pivotOffsets) {
+  if (pivotOffsets) {
     // Legacy pixel-offset path (backward compat — old records without norm data).
     hourPosY = clamp(Math.round(baseHour.y + pivotOffsets.hour.y), 0, 140);
     hourPivotNorm = toPivotNorm(hourPosY, hourLayer.artBoundsY, 140);
@@ -501,10 +508,7 @@ export async function saveCustomHandStyle(
   // ── Minute ──
   let minutePosY: number;
   let minutePivotNorm: number;
-  if (pivotNormOverrides?.minute !== undefined) {
-    minutePivotNorm = clamp(pivotNormOverrides.minute, 0, 1);
-    minutePosY = fromPivotNorm(minutePivotNorm, minuteLayer.artBoundsY, 200);
-  } else if (pivotOffsets) {
+  if (pivotOffsets) {
     minutePosY = clamp(Math.round(baseMinute.y + pivotOffsets.minute.y), 0, 200);
     minutePivotNorm = toPivotNorm(minutePosY, minuteLayer.artBoundsY, 200);
   } else {
@@ -518,10 +522,7 @@ export async function saveCustomHandStyle(
   // ── Second ──
   let secondPosY: number;
   let secondPivotNorm: number;
-  if (pivotNormOverrides?.second !== undefined) {
-    secondPivotNorm = clamp(pivotNormOverrides.second, 0, 1);
-    secondPosY = fromPivotNorm(secondPivotNorm, secondLayer.artBoundsY, 240);
-  } else if (pivotOffsets) {
+  if (pivotOffsets) {
     secondPosY = clamp(Math.round(baseSecond.y + pivotOffsets.second.y), 0, 240);
     secondPivotNorm = toPivotNorm(secondPosY, secondLayer.artBoundsY, 240);
   } else {
@@ -538,9 +539,9 @@ export async function saveCustomHandStyle(
   const hubRefH = Math.max(1, hubSize.height);
   const hubRef = Math.max(hubRefW, hubRefH); // use longest side as scalar reference
   // pivotXRatio = 0.5 (center horizontally) unless marker data provides otherwise
-  const hourPivotYRatio  = pivotNormOverrides?.hour    !== undefined ? clamp(pivotNormOverrides.hour, 0, 1)    : hourPivotNorm;
-  const minutePivotYRatio = pivotNormOverrides?.minute !== undefined ? clamp(pivotNormOverrides.minute, 0, 1)  : minutePivotNorm;
-  const secondPivotYRatio = pivotNormOverrides?.second !== undefined ? clamp(pivotNormOverrides.second, 0, 1)  : secondPivotNorm;
+  const hourPivotYRatio  = hourPivotNorm;
+  const minutePivotYRatio = minutePivotNorm;
+  const secondPivotYRatio = secondPivotNorm;
   const ratioGeometry = hubRef > 0 ? {
     hourWidthRatio:    hourArtSize.w   / hubRef,
     hourHeightRatio:   hourArtSize.h   / hubRef,
