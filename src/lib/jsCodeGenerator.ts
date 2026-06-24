@@ -124,8 +124,8 @@ function generateAppJson(config: WatchFaceConfig): string {
       },
       vender: 'AI-WatchFace-Creator',
       description: `Custom watch face - ${config.name}`,
-      icon: 'icon.png',
-      cover: ['icon.png'],
+      icon: 'anteprima.png',
+      cover: ['anteprima.png'],
     },
     permissions: [],
     runtime: {
@@ -137,7 +137,7 @@ function generateAppJson(config: WatchFaceConfig): string {
     },
     i18n: {
       'en-US': {
-        icon: 'icon.png',
+        icon: 'anteprima.png',
         appName: config.name,
       },
     },

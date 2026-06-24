@@ -118,6 +118,8 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       }
     }
     deviceZip.file('anteprima.png', anteprimaFile);
+    // Compatibility alias: some runtimes/tools still expect icon.png.
+    deviceZip.file('icon.png', anteprimaFile);
     
     console.log('[ZPK] Step 5: Adding app.js...');
     deviceZip.file('app.js', code.appJs);
