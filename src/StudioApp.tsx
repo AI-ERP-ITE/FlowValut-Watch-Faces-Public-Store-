@@ -3198,9 +3198,6 @@ function StudioApp() {
       const canvas = canvasRef.current;
       if (canvas) {
         previewDataUrl = canvas.toDataURL('image/png');
-        console.log('[App] Canvas screenshot captured, size:', previewDataUrl.length);
-        console.log('[App] Preview data URL header:', previewDataUrl.substring(0, 80));
-        capturePointerParitySnapshotFromCanvas('composer-preview');
       } else {
         console.warn('[App] Canvas ref not available for screenshot');
       }
@@ -3942,12 +3939,6 @@ function StudioApp() {
       const derivedSpecGroup = watchModels[configForBuild.watchModel]?.specGroup ?? null;
       const sourceJson = buildSourceJson(withNormalizedPointerEffects(configForBuild), derivedSpecGroup);
 
-      console.log('[App] Starting Firebase upload with:');
-      console.log('[App]   watchfaceId:', watchfaceId);
-      console.log('[App]   zpkBlob size:', zpkResult.blob.size);
-      console.log('[App]   previewDataUrl present:', !!previewDataUrl);
-      console.log('[App]   qrDataUrl present:', !!qrDataUrl);
-
       const uploadResult = await uploadStudioArtifactsToFirebase({
         watchfaceId,
         zpkBlob: zpkResult.blob,
@@ -3956,8 +3947,6 @@ function StudioApp() {
         previewDataUrl: previewDataUrl ?? undefined,
         sourceJson,
       });
-
-      console.log('[App] Firebase upload completed, result:', uploadResult);
 
       setLatestUploadResult(uploadResult);
 

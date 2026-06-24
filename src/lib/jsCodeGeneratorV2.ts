@@ -117,7 +117,7 @@ function generateAppJsonV2(config: WatchFaceConfig): string {
     debug: false,
     module: {
       watchface: {
-        path: 'watchface/index',
+        path: 'watchface/default-target/index',
         main: 1,
         editable: 0,
         lockscreen: 1,
