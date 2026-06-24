@@ -1422,8 +1422,10 @@ function regenerateDigitFilesFromElements(
       const days = fmt === 'full' ? WEEK_FULL : fmt === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
       const h = Math.max(el.bounds.height || 20, 12);
+      const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const prefix = `week_${safeId}`;
       for (let i = 0; i < 7; i++) {
-        results.push({ filename: `week_${i}.png`, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
+        results.push({ filename: `${prefix}_${i}.png`, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
       }
     } else if (el.type === 'IMG_DATE' && el.subtype === 'month') {
       const MONTH_FULL    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1433,8 +1435,10 @@ function regenerateDigitFilesFromElements(
       const monthNames = mfmt === 'full' ? MONTH_FULL : mfmt === 'initial' ? MONTH_INITIAL : MONTH_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
       const h = Math.max(el.bounds.height || 20, 12);
+      const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const prefix = `month_${safeId}`;
       for (let i = 0; i < 12; i++) {
-        results.push({ filename: `month_${i}.png`, dataUrl: makeLabelCanvas(monthNames[i], color, fontFamily, fontWeight, w, h) });
+        results.push({ filename: `${prefix}_${i}.png`, dataUrl: makeLabelCanvas(monthNames[i], color, fontFamily, fontWeight, w, h) });
       }
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
       const prefix = getTextImgPrefixForDataType(el.dataType);

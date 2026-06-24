@@ -10,6 +10,18 @@ import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDe
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 
+function _safeAssetIdV3(id?: string): string {
+  return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function _monthAssetPrefixV3(element: WatchFaceElement): string {
+  return `month_${_safeAssetIdV3(element.id)}`;
+}
+
+function _weekAssetPrefixV3(element: WatchFaceElement): string {
+  return `week_${_safeAssetIdV3(element.id)}`;
+}
+
 /** Compute shadow-bake padding (mirrors V2 helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
   return dropShadowPaddingForBake(ds);
@@ -361,6 +373,10 @@ function generateWidgetCode(element: WatchFaceElement): string {
       return generateArcProgressWidgetV3(element);
     case 'TEXT_IMG':
       return generateTextImgWidgetV3(element);
+    case 'IMG_DATE':
+      return generateImgDateWidgetV3(element);
+    case 'IMG_WEEK':
+      return generateImgWeekWidgetV3(element);
     case 'TEXT':
       return generateTextWidgetV3(element);
     case 'BUTTON':
@@ -429,6 +445,75 @@ function generateWidgetCode(element: WatchFaceElement): string {
   }
 
   return '';
+}
+
+function generateImgDateWidgetV3(element: WatchFaceElement): string {
+  const x = element.bounds.x ?? 92;
+  const y = element.bounds.y ?? 198;
+
+  if (element.subtype === 'month') {
+    const prefix = _monthAssetPrefixV3(element);
+    const monthArray: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      monthArray.push(`'${prefix}_${i}.png'`);
+    }
+    const monthArrayStr = `[${monthArray.join(', ')}]`;
+    return `
+                // ${element.name} - IMG_DATE Month Widget
+                hmUI.createWidget(hmUI.widget.IMG_DATE, {
+                    month_startX: px(${x}),
+                    month_startY: px(${y}),
+                    month_sc_array: ${monthArrayStr},
+                    month_tc_array: ${monthArrayStr},
+                    month_en_array: ${monthArrayStr},
+                    month_zero: 0,
+                    month_space: 0,
+                    month_is_character: true,
+                    month_align: hmUI.align.LEFT,
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
+  }
+
+  const dayArray: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    dayArray.push(`'date_digit_${i}.png'`);
+  }
+  const dayArrayStr = `[${dayArray.join(', ')}]`;
+  return `
+                // ${element.name} - IMG_DATE Widget
+                hmUI.createWidget(hmUI.widget.IMG_DATE, {
+                    day_startX: px(${x}),
+                    day_startY: px(${y}),
+                    day_sc_array: ${dayArrayStr},
+                    day_tc_array: ${dayArrayStr},
+                    day_en_array: ${dayArrayStr},
+                    day_zero: 1,
+                    day_space: 0,
+                    day_align: hmUI.align.LEFT,
+                    day_is_character: false,
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
+}
+
+function generateImgWeekWidgetV3(element: WatchFaceElement): string {
+  const x = element.bounds.x ?? 33;
+  const y = element.bounds.y ?? 198;
+  const prefix = _weekAssetPrefixV3(element);
+  const weekArray: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    weekArray.push(`'${prefix}_${i}.png'`);
+  }
+  const weekArrayStr = `[${weekArray.join(', ')}]`;
+  return `
+                // ${element.name} - IMG_WEEK Widget
+                hmUI.createWidget(hmUI.widget.IMG_WEEK, {
+                    x: px(${x}),
+                    y: px(${y}),
+                    week_en: ${weekArrayStr},
+                    week_sc: ${weekArrayStr},
+                    week_tc: ${weekArrayStr},
+                    show_level: hmUI.show_level.ONLY_NORMAL
+                });`;
 }
 
 // TIME_POINTER - Analog clock hands (hour/minute/second in ONE widget)

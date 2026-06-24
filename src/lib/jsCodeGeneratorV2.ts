@@ -9,6 +9,18 @@ import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDe
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 
+function _safeAssetId(id?: string): string {
+  return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function _monthAssetPrefix(element: WatchFaceElement): string {
+  return `month_${_safeAssetId(element.id)}`;
+}
+
+function _weekAssetPrefix(element: WatchFaceElement): string {
+  return `week_${_safeAssetId(element.id)}`;
+}
+
 /** Compute extra canvas padding required to contain a drop shadow (mirrors StudioApp helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
   return dropShadowPaddingForBake(ds);
@@ -287,12 +299,21 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   const minutesElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'minutes');
   const secondsElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'seconds');
   const hasTimeWidget = !!(hoursElement || minutesElement || secondsElement);
-  const dateElement = elements.find(e => e.type === 'IMG_DATE' && e.subtype !== 'month') 
-    ?? elements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
-  const monthElement = elements.find(e => e.type === 'IMG_DATE' && e.subtype === 'month')
-    ?? elements.find(e => e.name.toLowerCase().includes('month'));
-  const weekElement = elements.find(e => e.type === 'IMG_WEEK')
-    ?? elements.find(e => e.name.toLowerCase().includes('week'));
+  const dateElements = elements.filter(e => e.type === 'IMG_DATE' && e.subtype !== 'month');
+  if (dateElements.length === 0) {
+    const fallback = elements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
+    if (fallback) dateElements.push(fallback);
+  }
+  const monthElements = elements.filter(e => e.type === 'IMG_DATE' && e.subtype === 'month');
+  if (monthElements.length === 0) {
+    const fallback = elements.find(e => e.name.toLowerCase().includes('month'));
+    if (fallback) monthElements.push(fallback);
+  }
+  const weekElements = elements.filter(e => e.type === 'IMG_WEEK');
+  if (weekElements.length === 0) {
+    const fallback = elements.find(e => e.name.toLowerCase().includes('week'));
+    if (fallback) weekElements.push(fallback);
+  }
   
   // Add IMG_TIME widget if time element exists
   if (hasTimeWidget) {
@@ -300,17 +321,17 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   }
   
   // Add IMG_DATE widget if date element exists
-  if (dateElement) {
+  for (const dateElement of dateElements) {
     normalWidgetsCode += generateIMGDateWidget(dateElement, normalWidgetCounter++, 'ONLY_NORMAL');
   }
 
   // Add IMG_DATE (month) widget if month element exists
-  if (monthElement) {
+  for (const monthElement of monthElements) {
     normalWidgetsCode += generateIMGMonthWidget(monthElement, normalWidgetCounter++, 'ONLY_NORMAL');
   }
   
   // Add IMG_WEEK widget if week element exists
-  if (weekElement) {
+  for (const weekElement of weekElements) {
     normalWidgetsCode += generateIMGWeekWidget(weekElement, normalWidgetCounter++, 'ONLY_NORMAL');
   }
   
@@ -360,26 +381,35 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
   const aodMinutesElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'minutes');
   const aodSecondsElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'seconds');
   const hasAodTimeWidget = !!(aodHoursElement || aodMinutesElement || aodSecondsElement);
-  const aodDateElement = aodElements.find(e => e.type === 'IMG_DATE' && e.subtype !== 'month')
-    ?? aodElements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
-  const aodMonthElement = aodElements.find(e => e.type === 'IMG_DATE' && e.subtype === 'month')
-    ?? aodElements.find(e => e.name.toLowerCase().includes('month'));
-  const aodWeekElement = aodElements.find(e => e.type === 'IMG_WEEK')
-    ?? aodElements.find(e => e.name.toLowerCase().includes('week'));
+  const aodDateElements = aodElements.filter(e => e.type === 'IMG_DATE' && e.subtype !== 'month');
+  if (aodDateElements.length === 0) {
+    const fallback = aodElements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
+    if (fallback) aodDateElements.push(fallback);
+  }
+  const aodMonthElements = aodElements.filter(e => e.type === 'IMG_DATE' && e.subtype === 'month');
+  if (aodMonthElements.length === 0) {
+    const fallback = aodElements.find(e => e.name.toLowerCase().includes('month'));
+    if (fallback) aodMonthElements.push(fallback);
+  }
+  const aodWeekElements = aodElements.filter(e => e.type === 'IMG_WEEK');
+  if (aodWeekElements.length === 0) {
+    const fallback = aodElements.find(e => e.name.toLowerCase().includes('week'));
+    if (fallback) aodWeekElements.push(fallback);
+  }
 
   if (hasAodTimeWidget) {
     aodWidgetsCode += generateIMGTimeWidget(aodHoursElement, aodMinutesElement, aodSecondsElement, aodWidgetCounter++, 'ONLY_AOD');
   }
   
-  if (aodDateElement) {
+  for (const aodDateElement of aodDateElements) {
     aodWidgetsCode += generateIMGDateWidget(aodDateElement, aodWidgetCounter++, 'ONLY_AOD');
   }
 
-  if (aodMonthElement) {
+  for (const aodMonthElement of aodMonthElements) {
     aodWidgetsCode += generateIMGMonthWidget(aodMonthElement, aodWidgetCounter++, 'ONLY_AOD');
   }
   
-  if (aodWeekElement) {
+  for (const aodWeekElement of aodWeekElements) {
     aodWidgetsCode += generateIMGWeekWidget(aodWeekElement, aodWidgetCounter++, 'ONLY_AOD');
   }
   
@@ -586,11 +616,12 @@ function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, s
 function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 105;
   const y = element.bounds.y || 198;
+  const prefix = _monthAssetPrefix(element);
   
   // Use month_N.png naming — 12 images for Jan-Dec (0-indexed)
   const monthArray = [];
   for (let i = 0; i < 12; i++) {
-    monthArray.push(`'month_${i}.png'`);
+    monthArray.push(`'${prefix}_${i}.png'`);
   }
   const monthArrayStr = `[${monthArray.join(', ')}]`;
   
@@ -614,11 +645,12 @@ function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, 
 function generateIMGWeekWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 33;
   const y = element.bounds.y || 198;
+  const prefix = _weekAssetPrefix(element);
   
   // Use week_N.png naming — must match what mockKimiAnalysis generates
   const weekArray = [];
   for (let i = 0; i < 7; i++) {
-    weekArray.push(`'week_${i}.png'`);
+    weekArray.push(`'${prefix}_${i}.png'`);
   }
   const weekArrayStr = `[${weekArray.join(', ')}]`;
   
