@@ -7,7 +7,7 @@ import {
   registerCustomFonts,
   type SerializableCustomFontRecord,
 } from '@/lib/customFontStore';
-import { loadCustomHandStyles, replaceCustomHandStyles, type CustomHandRecord } from '@/lib/customHandStore';
+import { replaceCustomHandStyles, type CustomHandRecord } from '@/lib/customHandStore';
 import {
   fetchLabManifest,
   isBackendBridgeConfigured,
@@ -67,13 +67,13 @@ export async function pullAllLabAssetsFromCloud(): Promise<void> {
 }
 
 export async function pushLabAssetTypeToCloud(type: LabAssetType): Promise<void> {
+  // Hands use Firestore/Storage as primary cross-device sync (pushLabAssetToFirestore).
+  // The GitHub JSON bridge for hands is redundant and requires a PAT with Contents:write
+  // scope that the current fine-grained token does not provide. Skip to avoid 403 noise.
+  if (type === 'hands') return;
+
   if (type === 'icons') {
     await putEnvelope('icons', await loadCustomIcons());
-    return;
-  }
-
-  if (type === 'hands') {
-    await putEnvelope('hands', await loadCustomHandStyles());
     return;
   }
 
