@@ -168,12 +168,9 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
         }
       }
     }
-    const deviceAssets = deviceZip.folder('assets');
-    if (deviceAssets) {
-      deviceAssets.file('anteprima.png', anteprimaFile);
-    } else {
-      throw new Error('Failed to create device assets folder for anteprima.png');
-    }
+    deviceZip.file('anteprima.png', anteprimaFile);
+    // Compatibility alias: some runtimes/tools still expect icon.png.
+    deviceZip.file('icon.png', anteprimaFile);
     
     console.log('[ZPK] Step 5: Adding app.js...');
     deviceZip.file('app.js', code.appJs);
@@ -279,6 +276,26 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     // Create final ZPK
     console.log('[ZPK] Step 15: Creating final ZPK...');
     const zpkZip = new JSZip();
+    // Outer root: global manifest + thumbnails alongside inner archives.
+    // The Zepp installer reads this root before opening any inner zip.
+    // app.json here uses icon=icon.png and cover=preview_en.png per Zepp spec.
+    const outerAppJson = JSON.parse(code.appJson);
+    outerAppJson.app.icon = 'icon.png';
+    outerAppJson.app.cover = ['preview_en.png'];
+    if (outerAppJson.i18n) {
+      for (const lang of Object.keys(outerAppJson.i18n)) {
+        if (outerAppJson.i18n[lang]) outerAppJson.i18n[lang].icon = 'icon.png';
+      }
+    }
+    
+    const outerAppJsonStr = JSON.stringify(outerAppJson, null, 2);
+    zpkZip.file('app.json', outerAppJsonStr);
+    logStep('outer-appjson-added', 'OK', `${outerAppJsonStr.length} bytes, icon: ${outerAppJson.app.icon}, cover: ${outerAppJson.app.cover}`);
+    
+    zpkZip.file('anteprima.png', anteprimaFile);
+    zpkZip.file('icon.png', anteprimaFile);
+    zpkZip.file('preview_en.png', anteprimaFile);
+    logStep('outer-thumbnails-added', 'OK', `anteprima.png, icon.png, preview_en.png (${anteprimaFile.size} bytes each)`);
     
     zpkZip.file('device.zip', deviceBlob);
     zpkZip.file('app-side.zip', appSideBlob);

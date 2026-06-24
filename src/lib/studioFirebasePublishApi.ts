@@ -109,6 +109,19 @@ export async function uploadStudioArtifactsToFirebase(input: {
 }): Promise<StudioUploadResult> {
   const zpkBase64 = await blobToBase64(input.zpkBlob);
 
+  // Log upload details for debugging
+  console.log('[Firebase] uploadStudioArtifactsToFirebase called');
+  console.log('[Firebase] zpkBlob size:', input.zpkBlob.size);
+  console.log('[Firebase] previewDataUrl exists:', !!input.previewDataUrl);
+  if (input.previewDataUrl) {
+    console.log('[Firebase] previewDataUrl length:', input.previewDataUrl.length);
+    console.log('[Firebase] previewDataUrl header:', input.previewDataUrl.substring(0, 50));
+  }
+  console.log('[Firebase] qrDataUrl exists:', !!input.qrDataUrl);
+  if (input.qrDataUrl) {
+    console.log('[Firebase] qrDataUrl length:', input.qrDataUrl.length);
+  }
+
   const payload = {
     watchfaceId: input.watchfaceId,
     zpkBase64,
@@ -118,10 +131,19 @@ export async function uploadStudioArtifactsToFirebase(input: {
     sourceJson: input.sourceJson,
   };
 
-  return adminFetch<StudioUploadResult>('studioUploadArtifacts', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  console.log('[Firebase] Upload payload prepared, keys:', Object.keys(payload).join(', '));
+
+  try {
+    const result = await adminFetch<StudioUploadResult>('studioUploadArtifacts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    console.log('[Firebase] Upload succeeded:', result.ok);
+    return result;
+  } catch (err) {
+    console.error('[Firebase] Upload failed:', err);
+    throw err;
+  }
 }
 
 export async function publishStudioWatchfaceToFirebase(entry: {
