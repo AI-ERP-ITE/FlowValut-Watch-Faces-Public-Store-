@@ -813,7 +813,7 @@ function hitTestArc(x: number, y: number, el: WatchFaceElement): boolean {
 
 // ─── Selection Highlight ────────────────────────────────────────────────────────
 
-const HANDLE_SIZE = 8;
+const HANDLE_SIZE = 5;
 const SEL_COLOR = '#00D4FF';
 
 function drawSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
@@ -831,7 +831,7 @@ function drawSecondarySelection(ctx: CanvasRenderingContext2D, el: WatchFaceElem
   const { x, y, width, height } = el.bounds;
   ctx.save();
   ctx.strokeStyle = 'rgba(0,212,255,0.5)';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1;
   ctx.setLineDash([3, 4]);
   ctx.strokeRect(x - 1, y - 1, width + 2, height + 2);
   ctx.setLineDash([]);
@@ -843,7 +843,7 @@ function drawRectSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) 
 
   ctx.save();
   ctx.strokeStyle = 'rgba(0,212,255,0.35)';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(x - 1, y - 1, width + 2, height + 2);
   ctx.setLineDash([]);
@@ -857,7 +857,7 @@ function drawRectSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) 
   for (const [hx, hy] of handles) {
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = SEL_COLOR;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1;
     ctx.fillRect(hx - HANDLE_SIZE / 2, hy - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
     ctx.strokeRect(hx - HANDLE_SIZE / 2, hy - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
   }
