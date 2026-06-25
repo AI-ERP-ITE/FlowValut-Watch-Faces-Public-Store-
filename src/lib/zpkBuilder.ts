@@ -136,6 +136,8 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       // Add background image directly from uploaded file (no conversion)
       console.log('[ZPK] Step 8: Adding background image...');
       assets.file('background.png', backgroundFile);
+      // Keep a dedicated watch thumbnail inside device assets for installer/device lookup.
+      assets.file('anteprima.png', anteprimaFile);
       console.log('[ZPK] Step 9: Background image added, size:', backgroundFile.size);
 
       if (aodBackgroundFile) {
@@ -209,7 +211,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
         version: { code: 1, name: '1.0.0' },
         vender: 'AI-WatchFace-Creator',
         description: `Custom watch face - ${config.name}`,
-        icon: 'assets/background.png',
+        icon: 'assets/anteprima.png',
       },
       permissions: [],
     }, null, 2);
