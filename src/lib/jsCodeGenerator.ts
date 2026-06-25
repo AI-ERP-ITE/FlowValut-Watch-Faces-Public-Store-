@@ -452,11 +452,13 @@ function generateImgDateWidgetV3(element: WatchFaceElement): string {
   const y = element.bounds.y ?? 198;
 
   if (element.subtype === 'month') {
+    const explicitMonthArray = Array.isArray(element.images) && element.images.length >= 12
+      ? element.images.slice(0, 12)
+      : null;
     const prefix = _monthAssetPrefixV3(element);
-    const monthArray: string[] = [];
-    for (let i = 0; i < 12; i++) {
-      monthArray.push(`'${prefix}_${i}.png'`);
-    }
+    const monthArray = explicitMonthArray
+      ? explicitMonthArray.map((img) => `'${img}'`)
+      : Array.from({ length: 12 }, (_, i) => `'${prefix}_${i}.png'`);
     const monthArrayStr = `[${monthArray.join(', ')}]`;
     return `
                 // ${element.name} - IMG_DATE Month Widget
@@ -474,10 +476,11 @@ function generateImgDateWidgetV3(element: WatchFaceElement): string {
                 });`;
   }
 
-  const dayArray: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    dayArray.push(`'date_digit_${i}.png'`);
-  }
+  const raw = element.fontArray ?? element.images;
+  const dayDigits = Array.isArray(raw) && raw.length > 0
+    ? raw
+    : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
+  const dayArray = dayDigits.map((d) => `'${d}'`);
   const dayArrayStr = `[${dayArray.join(', ')}]`;
   return `
                 // ${element.name} - IMG_DATE Widget
@@ -498,11 +501,13 @@ function generateImgDateWidgetV3(element: WatchFaceElement): string {
 function generateImgWeekWidgetV3(element: WatchFaceElement): string {
   const x = element.bounds.x ?? 33;
   const y = element.bounds.y ?? 198;
+  const explicitWeekArray = Array.isArray(element.images) && element.images.length >= 7
+    ? element.images.slice(0, 7)
+    : null;
   const prefix = _weekAssetPrefixV3(element);
-  const weekArray: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    weekArray.push(`'${prefix}_${i}.png'`);
-  }
+  const weekArray = explicitWeekArray
+    ? explicitWeekArray.map((img) => `'${img}'`)
+    : Array.from({ length: 7 }, (_, i) => `'${prefix}_${i}.png'`);
   const weekArrayStr = `[${weekArray.join(', ')}]`;
   return `
                 // ${element.name} - IMG_WEEK Widget

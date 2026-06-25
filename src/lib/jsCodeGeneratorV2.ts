@@ -532,6 +532,12 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
   const refEl = hoursEl ?? minutesEl ?? secondsEl;
   if (!refEl) return '';
 
+  const resolveDigits = (el: WatchFaceElement | undefined): string[] => {
+    const arr = el?.fontArray ?? el?.images;
+    if (Array.isArray(arr) && arr.length > 0) return arr;
+    return Array.from({ length: 10 }, (_, i) => `time_digit_${i}.png`);
+  };
+
   // Hour position: from hoursEl, or fallback
   const hx = hoursEl ? hoursEl.bounds.x : (refEl.bounds.x);
   const hy = hoursEl ? hoursEl.bounds.y : (refEl.bounds.y);
@@ -548,18 +554,18 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
   const sx = secondsEl ? secondsEl.bounds.x : 0;
   const sy = secondsEl ? secondsEl.bounds.y : 0;
 
-  // Use time_digit_N.png naming — must match what assetImageGenerator generates
-  const digitArray = [];
-  for (let i = 0; i < 10; i++) {
-    digitArray.push(`'time_digit_${i}.png'`);
-  }
-  const digitArrayStr = `[${digitArray.join(', ')}]`;
+  const hourDigits = resolveDigits(hoursEl ?? refEl);
+  const minuteDigits = resolveDigits(minutesEl ?? hoursEl ?? refEl);
+  const secondDigits = resolveDigits(secondsEl ?? minutesEl ?? hoursEl ?? refEl);
+  const hourArrayStr = `[${hourDigits.map((d) => `'${d}'`).join(', ')}]`;
+  const minuteArrayStr = `[${minuteDigits.map((d) => `'${d}'`).join(', ')}]`;
+  const secondArrayStr = `[${secondDigits.map((d) => `'${d}'`).join(', ')}]`;
   
   const secondParams = hasSeconds ? `
                     second_zero: 1,
                     second_startX: px(${sx}),
                     second_startY: px(${sy}),
-                    second_array: ${digitArrayStr},
+                    second_array: ${secondArrayStr},
                     second_space: 0,
                     second_align: hmUI.align.LEFT,` : '';
 
@@ -569,13 +575,13 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
                     hour_zero: 1,
                     hour_startX: px(${hx}),
                     hour_startY: px(${hy}),
-                    hour_array: ${digitArrayStr},
+                  hour_array: ${hourArrayStr},
                     hour_space: 0,
                     hour_align: hmUI.align.LEFT,
                     minute_zero: 1,
                     minute_startX: px(${mx}),
                     minute_startY: px(${my}),
-                    minute_array: ${digitArrayStr},
+                  minute_array: ${minuteArrayStr},
                     minute_space: 0,
                     minute_align: hmUI.align.LEFT,
                     minute_follow: 0,${secondParams}
@@ -587,13 +593,12 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
 function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 92;
   const y = element.bounds.y || 198;
-  
-  // Use date_digit_N.png naming — must match what mockKimiAnalysis generates
-  const digitArray = [];
-  for (let i = 0; i < 10; i++) {
-    digitArray.push(`'date_digit_${i}.png'`);
-  }
-  const digitArrayStr = `[${digitArray.join(', ')}]`;
+
+  const raw = element.fontArray ?? element.images;
+  const dayDigits = Array.isArray(raw) && raw.length > 0
+    ? raw
+    : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
+  const digitArrayStr = `[${dayDigits.map((d) => `'${d}'`).join(', ')}]`;
   
   return `
                 // ${element.name} - IMG_DATE Widget
@@ -616,13 +621,13 @@ function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, s
 function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 105;
   const y = element.bounds.y || 198;
+  const explicitMonthArray = Array.isArray(element.images) && element.images.length >= 12
+    ? element.images.slice(0, 12)
+    : null;
   const prefix = _monthAssetPrefix(element);
-  
-  // Use month_N.png naming — 12 images for Jan-Dec (0-indexed)
-  const monthArray = [];
-  for (let i = 0; i < 12; i++) {
-    monthArray.push(`'${prefix}_${i}.png'`);
-  }
+  const monthArray = explicitMonthArray
+    ? explicitMonthArray.map((img) => `'${img}'`)
+    : Array.from({ length: 12 }, (_, i) => `'${prefix}_${i}.png'`);
   const monthArrayStr = `[${monthArray.join(', ')}]`;
   
   return `
@@ -645,13 +650,13 @@ function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, 
 function generateIMGWeekWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 33;
   const y = element.bounds.y || 198;
+  const explicitWeekArray = Array.isArray(element.images) && element.images.length >= 7
+    ? element.images.slice(0, 7)
+    : null;
   const prefix = _weekAssetPrefix(element);
-  
-  // Use week_N.png naming — must match what mockKimiAnalysis generates
-  const weekArray = [];
-  for (let i = 0; i < 7; i++) {
-    weekArray.push(`'${prefix}_${i}.png'`);
-  }
+  const weekArray = explicitWeekArray
+    ? explicitWeekArray.map((img) => `'${img}'`)
+    : Array.from({ length: 7 }, (_, i) => `'${prefix}_${i}.png'`);
   const weekArrayStr = `[${weekArray.join(', ')}]`;
   
   return `

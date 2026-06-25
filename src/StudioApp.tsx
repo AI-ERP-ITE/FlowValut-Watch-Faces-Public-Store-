@@ -1342,8 +1342,13 @@ async function preparePointerGeometryForExport(
  */
 function regenerateDigitFilesFromElements(
   elements: WatchFaceElement[],
-): { filename: string; dataUrl: string }[] {
+  scope: 'main' | 'aod',
+): {
+  files: { filename: string; dataUrl: string }[];
+  elementUpdates: Map<string, Partial<WatchFaceElement>>;
+} {
   const results: { filename: string; dataUrl: string }[] = [];
+  const elementUpdates = new Map<string, Partial<WatchFaceElement>>();
 
   function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
     // Pre-measure the widest digit (0-9) in this font so all digit images share the
@@ -1401,19 +1406,28 @@ function regenerateDigitFilesFromElements(
     const fontEntry = el.fontStyle ? FONT_STYLES.find(f => f.key === el.fontStyle) : undefined;
     const fontFamily = fontEntry?.fontFamily ?? 'Arial';
     const fontWeight = fontEntry?.fontWeight ?? 'bold';
+    const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
 
     if (el.type === 'IMG_TIME') {
       const w = Math.max(Math.floor((el.bounds.width || 60) / 2), 12);
       const h = Math.max(el.bounds.height || 50, 16);
+      const scopedDigits: string[] = [];
       for (let i = 0; i < 10; i++) {
-        results.push({ filename: `time_digit_${i}.png`, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+        const filename = `time_digit_${scope}_${safeId}_${i}.png`;
+        scopedDigits.push(filename);
+        results.push({ filename, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
       }
+      elementUpdates.set(el.id, { fontArray: scopedDigits });
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const w = Math.max(Math.floor((el.bounds.width || 40) / 2), 8);
       const h = Math.max(el.bounds.height || 30, 12);
+      const scopedDigits: string[] = [];
       for (let i = 0; i < 10; i++) {
-        results.push({ filename: `date_digit_${i}.png`, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+        const filename = `date_digit_${scope}_${safeId}_${i}.png`;
+        scopedDigits.push(filename);
+        results.push({ filename, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
       }
+      elementUpdates.set(el.id, { fontArray: scopedDigits });
     } else if (el.type === 'IMG_WEEK') {
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -1422,11 +1436,14 @@ function regenerateDigitFilesFromElements(
       const days = fmt === 'full' ? WEEK_FULL : fmt === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
       const h = Math.max(el.bounds.height || 20, 12);
-      const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const prefix = `week_${safeId}`;
+      const prefix = `week_${scope}_${safeId}`;
+      const scopedWeekImages: string[] = [];
       for (let i = 0; i < 7; i++) {
-        results.push({ filename: `${prefix}_${i}.png`, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
+        const filename = `${prefix}_${i}.png`;
+        scopedWeekImages.push(filename);
+        results.push({ filename, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
       }
+      elementUpdates.set(el.id, { images: scopedWeekImages });
     } else if (el.type === 'IMG_DATE' && el.subtype === 'month') {
       const MONTH_FULL    = ['January','February','March','April','May','June','July','August','September','October','November','December'];
       const MONTH_SHORT   = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
@@ -1435,24 +1452,31 @@ function regenerateDigitFilesFromElements(
       const monthNames = mfmt === 'full' ? MONTH_FULL : mfmt === 'initial' ? MONTH_INITIAL : MONTH_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
       const h = Math.max(el.bounds.height || 20, 12);
-      const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const prefix = `month_${safeId}`;
+      const prefix = `month_${scope}_${safeId}`;
+      const scopedMonthImages: string[] = [];
       for (let i = 0; i < 12; i++) {
-        results.push({ filename: `${prefix}_${i}.png`, dataUrl: makeLabelCanvas(monthNames[i], color, fontFamily, fontWeight, w, h) });
+        const filename = `${prefix}_${i}.png`;
+        scopedMonthImages.push(filename);
+        results.push({ filename, dataUrl: makeLabelCanvas(monthNames[i], color, fontFamily, fontWeight, w, h) });
       }
+      elementUpdates.set(el.id, { images: scopedMonthImages });
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
       const prefix = getTextImgPrefixForDataType(el.dataType);
       if (prefix) {
         const w = Math.max(Math.floor((el.bounds.width || 64) / 4), 8);
         const h = Math.max(el.bounds.height || 25, 12);
+        const scopedDigits: string[] = [];
         for (let i = 0; i < 10; i++) {
-          results.push({ filename: `${prefix}_${i}.png`, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+          const filename = `${prefix}_${scope}_${safeId}_${i}.png`;
+          scopedDigits.push(filename);
+          results.push({ filename, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
         }
+        elementUpdates.set(el.id, { fontArray: scopedDigits });
       }
     }
   }
 
-  return results;
+  return { files: results, elementUpdates };
 }
 
 // ─── Drop-shadow PNG baking helpers ─────────────────────────────────────────
@@ -3125,7 +3149,12 @@ function StudioApp() {
         const config: WatchFaceConfig = parsed.watchFaceConfig ?? parsed;
         const bgImage: string | null = parsed.backgroundImage ?? null;
         if (!config || !config.elements) throw new Error('Invalid project file');
-        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects(config)));
+        const requestedName = watchFaceName?.trim();
+        const effectiveName = requestedName || config.name || file.name;
+        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects({
+          ...config,
+          name: effectiveName,
+        })));
         if (bgImage) {
           dispatch(actions.setBackgroundImage(bgImage));
           // Build a backgroundFile so ZPK export works if user re-exports
@@ -3136,13 +3165,13 @@ function StudioApp() {
           } catch { /* non-critical */ }
         }
         dispatch(actions.setStep('preview'));
-        toast.success(`Project loaded: ${config.name || file.name}`);
+        toast.success(`Project loaded: ${effectiveName}`);
       } catch (e) {
         toast.error('Failed to load project file. Make sure it is a valid .fvwf file.');
       }
     };
     input.click();
-  }, [dispatch]);
+  }, [dispatch, watchFaceName]);
 
   // Load widgets-only from a .fvwf file — keeps current background image intact
   const handleLoadWidgetsOnly = useCallback(() => {
@@ -3362,7 +3391,11 @@ function StudioApp() {
 
       // Regenerate digit images with current element colors + font styles.
       // This replaces any stale images from initial generation so UI choices reach the device.
-      const freshDigits = regenerateDigitFilesFromElements(allEditorElements);
+      const mainDigitAssets = regenerateDigitFilesFromElements(mainEditorElements, 'main');
+      const aodDigitAssets = aodEditorElements
+        ? regenerateDigitFilesFromElements(aodEditorElements, 'aod')
+        : { files: [], elementUpdates: new Map<string, Partial<WatchFaceElement>>() };
+      const freshDigits = [...mainDigitAssets.files, ...aodDigitAssets.files];
       for (const { filename, dataUrl } of freshDigits) {
         const { bytes } = decodeDataUrlToBytes(dataUrl, `Digit image ${filename}`);
         const existing = elementFiles.findIndex(f => f.src === filename);
@@ -3374,6 +3407,8 @@ function StudioApp() {
 
       // Resolve all IMG_LEVEL assets (weather and non-weather use the same loop).
       // Weather elements carry data: URLs in el.images (set at creation / style change).
+      const aodEditorElementSet = new Set(aodEditorElements ?? []);
+      const scopedElementKey = (scope: 'main' | 'aod', id: string) => `${scope}:${id}`;
       const resolvedImgLevelFrames = new Map<string, string[]>();
       for (const el of allEditorElements) {
         if (el.type !== 'IMG_LEVEL') continue;
@@ -3384,9 +3419,10 @@ function StudioApp() {
         const explicitCount = el.imageSwitcherFrameCount
           ?? (configuredFrames.length > 0 ? configuredFrames.length : undefined);
         const policy = resolveImageSwitcherFrameCount(el.dataType, { explicitCount });
+        const elementScope: 'main' | 'aod' = aodEditorElementSet.has(el) ? 'aod' : 'main';
 
         if (policy.expectedCount === null) {
-          resolvedImgLevelFrames.set(el.id, configuredFrames);
+          resolvedImgLevelFrames.set(scopedElementKey(elementScope, el.id), configuredFrames);
           continue;
         }
 
@@ -3448,7 +3484,7 @@ function StudioApp() {
           elementFiles.push({ src: frameName, file: new File([bytes], frameName, { type: 'image/png' }) });
         }
 
-        resolvedImgLevelFrames.set(el.id, normalizedFrames);
+        resolvedImgLevelFrames.set(scopedElementKey(elementScope, el.id), normalizedFrames);
       }
 
       // Pre-warm Tabler icon cache so getIconByKey works synchronously for tabler:* keys
@@ -3590,29 +3626,42 @@ function StudioApp() {
         ...(el.secondPos ? { secondPos: { ...el.secondPos } } : {}),
       }));
 
-      const exportElements = prepareExportElements(mainEditorElements);
-      const exportAodElements = aodEditorElements ? prepareExportElements(aodEditorElements) : null;
+      const applyElementUpdates = (
+        inputElements: WatchFaceElement[],
+        updates: Map<string, Partial<WatchFaceElement>>,
+      ): WatchFaceElement[] => inputElements.map((el) => {
+        const patch = updates.get(el.id);
+        return patch ? { ...el, ...patch } : el;
+      });
+
+      const exportElements = applyElementUpdates(
+        prepareExportElements(mainEditorElements),
+        mainDigitAssets.elementUpdates,
+      );
+      const exportAodElements = aodEditorElements
+        ? applyElementUpdates(prepareExportElements(aodEditorElements), aodDigitAssets.elementUpdates)
+        : null;
       const exportCombinedElements = exportAodElements ? [...exportElements, ...exportAodElements] : exportElements;
       for (const el of exportElements) {
         if (el.type === 'IMG_LEVEL') {
-          const resolvedFrames = resolvedImgLevelFrames.get(el.id);
+          const resolvedFrames = resolvedImgLevelFrames.get(scopedElementKey('main', el.id));
           if (resolvedFrames) {
             el.images = [...resolvedFrames];
           }
         }
-        if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT') {
+        if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT' && (!el.fontArray || el.fontArray.length === 0)) {
           el.fontArray = weatherTempDigitFilenames();
         }
       }
       if (exportAodElements) {
         for (const el of exportAodElements) {
           if (el.type === 'IMG_LEVEL') {
-            const resolvedFrames = resolvedImgLevelFrames.get(el.id);
+            const resolvedFrames = resolvedImgLevelFrames.get(scopedElementKey('aod', el.id));
             if (resolvedFrames) {
               el.images = [...resolvedFrames];
             }
           }
-          if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT') {
+          if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT' && (!el.fontArray || el.fontArray.length === 0)) {
             el.fontArray = weatherTempDigitFilenames();
           }
         }
@@ -3730,11 +3779,22 @@ function StudioApp() {
         }
       }
 
-      // Inject clock hand images for TIME_POINTER elements
-      // Always regenerate from current handStyle so the actual selected style is baked in.
-      const timePointerEl = exportCombinedElements.find(el => el.type === 'TIME_POINTER');
+      // Inject clock hand images for TIME_POINTER elements.
+      // Each MAIN/AOD pointer gets its own scoped asset filenames.
       const missingPointerAssets: string[] = [];
-      if (timePointerEl) {
+      const aodExportElementSet = new Set(exportAodElements ?? []);
+      const timePointerElements = exportCombinedElements.filter((el) => el.type === 'TIME_POINTER');
+
+      for (const timePointerEl of timePointerElements) {
+        const pointerScope: 'main' | 'aod' = aodExportElementSet.has(timePointerEl) ? 'aod' : 'main';
+        const safePointerId = timePointerEl.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const scopedNames = {
+          hour: `hour_hand_${pointerScope}_${safePointerId}.png`,
+          minute: `minute_hand_${pointerScope}_${safePointerId}.png`,
+          second: `second_hand_${pointerScope}_${safePointerId}.png`,
+          cover: `hand_cover_${pointerScope}_${safePointerId}.png`,
+        };
+
         if (timePointerEl.handStyle?.startsWith('custom_hand:')) {
           const customHand = await getCustomHandByKey(timePointerEl.handStyle);
           if (customHand) {
@@ -3747,8 +3807,6 @@ function StudioApp() {
             if (typeof customHand.secondPosX === 'number' && typeof customHand.secondPosY === 'number') {
               timePointerEl.secondPos = { x: customHand.secondPosX, y: customHand.secondPosY };
             }
-            // Propagate the SVG-derived hub dimensions so v2/v3 generators emit
-            // the cap at the artwork's true size instead of a fixed 30×30.
             if (typeof customHand.coverWidth === 'number' && customHand.coverWidth > 0) {
               timePointerEl.coverWidth = customHand.coverWidth;
             }
@@ -3760,8 +3818,6 @@ function StudioApp() {
             const sourceMode = resolvedPack?.mode === 'source-based-custom';
             const sourcePivotRatios = sourceMode
               ? {
-                // Prefer IDB-stored pivot coordinates (which already incorporate tip-tail
-                // adjustment) over SVG-parsed ratios that know nothing of the adjustment.
                 hour: (customHand.hourPosX !== undefined && customHand.hourPosY !== undefined)
                   ? { x: customHand.hourPosX / 22, y: customHand.hourPosY / 140 }
                   : parsePivotRatioFromSource(customHand.sourceHourHtml),
@@ -3774,27 +3830,22 @@ function StudioApp() {
                 cover: { x: 0.5, y: 0.5 },
               }
               : null;
-            timePointerEl.coverSrc = coverDataUrl ? 'hand_cover.png' : undefined;
-            timePointerEl.hourHandSrc = 'hour_hand.png';
-            timePointerEl.minuteHandSrc = 'minute_hand.png';
-            timePointerEl.secondHandSrc = 'second_hand.png';
+            timePointerEl.coverSrc = coverDataUrl ? scopedNames.cover : undefined;
+            timePointerEl.hourHandSrc = scopedNames.hour;
+            timePointerEl.minuteHandSrc = scopedNames.minute;
+            timePointerEl.secondHandSrc = scopedNames.second;
+
             const handFiles = [
-              // Always use the pre-baked 22×140 / 16×200 / 8×240 PNG for hand layers.
-              // The IDB hourPosY is in the pre-baked PNG coordinate space (rendered via
-              // renderHandToPngWithPivot with cover-fit + crop). Using the raw SVG source
-              // instead caused a coordinate-space mismatch that made tip-tail adjustments
-              // appear on-screen but have no effect in the exported ZPK.
-              { name: 'hour_hand.png', dataUrl: customHand.hourDataUrl },
-              { name: 'minute_hand.png', dataUrl: customHand.minuteDataUrl },
-              { name: 'second_hand.png', dataUrl: customHand.secondDataUrl },
+              { name: scopedNames.hour, dataUrl: customHand.hourDataUrl },
+              { name: scopedNames.minute, dataUrl: customHand.minuteDataUrl },
+              { name: scopedNames.second, dataUrl: customHand.secondDataUrl },
             ];
-            if (coverDataUrl) {
-              handFiles.push({ name: 'hand_cover.png', dataUrl: coverDataUrl });
-            }
+            if (coverDataUrl) handFiles.push({ name: scopedNames.cover, dataUrl: coverDataUrl });
+
             for (const { name, dataUrl } of handFiles) {
               if (!dataUrl) {
                 console.warn('[App] Missing custom hand layer for export:', name, 'style:', timePointerEl.handStyle);
-                missingPointerAssets.push(`baked-export:${name} (${timePointerEl.handStyle})`);
+                missingPointerAssets.push(`baked-export:${timePointerEl.id}:${name} (${timePointerEl.handStyle})`);
                 continue;
               }
               const layer: PointerLayer = name.startsWith('hour_')
@@ -3804,9 +3855,6 @@ function StudioApp() {
                   : name.startsWith('second_')
                     ? 'second'
                     : 'cover';
-              // For hand layers (hour/minute/second): always null — pivot comes from
-              // IDB hourPos which is already in the pre-baked PNG coordinate space.
-              // Cover keeps source ratio since its pivot is always 0.5/0.5 regardless.
               const ratio = (layer === 'cover' && sourceMode) ? sourcePivotRatios?.cover : null;
               const prepared = await preparePointerGeometryForExport(dataUrl, layer, timePointerEl, customHand, ratio);
               if (layer === 'hour' && prepared.pivot) timePointerEl.hourPos = prepared.pivot;
@@ -3815,25 +3863,24 @@ function StudioApp() {
               const effectedDataUrl = await applyPointerEffectsForZPK(prepared.dataUrl, timePointerEl, layer);
               const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Pointer image ${name}`);
               const newFile = { src: name, file: new File([bytes], name, { type: 'image/png' }) };
-              const idx = elementFiles.findIndex(f => f.src === name);
+              const idx = elementFiles.findIndex((f) => f.src === name);
               if (idx >= 0) elementFiles[idx] = newFile;
               else elementFiles.push(newFile);
             }
-            console.log('[App] Injected custom hand images for style:', timePointerEl.handStyle);
+            console.log('[App] Injected custom hand images for style:', timePointerEl.handStyle, 'scope:', pointerScope);
           }
         } else {
-          // Built-in hand style — always regenerate so style changes are reflected
           const hs = (timePointerEl.handStyle ?? 'silver') as HandStyleKey;
-          timePointerEl.hourHandSrc = 'hour_hand.png';
-          timePointerEl.minuteHandSrc = 'minute_hand.png';
-          timePointerEl.secondHandSrc = 'second_hand.png';
-          timePointerEl.coverSrc = 'hand_cover.png';
+          timePointerEl.hourHandSrc = scopedNames.hour;
+          timePointerEl.minuteHandSrc = scopedNames.minute;
+          timePointerEl.secondHandSrc = scopedNames.second;
+          timePointerEl.coverSrc = scopedNames.cover;
           const handSet = generateHandSet(hs);
           const builtInHandFiles = [
-            { name: 'hour_hand.png', dataUrl: handSet.hourHand },
-            { name: 'minute_hand.png', dataUrl: handSet.minuteHand },
-            { name: 'second_hand.png', dataUrl: handSet.secondHand },
-            { name: 'hand_cover.png', dataUrl: handSet.cover },
+            { name: scopedNames.hour, dataUrl: handSet.hourHand },
+            { name: scopedNames.minute, dataUrl: handSet.minuteHand },
+            { name: scopedNames.second, dataUrl: handSet.secondHand },
+            { name: scopedNames.cover, dataUrl: handSet.cover },
           ];
           for (const { name, dataUrl } of builtInHandFiles) {
             const layer: PointerLayer = name.startsWith('hour_')
@@ -3850,11 +3897,11 @@ function StudioApp() {
             const effectedDataUrl = await applyPointerEffectsForZPK(prepared.dataUrl, timePointerEl, layer);
             const { bytes } = decodeDataUrlToBytes(effectedDataUrl, `Pointer image ${name}`);
             const newFile = { src: name, file: new File([bytes], name, { type: 'image/png' }) };
-            const idx = elementFiles.findIndex(f => f.src === name);
+            const idx = elementFiles.findIndex((f) => f.src === name);
             if (idx >= 0) elementFiles[idx] = newFile;
             else elementFiles.push(newFile);
           }
-          console.log('[App] Regenerated built-in hand images for style:', hs);
+          console.log('[App] Regenerated built-in hand images for style:', hs, 'scope:', pointerScope);
         }
 
         const pointerAssetRefs = [
@@ -3866,8 +3913,8 @@ function StudioApp() {
         const exportedAssetNames = new Set(elementFiles.map((f) => f.src));
         const missingReferencedAssets = pointerAssetRefs.filter((src) => !exportedAssetNames.has(src));
         if (missingReferencedAssets.length > 0) {
-          missingPointerAssets.push(...missingReferencedAssets.map((src) => `reference-missing:${src}`));
-          throw new Error(`TIME_POINTER assets missing before build: ${missingReferencedAssets.join(', ')}`);
+          missingPointerAssets.push(...missingReferencedAssets.map((src) => `reference-missing:${timePointerEl.id}:${src}`));
+          throw new Error(`TIME_POINTER assets missing before build (${timePointerEl.id}): ${missingReferencedAssets.join(', ')}`);
         }
       }
       pointerParityMissingAssetsRef.current = missingPointerAssets;
@@ -4095,7 +4142,7 @@ function StudioApp() {
                 <Label className="text-sm text-zinc-300">Watch Face Name (optional)</Label>
                 <Input
                   value={watchFaceName}
-                  onChange={(e) => setWatchFaceName(e.target.value.trim())}
+                  onChange={(e) => setWatchFaceName(e.target.value)}
                   placeholder="My Custom Watch Face"
                   className="bg-[#0F0F0F] border-zinc-700 text-white placeholder:text-zinc-600"
                 />
