@@ -22,39 +22,10 @@ export interface ZPKBuildResult {
 export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult> {
   console.log('[ZPK] Starting...');
   const { config, backgroundFile, aodBackgroundFile } = options;
-  const BUILD_LOG: { step: string; status: string; detail?: string; error?: string }[] = [];
-  
-  const logStep = (step: string, status: 'OK' | 'WARN' | 'ERROR', detail?: string, error?: unknown) => {
-    const entry = { step, status, detail, error: error ? String(error) : undefined };
-    BUILD_LOG.push(entry);
-    const level = status === 'ERROR' ? 'error' : status === 'WARN' ? 'warn' : 'log';
-    console[level](`[ZPK] ${step}: ${status}`, detail, error);
-  };
-  
-  // Helper: validate blob before packing
-  const validateBlob = (blob: Blob | File, name: string): boolean => {
-    if (!blob || blob.size === 0) {
-      logStep(`validate-blob-${name}`, 'ERROR', `Blob is null or empty (size=${blob?.size ?? 'null'})`);
-      return false;
-    }
-    if (blob.type && !blob.type.startsWith('image/') && blob.type !== 'application/zip') {
-      logStep(`validate-blob-${name}`, 'WARN', `Unexpected mime type: ${blob.type}`);
-    }
-    logStep(`validate-blob-${name}`, 'OK', `Size: ${blob.size} bytes`);
-    return true;
-  };
   
   try {
     // Build a set of asset filenames from elementFiles for restoring data URLs
     const assetFilenames = new Set(options.elementFiles.map(ef => ef.src));
-    logStep('input-validation', 'OK', `Elements: ${options.elementFiles.length}, PreviewDataUrl: ${!!options.previewDataUrl}`);
-    
-    if (!validateBlob(backgroundFile, 'background')) {
-      throw new Error('Background file invalid or empty');
-    }
-    if (aodBackgroundFile && !validateBlob(aodBackgroundFile, 'aodBackground')) {
-      logStep('aod-background-validation', 'WARN', 'AOD background provided but invalid, will skip');
-    }
     
     // Elements may have data URLs (from preview rendering) instead of filenames.
     // Prefer assetFilename (set by pipeline), fall back to name-based guessing.
@@ -83,10 +54,8 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     
     const fixedConfig = { ...config, elements: fixedElements, aodElements: fixedAodElements };
     
-    logStep('code-generation-start', 'OK');
     console.log('[ZPK] Step 1: Generating JS code...');
     const code = generateWatchFaceCode(fixedConfig);
-    logStep('code-generation-end', 'OK', `app.json: ${code.appJson.length} bytes`);
     console.log('[ZPK] Step 2: JS code generated, app.json length:', code.appJson.length);
     // Extract appId from device app.json to reuse in app-side (must match)
     const parsedDeviceJson = JSON.parse(code.appJson);
@@ -136,36 +105,18 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
 
     let anteprimaFile: Blob;
     const thumbSrc = options.previewDataUrl ?? await fileToDataUrl(backgroundFile);
-    logStep('thumbnail-source-ready', 'OK', `Using ${options.previewDataUrl ? 'preview' : 'background'} as thumb source`);
-    
     try {
       anteprimaFile = await resizeToThumb(thumbSrc);
-      if (!validateBlob(anteprimaFile, 'anteprima')) {
-        throw new Error('Resized thumbnail is invalid or empty');
-      }
-      // Log first 12 bytes as hex (PNG magic: 89 50 4E 47 0D 0A 1A 0A)
-      const arr = new Uint8Array(await anteprimaFile.slice(0, 12).arrayBuffer());
-      const hexStart = Array.from(arr).map(x => x.toString(16).padStart(2, '0')).join(' ');
-      logStep('thumbnail-resize-ok', 'OK', `${thumbSize.w}×${thumbSize.h}, size: ${anteprimaFile.size}, header: ${hexStart}`);
       console.log('[ZPK] anteprima.png created:', thumbSize.w, 'x', thumbSize.h, 'blob size:', anteprimaFile.size);
     } catch (e) {
-      logStep('thumbnail-resize-fail', 'WARN', `First attempt failed: ${String(e)}`);
       console.warn('[ZPK] Thumbnail resize failed, trying background fallback:', e);
       try {
         const bgDataUrl = await fileToDataUrl(backgroundFile);
         anteprimaFile = await resizeToThumb(bgDataUrl);
-        if (!validateBlob(anteprimaFile, 'anteprima-fallback')) {
-          throw new Error('Fallback thumbnail is invalid or empty');
-        }
-        logStep('thumbnail-fallback-ok', 'OK', `Fallback: ${anteprimaFile.size} bytes`);
         console.log('[ZPK] anteprima.png fallback created:', anteprimaFile.size);
       } catch (e2) {
-        logStep('thumbnail-fallback-fail', 'ERROR', `All resize attempts failed: ${String(e2)}, using raw background`);
         console.warn('[ZPK] All thumbnail attempts failed, packing raw background:', e2);
         anteprimaFile = backgroundFile;
-        if (!validateBlob(anteprimaFile, 'anteprima-raw')) {
-          throw new Error('Raw background fallback is invalid or empty');
-        }
       }
     }
     deviceZip.file('anteprima.png', anteprimaFile);
@@ -174,11 +125,9 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     
     console.log('[ZPK] Step 5: Adding app.js...');
     deviceZip.file('app.js', code.appJs);
-    logStep('device-appjs-added', 'OK', `${code.appJs.length} bytes`);
     
     console.log('[ZPK] Step 6: Adding watchface/index.js...');
     deviceZip.file('watchface/index.js', code.watchfaceIndexJs);
-    logStep('device-watchface-added', 'OK', `${code.watchfaceIndexJs.length} bytes`);
     
     // Add assets folder with images
     console.log('[ZPK] Step 7: Creating assets folder...');
@@ -287,38 +236,18 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
         if (outerAppJson.i18n[lang]) outerAppJson.i18n[lang].icon = 'icon.png';
       }
     }
-    
-    const outerAppJsonStr = JSON.stringify(outerAppJson, null, 2);
-    zpkZip.file('app.json', outerAppJsonStr);
-    logStep('outer-appjson-added', 'OK', `${outerAppJsonStr.length} bytes, icon: ${outerAppJson.app.icon}, cover: ${outerAppJson.app.cover}`);
-    
+    zpkZip.file('app.json', JSON.stringify(outerAppJson, null, 2));
     zpkZip.file('anteprima.png', anteprimaFile);
     zpkZip.file('icon.png', anteprimaFile);
     zpkZip.file('preview_en.png', anteprimaFile);
-    logStep('outer-thumbnails-added', 'OK', `anteprima.png, icon.png, preview_en.png (${anteprimaFile.size} bytes each)`);
-    
     zpkZip.file('device.zip', deviceBlob);
     zpkZip.file('app-side.zip', appSideBlob);
-    logStep('outer-archives-added', 'OK', `device.zip: ${deviceBlob.size}, app-side.zip: ${appSideBlob.size}`);
     
     console.log('[ZPK] Step 16: Generating final ZPK blob...');
     const zpkBlob = await zpkZip.generateAsync({ 
       type: 'blob',
       compression: 'STORE'
     });
-    logStep('zpk-generated', 'OK', `Final size: ${zpkBlob.size} bytes`);
-    
-    if (!validateBlob(zpkBlob, 'final-zpk')) {
-      throw new Error('Final ZPK blob is invalid or empty');
-    }
-    
-    // Log complete build manifest
-    console.log('[ZPK] ═══════════════════════════════════════');
-    console.log('[ZPK] BUILD MANIFEST:');
-    for (const entry of BUILD_LOG) {
-      console.log(`  [${entry.status}] ${entry.step}: ${entry.detail ?? ''}${entry.error ? ` | ${entry.error}` : ''}`);
-    }
-    console.log('[ZPK] ═══════════════════════════════════════');
     console.log('[ZPK] Complete! Size:', zpkBlob.size);
     
     return {
@@ -327,14 +256,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       size: zpkBlob.size,
     };
   } catch (error) {
-    console.error('[ZPK] ═══════════════════════════════════════');
-    console.error('[ZPK] BUILD FAILED');
-    console.error('[ZPK] Error:', error);
-    console.error('[ZPK] Log history:');
-    for (const entry of BUILD_LOG) {
-      console.error(`  [${entry.status}] ${entry.step}: ${entry.detail ?? ''}${entry.error ? ` | ${entry.error}` : ''}`);
-    }
-    console.error('[ZPK] ═══════════════════════════════════════');
+    console.error('[ZPK] Error in buildZPK:', error);
     throw error;
   }
 }
