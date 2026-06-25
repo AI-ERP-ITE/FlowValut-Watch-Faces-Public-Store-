@@ -3162,14 +3162,20 @@ function StudioApp() {
         const patchedElements = config.elements.map((el: WatchFaceElement) =>
           el.name === 'Background' && currentBg ? { ...el, src: currentBg } : el
         );
-        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects({ ...config, elements: patchedElements })));
+        const requestedName = watchFaceName?.trim();
+        const effectiveName = requestedName || config.name || file.name;
+        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects({
+          ...config,
+          name: effectiveName,
+          elements: patchedElements,
+        })));
         toast.success(`Widgets loaded: ${file.name}`);
       } catch {
         toast.error('Failed to load project file. Make sure it is a valid .fvwf file.');
       }
     };
     input.click();
-  }, [dispatch, state.backgroundImage]);
+  }, [dispatch, state.backgroundImage, watchFaceName]);
 
   // Handle regenerate ZPK (local download, no GitHub upload)
   // Handle generate ZPK
