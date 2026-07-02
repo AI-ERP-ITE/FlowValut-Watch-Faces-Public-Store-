@@ -134,6 +134,8 @@ export interface WatchFaceElement {
   // ── Hand scaling ──────────────────────────────────────────────────────────
   // "Scale Whole" mode: one multiplier for all hands (length only)
   handLengthScale?: number;   // 0.5–2.0, default 1.0
+  // Hub uses one scalar so width/height stay locked together.
+  handHubScale?: number;      // 0.5–2.0, default 1.0
   // "Scale Each" mode: per-hand length + width multipliers
   handHourLength?: number;    // 0.5–2.0
   handHourWidth?: number;     // 0.5–2.0

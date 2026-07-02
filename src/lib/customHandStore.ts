@@ -725,6 +725,7 @@ function findOpaqueBounds(canvas: HTMLCanvasElement): { minX: number; minY: numb
   if (!ctx) return null;
   const { width, height } = canvas;
   const data = ctx.getImageData(0, 0, width, height).data;
+  const visibleAlphaThreshold = 2;
   let minX = width;
   let minY = height;
   let maxX = -1;
@@ -732,7 +733,7 @@ function findOpaqueBounds(canvas: HTMLCanvasElement): { minX: number; minY: numb
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const alpha = data[(y * width + x) * 4 + 3];
-      if (alpha > 8) {
+      if (alpha > visibleAlphaThreshold) {
         if (x < minX) minX = x;
         if (y < minY) minY = y;
         if (x > maxX) maxX = x;
@@ -1078,6 +1079,7 @@ function renderHubToContainPng(code: string, size: number): Promise<string> {
       sampleCtx.clearRect(0, 0, sampleW, sampleH);
       sampleCtx.drawImage(img, 0, 0, sampleW, sampleH);
       const data = sampleCtx.getImageData(0, 0, sampleW, sampleH).data;
+      const visibleAlphaThreshold = 2;
 
       let minX = sampleW;
       let minY = sampleH;
@@ -1086,7 +1088,7 @@ function renderHubToContainPng(code: string, size: number): Promise<string> {
       for (let y = 0; y < sampleH; y++) {
         for (let x = 0; x < sampleW; x++) {
           const alpha = data[(y * sampleW + x) * 4 + 3];
-          if (alpha > 8) {
+          if (alpha > visibleAlphaThreshold) {
             if (x < minX) minX = x;
             if (y < minY) minY = y;
             if (x > maxX) maxX = x;

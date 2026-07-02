@@ -935,8 +935,11 @@ function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: numbe
     const minuteSrc = toHandPath(element.minuteHandSrc || 'minute_hand.png')!;
     const secondSrc = toHandPath(element.secondHandSrc || 'second_hand.png')!;
     const coverSrc = toHandPath(element.coverSrc);
-  const coverW = (element.coverWidth && element.coverWidth > 0) ? element.coverWidth : 30;
-  const coverH = (element.coverHeight && element.coverHeight > 0) ? element.coverHeight : 30;
+  const coverBaseW = (element.coverWidth && element.coverWidth > 0) ? element.coverWidth : 30;
+  const coverBaseH = (element.coverHeight && element.coverHeight > 0) ? element.coverHeight : 30;
+  const coverScale = (element.handHubScale ?? 1) * (element.handLengthScale ?? 1);
+  const coverW = Math.max(1, Math.round(coverBaseW * coverScale));
+  const coverH = Math.max(1, Math.round(coverBaseH * coverScale));
   const hasSeconds = !element.hideSeconds;
 
   const secondParams = hasSeconds ? `

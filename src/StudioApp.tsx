@@ -301,6 +301,7 @@ async function mockKimiAnalysis(
       hourPos: { x: 11, y: 118 },
       minutePos: { x: 8, y: 172 },
       secondPos: { x: 4, y: 180 },
+      handHubScale: 1,
       visible: true,
       zIndex: 15,
     },
@@ -1242,20 +1243,21 @@ async function preparePointerGeometryForExport(
   const base = POINTER_BASE_METRICS[layer];
 
   const globalLen = el.handLengthScale ?? 1;
+  const hubScale = (el.handHubScale ?? 1) * globalLen;
   const len = layer === 'hour'
     ? (el.handHourLength ?? globalLen)
     : layer === 'minute'
       ? (el.handMinuteLength ?? globalLen)
       : layer === 'second'
         ? (el.handSecondLength ?? globalLen)
-        : 1;
+        : hubScale;
   const wid = layer === 'hour'
     ? (el.handHourWidth ?? 1)
     : layer === 'minute'
       ? (el.handMinuteWidth ?? 1)
       : layer === 'second'
         ? (el.handSecondWidth ?? 1)
-        : 1;
+        : hubScale;
 
   const baseW = sourceMode ? width : base.width;
   const baseH = sourceMode ? height : base.height;
@@ -1288,10 +1290,10 @@ async function preparePointerGeometryForExport(
   // derive these from the SVG natural size); otherwise falls back to 30×30.
   const coverW = (el.coverWidth && el.coverWidth > 0) ? el.coverWidth : POINTER_BASE_METRICS.cover.width;
   const coverH = (el.coverHeight && el.coverHeight > 0) ? el.coverHeight : POINTER_BASE_METRICS.cover.height;
-  const finalTargetW = layer === 'cover' ? coverW : targetW;
-  const finalTargetH = layer === 'cover' ? coverH : targetH;
-  const finalPivotX = layer === 'cover' ? coverW / 2 : drawPivotX;
-  const finalPivotY = layer === 'cover' ? coverH / 2 : drawPivotY;
+  const finalTargetW = layer === 'cover' ? Math.max(1, Math.round(coverW * hubScale)) : targetW;
+  const finalTargetH = layer === 'cover' ? Math.max(1, Math.round(coverH * hubScale)) : targetH;
+  const finalPivotX = layer === 'cover' ? finalTargetW / 2 : drawPivotX;
+  const finalPivotY = layer === 'cover' ? finalTargetH / 2 : drawPivotY;
 
   // Reserve safe margins so baked pointer shadows/glow are not clipped at export time.
   const effectPadRaw = pointerEffectPaddingFromIntensity(el.handShadow ?? 0, el.handGlow ?? 0, el.handTrail ?? 0);

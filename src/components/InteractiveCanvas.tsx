@@ -1862,12 +1862,9 @@ function loadHandImages(
   if (customRecord) {
     const resolved = resolveCustomHandPack(customRecord);
     srcs = {
-      // Always use the pre-baked PNG for hand layers — the IDB hourPosX/Y pivot
-      // is in that coordinate space. Raw SVG source causes a coord mismatch that
-      // makes tip-tail adjustments invisible in the preview.
-      hour: customRecord.hourDataUrl ?? null,
-      minute: customRecord.minuteDataUrl ?? null,
-      second: customRecord.secondDataUrl ?? null,
+      hour: resolved?.sources.hour ?? customRecord.hourDataUrl ?? null,
+      minute: resolved?.sources.minute ?? customRecord.minuteDataUrl ?? null,
+      second: resolved?.sources.second ?? customRecord.secondDataUrl ?? null,
       cover: resolved?.sources.cover ?? customRecord.coverDataUrl ?? null,
     };
   } else {
@@ -1918,19 +1915,39 @@ function drawTimePointer(
 
   const style = el.handStyle ?? 'silver';
   const customRecord = customHands?.find(h => h.key === style);
-  // Always false: preview uses pre-baked PNG + IDB pivot (tip-tail aware coord space).
-  const sourceMode = false;
-  const sourcePivot = null;
+  const hasSourceMarkup = !!(
+    customRecord?.sourceHourHtml
+    || customRecord?.sourceMinuteHtml
+    || customRecord?.sourceSecondHtml
+    || customRecord?.sourceHubHtml
+  );
+  const sourceMode = hasSourceMarkup;
+  const sourcePivot = hasSourceMarkup && customRecord ? {
+    hour: {
+      x: (customRecord.hourPosX ?? 11) / 22,
+      y: (customRecord.hourPosY ?? 118) / 140,
+    },
+    minute: {
+      x: (customRecord.minutePosX ?? 8) / 16,
+      y: (customRecord.minutePosY ?? 172) / 200,
+    },
+    second: {
+      x: (customRecord.secondPosX ?? 4) / 8,
+      y: (customRecord.secondPosY ?? 180) / 240,
+    },
+    cover: { x: 0.5, y: 0.5 },
+  } : null;
   const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
   // "Scale whole" uses handLengthScale for all; "Scale each" uses per-hand fields
   const globalLen = el.handLengthScale ?? 1.0;
+  const hubScale = (el.handHubScale ?? 1.0) * globalLen;
   const perScale: Record<string, { len: number; wid: number }> = {
     hour:   { len: (el.handHourLength   ?? globalLen), wid: (el.handHourWidth   ?? 1.0) },
     minute: { len: (el.handMinuteLength ?? globalLen), wid: (el.handMinuteWidth ?? 1.0) },
     second: { len: (el.handSecondLength ?? globalLen), wid: (el.handSecondWidth ?? 1.0) },
-    cover:  { len: 1, wid: 1 },
+    cover:  { len: hubScale, wid: hubScale },
   };
 
   // ── Effects ──────────────────────────────────────────────────────────────

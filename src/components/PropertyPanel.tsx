@@ -1462,6 +1462,18 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               className="w-full accent-cyan-400 h-1"
             />
           </div>
+          <div className="space-y-2 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Hub size</span>
+              <span className="text-[10px] text-cyan-400 font-mono w-10 text-right">{(element.handHubScale ?? 1).toFixed(2)}×</span>
+            </div>
+            <input
+              type="range" min="0.5" max="3.0" step="0.05"
+              value={element.handHubScale ?? 1}
+              onChange={e => update({ handHubScale: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
           {/* Scale each */}
           <details className="mt-2">
             <summary className="text-[10px] text-white/40 cursor-pointer hover:text-white/70 select-none">Scale each hand individually ▸</summary>
