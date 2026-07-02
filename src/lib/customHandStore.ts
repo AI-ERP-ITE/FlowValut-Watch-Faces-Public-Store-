@@ -21,9 +21,14 @@ export interface CustomHandRecord {
   // High-res preview PNGs (4× the ZPK size) — canvas preview only, NOT used in ZPK export.
   // Present only on records saved after this field was added. Old records fall back to
   // the standard hourDataUrl etc. for preview, which is lower quality but still correct.
-  hourPreviewDataUrl?: string;   // 88×560 PNG — drawn at 22×140 in canvas → sharp downscale
-  minutePreviewDataUrl?: string; // 64×800 PNG — drawn at 16×200 in canvas
-  secondPreviewDataUrl?: string; // 32×960 PNG — drawn at 8×240 in canvas
+  // SVG-viewBox-space pivot ratios (0=tip/top, 1=tail/bottom) — saved at compose time.
+  // These are the composerAxis values: they represent the fraction of the SVG natural
+  // height where the rotation point sits, independent of any bake coordinate space.
+  // Used by the canvas SVG-native render path (spec 109) for source-backed hands.
+  // Old records without these fall back to hourPivotNorm (baked-PNG space, approximate).
+  hourSvgPivotNorm?: number;
+  minuteSvgPivotNorm?: number;
+  secondSvgPivotNorm?: number;
   // Baked hub PNG dimensions (derived from source SVG natural size, clamped to safe range).
   // The ZPK exporter and composer preview both read these so the cap reflects the artwork's
   // true aspect/size instead of being locked to a fixed square.
@@ -471,22 +476,13 @@ export async function saveCustomHandStyle(
       renderHubToContainPng(hubSvg, 24),  // swatch: trim transparent bounds before fitting
     ]);
 
-  // Bake high-res preview PNGs (4×) for canvas display quality.
-  // MUST use renderHandToPngWithPivot (not renderToHandPng) so the crop + cover-fit
-  // logic is identical to the ZPK bake. Both pipelines crop to opaque art bounds first,
-  // so the art occupies the same proportional area in both 22×140 and 88×560 outputs.
-  // When the canvas draws the 88×560 PNG at 22×140, the saved pivot (hourPosY in 22×140
-  // space) maps correctly because art positions are 4× scaled but proportionally identical.
-  // These are NEVER written to the ZPK — only used for the studio canvas preview.
-  const [hourPreviewLayer, minutePreviewLayer, secondPreviewLayer] =
-    await Promise.all([
-      renderHandToPngWithPivot(hourSvg, 88, 560, hourPivotSource),
-      renderHandToPngWithPivot(minuteSvg, 64, 800, minutePivotSource),
-      renderHandToPngWithPivot(secondSvg, 32, 960, secondPivotSource),
-    ]);
-  const hourPreviewDataUrl = hourPreviewLayer.dataUrl;
-  const minutePreviewDataUrl = minutePreviewLayer.dataUrl;
-  const secondPreviewDataUrl = secondPreviewLayer.dataUrl;
+  // Capture the SVG-viewBox-space pivot ratio from the pivot source.
+  // hourPivotSource.yRatio = composerAxis value = fraction of SVG natural height.
+  // This is what the canvas SVG-native path needs to place the rotation point correctly
+  // without any bake coordinate space translation.
+  const hourSvgPivotNorm = hourPivotSource?.yRatio;
+  const minuteSvgPivotNorm = minutePivotSource?.yRatio;
+  const secondSvgPivotNorm = secondPivotSource?.yRatio;
 
   const hourPivot = hourLayer.pivot;
   const minutePivot = minuteLayer.pivot;
@@ -586,9 +582,10 @@ export async function saveCustomHandStyle(
     hourDataUrl: hourLayer.dataUrl,
     minuteDataUrl: minuteLayer.dataUrl,
     secondDataUrl: secondLayer.dataUrl,
-    hourPreviewDataUrl,
-    minutePreviewDataUrl,
-    secondPreviewDataUrl,
+    // SVG-viewBox-space pivot ratios for canvas SVG-native render (spec 109)
+    ...(hourSvgPivotNorm !== undefined ? { hourSvgPivotNorm } : {}),
+    ...(minuteSvgPivotNorm !== undefined ? { minuteSvgPivotNorm } : {}),
+    ...(secondSvgPivotNorm !== undefined ? { secondSvgPivotNorm } : {}),
     coverDataUrl,
     coverWidth: hubSize.width,
     coverHeight: hubSize.height,

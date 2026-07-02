@@ -1862,15 +1862,13 @@ function loadHandImages(
   if (customRecord) {
     const resolved = resolveCustomHandPack(customRecord);
     srcs = {
-      // Use pre-baked PNGs for hands — they are already fitted to the correct hand-slot
-      // dimensions (22×140, 16×200, 8×240). Raw SVG data URLs preserve their own aspect
-      // ratio when drawn via ctx.drawImage, which squashes the art into a tiny square
-      // inside the tall hand slot. Baked PNGs avoid that completely.
-      // Prefer the high-res preview PNG (4×) when available — drawn at standard slot size
-      // the browser downsamples it cleanly, preserving ornate detail.
-      hour: customRecord.hourPreviewDataUrl ?? customRecord.hourDataUrl ?? null,
-      minute: customRecord.minutePreviewDataUrl ?? customRecord.minuteDataUrl ?? null,
-      second: customRecord.secondPreviewDataUrl ?? customRecord.secondDataUrl ?? null,
+      // Source-backed custom hands: use the source SVG data URL.
+      // The canvas SVG-native render path (spec 109) draws the SVG at its natural
+      // dimensions × canvas scale, so aspect ratio is always preserved and ornate
+      // detail is not lost. Cover still uses the baked PNG (hub sizing is separate).
+      hour: resolved?.sources.hour ?? customRecord.hourDataUrl ?? null,
+      minute: resolved?.sources.minute ?? customRecord.minuteDataUrl ?? null,
+      second: resolved?.sources.second ?? customRecord.secondDataUrl ?? null,
       cover: resolved?.sources.cover ?? customRecord.coverDataUrl ?? null,
     };
   } else {
@@ -1921,14 +1919,12 @@ function drawTimePointer(
 
   const style = el.handStyle ?? 'silver';
   const customRecord = customHands?.find(h => h.key === style);
-  // sourceMode is intentionally OFF for the canvas preview.
-  // Raw SVG source URLs cannot be drawn via ctx.drawImage at hand-slot dimensions —
-  // SVG preserves aspect ratio, so a square 400×400 SVG in a 22×140 slot renders as
-  // a tiny 22×22 square with 118px empty below it. Baked PNGs (hourDataUrl etc.) are
-  // already fitted correctly. Quality improvement via source markup requires a separate
-  // pre-render step (offscreen canvas at high res) before using it here.
-  const sourceMode = false;
-  const sourcePivot = null;
+  // Spec 109: source-backed custom hands use the SVG-native render path.
+  // The SVG is drawn at its natural dimensions × (canvasH / svgNaturalH) so the
+  // aspect ratio is always correct and full vector detail is preserved at any canvas size.
+  // Built-in styles and the hub/cover always use the baked-PNG path.
+  const hasSourceMarkup = !!(customRecord?.sourceHourHtml || customRecord?.sourceMinuteHtml
+    || customRecord?.sourceSecondHtml || customRecord?.sourceHubHtml);
   const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
@@ -1966,26 +1962,38 @@ function drawTimePointer(
 
       const srcW = Math.max(1, img.naturalWidth || img.width || def.w);
       const srcH = Math.max(1, img.naturalHeight || img.height || def.h);
-      // Always use baked PNG's fixed canvas dimensions for sizing.
-      // The Spec 104 hub-ratio path used SVG natural art sizes (not baked PNG sizes),
-      // causing a coordinate mismatch that rendered hands at wrong dimensions and
-      // corrupted the canvas state for all subsequent hands in the loop.
-      const baseW = def.key === 'cover' ? srcW : def.w;
-      const baseH = def.key === 'cover' ? srcH : def.h;
 
+      let baseW: number;
+      let baseH: number;
       let pivotX: number;
       let pivotY: number;
-      if (sourceMode) {
-        const ratio = sourcePivot?.[def.key] ?? { x: 0.5, y: 0.5 };
-        pivotX = baseW * ratio.x;
-        pivotY = baseH * ratio.y;
+
+      if (hasSourceMarkup && def.key !== 'cover') {
+        // ── SVG-native path (spec 109): scale SVG natural size to canvas height ─────────
+        // SVG already has explicit width/height, so naturalWidth/Height are reliable.
+        // scale = canvasHeight / svgNaturalHeight so the hand fills the canvas vertically.
+        // Both dimensions scale by the same factor → aspect ratio preserved, no squishing.
+        const canvasH = ctx.canvas.height;
+        const svgScale = srcH > 0 ? canvasH / srcH : 1;
+        baseW = srcW * svgScale;
+        baseH = canvasH;  // = srcH × svgScale
+        // Pivot from SVG-viewBox-space norm (composerAxis ratio saved at compose time).
+        // Falls back to hourPivotNorm (baked-PNG-space norm, close enough for SVGs
+        // without large transparent padding) for old records missing svgPivotNorm.
+        const svgPivotNorm = def.key === 'hour'
+          ? (customRecord?.hourSvgPivotNorm ?? customRecord?.hourPivotNorm ?? 0.843)
+          : def.key === 'minute'
+            ? (customRecord?.minuteSvgPivotNorm ?? customRecord?.minutePivotNorm ?? 0.860)
+            : (customRecord?.secondSvgPivotNorm ?? customRecord?.secondPivotNorm ?? 0.750);
+        pivotX = baseW / 2;
+        pivotY = svgPivotNorm * baseH;
       } else {
+        // ── Baked-PNG path: built-in styles and cover ─────────────────────────────────
+        baseW = def.key === 'cover' ? srcW : def.w;
+        baseH = def.key === 'cover' ? srcH : def.h;
         pivotX = def.pivotX;
         pivotY = def.pivotY;
         if (def.key === 'hour') {
-          // customRecord (IDB) pivot always matches its baked PNG coordinate space.
-          // def.pivotX/Y are the correct HAND_DEFS defaults for built-in styles.
-          // el.hourPos is NOT used — it may contain stale initial values (was y:70).
           pivotX = customRecord?.hourPosX ?? def.pivotX;
           pivotY = customRecord?.hourPosY ?? def.pivotY;
         } else if (def.key === 'minute') {
@@ -1995,8 +2003,6 @@ function drawTimePointer(
           pivotX = customRecord?.secondPosX ?? def.pivotX;
           pivotY = customRecord?.secondPosY ?? def.pivotY;
         } else if (def.key === 'cover') {
-          // Cover pivot is always its own center (matches the v2/v3 ZPK overlay
-          // emitter which centers the cap at centerX/centerY).
           pivotX = baseW / 2;
           pivotY = baseH / 2;
         }
