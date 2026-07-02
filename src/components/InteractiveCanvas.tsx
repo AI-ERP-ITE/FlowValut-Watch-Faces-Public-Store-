@@ -1866,9 +1866,11 @@ function loadHandImages(
       // dimensions (22×140, 16×200, 8×240). Raw SVG data URLs preserve their own aspect
       // ratio when drawn via ctx.drawImage, which squashes the art into a tiny square
       // inside the tall hand slot. Baked PNGs avoid that completely.
-      hour: customRecord.hourDataUrl ?? null,
-      minute: customRecord.minuteDataUrl ?? null,
-      second: customRecord.secondDataUrl ?? null,
+      // Prefer the high-res preview PNG (4×) when available — drawn at standard slot size
+      // the browser downsamples it cleanly, preserving ornate detail.
+      hour: customRecord.hourPreviewDataUrl ?? customRecord.hourDataUrl ?? null,
+      minute: customRecord.minutePreviewDataUrl ?? customRecord.minuteDataUrl ?? null,
+      second: customRecord.secondPreviewDataUrl ?? customRecord.secondDataUrl ?? null,
       cover: resolved?.sources.cover ?? customRecord.coverDataUrl ?? null,
     };
   } else {
@@ -2003,9 +2005,10 @@ function drawTimePointer(
       const sc = perScale[def.key];
       const drawW = baseW * sc.wid;
       const drawH = baseH * sc.len;
-      // Pivot position scales with length (pivot is near base)
+      // Pivot position scales with length (pivot is near base).
+      // Cover uses drawH/2 so the hub stays centered on the clock face at any hubScale.
       const drawPivotX = pivotX * sc.wid;
-      const drawPivotY = def.key === 'cover' ? pivotY : (pivotY / baseH) * drawH;
+      const drawPivotY = def.key === 'cover' ? drawH / 2 : (pivotY / baseH) * drawH;
 
       const angle = def.key === 'cover' ? 0 : angles[def.key];
       const bakedBase = hasPointerEffects

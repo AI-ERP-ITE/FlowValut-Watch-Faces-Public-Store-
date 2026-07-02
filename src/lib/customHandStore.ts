@@ -18,6 +18,12 @@ export interface CustomHandRecord {
   secondDataUrl: string; // 8×240 PNG data URL
   coverDataUrl: string;  // Hub PNG data URL — size = baked dimensions below
   swatchDataUrl: string; // 24×24 thumbnail for UI preview
+  // High-res preview PNGs (4× the ZPK size) — canvas preview only, NOT used in ZPK export.
+  // Present only on records saved after this field was added. Old records fall back to
+  // the standard hourDataUrl etc. for preview, which is lower quality but still correct.
+  hourPreviewDataUrl?: string;   // 88×560 PNG — drawn at 22×140 in canvas → sharp downscale
+  minutePreviewDataUrl?: string; // 64×800 PNG — drawn at 16×200 in canvas
+  secondPreviewDataUrl?: string; // 32×960 PNG — drawn at 8×240 in canvas
   // Baked hub PNG dimensions (derived from source SVG natural size, clamped to safe range).
   // The ZPK exporter and composer preview both read these so the cap reflects the artwork's
   // true aspect/size instead of being locked to a fixed square.
@@ -465,6 +471,17 @@ export async function saveCustomHandStyle(
       renderHubToContainPng(hubSvg, 24),  // swatch: trim transparent bounds before fitting
     ]);
 
+  // Bake high-res preview PNGs (4×) for canvas display quality.
+  // The canvas draws these at the normal hand slot size (22×140 etc.), so the browser
+  // downsamples the high-res PNG with proper filtering → much sharper ornate detail.
+  // These are NEVER written to the ZPK — only used for the studio canvas preview.
+  const [hourPreviewDataUrl, minutePreviewDataUrl, secondPreviewDataUrl] =
+    await Promise.all([
+      renderToHandPng(hourSvg, 88, 560),
+      renderToHandPng(minuteSvg, 64, 800),
+      renderToHandPng(secondSvg, 32, 960),
+    ]);
+
   const hourPivot = hourLayer.pivot;
   const minutePivot = minuteLayer.pivot;
   const secondPivot = secondLayer.pivot;
@@ -563,6 +580,9 @@ export async function saveCustomHandStyle(
     hourDataUrl: hourLayer.dataUrl,
     minuteDataUrl: minuteLayer.dataUrl,
     secondDataUrl: secondLayer.dataUrl,
+    hourPreviewDataUrl,
+    minutePreviewDataUrl,
+    secondPreviewDataUrl,
     coverDataUrl,
     coverWidth: hubSize.width,
     coverHeight: hubSize.height,
