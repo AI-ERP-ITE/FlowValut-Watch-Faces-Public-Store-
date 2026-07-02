@@ -472,15 +472,21 @@ export async function saveCustomHandStyle(
     ]);
 
   // Bake high-res preview PNGs (4×) for canvas display quality.
-  // The canvas draws these at the normal hand slot size (22×140 etc.), so the browser
-  // downsamples the high-res PNG with proper filtering → much sharper ornate detail.
+  // MUST use renderHandToPngWithPivot (not renderToHandPng) so the crop + cover-fit
+  // logic is identical to the ZPK bake. Both pipelines crop to opaque art bounds first,
+  // so the art occupies the same proportional area in both 22×140 and 88×560 outputs.
+  // When the canvas draws the 88×560 PNG at 22×140, the saved pivot (hourPosY in 22×140
+  // space) maps correctly because art positions are 4× scaled but proportionally identical.
   // These are NEVER written to the ZPK — only used for the studio canvas preview.
-  const [hourPreviewDataUrl, minutePreviewDataUrl, secondPreviewDataUrl] =
+  const [hourPreviewLayer, minutePreviewLayer, secondPreviewLayer] =
     await Promise.all([
-      renderToHandPng(hourSvg, 88, 560),
-      renderToHandPng(minuteSvg, 64, 800),
-      renderToHandPng(secondSvg, 32, 960),
+      renderHandToPngWithPivot(hourSvg, 88, 560, hourPivotSource),
+      renderHandToPngWithPivot(minuteSvg, 64, 800, minutePivotSource),
+      renderHandToPngWithPivot(secondSvg, 32, 960, secondPivotSource),
     ]);
+  const hourPreviewDataUrl = hourPreviewLayer.dataUrl;
+  const minutePreviewDataUrl = minutePreviewLayer.dataUrl;
+  const secondPreviewDataUrl = secondPreviewLayer.dataUrl;
 
   const hourPivot = hourLayer.pivot;
   const minutePivot = minuteLayer.pivot;
