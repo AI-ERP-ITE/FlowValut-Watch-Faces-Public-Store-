@@ -1862,9 +1862,13 @@ function loadHandImages(
   if (customRecord) {
     const resolved = resolveCustomHandPack(customRecord);
     srcs = {
-      hour: resolved?.sources.hour ?? customRecord.hourDataUrl ?? null,
-      minute: resolved?.sources.minute ?? customRecord.minuteDataUrl ?? null,
-      second: resolved?.sources.second ?? customRecord.secondDataUrl ?? null,
+      // Use pre-baked PNGs for hands — they are already fitted to the correct hand-slot
+      // dimensions (22×140, 16×200, 8×240). Raw SVG data URLs preserve their own aspect
+      // ratio when drawn via ctx.drawImage, which squashes the art into a tiny square
+      // inside the tall hand slot. Baked PNGs avoid that completely.
+      hour: customRecord.hourDataUrl ?? null,
+      minute: customRecord.minuteDataUrl ?? null,
+      second: customRecord.secondDataUrl ?? null,
       cover: resolved?.sources.cover ?? customRecord.coverDataUrl ?? null,
     };
   } else {
@@ -1915,28 +1919,14 @@ function drawTimePointer(
 
   const style = el.handStyle ?? 'silver';
   const customRecord = customHands?.find(h => h.key === style);
-  const hasSourceMarkup = !!(
-    customRecord?.sourceHourHtml
-    || customRecord?.sourceMinuteHtml
-    || customRecord?.sourceSecondHtml
-    || customRecord?.sourceHubHtml
-  );
-  const sourceMode = hasSourceMarkup;
-  const sourcePivot = hasSourceMarkup && customRecord ? {
-    hour: {
-      x: (customRecord.hourPosX ?? 11) / 22,
-      y: (customRecord.hourPosY ?? 118) / 140,
-    },
-    minute: {
-      x: (customRecord.minutePosX ?? 8) / 16,
-      y: (customRecord.minutePosY ?? 172) / 200,
-    },
-    second: {
-      x: (customRecord.secondPosX ?? 4) / 8,
-      y: (customRecord.secondPosY ?? 180) / 240,
-    },
-    cover: { x: 0.5, y: 0.5 },
-  } : null;
+  // sourceMode is intentionally OFF for the canvas preview.
+  // Raw SVG source URLs cannot be drawn via ctx.drawImage at hand-slot dimensions —
+  // SVG preserves aspect ratio, so a square 400×400 SVG in a 22×140 slot renders as
+  // a tiny 22×22 square with 118px empty below it. Baked PNGs (hourDataUrl etc.) are
+  // already fitted correctly. Quality improvement via source markup requires a separate
+  // pre-render step (offscreen canvas at high res) before using it here.
+  const sourceMode = false;
+  const sourcePivot = null;
   const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
