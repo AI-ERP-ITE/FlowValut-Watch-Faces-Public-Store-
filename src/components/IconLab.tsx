@@ -818,6 +818,30 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     onHandsSaved?.();
   };
 
+  const handleLoadHand = (hand: CustomHandRecord) => {
+    if (!hand.sourceHourHtml && !hand.sourceMinuteHtml && !hand.sourceSecondHtml && !hand.sourceHubHtml) {
+      setSaveHandMsg('✗ No source HTML stored for this style — legacy record, cannot load into editor');
+      return;
+    }
+    updateComposerDraft({
+      hourHtml:   hand.sourceHourHtml   ?? '',
+      minuteHtml: hand.sourceMinuteHtml ?? '',
+      secondHtml: hand.sourceSecondHtml ?? '',
+      hubHtml:    hand.sourceHubHtml    ?? '',
+    });
+    setSaveHandName(hand.name);
+    // Restore tip/tail axis from stored SVG-space pivot norms if available.
+    // Falls back to hourPivotNorm (baked-PNG-space norm, close enough).
+    setComposerAxis({
+      hour:   hand.hourSvgPivotNorm   ?? hand.hourPivotNorm   ?? 0.843,
+      minute: hand.minuteSvgPivotNorm ?? hand.minutePivotNorm ?? 0.860,
+      second: hand.secondSvgPivotNorm ?? hand.secondPivotNorm ?? 0.750,
+    });
+    setComposerAxisTouched({ hour: false, minute: false, second: false });
+    setActiveTab('pointers');
+    setSaveHandMsg('✓ Loaded into composer — adjust if needed then Save');
+  };
+
   // ── Font upload ────────────────────────────────────────────────────────────
   const handleFontFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1476,6 +1500,15 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                             />
                           </div>
                           <p className="text-[8px] text-white/40 text-center truncate mt-0.5">{hand.name}</p>
+                          {(hand.sourceHourHtml || hand.sourceHubHtml) && (
+                            <button
+                              onClick={() => handleLoadHand(hand)}
+                              className="absolute -bottom-1 left-1/2 -translate-x-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-emerald-600 rounded-full text-white"
+                              title="Load into composer for editing"
+                            >
+                              <Pencil className="h-2.5 w-2.5" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeleteHand(hand.key)}
                             className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 bg-red-600 rounded-full text-white"
@@ -1697,6 +1730,15 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                               />
                             </div>
                             <p className="text-[8px] text-white/40 text-center truncate mt-0.5">{hand.name}</p>
+                            {(hand.sourceHourHtml || hand.sourceHubHtml) && (
+                              <button
+                                onClick={() => handleLoadHand(hand)}
+                                className="absolute -bottom-1 left-1/2 -translate-x-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-emerald-600 rounded-full text-white"
+                                title="Load into composer for editing"
+                              >
+                                <Pencil className="h-2.5 w-2.5" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleDeleteHand(hand.key)}
                               className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 bg-red-600 rounded-full text-white"
