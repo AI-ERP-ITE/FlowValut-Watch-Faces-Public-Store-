@@ -1969,17 +1969,19 @@ function drawTimePointer(
       let pivotY: number;
 
       if (hasSourceMarkup && def.key !== 'cover') {
-        // ── SVG-native path (spec 109): scale SVG natural size to canvas height ─────────
-        // SVG already has explicit width/height, so naturalWidth/Height are reliable.
-        // scale = canvasHeight / svgNaturalHeight so the hand fills the canvas vertically.
-        // Both dimensions scale by the same factor → aspect ratio preserved, no squishing.
-        const canvasH = ctx.canvas.height;
-        const svgScale = srcH > 0 ? canvasH / srcH : 1;
-        baseW = srcW * svgScale;
-        baseH = canvasH;  // = srcH × svgScale
+        // ── SVG-native path (spec 109): scale by canvas/renderer ratio ───────────────────
+        // The composer preview is fixed at 480×480 (COMPOSER_REFERENCE_SIZE).
+        // Each hand SVG declares its own width/height (e.g. 200×200).
+        // The composer renders at native declared size — no internal scaling.
+        // So: finalSize = declaredSize × (canvasSize / 480)
+        //   canvas=480 → scale=1.0 → renders at declared size (exact match with composer)
+        //   canvas=360 → scale=0.75 → hand shrinks proportionally
+        //   canvas=540 → scale=1.125 → hand grows proportionally
+        const COMPOSER_REFERENCE_SIZE = 480;
+        const scale = ctx.canvas.height / COMPOSER_REFERENCE_SIZE;
+        baseW = srcW * scale;
+        baseH = srcH * scale;
         // Pivot from SVG-viewBox-space norm (composerAxis ratio saved at compose time).
-        // Falls back to hourPivotNorm (baked-PNG-space norm, close enough for SVGs
-        // without large transparent padding) for old records missing svgPivotNorm.
         const svgPivotNorm = def.key === 'hour'
           ? (customRecord?.hourSvgPivotNorm ?? customRecord?.hourPivotNorm ?? 0.843)
           : def.key === 'minute'
