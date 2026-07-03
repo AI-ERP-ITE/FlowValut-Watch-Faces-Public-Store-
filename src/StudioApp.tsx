@@ -2655,10 +2655,13 @@ function StudioApp() {
   const [republishMode, setRepublishMode] = useState<'KEEP_QR' | 'REGENERATE_ALL'>('REGENERATE_ALL');
   const [latestUploadResult, setLatestUploadResult] = useState<StudioUploadResult | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
-  const [watchModels, setWatchModels] = useState<Record<string, { specGroup?: string }>>({});
+const [watchModels, setWatchModels] = useState<Record<string, { name?: string; specGroup?: string }>>({});
 
   // ── Spec 110: Derive canvas geometry from specGroups (placed AFTER state declarations) ──
-  const activeSpecGroupKey = watchModels[watchModel]?.specGroup ?? '';
+  // models.json keys are slugs (e.g. 'active-2-square') but watchModel holds display names
+  // (e.g. 'Active 2 Square'). Search by the name field instead of direct key lookup.
+  const _activeModelEntry = Object.values(watchModels).find(m => m.name === watchModel);
+  const activeSpecGroupKey = _activeModelEntry?.specGroup ?? '';
   const activeSpecGroup = specGroups[activeSpecGroupKey] ?? null;
   const _resolvedResolution = (() => {
     if (!activeSpecGroup?.resolution) return { w: 480, h: 480 };
@@ -3684,7 +3687,9 @@ function StudioApp() {
       }
       // Spec 110: derive configVersion from specGroups.supportedConfigVersions.
       // Models supporting v3 get the modern generator; others fall back to v2 (safe default).
-      const buildSpecGroupKey = watchModels[state.watchFaceConfig.watchModel]?.specGroup ?? '';
+      const buildSpecGroupKey = Object.values(watchModels).find(
+        m => m.name === state.watchFaceConfig?.watchModel
+      )?.specGroup ?? '';
       const buildSpecGroup = specGroups[buildSpecGroupKey];
       const derivedConfigVersion: 'v2' | 'v3' =
         buildSpecGroup?.supportedConfigVersions?.includes('v3') ? 'v3' : 'v2';
@@ -4014,7 +4019,9 @@ function StudioApp() {
 
       // Build source.json for safe future regeneration
       // Derive specGroup from watchModel so adminPatchSpecGroups batch can repair catalog entries.
-      const derivedSpecGroup = watchModels[configForBuild.watchModel]?.specGroup ?? null;
+      const derivedSpecGroup = Object.values(watchModels).find(
+        m => m.name === configForBuild.watchModel
+      )?.specGroup ?? null;
       const sourceJson = buildSourceJson(withNormalizedPointerEffects(configForBuild), derivedSpecGroup);
 
       const uploadResult = await uploadStudioArtifactsToFirebase({
