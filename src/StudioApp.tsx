@@ -1703,14 +1703,14 @@ const HTML_CREATOR_SLOT_OPTIONS: Record<HtmlLibraryTarget, HtmlLibrarySlotOption
   all: [{ value: 'auto', label: 'Auto (All)' }],
 };
 
-function buildSolidBackgroundDataUrl(size: number, color: string): string {
+function buildSolidBackgroundDataUrl(width: number, height: number, color: string): string {
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
   ctx.fillStyle = color;
-  ctx.fillRect(0, 0, size, size);
+  ctx.fillRect(0, 0, width, height);
   return canvas.toDataURL('image/png');
 }
 
@@ -2022,8 +2022,13 @@ function StudioApp() {
     if (editorMode === 'AOD') return aodElements ?? [];
     return state.watchFaceConfig.elements;
   }, [aodElements, editorMode, state.watchFaceConfig]);
-  const activeResolution = state.watchFaceConfig?.resolution?.width ?? 480;
-  const aodSolidBackgroundImage = useMemo(() => buildSolidBackgroundDataUrl(activeResolution, aodSolidColor), [activeResolution, aodSolidColor]);
+  const activeResolutionW = state.watchFaceConfig?.resolution?.width ?? 480;
+  const activeResolutionH = state.watchFaceConfig?.resolution?.height ?? activeResolutionW;
+  const activeResolution = activeResolutionW;
+  const aodSolidBackgroundImage = useMemo(
+    () => buildSolidBackgroundDataUrl(activeResolutionW, activeResolutionH, aodSolidColor),
+    [activeResolutionH, activeResolutionW, aodSolidColor],
+  );
   const activeBackgroundImage = useMemo(() => {
     if (editorMode !== 'AOD' || !aodElements) return state.backgroundImage;
     if (aodBackgroundMode === 'NONE_BLACK') return null;
@@ -2447,8 +2452,10 @@ function StudioApp() {
   const handleAddElement = () => {
     if (!state.watchFaceConfig) return;
     const maxZ = activeElements.reduce((m, e) => Math.max(m, e.zIndex), 0);
-    const canvas = activeResolution;
-    const cx = Math.floor(canvas / 2);
+    const canvasW = activeResolutionW;
+    const canvasH = activeResolutionH;
+    const cx = Math.floor(canvasW / 2);
+    const cy = Math.floor(canvasH / 2);
     // Default sizes per type
     const defaults: Partial<Record<WatchFaceElement['type'], { w: number; h: number }>> = {
       TEXT: { w: 160, h: 50 },
@@ -2463,7 +2470,7 @@ function StudioApp() {
       IMG_STATUS: { w: 40, h: 40 },
       CIRCLE: { w: 80, h: 80 },
       BUTTON: { w: 120, h: 60 },
-      TIME_POINTER: { w: canvas, h: canvas },
+      TIME_POINTER: { w: canvasW, h: canvasH },
     };
     const { w = 120, h = 60 } = defaults[addElType] ?? {};
     // Auto-size TEXT_IMG / IMG_TIME / IMG_DATE / IMG_WEEK width to fit max digit count tightly
@@ -2489,7 +2496,7 @@ function StudioApp() {
       return mock.length * digitW;
     })();
     const x = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : cx - Math.floor(autoW / 2);
-    const y = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : Math.floor(canvas * 0.4) - Math.floor(h / 2);
+    const y = addElType === 'ARC_PROGRESS' || addElType === 'TIME_POINTER' ? 0 : Math.floor(canvasH * 0.4) - Math.floor(h / 2);
     const needsDataType = addAllowedDataTypes.length > 0;
     const isStatus = addElType === 'IMG_STATUS';
     const isArc = addElType === 'ARC_PROGRESS';
@@ -2511,12 +2518,12 @@ function StudioApp() {
         ? { images: generateWeatherSet('flat'), weatherStyle: 'flat' }
         : {}),
       ...(isStatus ? { statusType: addElDataType } : {}),
-      ...(isArc ? { startAngle: -90, endAngle: 270, radius: 80, lineWidth: 10, color: '#00CC88', center: { x: cx, y: cx } } : {}),
-      ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cx } } : {}),
+      ...(isArc ? { startAngle: -90, endAngle: 270, radius: 80, lineWidth: 10, color: '#00CC88', center: { x: cx, y: cy } } : {}),
+      ...(addElType === 'TIME_POINTER' ? { center: { x: cx, y: cy } } : {}),
       ...(addElType === 'GAUGE_POINTER'
         ? {
             src: DEFAULT_GAUGE_POINTER_FILENAME,
-            center: { x: cx, y: Math.floor(canvas * 0.72) },
+        center: { x: cx, y: Math.floor(canvasH * 0.72) },
             hourPos: { x: Math.floor(w / 2), y: h - 8 },
             pivotX: 0.5,
             pivotY: 0.9,
@@ -2802,9 +2809,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     if (photoEditorTarget === 'MAIN') return state.backgroundImage;
     if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
     if (aodBackgroundMode === 'SOLID_COLOR') return aodSolidBackgroundImage;
-    if (aodBackgroundMode === 'NONE_BLACK') return buildSolidBackgroundDataUrl(activeResolution, '#000000');
+    if (aodBackgroundMode === 'NONE_BLACK') return buildSolidBackgroundDataUrl(activeCanvasW, activeCanvasH, '#000000');
     return state.backgroundImage;
-  }, [activeResolution, aodBackgroundImage, aodBackgroundMode, aodSolidBackgroundImage, photoEditorTarget, state.backgroundImage]);
+  }, [activeCanvasH, activeCanvasW, aodBackgroundImage, aodBackgroundMode, aodSolidBackgroundImage, photoEditorTarget, state.backgroundImage]);
 
   // T042: on Save → dispatch edited image to state (also rebuild backgroundFile)
   const handlePhotoEditorSave = (dataUrl: string) => {
@@ -2912,22 +2919,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
   // Skip HTML/AI input — go straight to blank canvas and add widgets manually
   const handleStartBlank = useCallback(() => {
-    const MODEL_RES: Record<string, { width: number; height: number }> = {
-      'Balance 2': { width: 480, height: 480 },
-      'Balance': { width: 480, height: 480 },
-      'Active Max': { width: 480, height: 480 },
-      'Active 3 Premium': { width: 466, height: 466 },
-      'Active 2 Round': { width: 466, height: 466 },
-      'Active 2 Square': { width: 390, height: 450 },
-      'Active': { width: 390, height: 450 },
-      'Pop 3S (PIB)': { width: 410, height: 502 },
-      'GTR4': { width: 466, height: 466 },
-      'GTS4': { width: 390, height: 450 },
-      'Cheetah Pro': { width: 466, height: 466 },
-      'T-Rex 2': { width: 454, height: 454 },
-      'Falcon': { width: 416, height: 416 },
-    };
-    const res = MODEL_RES[watchModel] ?? { width: 480, height: 480 };
+    const res = { width: activeCanvasW, height: activeCanvasH };
     const elements: WatchFaceElement[] = [];
     if (state.backgroundImage) {
       elements.push({
@@ -2954,7 +2946,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     dispatch(actions.setElementImages([]));
     dispatch(actions.setStep('preview'));
     toast.success('Blank canvas ready — add widgets with the + button');
-  }, [watchModel, watchFaceName, state.backgroundImage, dispatch]);
+  }, [activeCanvasH, activeCanvasW, watchModel, watchFaceName, state.backgroundImage, dispatch]);
   const handleLoadLayout = useCallback(async () => {
     if (!htmlInput.trim()) return;
     dispatch(actions.setLoading(true));
@@ -3308,7 +3300,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       }
 
       if (aodEditorElements && effectiveAodBackgroundMode === 'SOLID_COLOR') {
-        const solidDataUrl = buildSolidBackgroundDataUrl(state.watchFaceConfig.resolution.width, aodSolidColor);
+        const solidDataUrl = buildSolidBackgroundDataUrl(state.watchFaceConfig.resolution.width, state.watchFaceConfig.resolution.height, aodSolidColor);
         const { mimeType, bytes } = decodeDataUrlToBytes(solidDataUrl, 'AOD solid background');
         preparedAodBackgroundFile = new File([bytes], 'aod_background.png', { type: mimeType });
       }
@@ -5243,6 +5235,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
           onCancel={handlePhotoEditorClose}
           canvasShape={activeShape}
           canvasCornerRadius={activeCornerRadius}
+          canvasWidth={activeCanvasW}
+          canvasHeight={activeCanvasH}
         />
       )}
 

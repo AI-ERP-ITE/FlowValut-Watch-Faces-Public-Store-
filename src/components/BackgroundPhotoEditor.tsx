@@ -70,6 +70,9 @@ interface Props {
   /** Spec 110: watch model shape for clip overlay in preview. Output PNG is always unclipped square. */
   canvasShape?: 'round' | 'square';
   canvasCornerRadius?: number;
+  /** Spec 110: target editor/export dimensions from active watch model. */
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
 interface FlickerPreviewInfo {
@@ -131,7 +134,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasShape, canvasCornerRadius }: Props) {
+export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasShape, canvasCornerRadius, canvasWidth, canvasHeight }: Props) {
   const [editParams, setEditParams] = useState<EditParams>(DEFAULT_EDIT_PARAMS);
   const [shadowClamp, setShadowClamp] = useState<number>(DEFAULT_SHADOW_CLAMP);
   const [shadowClampEnabled, setShadowClampEnabled] = useState<boolean>(DEFAULT_SHADOW_CLAMP_ENABLED);
@@ -144,12 +147,21 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
 
   // T007: Store loaded HTMLImageElement so draw functions can access it
   const imgRef = useRef<HTMLImageElement | null>(null);
-  // T009: Ref to the visible 480×480 canvas element
+  // T009: Ref to the visible preview canvas element
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // T012: Pending RAF handle — lets us cancel stale frames on rapid slider drag
   const rafRef = useRef<number>(0);
   // Tracks whether the source image has finished loading
   const [imgLoaded, setImgLoaded] = useState(false);
+
+  const targetCanvasW = Math.max(1, Math.round(canvasWidth ?? 480));
+  const targetCanvasH = Math.max(1, Math.round(canvasHeight ?? 480));
+  const previewScale = Math.min(400 / targetCanvasW, 400 / targetCanvasH, 1);
+  const previewDisplayW = Math.max(1, Math.round(targetCanvasW * previewScale));
+  const previewDisplayH = Math.max(1, Math.round(targetCanvasH * previewScale));
+  const previewBorderRadius = canvasShape === 'square' && (canvasCornerRadius ?? 0) > 0
+    ? `${Math.max(0, Math.round((canvasCornerRadius ?? 0) * previewScale))}px`
+    : '50%';
 
   // T006: Load sourceDataUrl into an HTMLImageElement on mount
   useEffect(() => {
@@ -172,10 +184,9 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
     const img    = imgRef.current;
     if (!canvas || !img) return;
 
-    // Use source image natural dimensions (always correct — BackgroundCropTool outputs at model resolution)
-    const csW = img.naturalWidth  || 480;
-    const csH = img.naturalHeight || 480;
-    const SIZE = csW;  // alias kept for pixel math below (assumes square; rect handled via csH in loops)
+    // Use target canvas dimensions from active model; draw source image scaled into this buffer.
+    const csW = targetCanvasW;
+    const csH = targetCanvasH;
     const csShape: 'round' | 'square' = canvasShape ?? 'round';
     const csRadius = canvasCornerRadius ?? 0;
     const cxV = csW / 2;
@@ -219,7 +230,7 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
         return p;
       };
 
-      const imageData = offCtx.getImageData(0, 0, SIZE, SIZE);
+      const imageData = offCtx.getImageData(0, 0, csW, csH);
       const d = imageData.data;
 
       for (let i = 0; i < d.length; i += 4) {
@@ -291,23 +302,23 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
     // ── Step 6: Sharpness — 3×3 unsharp-mask convolution ─────────────────
     // Kernel: [ 0,-1, 0, -1,5,-1, 0,-1, 0 ] blended by (sharpness/100)
     if (sharpness > 0) {
-      const src = offCtx.getImageData(0, 0, SIZE, SIZE);
-      const dst = offCtx.createImageData(SIZE, SIZE);
+      const src = offCtx.getImageData(0, 0, csW, csH);
+      const dst = offCtx.createImageData(csW, csH);
       const sd  = src.data;
       const dd  = dst.data;
       const amt = sharpness / 100;
 
-      for (let y = 1; y < SIZE - 1; y++) {
-        for (let x = 1; x < SIZE - 1; x++) {
-          const idx = (y * SIZE + x) * 4;
+      for (let y = 1; y < csH - 1; y++) {
+        for (let x = 1; x < csW - 1; x++) {
+          const idx = (y * csW + x) * 4;
           for (let c = 0; c < 3; c++) {
             const center = sd[idx + c];
             const conv   = Math.min(255, Math.max(0,
               5 * center
-              - sd[((y - 1) * SIZE + x    ) * 4 + c]
-              - sd[((y + 1) * SIZE + x    ) * 4 + c]
-              - sd[(y       * SIZE + x - 1) * 4 + c]
-              - sd[(y       * SIZE + x + 1) * 4 + c],
+              - sd[((y - 1) * csW + x    ) * 4 + c]
+              - sd[((y + 1) * csW + x    ) * 4 + c]
+              - sd[(y       * csW + x - 1) * 4 + c]
+              - sd[(y       * csW + x + 1) * 4 + c],
             ));
             dd[idx + c] = Math.round(center + (conv - center) * amt);
           }
@@ -315,14 +326,17 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
         }
       }
       // Copy 1-px border pixels unchanged
-      for (let i = 0; i < SIZE; i++) {
-        const top = i * 4;
-        const bot = ((SIZE - 1) * SIZE + i) * 4;
-        const lft = (i * SIZE) * 4;
-        const rgt = (i * SIZE + SIZE - 1) * 4;
-        for (const p of [top, bot, lft, rgt]) {
-          dd[p] = sd[p]; dd[p+1] = sd[p+1]; dd[p+2] = sd[p+2]; dd[p+3] = sd[p+3];
-        }
+      for (let x = 0; x < csW; x++) {
+        const top = x * 4;
+        const bot = ((csH - 1) * csW + x) * 4;
+        dd[top] = sd[top]; dd[top + 1] = sd[top + 1]; dd[top + 2] = sd[top + 2]; dd[top + 3] = sd[top + 3];
+        dd[bot] = sd[bot]; dd[bot + 1] = sd[bot + 1]; dd[bot + 2] = sd[bot + 2]; dd[bot + 3] = sd[bot + 3];
+      }
+      for (let y = 0; y < csH; y++) {
+        const lft = (y * csW) * 4;
+        const rgt = (y * csW + csW - 1) * 4;
+        dd[lft] = sd[lft]; dd[lft + 1] = sd[lft + 1]; dd[lft + 2] = sd[lft + 2]; dd[lft + 3] = sd[lft + 3];
+        dd[rgt] = sd[rgt]; dd[rgt + 1] = sd[rgt + 1]; dd[rgt + 2] = sd[rgt + 2]; dd[rgt + 3] = sd[rgt + 3];
       }
       offCtx.putImageData(dst, 0, 0);
     }
@@ -373,7 +387,7 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
       forbiddenCount: analysis.forbiddenCount,
       totalCount: analysis.totalCount,
     });
-  }, [editParams, shadowClamp, shadowClampEnabled]);
+  }, [canvasCornerRadius, canvasShape, editParams, shadowClamp, shadowClampEnabled, targetCanvasH, targetCanvasW]);
 
   // T012: Schedule draw via RAF; cancel pending frame if params change again before it fires.
   // T028: Cancel on unmount too.
@@ -395,26 +409,27 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
 
   // T029: Export — run the full pixel pipeline on a fresh offscreen canvas
   // and call onSave with the resulting data URL.
-  // T030: Export is a FULL 480×480 square PNG (no circular clip) — matching
+  // T030: Export uses active model dimensions (full square/rect PNG, no clip)
   // how Spec 011 stores backgroundImage. The circular mask is UI-only.
   const handleSave = useCallback(() => {
     const img = imgRef.current;
     if (!img) return;
 
-    const SIZE = 480;
+    const exportW = targetCanvasW;
+    const exportH = targetCanvasH;
     const { exposure, brightness, contrast, highlights, shadows,
             saturation, hue, temperature, tint, sharpness, vignette } = editParams;
 
     const off    = document.createElement('canvas');
-    off.width    = SIZE;
-    off.height   = SIZE;
+    off.width    = exportW;
+    off.height   = exportH;
     const offCtx = off.getContext('2d')!;
 
     // Step 2: CSS filter — exposure × brightness + contrast
     const expBrightFactor = Math.pow(2, exposure / 100) * Math.max(0, 1 + brightness / 100);
     const contrastFactor  = (259 * (contrast + 255)) / (255 * (259 - contrast));
     offCtx.filter = `brightness(${expBrightFactor}) contrast(${contrastFactor})`;
-    offCtx.drawImage(img, 0, 0, SIZE, SIZE);
+    offCtx.drawImage(img, 0, 0, exportW, exportH);
     offCtx.filter = 'none';
 
     // Steps 3–5: per-pixel ops
@@ -438,7 +453,7 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
         return p;
       };
 
-      const imageData = offCtx.getImageData(0, 0, SIZE, SIZE);
+      const imageData = offCtx.getImageData(0, 0, exportW, exportH);
       const d = imageData.data;
 
       for (let i = 0; i < d.length; i += 4) {
@@ -501,36 +516,39 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
 
     // Step 6: Sharpness
     if (sharpness > 0) {
-      const src = offCtx.getImageData(0, 0, SIZE, SIZE);
-      const dst = offCtx.createImageData(SIZE, SIZE);
+      const src = offCtx.getImageData(0, 0, exportW, exportH);
+      const dst = offCtx.createImageData(exportW, exportH);
       const sd  = src.data;
       const dd  = dst.data;
       const amt = sharpness / 100;
-      for (let y = 1; y < SIZE - 1; y++) {
-        for (let x = 1; x < SIZE - 1; x++) {
-          const idx = (y * SIZE + x) * 4;
+      for (let y = 1; y < exportH - 1; y++) {
+        for (let x = 1; x < exportW - 1; x++) {
+          const idx = (y * exportW + x) * 4;
           for (let c = 0; c < 3; c++) {
             const center = sd[idx + c];
             const conv   = Math.min(255, Math.max(0,
               5 * center
-              - sd[((y - 1) * SIZE + x    ) * 4 + c]
-              - sd[((y + 1) * SIZE + x    ) * 4 + c]
-              - sd[(y       * SIZE + x - 1) * 4 + c]
-              - sd[(y       * SIZE + x + 1) * 4 + c],
+              - sd[((y - 1) * exportW + x    ) * 4 + c]
+              - sd[((y + 1) * exportW + x    ) * 4 + c]
+              - sd[(y       * exportW + x - 1) * 4 + c]
+              - sd[(y       * exportW + x + 1) * 4 + c],
             ));
             dd[idx + c] = Math.round(center + (conv - center) * amt);
           }
           dd[idx + 3] = sd[idx + 3];
         }
       }
-      for (let i = 0; i < SIZE; i++) {
-        const top = i * 4;
-        const bot = ((SIZE - 1) * SIZE + i) * 4;
-        const lft = (i * SIZE) * 4;
-        const rgt = (i * SIZE + SIZE - 1) * 4;
-        for (const p of [top, bot, lft, rgt]) {
-          dd[p] = sd[p]; dd[p+1] = sd[p+1]; dd[p+2] = sd[p+2]; dd[p+3] = sd[p+3];
-        }
+      for (let x = 0; x < exportW; x++) {
+        const top = x * 4;
+        const bot = ((exportH - 1) * exportW + x) * 4;
+        dd[top] = sd[top]; dd[top + 1] = sd[top + 1]; dd[top + 2] = sd[top + 2]; dd[top + 3] = sd[top + 3];
+        dd[bot] = sd[bot]; dd[bot + 1] = sd[bot + 1]; dd[bot + 2] = sd[bot + 2]; dd[bot + 3] = sd[bot + 3];
+      }
+      for (let y = 0; y < exportH; y++) {
+        const lft = (y * exportW) * 4;
+        const rgt = (y * exportW + exportW - 1) * 4;
+        dd[lft] = sd[lft]; dd[lft + 1] = sd[lft + 1]; dd[lft + 2] = sd[lft + 2]; dd[lft + 3] = sd[lft + 3];
+        dd[rgt] = sd[rgt]; dd[rgt + 1] = sd[rgt + 1]; dd[rgt + 2] = sd[rgt + 2]; dd[rgt + 3] = sd[rgt + 3];
       }
       offCtx.putImageData(dst, 0, 0);
     }
@@ -538,22 +556,25 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
     // Step 7: Vignette (drawn directly onto export canvas — full square)
     if (vignette > 0) {
       const strength = (vignette / 100) * 0.85;
-      const grad = offCtx.createRadialGradient(240, 240, 0, 240, 240, 240);
+      const cx = exportW / 2;
+      const cy = exportH / 2;
+      const radius = Math.min(cx, cy);
+      const grad = offCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
       grad.addColorStop(0, 'rgba(0,0,0,0)');
       grad.addColorStop(1, `rgba(0,0,0,${strength.toFixed(3)})`);
       offCtx.fillStyle = grad;
-      offCtx.fillRect(0, 0, SIZE, SIZE);
+      offCtx.fillRect(0, 0, exportW, exportH);
     }
 
     if (shadowClampEnabled) {
-      const imageData = offCtx.getImageData(0, 0, SIZE, SIZE);
+      const imageData = offCtx.getImageData(0, 0, exportW, exportH);
       applyShadowClampToImageData(imageData, shadowClamp);
       offCtx.putImageData(imageData, 0, 0);
     }
 
-    // Step 8: Export full 480×480 square PNG → dispatch via onSave
+    // Step 8: Export at active model dimensions → dispatch via onSave
     onSave(off.toDataURL('image/png'));
-  }, [editParams, onSave, shadowClamp, shadowClampEnabled]);
+  }, [editParams, onSave, shadowClamp, shadowClampEnabled, targetCanvasH, targetCanvasW]);
 
   return (
     // T003: Full-screen overlay with dark backdrop
@@ -581,16 +602,16 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasS
 
           {/* Left column: canvas preview area (fixed-width on desktop, full-width on mobile) */}
           <div className="flex items-center justify-center p-6 bg-[#111111] md:flex-shrink-0">
-            {/* T009: 480×480 pixel buffer, displayed at 400px CSS.
+            {/* T009: Pixel buffer at active model dimensions, scaled for UI preview.
                 T010: circular clip + cyan border applied via style. */}
             <canvas
               ref={canvasRef}
-              width={480}
-              height={480}
+              width={targetCanvasW}
+              height={targetCanvasH}
               style={{
-                width: 400,
-                height: 400,
-                borderRadius: '50%',
+                width: previewDisplayW,
+                height: previewDisplayH,
+                borderRadius: previewBorderRadius,
                 border: '2px solid rgba(0,212,255,0.5)',
                 background: '#1a1a1a',
                 flexShrink: 0,
