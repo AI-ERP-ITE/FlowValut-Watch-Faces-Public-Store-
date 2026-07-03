@@ -48,15 +48,9 @@ function _shadowImgWidgetV3(element: WatchFaceElement, label: string): string {
                 });`;
 }
 
-// Device models using V2 format (Balance 2, Balance, Active Max, etc.)
-const V2_DEVICE_MODELS = [
-  'Balance 2',
-  'Balance',
-  'Active Max',
-  'Active 3 Premium',
-];
-
-// Device models using V3 format (GTR 4, GTS 4, newer Zepp OS models)
+// Device models using V3 format — fallback list used only when configVersion is not set on the config.
+// Spec 110: configVersion is now injected by StudioApp from specGroups.supportedConfigVersions,
+// so this list is only hit for configs saved before spec 110.
 const V3_DEVICE_MODELS = [
   'GTR 4',
   'GTS 4',
@@ -67,18 +61,18 @@ const V3_DEVICE_MODELS = [
 
 export function generateWatchFaceCode(config: WatchFaceConfig): GeneratedCode {
   console.log('[JSGen] Starting code generation for:', config.name, 'Model:', config.watchModel);
-  
-  // Route to appropriate generator based on device model
-  if (V2_DEVICE_MODELS.includes(config.watchModel)) {
-    console.log('[JSGen] Using V2 generator (legacy format) for model:', config.watchModel);
-    return generateWatchFaceCodeV2(config);
-  } else if (V3_DEVICE_MODELS.includes(config.watchModel)) {
-    console.log('[JSGen] Using V3 generator (modern format) for model:', config.watchModel);
+
+  // Spec 110: prefer explicit configVersion from specGroups lookup (set by StudioApp at export time).
+  // Fall back to legacy hardcoded model-name lists for configs saved before this change.
+  const version = config.configVersion
+    ?? (V3_DEVICE_MODELS.includes(config.watchModel) ? 'v3' : 'v2');
+
+  if (version === 'v3') {
+    console.log('[JSGen] Using V3 generator for model:', config.watchModel);
     return generateWatchFaceCodeV3(config);
-  } else {
-    console.log('[JSGen] Unknown model, defaulting to V2 for safety:', config.watchModel);
-    return generateWatchFaceCodeV2(config);
   }
+  console.log('[JSGen] Using V2 generator (legacy format) for model:', config.watchModel);
+  return generateWatchFaceCodeV2(config);
 }
 
 // V3 Generator (for newer devices)

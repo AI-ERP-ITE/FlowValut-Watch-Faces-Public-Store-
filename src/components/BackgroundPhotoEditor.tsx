@@ -64,9 +64,12 @@ function applyShadowClampToImageData(imageData: ImageData, threshold: number): v
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  sourceDataUrl: string;          // the cropped 480×480 PNG from BackgroundCropTool
+  sourceDataUrl: string;          // the cropped PNG from BackgroundCropTool (correct model dimensions)
   onSave: (dataUrl: string) => void;
   onCancel: () => void;
+  /** Spec 110: watch model shape for clip overlay in preview. Output PNG is always unclipped square. */
+  canvasShape?: 'round' | 'square';
+  canvasCornerRadius?: number;
 }
 
 interface FlickerPreviewInfo {
@@ -128,7 +131,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props) {
+export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasShape, canvasCornerRadius }: Props) {
   const [editParams, setEditParams] = useState<EditParams>(DEFAULT_EDIT_PARAMS);
   const [shadowClamp, setShadowClamp] = useState<number>(DEFAULT_SHADOW_CLAMP);
   const [shadowClampEnabled, setShadowClampEnabled] = useState<boolean>(DEFAULT_SHADOW_CLAMP_ENABLED);
@@ -169,22 +172,29 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
     const img    = imgRef.current;
     if (!canvas || !img) return;
 
-    const SIZE = 480;
+    // Use source image natural dimensions (always correct — BackgroundCropTool outputs at model resolution)
+    const csW = img.naturalWidth  || 480;
+    const csH = img.naturalHeight || 480;
+    const SIZE = csW;  // alias kept for pixel math below (assumes square; rect handled via csH in loops)
+    const csShape: 'round' | 'square' = canvasShape ?? 'round';
+    const csRadius = canvasCornerRadius ?? 0;
+    const cxV = csW / 2;
+    const cyV = csH / 2;
 
     const { exposure, brightness, contrast, highlights, shadows,
             saturation, hue, temperature, tint, sharpness, vignette } = editParams;
 
-    // ── Step 1: Offscreen 480×480 canvas ─────────────────────────────────
+    // ── Step 1: Offscreen canvas matching source dimensions ─────────────────
     const off    = document.createElement('canvas');
-    off.width    = SIZE;
-    off.height   = SIZE;
+    off.width    = csW;
+    off.height   = csH;
     const offCtx = off.getContext('2d')!;
 
     // ── Step 2: Bake exposure + brightness + contrast via CSS filter ──────
     const expBrightFactor = Math.pow(2, exposure / 100) * Math.max(0, 1 + brightness / 100);
     const contrastFactor  = (259 * (contrast + 255)) / (255 * (259 - contrast));
     offCtx.filter = `brightness(${expBrightFactor}) contrast(${contrastFactor})`;
-    offCtx.drawImage(img, 0, 0, SIZE, SIZE);
+    offCtx.drawImage(img, 0, 0, csW, csH);
     offCtx.filter = 'none';
 
     // ── Steps 3–5: Per-pixel — highlights/shadows, temp/tint, hue/sat ────
@@ -317,12 +327,16 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
       offCtx.putImageData(dst, 0, 0);
     }
 
-    // ── Step 7: Copy offscreen → visible canvas with circular clip ────────
+    // ── Step 7: Copy offscreen → visible canvas with shape clip ────────
     const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, SIZE, SIZE);
+    ctx.clearRect(0, 0, csW, csH);
     ctx.save();
     ctx.beginPath();
-    ctx.arc(240, 240, 240, 0, Math.PI * 2);
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius);
+    } else {
+      ctx.arc(cxV, cyV, Math.min(cxV, cyV), 0, Math.PI * 2);
+    }
     ctx.clip();
     ctx.drawImage(off, 0, 0);
     ctx.restore();
@@ -330,19 +344,23 @@ export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel }: Props
     // ── Step 8: Vignette radial-gradient overlay ──────────────────────────
     if (vignette > 0) {
       const strength = (vignette / 100) * 0.85;
-      const grad = ctx.createRadialGradient(240, 240, 0, 240, 240, 240);
+      const grad = ctx.createRadialGradient(cxV, cyV, 0, cxV, cyV, Math.min(cxV, cyV));
       grad.addColorStop(0, 'rgba(0,0,0,0)');
       grad.addColorStop(1, `rgba(0,0,0,${strength.toFixed(3)})`);
       ctx.save();
       ctx.beginPath();
-      ctx.arc(240, 240, 240, 0, Math.PI * 2);
+      if (csShape === 'square' && csRadius > 0) {
+        ctx.roundRect(0, 0, csW, csH, csRadius);
+      } else {
+        ctx.arc(cxV, cyV, Math.min(cxV, cyV), 0, Math.PI * 2);
+      }
       ctx.clip();
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, SIZE, SIZE);
+      ctx.fillRect(0, 0, csW, csH);
       ctx.restore();
     }
 
-    const imageData = ctx.getImageData(0, 0, SIZE, SIZE);
+    const imageData = ctx.getImageData(0, 0, csW, csH);
     if (shadowClampEnabled) {
       applyShadowClampToImageData(imageData, shadowClamp);
       ctx.putImageData(imageData, 0, 0);

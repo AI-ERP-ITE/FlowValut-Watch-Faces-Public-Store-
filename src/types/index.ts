@@ -238,6 +238,8 @@ export interface WatchFaceConfig {
   /** Optional AOD background transform state. */
   aodBackgroundTransform?: BackgroundTransform | null;
   watchModel: string;
+  /** Spec 110: ZPK generator version derived from specGroups.supportedConfigVersions. Set at export time. */
+  configVersion?: 'v2' | 'v3';
 }
 
 export interface GeneratedCode {

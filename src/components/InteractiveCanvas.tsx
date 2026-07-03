@@ -20,6 +20,7 @@ import {
   normalizeGaugePivot,
 } from '@/lib/gaugePointerDefaults';
 
+// Default fallbacks when no model props are supplied (keeps all existing behaviour).
 const CANVAS_SIZE = 480;
 const CX = 240;
 const CY = 240;
@@ -82,6 +83,11 @@ export interface InteractiveCanvasProps {
   onElementWarningsChange?: (warnings: ElementWarningsMap) => void;
   className?: string;
   customHandStyles?: CustomHandRecord[];
+  /** Spec 110: canvas dimensions from the active watch model. Defaults to 480×480 (round) when not provided. */
+  canvasW?: number;
+  canvasH?: number;
+  canvasShape?: 'round' | 'square';
+  canvasCornerRadius?: number;
 }
 
 export interface ElementWarningInfo {
@@ -115,7 +121,16 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   onElementWarningsChange,
   className,
   customHandStyles,
+  canvasW: canvasWProp,
+  canvasH: canvasHProp,
+  canvasShape: canvasShapeProp,
+  canvasCornerRadius: canvasCornerRadiusProp,
 }, forwardedRef) {
+  // Spec 110: canvas geometry from model props, fallback to 480×480 round.
+  const csW = canvasWProp ?? CANVAS_SIZE;
+  const csH = canvasHProp ?? CANVAS_SIZE;
+  const csShape: 'round' | 'square' = canvasShapeProp ?? 'round';
+  const csRadius = canvasCornerRadiusProp ?? 0;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const elementsRef = useRef(elements);
@@ -167,14 +182,14 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.clearRect(0, 0, csW, csH);
     ctx.imageSmoothingEnabled = !calibrationEnabled;
 
     // Background
     if (bgImageRef.current) {
-      drawBackground(ctx, bgImageRef.current, backgroundTransform);
+      drawBackground(ctx, bgImageRef.current, backgroundTransform, csShape, csRadius);
     } else {
-      drawBlackCircle(ctx);
+      drawBlackCircle(ctx, csShape, csRadius);
     }
 
     // Grid overlay
@@ -365,8 +380,8 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     if (resizeHandleRef.current) {
       // Arc handles
       if (resizeHandleRef.current === 'ARC_RADIUS' || resizeHandleRef.current === 'ARC_START' || resizeHandleRef.current === 'ARC_END') {
-        const cx = snap.center?.x ?? CX;
-        const cy = snap.center?.y ?? CY;
+        const cx = snap.center?.x ?? csW / 2;
+        const cy = snap.center?.y ?? csH / 2;
         // atan2 gives angle in canvas convention (0=3PM); stored angles use device convention (0=12PM).
         // Add 90° when storing so the arc redraws at the exact pixel the user dragged to.
         const canvasAngleDeg = Math.atan2(y - cy, x - cx) * (180 / Math.PI);
@@ -461,22 +476,22 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
     // Drag mode
     const newBounds = {
-      x: Math.max(0, Math.min(CANVAS_SIZE - snap.bounds.width, snap.bounds.x + dx)),
-      y: Math.max(0, Math.min(CANVAS_SIZE - snap.bounds.height, snap.bounds.y + dy)),
+      x: Math.max(0, Math.min(csW - snap.bounds.width, snap.bounds.x + dx)),
+      y: Math.max(0, Math.min(csH - snap.bounds.height, snap.bounds.y + dy)),
       width: snap.bounds.width,
       height: snap.bounds.height,
     };
     const changes: Partial<WatchFaceElement> = { bounds: newBounds };
     if (snap.center) {
       changes.center = {
-        x: Math.max(0, Math.min(CANVAS_SIZE, snap.center.x + dx)),
-        y: Math.max(0, Math.min(CANVAS_SIZE, snap.center.y + dy)),
+        x: Math.max(0, Math.min(csW, snap.center.x + dx)),
+        y: Math.max(0, Math.min(csH, snap.center.y + dy)),
       };
     } else if (snap.type === 'ARC_PROGRESS') {
       // ARC_PROGRESS without center stored: derive from new bounds midpoint so canvas and device stay in sync
       changes.center = {
-        x: Math.max(0, Math.min(CANVAS_SIZE, newBounds.x + newBounds.width / 2)),
-        y: Math.max(0, Math.min(CANVAS_SIZE, newBounds.y + newBounds.height / 2)),
+        x: Math.max(0, Math.min(csW, newBounds.x + newBounds.width / 2)),
+        y: Math.max(0, Math.min(csH, newBounds.y + newBounds.height / 2)),
       };
     }
     onUpdateElement?.(snap.id, changes);
@@ -486,16 +501,16 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const batchUpdates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
       for (const [xid, xsnap] of dragSnapshotsRef.current) {
         const xBounds = {
-          x: Math.max(0, Math.min(CANVAS_SIZE - xsnap.bounds.width, xsnap.bounds.x + dx)),
-          y: Math.max(0, Math.min(CANVAS_SIZE - xsnap.bounds.height, xsnap.bounds.y + dy)),
+          x: Math.max(0, Math.min(csW - xsnap.bounds.width, xsnap.bounds.x + dx)),
+          y: Math.max(0, Math.min(csH - xsnap.bounds.height, xsnap.bounds.y + dy)),
           width: xsnap.bounds.width,
           height: xsnap.bounds.height,
         };
         const xChanges: Partial<WatchFaceElement> = { bounds: xBounds };
         if (xsnap.center) {
           xChanges.center = {
-            x: Math.max(0, Math.min(CANVAS_SIZE, xsnap.center.x + dx)),
-            y: Math.max(0, Math.min(CANVAS_SIZE, xsnap.center.y + dy)),
+            x: Math.max(0, Math.min(csW, xsnap.center.x + dx)),
+            y: Math.max(0, Math.min(csH, xsnap.center.y + dy)),
           };
         }
         batchUpdates.push({ id: xid, changes: xChanges });
@@ -548,21 +563,21 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
     const snap = dragSnapshotRef.current;
     const newBounds = {
-      x: Math.max(0, Math.min(CANVAS_SIZE - snap.bounds.width, snap.bounds.x + dx)),
-      y: Math.max(0, Math.min(CANVAS_SIZE - snap.bounds.height, snap.bounds.y + dy)),
+      x: Math.max(0, Math.min(csW - snap.bounds.width, snap.bounds.x + dx)),
+      y: Math.max(0, Math.min(csH - snap.bounds.height, snap.bounds.y + dy)),
       width: snap.bounds.width,
       height: snap.bounds.height,
     };
     const changes: Partial<WatchFaceElement> = { bounds: newBounds };
     if (snap.center) {
       changes.center = {
-        x: Math.max(0, Math.min(CANVAS_SIZE, snap.center.x + dx)),
-        y: Math.max(0, Math.min(CANVAS_SIZE, snap.center.y + dy)),
+        x: Math.max(0, Math.min(csW, snap.center.x + dx)),
+        y: Math.max(0, Math.min(csH, snap.center.y + dy)),
       };
     } else if (snap.type === 'ARC_PROGRESS') {
       changes.center = {
-        x: Math.max(0, Math.min(CANVAS_SIZE, newBounds.x + newBounds.width / 2)),
-        y: Math.max(0, Math.min(CANVAS_SIZE, newBounds.y + newBounds.height / 2)),
+        x: Math.max(0, Math.min(csW, newBounds.x + newBounds.width / 2)),
+        y: Math.max(0, Math.min(csH, newBounds.y + newBounds.height / 2)),
       };
     }
     onUpdateElement?.(snap.id, changes);
@@ -610,9 +625,9 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
         if (typeof forwardedRef === 'function') forwardedRef(node);
         else if (forwardedRef) forwardedRef.current = node;
       }}
-      width={CANVAS_SIZE}
-      height={CANVAS_SIZE}
-      className={cn('rounded-full shadow-2xl cursor-pointer select-none', className)}
+      width={csW}
+      height={csH}
+      className={cn(csShape === 'square' && csRadius > 0 ? `rounded-[${csRadius}px]` : csShape === 'square' ? 'rounded-none' : 'rounded-full', 'shadow-2xl cursor-pointer select-none', className)}
       style={{
         maxWidth: '100%',
         height: 'auto',
@@ -636,8 +651,8 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
 function getCanvasPos(e: React.MouseEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = CANVAS_SIZE / rect.width;
-  const scaleY = CANVAS_SIZE / rect.height;
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
   return {
     x: (e.clientX - rect.left) * scaleX,
     y: (e.clientY - rect.top) * scaleY,
@@ -646,8 +661,8 @@ function getCanvasPos(e: React.MouseEvent<HTMLCanvasElement>, canvas: HTMLCanvas
 
 function getTouchCanvasPos(touch: React.Touch, canvas: HTMLCanvasElement) {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = CANVAS_SIZE / rect.width;
-  const scaleY = CANVAS_SIZE / rect.height;
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
   return {
     x: (touch.clientX - rect.left) * scaleX,
     y: (touch.clientY - rect.top) * scaleY,
@@ -971,42 +986,62 @@ function drawImageWithDeterministicIconEffects(
 // ─── Background ─────────────────────────────────────────────────────────────────
 
 function drawGrid(ctx: CanvasRenderingContext2D) {
+  const csW = ctx.canvas.width;
+  const csH = ctx.canvas.height;
+  const cxV = csW / 2;
+  const cyV = csH / 2;
   const STEP = 48;
   ctx.save();
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
   ctx.lineWidth = 1;
-  for (let i = STEP; i < CANVAS_SIZE; i += STEP) {
-    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, CANVAS_SIZE); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(CANVAS_SIZE, i); ctx.stroke();
+  for (let i = STEP; i < Math.max(csW, csH); i += STEP) {
+    if (i < csW) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, csH); ctx.stroke(); }
+    if (i < csH) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(csW, i); ctx.stroke(); }
   }
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-  ctx.beginPath(); ctx.moveTo(CX, 0); ctx.lineTo(CX, CANVAS_SIZE); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, CY); ctx.lineTo(CANVAS_SIZE, CY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cxV, 0); ctx.lineTo(cxV, csH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, cyV); ctx.lineTo(csW, cyV); ctx.stroke();
   ctx.restore();
 }
 
-function drawBlackCircle(ctx: CanvasRenderingContext2D) {
+function drawBlackCircle(ctx: CanvasRenderingContext2D, shape: 'round' | 'square' = 'round', cornerRadius = 0) {
+  const csW = ctx.canvas.width;
+  const csH = ctx.canvas.height;
+  const cxV = csW / 2;
+  const cyV = csH / 2;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(CX, CY, CX, 0, Math.PI * 2);
+  if (shape === 'square' && cornerRadius > 0) {
+    ctx.roundRect(0, 0, csW, csH, cornerRadius);
+  } else {
+    ctx.arc(cxV, cyV, Math.min(cxV, cyV), 0, Math.PI * 2);
+  }
   ctx.fillStyle = '#111111';
   ctx.fill();
   ctx.restore();
 }
 
-function drawBackground(ctx: CanvasRenderingContext2D, img: HTMLImageElement, transform?: BackgroundTransform) {
+function drawBackground(ctx: CanvasRenderingContext2D, img: HTMLImageElement, transform?: BackgroundTransform, shape: 'round' | 'square' = 'round', cornerRadius = 0) {
+  const csW = ctx.canvas.width;
+  const csH = ctx.canvas.height;
+  const cxV = csW / 2;
+  const cyV = csH / 2;
   const angle = transform?.angle ?? 0;
   const flipH = !!transform?.flipH;
   const flipV = !!transform?.flipV;
 
   ctx.save();
   ctx.beginPath();
-  ctx.arc(CX, CY, CX, 0, Math.PI * 2);
+  if (shape === 'square' && cornerRadius > 0) {
+    ctx.roundRect(0, 0, csW, csH, cornerRadius);
+  } else {
+    ctx.arc(cxV, cyV, Math.min(cxV, cyV), 0, Math.PI * 2);
+  }
   ctx.clip();
-  ctx.translate(CX, CY);
+  ctx.translate(cxV, cyV);
   ctx.rotate((angle * Math.PI) / 180);
   ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
-  ctx.drawImage(img, -CX, -CY, CANVAS_SIZE, CANVAS_SIZE);
+  ctx.drawImage(img, -cxV, -cyV, csW, csH);
   ctx.restore();
 }
 

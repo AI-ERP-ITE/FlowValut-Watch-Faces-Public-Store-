@@ -2657,6 +2657,20 @@ function StudioApp() {
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
   const [watchModels, setWatchModels] = useState<Record<string, { specGroup?: string }>>({});
 
+  // ── Spec 110: Derive canvas geometry from specGroups (placed AFTER state declarations) ──
+  const activeSpecGroupKey = watchModels[watchModel]?.specGroup ?? '';
+  const activeSpecGroup = specGroups[activeSpecGroupKey] ?? null;
+  const _resolvedResolution = (() => {
+    if (!activeSpecGroup?.resolution) return { w: 480, h: 480 };
+    const parts = activeSpecGroup.resolution.split('x').map(Number);
+    if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) return { w: parts[0], h: parts[1] };
+    return { w: 480, h: 480 };
+  })();
+  const activeCanvasW: number = _resolvedResolution.w;
+  const activeCanvasH: number = _resolvedResolution.h;
+  const activeShape: 'round' | 'square' = activeSpecGroup?.shape ?? 'round';
+  const activeCornerRadius: number = activeSpecGroup?.cornerRadius ?? 0;
+
   // Fetch spec groups and models from Firebase Storage (single source of truth).
   useEffect(() => {
     fetchPublicConfig<Record<string, SpecGroup>>('specGroups')
@@ -3668,6 +3682,13 @@ function StudioApp() {
           }
         }
       }
+      // Spec 110: derive configVersion from specGroups.supportedConfigVersions.
+      // Models supporting v3 get the modern generator; others fall back to v2 (safe default).
+      const buildSpecGroupKey = watchModels[state.watchFaceConfig.watchModel]?.specGroup ?? '';
+      const buildSpecGroup = specGroups[buildSpecGroupKey];
+      const derivedConfigVersion: 'v2' | 'v3' =
+        buildSpecGroup?.supportedConfigVersions?.includes('v3') ? 'v3' : 'v2';
+
       const configForBuild: WatchFaceConfig = {
         ...state.watchFaceConfig,
         elements: exportElements,
@@ -3679,6 +3700,7 @@ function StudioApp() {
           : null,
         aodSolidColor: effectiveAodBackgroundMode === 'SOLID_COLOR' ? aodSolidColor : null,
         aodBackgroundTransform,
+        configVersion: derivedConfigVersion,
       };
 
       // Inject engrave/emboss frame PNGs for FILL_RECT elements with engraveFrame
@@ -4729,6 +4751,10 @@ function StudioApp() {
                       onElementWarningsChange={setElementWarnings}
                       className="w-full max-w-sm"
                       customHandStyles={customHandStyles}
+                      canvasW={activeCanvasW}
+                      canvasH={activeCanvasH}
+                      canvasShape={activeShape}
+                      canvasCornerRadius={activeCornerRadius}
                     />
                   </div>
                   <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(280px,340px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
@@ -5210,6 +5236,8 @@ function StudioApp() {
           sourceDataUrl={photoEditorSource}
           onSave={handlePhotoEditorSave}
           onCancel={handlePhotoEditorClose}
+          canvasShape={activeShape}
+          canvasCornerRadius={activeCornerRadius}
         />
       )}
 
@@ -5226,6 +5254,10 @@ function StudioApp() {
               file={cropFile}
               onConfirm={handleCropConfirm}
               onCancel={handleCropCancel}
+              width={activeCanvasW}
+              height={activeCanvasH}
+              shape={activeShape}
+              cornerRadius={activeCornerRadius}
             />
           )}
         </DialogContent>

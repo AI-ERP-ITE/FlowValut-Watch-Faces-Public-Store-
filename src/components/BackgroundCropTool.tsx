@@ -5,16 +5,26 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Grid3X3 } from 'lucide-react';
 
-const SIZE = 480; // canvas and output size
-const RADIUS = SIZE / 2; // 240
+const SIZE = 480; // fallback when no model props supplied
 
 interface Props {
   file: File;
   onConfirm: (dataUrl: string) => void;
   onCancel: () => void;
+  /** Spec 110: output dimensions from the active watch model. Defaults to 480×480 round. */
+  width?: number;
+  height?: number;
+  shape?: 'round' | 'square';
+  cornerRadius?: number;
 }
 
-export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
+export function BackgroundCropTool({ file, onConfirm, onCancel, width, height, shape, cornerRadius }: Props) {
+  const csW = width ?? SIZE;
+  const csH = height ?? SIZE;
+  const csShape: 'round' | 'square' = shape ?? 'round';
+  const csRadius = cornerRadius ?? 0;
+  const csRx = csW / 2;  // horizontal center
+  const csRy = csH / 2;  // vertical center
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -38,13 +48,13 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
       URL.revokeObjectURL(url);
       imgRef.current = img;
 
-      // T004/T005: compute min scale to fill circle, center by default
-      const ms = Math.max(SIZE / img.naturalWidth, SIZE / img.naturalHeight);
+      // T004/T005: compute min scale to fill canvas, center by default
+      const ms = Math.max(csW / img.naturalWidth, csH / img.naturalHeight);
       setMinScale(ms);
       setScale(ms);
       setOffset({
-        x: (SIZE - img.naturalWidth * ms) / 2,
-        y: (SIZE - img.naturalHeight * ms) / 2,
+        x: (csW - img.naturalWidth * ms) / 2,
+        y: (csH - img.naturalHeight * ms) / 2,
       });
     };
     img.src = url;
@@ -56,50 +66,67 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
     const img = imgRef.current;
     if (!canvas || !img) return;
     const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, SIZE, SIZE);
+    ctx.clearRect(0, 0, csW, csH);
 
-    // T006: clip to circle
+    // Clip to watch shape
     ctx.save();
     ctx.beginPath();
-    ctx.arc(RADIUS, RADIUS, RADIUS, 0, Math.PI * 2);
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius);
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy), 0, Math.PI * 2);
+    }
     ctx.clip();
     ctx.drawImage(img, offset.x, offset.y, img.naturalWidth * scale, img.naturalHeight * scale);
     ctx.restore();
 
-    // T007: darkened overlay outside circle
+    // Darkened overlay outside watch shape
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.beginPath();
-    ctx.rect(0, 0, SIZE, SIZE);
-    ctx.arc(RADIUS, RADIUS, RADIUS, 0, Math.PI * 2, true); // counter-clockwise = hole
+    ctx.rect(0, 0, csW, csH);
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius); // counter-clockwise hole
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy), 0, Math.PI * 2, true);
+    }
     ctx.fill('evenodd');
     ctx.restore();
 
-    // Circle border
+    // Shape border
     ctx.save();
     ctx.strokeStyle = 'rgba(0,212,255,0.7)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(RADIUS, RADIUS, RADIUS - 1, 0, Math.PI * 2);
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(1, 1, csW - 2, csH - 2, csRadius);
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy) - 1, 0, Math.PI * 2);
+    }
     ctx.stroke();
     ctx.restore();
 
-    // Alignment grid (clipped to circle, never touches export canvas)
+    // Alignment grid (clipped to watch shape)
     if (showCropGrid) {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(RADIUS, RADIUS, RADIUS - 1, 0, Math.PI * 2);
+      if (csShape === 'square' && csRadius > 0) {
+        ctx.roundRect(1, 1, csW - 2, csH - 2, csRadius);
+      } else {
+        ctx.arc(csRx, csRy, Math.min(csRx, csRy) - 1, 0, Math.PI * 2);
+      }
       ctx.clip();
-      const third = SIZE / 3;
+      const thirdW = csW / 3;
+      const thirdH = csH / 3;
       ctx.strokeStyle = 'rgba(255,255,255,0.25)';
       ctx.lineWidth = 1;
       for (let i = 1; i < 3; i++) {
-        ctx.beginPath(); ctx.moveTo(third * i, 0); ctx.lineTo(third * i, SIZE); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, third * i); ctx.lineTo(SIZE, third * i); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(thirdW * i, 0); ctx.lineTo(thirdW * i, csH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, thirdH * i); ctx.lineTo(csW, thirdH * i); ctx.stroke();
       }
       ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-      ctx.beginPath(); ctx.moveTo(RADIUS, 0); ctx.lineTo(RADIUS, SIZE); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, RADIUS); ctx.lineTo(SIZE, RADIUS); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(csRx, 0); ctx.lineTo(csRx, csH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, csRy); ctx.lineTo(csW, csRy); ctx.stroke();
       ctx.restore();
     }
   }, [offset, scale, showCropGrid]);
@@ -110,9 +137,8 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
   const constrain = useCallback((ox: number, oy: number, sc: number, img: HTMLImageElement) => {
     const iw = img.naturalWidth * sc;
     const ih = img.naturalHeight * sc;
-    // When image is smaller than canvas in a dimension, center it in that dimension
-    const x = iw >= SIZE ? Math.min(0, Math.max(ox, SIZE - iw)) : (SIZE - iw) / 2;
-    const y = ih >= SIZE ? Math.min(0, Math.max(oy, SIZE - ih)) : (SIZE - ih) / 2;
+    const x = iw >= csW ? Math.min(0, Math.max(ox, csW - iw)) : (csW - iw) / 2;
+    const y = ih >= csH ? Math.min(0, Math.max(oy, csH - ih)) : (csH - ih) / 2;
     return { x, y };
   }, []);
 
@@ -129,8 +155,8 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
     // Scale factor: canvas may be CSS-smaller than 480
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = SIZE / rect.width;
-    const scaleY = SIZE / rect.height;
+    const scaleX = csW / rect.width;
+    const scaleY = csH / rect.height;
     const newOffset = constrain(
       dragRef.current.ox + dx * scaleX,
       dragRef.current.oy + dy * scaleY,
@@ -155,11 +181,11 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
   const handleReset = useCallback(() => {
     const img = imgRef.current;
     if (!img) return;
-    const ms = Math.max(SIZE / img.naturalWidth, SIZE / img.naturalHeight);
+    const ms = Math.max(csW / img.naturalWidth, csH / img.naturalHeight);
     setScale(ms);
     setOffset({
-      x: (SIZE - img.naturalWidth * ms) / 2,
-      y: (SIZE - img.naturalHeight * ms) / 2,
+      x: (csW - img.naturalWidth * ms) / 2,
+      y: (csH - img.naturalHeight * ms) / 2,
     });
   }, []);
 
@@ -168,11 +194,15 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
     const img = imgRef.current;
     if (!img) return;
     const off = document.createElement('canvas');
-    off.width = SIZE;
-    off.height = SIZE;
+    off.width = csW;
+    off.height = csH;
     const ctx = off.getContext('2d')!;
     ctx.beginPath();
-    ctx.arc(RADIUS, RADIUS, RADIUS, 0, Math.PI * 2);
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius);
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy), 0, Math.PI * 2);
+    }
     ctx.clip();
     ctx.drawImage(img, offset.x, offset.y, img.naturalWidth * scale, img.naturalHeight * scale);
     onConfirm(off.toDataURL('image/png'));
@@ -180,12 +210,12 @@ export function BackgroundCropTool({ file, onConfirm, onCancel }: Props) {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {/* T002: 480×480 canvas (displayed at 320px, pixel buffer 480) */}
+      {/* Canvas — pixel buffer matches watch resolution, displayed at fixed CSS size */}
       <canvas
         ref={canvasRef}
-        width={SIZE}
-        height={SIZE}
-        style={{ width: 320, height: 320, borderRadius: '50%', cursor: 'grab', touchAction: 'none' }}
+        width={csW}
+        height={csH}
+        style={{ width: 320, height: Math.round(320 * csH / csW), borderRadius: csShape === 'round' ? '50%' : csRadius > 0 ? `${Math.round(csRadius * 320 / csW)}px` : '4px', cursor: 'grab', touchAction: 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
