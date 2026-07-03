@@ -212,22 +212,20 @@ async function mockKimiAnalysis(
 
   // Parse watch model for resolution
   const resolutions: Record<string, { width: number; height: number }> = {
-    // User's main goal
-    'Balance 2': { width: 480, height: 480 },
-    // Other requested models
-    'Balance': { width: 480, height: 480 },
-    'Active Max': { width: 480, height: 480 },
-    'Active 3 Premium': { width: 466, height: 466 },
-    'Active 2 Round': { width: 466, height: 466 },
-    'Active 2 Square': { width: 390, height: 450 },
-    'Active': { width: 390, height: 450 },
-    'Pop 3S (PIB)': { width: 410, height: 502 },
-    // Original models
-    'GTR4': { width: 466, height: 466 },
-    'GTS4': { width: 390, height: 450 },
-    'Cheetah Pro': { width: 466, height: 466 },
-    'T-Rex 2': { width: 454, height: 454 },
-    'Falcon': { width: 416, height: 416 },
+    // Names exactly match models.json `name` field for correct specGroup + deviceSources lookup
+    'Amazfit Balance 2': { width: 480, height: 480 },
+    'Amazfit Balance': { width: 480, height: 480 },
+    'Amazfit Active Max': { width: 480, height: 480 },
+    'Amazfit Active 3 Premium': { width: 466, height: 466 },
+    'Amazfit Active 2 (Round)': { width: 466, height: 466 },
+    'Amazfit Active 2 (Square)': { width: 390, height: 450 },
+    'Amazfit Active': { width: 390, height: 450 },
+    'Pop 3S (PIB)': { width: 410, height: 502 },  // not in models.json yet
+    'Amazfit GTR 4': { width: 466, height: 466 },
+    'Amazfit GTS 4': { width: 390, height: 450 },
+    'Amazfit Cheetah Pro': { width: 480, height: 480 },
+    'Amazfit T-Rex 2': { width: 454, height: 454 },
+    'Amazfit Falcon': { width: 416, height: 416 },
   };
 
   const resolution = resolutions[watchModel] || { width: 466, height: 466 };
@@ -1990,7 +1988,7 @@ async function renderHtmlBackgroundToDataUrl(rawHtml: string, width: number, hei
 function StudioApp() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
-  const [watchModel, setWatchModel] = useState('Balance 2');
+  const [watchModel, setWatchModel] = useState('Amazfit Balance 2');
   const [watchFaceName, setWatchFaceName] = useState('');
   const [editorMode, setEditorMode] = useState<EditorMode>('MAIN');
   const [aodElements, setAodElements] = useState<WatchFaceElement[] | null>(null);
@@ -4152,21 +4150,21 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                   onChange={(e) => setWatchModel(e.target.value)}
                   className="w-full h-10 px-3 rounded-md bg-[#0F0F0F] border border-zinc-700 text-white text-sm focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/20"
                 >
-                  {/* User's requested models - Balance 2 as default */}
-                  <option value="Balance 2">⭐ Amazfit Balance 2 (480×480)</option>
-                  <option value="Balance">Amazfit Balance (480×480)</option>
-                  <option value="Active Max">Amazfit Active Max (480×480)</option>
-                  <option value="Active 3 Premium">Amazfit Active 3 Premium (466×466)</option>
-                  <option value="Active 2 Round">Amazfit Active 2 Round (466×466)</option>
-                  <option value="Active 2 Square">Amazfit Active 2 Square (390×450)</option>
-                  <option value="Active">Amazfit Active (390×450)</option>
+                  {/* Names match models.json `name` field exactly for correct specGroup + deviceSources lookup */}
+                  <option value="Amazfit Balance 2">⭐ Amazfit Balance 2 (480×480)</option>
+                  <option value="Amazfit Balance">Amazfit Balance (480×480)</option>
+                  <option value="Amazfit Active Max">Amazfit Active Max (480×480)</option>
+                  <option value="Amazfit Active 3 Premium">Amazfit Active 3 Premium (466×466)</option>
+                  <option value="Amazfit Active 2 (Round)">Amazfit Active 2 Round (466×466)</option>
+                  <option value="Amazfit Active 2 (Square)">Amazfit Active 2 Square (390×450)</option>
+                  <option value="Amazfit Active">Amazfit Active (390×450)</option>
                   <option value="Pop 3S (PIB)">Amazfit Pop 3S / PIB (410×502)</option>
                   {/* Original models */}
-                  <option value="GTR4">Amazfit GTR 4 (466×466)</option>
-                  <option value="GTS4">Amazfit GTS 4 (390×450)</option>
-                  <option value="Cheetah Pro">Amazfit Cheetah Pro (466×466)</option>
-                  <option value="T-Rex 2">Amazfit T-Rex 2 (454×454)</option>
-                  <option value="Falcon">Amazfit Falcon (416×416)</option>
+                  <option value="Amazfit GTR 4">Amazfit GTR 4 (466×466)</option>
+                  <option value="Amazfit GTS 4">Amazfit GTS 4 (390×450)</option>
+                  <option value="Amazfit Cheetah Pro">Amazfit Cheetah Pro (480×480)</option>
+                  <option value="Amazfit T-Rex 2">Amazfit T-Rex 2 (454×454)</option>
+                  <option value="Amazfit Falcon">Amazfit Falcon (416×416)</option>
                 </select>
               </div>
               <div className="space-y-2">
