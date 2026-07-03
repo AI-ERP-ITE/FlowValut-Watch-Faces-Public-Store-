@@ -1245,11 +1245,11 @@ async function preparePointerGeometryForExport(
   const globalLen = el.handLengthScale ?? 1;
   const hubScale = (el.handHubScale ?? 1) * globalLen;
   const len = layer === 'hour'
-    ? (el.handHourLength ?? globalLen)
+    ? globalLen * (el.handHourLength ?? 1)
     : layer === 'minute'
-      ? (el.handMinuteLength ?? globalLen)
+      ? globalLen * (el.handMinuteLength ?? 1)
       : layer === 'second'
-        ? (el.handSecondLength ?? globalLen)
+        ? globalLen * (el.handSecondLength ?? 1)
         : hubScale;
   const wid = layer === 'hour'
     ? (el.handHourWidth ?? 1)

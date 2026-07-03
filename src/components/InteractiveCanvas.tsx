@@ -1928,13 +1928,15 @@ function drawTimePointer(
   const imgMap = handCache ? loadHandImages(style, handCache, onLoaded, customHands) : null;
 
   // ── Per-hand scale: resolve length/width multipliers ───────────────────
-  // "Scale whole" uses handLengthScale for all; "Scale each" uses per-hand fields
+  // "Scale whole" (globalLen) is a global multiplier that compounds with per-hand values.
+  // Formula: finalLen = globalLen × (perHandLen ?? 1.0)
+  // This serves all 5 cases: scale whole only, scale each only, scale whole+each, each+whole, no scale.
   const globalLen = el.handLengthScale ?? 1.0;
   const hubScale = (el.handHubScale ?? 1.0) * globalLen;
   const perScale: Record<string, { len: number; wid: number }> = {
-    hour:   { len: (el.handHourLength   ?? globalLen), wid: (el.handHourWidth   ?? 1.0) },
-    minute: { len: (el.handMinuteLength ?? globalLen), wid: (el.handMinuteWidth ?? 1.0) },
-    second: { len: (el.handSecondLength ?? globalLen), wid: (el.handSecondWidth ?? 1.0) },
+    hour:   { len: globalLen * (el.handHourLength   ?? 1.0), wid: (el.handHourWidth   ?? 1.0) },
+    minute: { len: globalLen * (el.handMinuteLength ?? 1.0), wid: (el.handMinuteWidth ?? 1.0) },
+    second: { len: globalLen * (el.handSecondLength ?? 1.0), wid: (el.handSecondWidth ?? 1.0) },
     cover:  { len: hubScale, wid: hubScale },
   };
 
