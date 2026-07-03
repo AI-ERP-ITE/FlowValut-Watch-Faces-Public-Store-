@@ -100,6 +100,22 @@ interface HandStorageMeta {
     minute: { x: number; y: number };
     second: { x: number; y: number };
   };
+  // Pivot norm fields — SVG-viewBox-space (spec 109) + baked-PNG-space fallback.
+  // All optional so old Firestore docs (without these fields) remain compatible.
+  hourSvgPivotNorm?: number;
+  minuteSvgPivotNorm?: number;
+  secondSvgPivotNorm?: number;
+  hourPivotNorm?: number;
+  minutePivotNorm?: number;
+  secondPivotNorm?: number;
+  hourPosX?: number;
+  hourPosY?: number;
+  minutePosX?: number;
+  minutePosY?: number;
+  secondPosX?: number;
+  secondPosY?: number;
+  coverWidth?: number;
+  coverHeight?: number;
   sourcePaths: { hour: string; minute: string; second: string; hub: string };
   sourceURLs: { hour: string; minute: string; second: string; hub: string };
   sourceHash: string;
@@ -577,6 +593,21 @@ async function pullHands(uid: string): Promise<void> {
         sourceHubHtml,
         handRenderVersion: meta.handRenderVersion,
         pivotOffsets: meta.pivotOffsets,
+        // Restore all pivot norm fields so SVG-native render and tip/tail work after sync
+        ...(meta.hourSvgPivotNorm !== undefined ? { hourSvgPivotNorm: meta.hourSvgPivotNorm } : {}),
+        ...(meta.minuteSvgPivotNorm !== undefined ? { minuteSvgPivotNorm: meta.minuteSvgPivotNorm } : {}),
+        ...(meta.secondSvgPivotNorm !== undefined ? { secondSvgPivotNorm: meta.secondSvgPivotNorm } : {}),
+        ...(meta.hourPivotNorm !== undefined ? { hourPivotNorm: meta.hourPivotNorm } : {}),
+        ...(meta.minutePivotNorm !== undefined ? { minutePivotNorm: meta.minutePivotNorm } : {}),
+        ...(meta.secondPivotNorm !== undefined ? { secondPivotNorm: meta.secondPivotNorm } : {}),
+        ...(meta.hourPosX !== undefined ? { hourPosX: meta.hourPosX } : {}),
+        ...(meta.hourPosY !== undefined ? { hourPosY: meta.hourPosY } : {}),
+        ...(meta.minutePosX !== undefined ? { minutePosX: meta.minutePosX } : {}),
+        ...(meta.minutePosY !== undefined ? { minutePosY: meta.minutePosY } : {}),
+        ...(meta.secondPosX !== undefined ? { secondPosX: meta.secondPosX } : {}),
+        ...(meta.secondPosY !== undefined ? { secondPosY: meta.secondPosY } : {}),
+        ...(meta.coverWidth !== undefined ? { coverWidth: meta.coverWidth } : {}),
+        ...(meta.coverHeight !== undefined ? { coverHeight: meta.coverHeight } : {}),
         sourceHash: meta.sourceHash,
         createdAt: meta.createdAt,
       });
@@ -678,6 +709,21 @@ async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
     downloadURLs,
     bakedVersion,
     ...(isValidPivotOffsets(record.pivotOffsets) ? { pivotOffsets: record.pivotOffsets } : {}),
+    // Persist all pivot norm fields so they survive cloud sync
+    ...(record.hourSvgPivotNorm !== undefined ? { hourSvgPivotNorm: record.hourSvgPivotNorm } : {}),
+    ...(record.minuteSvgPivotNorm !== undefined ? { minuteSvgPivotNorm: record.minuteSvgPivotNorm } : {}),
+    ...(record.secondSvgPivotNorm !== undefined ? { secondSvgPivotNorm: record.secondSvgPivotNorm } : {}),
+    ...(record.hourPivotNorm !== undefined ? { hourPivotNorm: record.hourPivotNorm } : {}),
+    ...(record.minutePivotNorm !== undefined ? { minutePivotNorm: record.minutePivotNorm } : {}),
+    ...(record.secondPivotNorm !== undefined ? { secondPivotNorm: record.secondPivotNorm } : {}),
+    ...(record.hourPosX !== undefined ? { hourPosX: record.hourPosX } : {}),
+    ...(record.hourPosY !== undefined ? { hourPosY: record.hourPosY } : {}),
+    ...(record.minutePosX !== undefined ? { minutePosX: record.minutePosX } : {}),
+    ...(record.minutePosY !== undefined ? { minutePosY: record.minutePosY } : {}),
+    ...(record.secondPosX !== undefined ? { secondPosX: record.secondPosX } : {}),
+    ...(record.secondPosY !== undefined ? { secondPosY: record.secondPosY } : {}),
+    ...(record.coverWidth !== undefined ? { coverWidth: record.coverWidth } : {}),
+    ...(record.coverHeight !== undefined ? { coverHeight: record.coverHeight } : {}),
   };
 
   await setDoc(labDocRef(uid, 'hands', record.key), meta);
