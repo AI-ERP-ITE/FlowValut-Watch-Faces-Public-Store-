@@ -124,10 +124,10 @@ function generateAppJson(config: WatchFaceConfig): string {
     permissions: [],
     runtime: {
       apiVersion: {
-        compatible: '1.0.0',
-        target: '1.0.1',
-        minVersion: '1.0.0',
+          minVersion: '3.0.0',
+          target: '3.0.0',
       },
+        type: 'js',
     },
     i18n: {
       'en-US': {
@@ -139,20 +139,20 @@ function generateAppJson(config: WatchFaceConfig): string {
     debug: false,
     targets: {
       default: {
-        module: {
-          watchface: {
-            path: 'watchface/index.js',
-            main: 1,
-            editable: 0,
-            lockscreen: 0,
-            hightCost: 0,
-          },
-        },
         platforms: deviceSources.map((source) => ({
           name: config.watchModel,
           deviceSource: source,
         })),
         designWidth: config.resolution.width,
+      },
+    },
+    module: {
+      watchface: {
+        path: 'watchface/index',
+        main: 1,
+        editable: 0,
+        lockscreen: 0,
+        hightCost: 0,
       },
     },
     packageInfo: {
