@@ -19,35 +19,116 @@ export interface ZPKBuildResult {
   size: number;
 }
 
+function sanitizeAssetFilename(input: string): string {
+  const trimmed = input.trim();
+  const dot = trimmed.lastIndexOf('.');
+  const hasExt = dot > 0 && dot < trimmed.length - 1;
+  const rawBase = hasExt ? trimmed.slice(0, dot) : trimmed;
+  const rawExt = hasExt ? trimmed.slice(dot + 1) : '';
+
+  const safeBase = rawBase
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'asset';
+
+  const safeExt = rawExt
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase();
+
+  return safeExt ? `${safeBase}.${safeExt}` : safeBase;
+}
+
+function normalizeElementFiles(
+  elementFiles: { src: string; file: File }[]
+): {
+  files: { src: string; file: File }[];
+  srcMap: Map<string, string>;
+} {
+  const used = new Set<string>();
+  const srcMap = new Map<string, string>();
+  const files = elementFiles.map((entry) => {
+    const candidate = sanitizeAssetFilename(entry.src);
+    const extDot = candidate.lastIndexOf('.');
+    const base = extDot > 0 ? candidate.slice(0, extDot) : candidate;
+    const ext = extDot > 0 ? candidate.slice(extDot) : '';
+
+    let safe = candidate;
+    let n = 2;
+    while (used.has(safe.toLowerCase())) {
+      safe = `${base}_${n}${ext}`;
+      n += 1;
+    }
+    used.add(safe.toLowerCase());
+    srcMap.set(entry.src, safe);
+    return { src: safe, file: entry.file };
+  });
+
+  return { files, srcMap };
+}
+
 export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult> {
   console.log('[ZPK] Starting...');
   const { config, backgroundFile, aodBackgroundFile } = options;
   
   try {
+    const normalizedFiles = normalizeElementFiles(options.elementFiles);
+    const normalizedElementFiles = normalizedFiles.files;
+    const srcMap = normalizedFiles.srcMap;
+
     // Build a set of asset filenames from elementFiles for restoring data URLs
-    const assetFilenames = new Set(options.elementFiles.map(ef => ef.src));
+    const assetFilenames = new Set(normalizedElementFiles.map(ef => ef.src));
+
+    const remapSrc = (value?: string): string | undefined => {
+      if (!value) return value;
+      return srcMap.get(value) ?? sanitizeAssetFilename(value);
+    };
     
     // Elements may have data URLs (from preview rendering) instead of filenames.
     // Prefer assetFilename (set by pipeline), fall back to name-based guessing.
     const fixElementSources = (input: WatchFaceConfig['elements']) => input.map(el => {
+      let next = { ...el };
       if (el.src && el.src.startsWith('data:')) {
         // Prefer the deterministic assetFilename set during pipeline
-        if (el.assetFilename && assetFilenames.has(el.assetFilename)) {
-          return { ...el, src: el.assetFilename };
+        const candidate = remapSrc(el.assetFilename);
+        if (candidate && assetFilenames.has(candidate)) {
+          next = { ...next, src: candidate };
+        } else {
+          // Legacy fallback: substring matching
+          const name = el.name.toLowerCase();
+          for (const filename of assetFilenames) {
+            const fn = filename.toLowerCase();
+            if (name.includes('battery') && fn.includes('batt')) { next = { ...next, src: filename }; break; }
+            if (name.includes('heart') && fn.includes('heart')) { next = { ...next, src: filename }; break; }
+            if (name.includes('steps') && fn.includes('step')) { next = { ...next, src: filename }; break; }
+            if (name.includes('arc') && fn.includes('arc')) { next = { ...next, src: filename }; break; }
+            if (name.includes('background') && fn.includes('background')) { next = { ...next, src: filename }; break; }
+          }
+          if (!next.src || next.src.startsWith('data:')) {
+            console.warn('[ZPK] Could not restore filename for element:', el.name);
+          }
         }
-        // Legacy fallback: substring matching
-        const name = el.name.toLowerCase();
-        for (const filename of assetFilenames) {
-          const fn = filename.toLowerCase();
-          if (name.includes('battery') && fn.includes('batt')) return { ...el, src: filename };
-          if (name.includes('heart') && fn.includes('heart')) return { ...el, src: filename };
-          if (name.includes('steps') && fn.includes('step')) return { ...el, src: filename };
-          if (name.includes('arc') && fn.includes('arc')) return { ...el, src: filename };
-          if (name.includes('background') && fn.includes('background')) return { ...el, src: filename };
-        }
-        console.warn('[ZPK] Could not restore filename for element:', el.name);
+      } else {
+        next = {
+          ...next,
+          src: remapSrc(next.src),
+        };
       }
-      return el;
+
+      return {
+        ...next,
+        assetFilename: remapSrc(next.assetFilename),
+        hourHandSrc: remapSrc(next.hourHandSrc),
+        minuteHandSrc: remapSrc(next.minuteHandSrc),
+        secondHandSrc: remapSrc(next.secondHandSrc),
+        coverSrc: remapSrc(next.coverSrc),
+        pressSrc: remapSrc(next.pressSrc),
+        normalSrc: remapSrc(next.normalSrc),
+        images: Array.isArray(next.images) ? next.images.map((v) => remapSrc(v) ?? v) : next.images,
+      };
     });
     const fixedElements = fixElementSources(config.elements);
     const fixedAodElements = config.aodElements ? fixElementSources(config.aodElements) : config.aodElements;
@@ -146,7 +227,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       }
       
       // Add element images (skip background.png since we already added it directly)
-      const filteredElements = options.elementFiles.filter(ef => ef.src !== 'background.png');
+      const filteredElements = normalizedElementFiles.filter(ef => ef.src !== 'background.png');
       console.log('[ZPK] Step 9b: Adding element images, count:', filteredElements.length);
       if (filteredElements.length === 0) {
         console.error('[ZPK] ERROR: No element files to add!');
@@ -159,7 +240,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
         }
         assets.file(elementFile.src, elementFile.file);
       }
-      console.log('[ZPK] Element images added, total:', options.elementFiles.length);
+      console.log('[ZPK] Element images added, total:', normalizedElementFiles.length);
 
       // Pack embeddable font files for TEXT elements
       const fontFilesToPack = new Set<string>();

@@ -125,6 +125,7 @@ function generateAppJson(config: WatchFaceConfig): string {
     runtime: {
       apiVersion: {
           minVersion: '3.0.0',
+          compatible: '3.0.0',
           target: '3.0.0',
       },
         type: 'js',
@@ -138,7 +139,7 @@ function generateAppJson(config: WatchFaceConfig): string {
     defaultLanguage: 'en-US',
     debug: false,
     targets: {
-      default: {
+      [platformMeta.targetKey]: {
         module: {
           watchface: {
             path: 'watchface/index',
@@ -148,12 +149,7 @@ function generateAppJson(config: WatchFaceConfig): string {
             hightCost: 0,
           },
         },
-        platforms: platformMeta.deviceSources.map((source) => ({
-          name: platformMeta.name,
-          st: platformMeta.st,
-          sr: platformMeta.sr,
-          deviceSource: source,
-        })),
+        platforms: platformMeta.platforms,
         designWidth: config.resolution.width,
       },
     },
@@ -169,12 +165,13 @@ function generateAppJson(config: WatchFaceConfig): string {
 }
 
 function getPlatformMeta(config: WatchFaceConfig): {
-  name: string;
+  targetKey: string;
   st: 'r' | 's';
   sr: string;
-  deviceSources: number[];
+  platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }>;
 } {
   const model = getModelEntry(config.watchModel);
+  const allModels = getModelEntries();
   const fallbackShape: 'r' | 's' = config.resolution.width === config.resolution.height ? 'r' : 's';
   const fallbackResTag = fallbackShape === 'r'
     ? `w${config.resolution.width}`
@@ -196,37 +193,64 @@ function getPlatformMeta(config: WatchFaceConfig): {
     }
   }
 
+  const compatibleModels = model?.specGroup
+    ? allModels.filter((entry) => entry.specGroup === model.specGroup)
+    : (model ? [model] : []);
+
+  const platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }> =
+    compatibleModels.length > 0
+      ? compatibleModels.flatMap((entry) =>
+          entry.deviceSources.map((source) => ({
+            name: entry.name,
+            st,
+            sr,
+            deviceSource: source,
+          }))
+        )
+      : [{
+          name: 'Compatible Device',
+          st,
+          sr,
+          deviceSource: 8519936,
+        }];
+
   return {
-    name: model?.name ?? config.watchModel,
+    targetKey: model?.key ?? 'default',
     st,
     sr,
-    deviceSources: model?.deviceSources ?? [8519936, 8519937, 8519939],
+    platforms,
   };
 }
 
 function getModelEntry(watchModel: string): {
+  key: string;
   name: string;
   specGroup?: string;
   deviceSources: number[];
 } | undefined {
+  return getModelEntries().find((model) => (
+    model.key.toLowerCase() === watchModel.trim().toLowerCase()
+    || model.name.toLowerCase() === watchModel.trim().toLowerCase()
+  ));
+}
+
+function getModelEntries(): Array<{
+  key: string;
+  name: string;
+  specGroup?: string;
+  deviceSources: number[];
+}> {
   const models = modelsData as Record<string, {
     name: string;
     specGroup?: string;
     deviceSources: number[];
   }>;
-  const needle = watchModel.trim().toLowerCase();
-
-  for (const [key, model] of Object.entries(models)) {
-    if (key.toLowerCase() === needle || model.name.toLowerCase() === needle) {
-      return {
-        name: model.name,
-        specGroup: model.specGroup,
-        deviceSources: model.deviceSources,
-      };
-    }
-  }
-
-  return undefined;
+  return Object.entries(models).map(([key, model]) => ({
+    key,
+    name: model.name,
+    specGroup: model.specGroup,
+    deviceSources: model.deviceSources,
+  }));
 }
 
 // Generate app.js - Matching working ZPK structure (comes from Brushed_Steel_Petroleum)
