@@ -521,7 +521,8 @@ function generateTimePointerWidgetV3(element: WatchFaceElement): string {
     if (!src) return undefined;
     const clean = src.replace(/^assets\//, '').trim();
     if (!clean) return undefined;
-    return `assets/${clean}`;
+    // Match the proven working watchface runtime convention: hand paths resolve by filename.
+    return clean;
   };
 
   const centerX = element.pointerCenter?.x ?? element.center?.x ?? (element.bounds.x + (element.bounds.width || 480) / 2);
