@@ -99,8 +99,8 @@ function generateWatchFaceCodeV3(config: WatchFaceConfig): GeneratedCode {
 function generateAppJson(config: WatchFaceConfig): string {
   const appId = generateAppId();
   
-  // Get device source for the watch model
-  const deviceSources = getDeviceSources(config.watchModel);
+  // Resolve platform metadata from model catalog with resolution fallback
+  const platformMeta = getPlatformMeta(config);
   
   // Increment version code based on timestamp (ensures each build has higher code)
   const versionCode = Math.floor(Date.now() / 1000);
@@ -139,20 +139,22 @@ function generateAppJson(config: WatchFaceConfig): string {
     debug: false,
     targets: {
       default: {
-        platforms: deviceSources.map((source) => ({
-          name: config.watchModel,
+        module: {
+          watchface: {
+            path: 'watchface/index',
+            main: 1,
+            editable: 0,
+            lockscreen: 0,
+            hightCost: 0,
+          },
+        },
+        platforms: platformMeta.deviceSources.map((source) => ({
+          name: platformMeta.name,
+          st: platformMeta.st,
+          sr: platformMeta.sr,
           deviceSource: source,
         })),
         designWidth: config.resolution.width,
-      },
-    },
-    module: {
-      watchface: {
-        path: 'watchface/index',
-        main: 1,
-        editable: 0,
-        lockscreen: 0,
-        hightCost: 0,
       },
     },
     packageInfo: {
@@ -166,13 +168,65 @@ function generateAppJson(config: WatchFaceConfig): string {
   return JSON.stringify(json, null, 2);
 }
 
-// Get device sources by matching watchModel name against models.json
-function getDeviceSources(watchModel: string): number[] {
-  const models = modelsData as Record<string, { name: string; deviceSources: number[] }>;
-  const entry = Object.values(models).find(
-    (m) => m.name === watchModel || m.name.toLowerCase() === watchModel.toLowerCase()
-  );
-  return entry?.deviceSources ?? [8519936, 8519937, 8519939];
+function getPlatformMeta(config: WatchFaceConfig): {
+  name: string;
+  st: 'r' | 's';
+  sr: string;
+  deviceSources: number[];
+} {
+  const model = getModelEntry(config.watchModel);
+  const fallbackShape: 'r' | 's' = config.resolution.width === config.resolution.height ? 'r' : 's';
+  const fallbackResTag = fallbackShape === 'r'
+    ? `w${config.resolution.width}`
+    : `w${config.resolution.width}h${config.resolution.height}`;
+
+  let st: 'r' | 's' = fallbackShape;
+  let sr = fallbackResTag;
+  const specGroup = model?.specGroup?.toLowerCase();
+
+  if (specGroup) {
+    if (specGroup.includes('round')) {
+      st = 'r';
+      const m = specGroup.match(/^(\d+)-round$/);
+      if (m) sr = `w${m[1]}`;
+    } else if (specGroup.includes('square')) {
+      st = 's';
+      const m = specGroup.match(/^(\d+)x(\d+)-square$/);
+      if (m) sr = `w${m[1]}h${m[2]}`;
+    }
+  }
+
+  return {
+    name: model?.name ?? config.watchModel,
+    st,
+    sr,
+    deviceSources: model?.deviceSources ?? [8519936, 8519937, 8519939],
+  };
+}
+
+function getModelEntry(watchModel: string): {
+  name: string;
+  specGroup?: string;
+  deviceSources: number[];
+} | undefined {
+  const models = modelsData as Record<string, {
+    name: string;
+    specGroup?: string;
+    deviceSources: number[];
+  }>;
+  const needle = watchModel.trim().toLowerCase();
+
+  for (const [key, model] of Object.entries(models)) {
+    if (key.toLowerCase() === needle || model.name.toLowerCase() === needle) {
+      return {
+        name: model.name,
+        specGroup: model.specGroup,
+        deviceSources: model.deviceSources,
+      };
+    }
+  }
+
+  return undefined;
 }
 
 // Generate app.js - Matching working ZPK structure (comes from Brushed_Steel_Petroleum)
