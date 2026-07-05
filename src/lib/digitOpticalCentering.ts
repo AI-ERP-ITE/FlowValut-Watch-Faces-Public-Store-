@@ -165,6 +165,8 @@ export function drawOpticallyCenteredDigit(
   const maxIterations = options?.maxIterations ?? 3;
   const debug = options?.debug ?? false;
   const debugTag = options?.debugTag ?? 'digit';
+  // Temporary test switch: disable optical re-centering on both axes while keeping code intact.
+  const centeringEnabled = false;
 
   ctx.fillStyle = color;
   ctx.font = font;
@@ -183,6 +185,13 @@ export function drawOpticallyCenteredDigit(
     metrics = measureInkMetrics(ctx, width, height);
 
     if (!metrics.hasInk) break;
+
+    if (!centeringEnabled) {
+      // Draw-on-center only: keep existing measurement/debug plumbing but skip all XY shifts.
+      metrics.offsetToTargetX = 0;
+      metrics.offsetToTargetY = 0;
+      break;
+    }
 
     const centerX = pickCenter(
       resolvedXMode,
