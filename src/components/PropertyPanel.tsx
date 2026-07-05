@@ -7,7 +7,7 @@ import type { WatchFaceElement } from '@/types';
 import { getIconLibrary, getFullIconLibrary } from '@/lib/iconLibrary';
 import type { IconEntry } from '@/lib/iconLibrary';
 import { cn } from '@/lib/utils';
-import { FONT_STYLES, getFontStyle } from '@/lib/fontLibrary';
+import { FONT_STYLES, getCustomFontStyles, getFontStyle } from '@/lib/fontLibrary';
 import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
@@ -39,6 +39,7 @@ export interface PropertyPanelProps {
   customGaugePointers?: CustomGaugePointerRecord[]; // user-created gauge pointers from IconLab
   switcherDefinitions?: import('@/types/imageSwitcher').ImageSwitcherDefinition[];
   onOpenSwitcherLab?: () => void;
+  fontLibraryKey?: number; // increment to force font list refresh after lab uploads/deletes
   /** Spec 091: called when buildGaugeFromMarkup creates a companion background IMG element. */
   onAddSiblingElement?: (partialEl: Omit<WatchFaceElement, 'id'>) => void;
   /** Called before re-building gauge siblings to remove stale ones (prevents duplicates). */
@@ -150,9 +151,10 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
+  const [fontSearch, setFontSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
   const [activeTab, setActiveTab] = useState<PanelTab>('position');
   const [gaugeMarkup, setGaugeMarkup] = useState('');
@@ -190,6 +192,15 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
     () => extractFramesFromMarkup(switcherMarkup),
     [switcherMarkup],
   );
+  const fontStyles = useMemo(() => {
+    const merged = [...FONT_STYLES, ...getCustomFontStyles()];
+    const unique = new Map<string, (typeof merged)[number]>();
+    for (const style of merged) unique.set(style.key, style);
+    const query = fontSearch.trim().toLowerCase();
+    return [...unique.values()]
+      .filter((style) => !query || style.label.toLowerCase().includes(query) || style.key.toLowerCase().includes(query))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [fontSearch, fontLibraryKey]);
 
   const update = (changes: Partial<WatchFaceElement>) => {
     if (!element) return;
@@ -2044,9 +2055,17 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               </span>
               <span className="text-[10px] text-white/40">{getFontStyle(element.fontStyle ?? 'bold-white').label}</span>
             </div>
+            <div className="px-2 py-2 border-b border-white/10 bg-zinc-900/80">
+              <Input
+                value={fontSearch}
+                onChange={(e) => setFontSearch(e.target.value)}
+                placeholder="Search font name..."
+                className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/35"
+              />
+            </div>
             {/* Scrollable list */}
             <div className="max-h-48 overflow-y-auto bg-zinc-900">
-              {FONT_STYLES.map(style => (
+              {fontStyles.map(style => (
                 <button
                   key={style.key}
                   onClick={() => update({ fontStyle: style.key, color: style.color })}
@@ -2074,6 +2093,9 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                   </span>
                 </button>
               ))}
+              {fontStyles.length === 0 && (
+                <div className="px-3 py-3 text-xs text-white/45">No fonts match your search.</div>
+              )}
             </div>
           </div>
         </Section>

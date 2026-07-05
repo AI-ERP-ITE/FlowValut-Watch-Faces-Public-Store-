@@ -2012,6 +2012,7 @@ function StudioApp() {
   const [labOpen, setLabOpen] = useState(false);
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
   const [iconLibraryKey, setIconLibraryKey] = useState(0);
+  const [fontLibraryKey, setFontLibraryKey] = useState(0);
   const [customHandStyles, setCustomHandStyles] = useState<CustomHandRecord[]>([]);
   const [customGaugePointers, setCustomGaugePointers] = useState<CustomGaugePointerRecord[]>([]);
   const [addElDataType, setAddElDataType] = useState('HEART');
@@ -2270,6 +2271,7 @@ function StudioApp() {
       if (hands.length > 0) setCustomHandStyles(hands);
       if (gaugePointers.length > 0) setCustomGaugePointers(gaugePointers);
       if (icons.length > 0) setIconLibraryKey(k => k + 1);
+      setFontLibraryKey(k => k + 1);
     };
 
     // Phase 1: load immediately from IndexedDB
@@ -2312,6 +2314,7 @@ function StudioApp() {
     loadCustomFonts().then(async (fonts) => {
       const names = await registerCustomFonts();
       registerCustomFontsInLibrary(names.length > 0 ? names : fonts.map(f => f.name));
+      setFontLibraryKey(k => k + 1);
     });
   }, []);
 
@@ -4764,6 +4767,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                         onAddFrame={handleAddFrame}
                         onRemoveFrame={handleRemoveFrame}
                         iconLibraryKey={iconLibraryKey}
+                        fontLibraryKey={fontLibraryKey}
                         customHandStyles={customHandStyles}
                         customGaugePointers={customGaugePointers}
                         onAddSiblingElement={(partialEl) => {
