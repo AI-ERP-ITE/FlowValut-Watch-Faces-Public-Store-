@@ -1337,12 +1337,14 @@ function regenerateDigitFilesFromElements(
     const canvas = document.createElement('canvas');
     canvas.width = canvasW; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, canvasW, h);
-    ctx.fillStyle = color;
-    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(digit, canvasW / 2, h / 2);
+    drawOpticallyCenteredDigit(
+      ctx,
+      canvasW,
+      h,
+      digit,
+      color,
+      `${fontWeight} ${fontSize}px ${fontFamily}`,
+    );
     return canvas.toDataURL('image/png');
   }
 
