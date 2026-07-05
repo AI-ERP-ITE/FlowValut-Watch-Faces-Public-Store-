@@ -2,6 +2,7 @@ export interface DigitInkMetrics {
   hasInk: boolean;
   targetX: number;
   targetY: number;
+  opticalCenterX: number;
   bboxCenterX: number;
   bboxCenterY: number;
   alphaCentroidX: number;
@@ -67,6 +68,7 @@ function measureInkMetrics(ctx: CanvasRenderingContext2D, width: number, height:
       hasInk: false,
       targetX,
       targetY,
+      opticalCenterX: targetX,
       bboxCenterX: targetX,
       bboxCenterY: targetY,
       alphaCentroidX: targetX,
@@ -84,17 +86,21 @@ function measureInkMetrics(ctx: CanvasRenderingContext2D, width: number, height:
   const alphaCentroidY = alphaWeightedY / alphaWeightSum;
   const pixelCentroidX = pixelXSum / pixelCount;
   const pixelCentroidY = pixelYSum / pixelCount;
+  // Horizontal optical center uses a bbox-heavy blend to avoid anti-aliased edge bias
+  // that can make numerals appear slightly left-shifted on device.
+  const opticalCenterX = bboxCenterX * 0.7 + alphaCentroidX * 0.3;
   return {
     hasInk: true,
     targetX,
     targetY,
+    opticalCenterX,
     bboxCenterX,
     bboxCenterY,
     alphaCentroidX,
     alphaCentroidY,
     pixelCentroidX,
     pixelCentroidY,
-    offsetToTargetX: targetX - alphaCentroidX,
+    offsetToTargetX: targetX - opticalCenterX,
     offsetToTargetY: targetY - alphaCentroidY,
   };
 }
@@ -138,6 +144,7 @@ export function drawOpticallyCenteredDigit(
         height,
         drawX,
         drawY,
+        opticalCenterX: metrics.opticalCenterX,
         bboxCenterX: metrics.bboxCenterX,
         bboxCenterY: metrics.bboxCenterY,
         alphaCentroidX: metrics.alphaCentroidX,
