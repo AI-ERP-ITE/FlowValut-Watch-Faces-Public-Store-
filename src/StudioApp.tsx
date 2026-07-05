@@ -76,6 +76,7 @@ import {
   resolveImageSwitcherFrameCount,
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
+import { drawOpticallyCenteredDigit } from '@/lib/digitOpticalCentering';
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
@@ -631,11 +632,14 @@ async function mockKimiAnalysis(
   
   // Helper: draw a digit on canvas
   function drawDigit(ctx: CanvasRenderingContext2D, w: number, h: number, digit: string, color: string) {
-    ctx.fillStyle = color;
-    ctx.font = `bold ${Math.floor(h * 0.7)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(digit, w / 2, h / 2);
+    drawOpticallyCenteredDigit(
+      ctx,
+      w,
+      h,
+      digit,
+      color,
+      `bold ${Math.floor(h * 0.7)}px Arial`,
+    );
   }
   
   // Generate TIME digit images (0-9) - used by IMG_TIME for hours and minutes

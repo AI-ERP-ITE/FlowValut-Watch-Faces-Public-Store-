@@ -12,6 +12,7 @@ import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { createDefaultGaugePointerDataUrl } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
+import { drawOpticallyCenteredDigit } from '@/lib/digitOpticalCentering';
 
 // ─── Canvas Utility ─────────────────────────────────────────────────────────────
 
@@ -81,11 +82,14 @@ export function generateDigitImages(
   for (let i = 0; i < 10; i++) {
     const name = `${prefix}_${i}.png`;
     const dataUrl = createCanvasImage(width, height, (ctx, w, h) => {
-      ctx.fillStyle = color;
-      ctx.font = `${fontWeight} ${Math.floor(h * 0.75)}px ${fontFamily}`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(i), w / 2, h / 2);
+      drawOpticallyCenteredDigit(
+        ctx,
+        w,
+        h,
+        String(i),
+        color,
+        `${fontWeight} ${Math.floor(h * 0.75)}px ${fontFamily}`,
+      );
     });
     images.push({ name, dataUrl, bounds: { x: 0, y: 0, width, height }, type: 'IMG' });
   }
