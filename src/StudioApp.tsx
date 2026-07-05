@@ -3804,15 +3804,12 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             const sourceMode = resolvedPack?.mode === 'source-based-custom';
             const sourcePivotRatios = sourceMode
               ? {
-                hour: (customHand.hourPosX !== undefined && customHand.hourPosY !== undefined)
-                  ? { x: customHand.hourPosX / 22, y: customHand.hourPosY / 140 }
-                  : parsePivotRatioFromSource(customHand.sourceHourHtml),
-                minute: (customHand.minutePosX !== undefined && customHand.minutePosY !== undefined)
-                  ? { x: customHand.minutePosX / 16, y: customHand.minutePosY / 200 }
-                  : parsePivotRatioFromSource(customHand.sourceMinuteHtml),
-                second: (customHand.secondPosX !== undefined && customHand.secondPosY !== undefined)
-                  ? { x: customHand.secondPosX / 8, y: customHand.secondPosY / 240 }
-                  : parsePivotRatioFromSource(customHand.sourceSecondHtml),
+                hour: parsePivotRatioFromSource(customHand.sourceHourHtml)
+                  ?? { x: customHand.hourPivotXRatio ?? 0.5, y: customHand.hourSvgPivotNorm ?? customHand.hourPivotYRatio ?? customHand.hourPivotNorm ?? (customHand.hourPosY ?? 118) / 140 },
+                minute: parsePivotRatioFromSource(customHand.sourceMinuteHtml)
+                  ?? { x: customHand.minutePivotXRatio ?? 0.5, y: customHand.minuteSvgPivotNorm ?? customHand.minutePivotYRatio ?? customHand.minutePivotNorm ?? (customHand.minutePosY ?? 172) / 200 },
+                second: parsePivotRatioFromSource(customHand.sourceSecondHtml)
+                  ?? { x: customHand.secondPivotXRatio ?? 0.5, y: customHand.secondSvgPivotNorm ?? customHand.secondPivotYRatio ?? customHand.secondPivotNorm ?? (customHand.secondPosY ?? 180) / 240 },
                 cover: { x: 0.5, y: 0.5 },
               }
               : null;
@@ -3822,9 +3819,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             timePointerEl.secondHandSrc = scopedNames.second;
 
             const handFiles = [
-              { name: scopedNames.hour, dataUrl: customHand.hourDataUrl },
-              { name: scopedNames.minute, dataUrl: customHand.minuteDataUrl },
-              { name: scopedNames.second, dataUrl: customHand.secondDataUrl },
+              { name: scopedNames.hour, dataUrl: sourceMode ? (resolvedPack?.sources.hour ?? customHand.hourDataUrl) : customHand.hourDataUrl },
+              { name: scopedNames.minute, dataUrl: sourceMode ? (resolvedPack?.sources.minute ?? customHand.minuteDataUrl) : customHand.minuteDataUrl },
+              { name: scopedNames.second, dataUrl: sourceMode ? (resolvedPack?.sources.second ?? customHand.secondDataUrl) : customHand.secondDataUrl },
             ];
             if (coverDataUrl) handFiles.push({ name: scopedNames.cover, dataUrl: coverDataUrl });
 
@@ -3841,7 +3838,15 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                   : name.startsWith('second_')
                     ? 'second'
                     : 'cover';
-              const ratio = (layer === 'cover' && sourceMode) ? sourcePivotRatios?.cover : null;
+              const ratio = sourceMode
+                ? (layer === 'hour'
+                  ? sourcePivotRatios?.hour
+                  : layer === 'minute'
+                    ? sourcePivotRatios?.minute
+                    : layer === 'second'
+                      ? sourcePivotRatios?.second
+                      : sourcePivotRatios?.cover)
+                : null;
               const prepared = await preparePointerGeometryForExport(dataUrl, layer, timePointerEl, customHand, ratio);
               if (layer === 'hour' && prepared.pivot) timePointerEl.hourPos = prepared.pivot;
               if (layer === 'minute' && prepared.pivot) timePointerEl.minutePos = prepared.pivot;
