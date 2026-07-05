@@ -97,6 +97,8 @@ export interface WatchFaceElement {
   fontArray?: string[];
   hSpace?: number;
   alignH?: string;
+  // Preview-only custom sample value for digit widgets (IMG_DATE / IMG_TIME / TEXT_IMG)
+  previewValue?: string;
 
   // Icon library
   iconKey?: string;

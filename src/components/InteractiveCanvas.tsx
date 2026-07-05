@@ -14,6 +14,7 @@ import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from 
 import { normalizeDropShadowForBake, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import { analyzeFlicker } from '@/utils/flickerEngine';
 import { drawImageWithPhotoEdit, DEFAULT_PHOTO_EDIT } from '@/lib/photoEditUtils';
+import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
   createDefaultGaugePointerDataUrl,
@@ -1757,9 +1758,9 @@ export function getMaxDigitMock(dataType: string | undefined, type: WatchFaceEle
 }
 
 function getPlaceholderText(el: WatchFaceElement): string {
+  const mock = getDigitPreviewValue(el);
+  if (mock && mock.length > 0) return mock;
   const name = el.name.toLowerCase();
-  const mock = getMaxDigitMock(el.dataType, el.type, el.subtype);
-  if (mock) return mock;
   if (name.includes('month')) return 'APR';
   if (name.includes('week')) return 'WED';
   if (name.includes('date')) return '31';
@@ -1784,27 +1785,52 @@ function drawDigitElement(
 
   // If digit images available, draw them
   const images = el.images ?? el.fontArray;
-  if (images && images.length > 0 && digitCache) {
+  if (images && images.length > 0 && digitCache && (el.type === 'IMG_DATE' || el.type === 'IMG_TIME' || el.type === 'TEXT_IMG')) {
     const sampleText = getPlaceholderText(el);
-    const digitCount = Math.max(1, sampleText.replace(/[^0-9A-Za-z]/g, '').length);
-    const digitW = Math.max(1, Math.floor((w - hSpace * Math.max(0, digitCount - 1)) / digitCount));
-    const totalW = digitW * digitCount + hSpace * Math.max(0, digitCount - 1);
-    const startX = alignH === 'CENTER_H'
-      ? Math.floor(x + (w - totalW) / 2)
-      : alignH === 'RIGHT'
-        ? x + w - totalW
-        : x;
-    let drawn = false;
-    for (let i = 0; i < Math.min(digitCount, images.length); i++) {
-      const imgSrc = images[i];
-      if (!imgSrc) continue;
-      const img = getCachedImage(imgSrc, digitCache, onLoad);
+    const chars = sampleText.split('');
+
+    const bitmapMetrics: DigitBitmapMetrics[] = [];
+    const charSrcMap = new Map<string, string>();
+    let allDigitsMapped = chars.length > 0;
+
+    for (const char of chars) {
+      if (!/^\d$/.test(char)) {
+        allDigitsMapped = false;
+        continue;
+      }
+      const src = images[Number(char)];
+      if (!src) {
+        allDigitsMapped = false;
+        continue;
+      }
+      charSrcMap.set(char, src);
+      const img = getCachedImage(src, digitCache, onLoad);
       if (img?.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, startX + i * (digitW + hSpace), y, digitW, h);
-        drawn = true;
+        bitmapMetrics.push({ char, width: img.naturalWidth, height: img.naturalHeight || h });
       }
     }
-    if (drawn) return;
+
+    if (allDigitsMapped) {
+      const layout = computeDigitBitmapLayout({
+        widgetType: el.type,
+        bounds: { x, y, width: w, height: h },
+        value: sampleText,
+        alignH,
+        hSpace,
+        bitmaps: bitmapMetrics,
+      });
+
+      let drawn = false;
+      for (const glyph of layout.glyphs) {
+        const src = charSrcMap.get(glyph.char);
+        if (!src) continue;
+        const img = digitCache.get(src);
+        if (!img?.complete || img.naturalWidth <= 0) continue;
+        ctx.drawImage(img, glyph.x, glyph.y, glyph.width, glyph.height);
+        drawn = true;
+      }
+      if (drawn) return;
+    }
   }
 
   // Fallback: draw placeholder text scaled to fit bounds

@@ -77,6 +77,8 @@ import {
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import { drawOpticallyCenteredDigit } from '@/lib/digitOpticalCentering';
+import { logDigitParityReport } from '@/lib/digitParityValidator';
+import type { DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
@@ -1318,7 +1320,7 @@ function regenerateDigitFilesFromElements(
   const results: { filename: string; dataUrl: string }[] = [];
   const elementUpdates = new Map<string, Partial<WatchFaceElement>>();
 
-  function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
+  function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): { dataUrl: string; width: number; height: number } {
     // Pre-measure the widest digit (0-9) in this font so all digit images share the
     // same width (monospace-like), with minimal whitespace on the sides.
     // This prevents proportional glyphs like "1" from having huge empty margins
@@ -1345,7 +1347,7 @@ function regenerateDigitFilesFromElements(
       color,
       `${fontWeight} ${fontSize}px ${fontFamily}`,
     );
-    return canvas.toDataURL('image/png');
+    return { dataUrl: canvas.toDataURL('image/png'), width: canvasW, height: h };
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
@@ -1382,22 +1384,30 @@ function regenerateDigitFilesFromElements(
       const w = Math.max(Math.floor((el.bounds.width || 60) / 2), 12);
       const h = Math.max(el.bounds.height || 50, 16);
       const scopedDigits: string[] = [];
+      const parityBitmaps: DigitBitmapMetrics[] = [];
       for (let i = 0; i < 10; i++) {
         const filename = `time_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);
-        results.push({ filename, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+        const rendered = makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h);
+        results.push({ filename, dataUrl: rendered.dataUrl });
+        parityBitmaps.push({ char: String(i), width: rendered.width, height: rendered.height });
       }
       elementUpdates.set(el.id, { fontArray: scopedDigits });
+      logDigitParityReport(el, parityBitmaps);
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const w = Math.max(Math.floor((el.bounds.width || 40) / 2), 8);
       const h = Math.max(el.bounds.height || 30, 12);
       const scopedDigits: string[] = [];
+      const parityBitmaps: DigitBitmapMetrics[] = [];
       for (let i = 0; i < 10; i++) {
         const filename = `date_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);
-        results.push({ filename, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+        const rendered = makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h);
+        results.push({ filename, dataUrl: rendered.dataUrl });
+        parityBitmaps.push({ char: String(i), width: rendered.width, height: rendered.height });
       }
       elementUpdates.set(el.id, { fontArray: scopedDigits });
+      logDigitParityReport(el, parityBitmaps);
     } else if (el.type === 'IMG_WEEK') {
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -1436,12 +1446,16 @@ function regenerateDigitFilesFromElements(
         const w = Math.max(Math.floor((el.bounds.width || 64) / 4), 8);
         const h = Math.max(el.bounds.height || 25, 12);
         const scopedDigits: string[] = [];
+        const parityBitmaps: DigitBitmapMetrics[] = [];
         for (let i = 0; i < 10; i++) {
           const filename = `${prefix}_${scope}_${safeId}_${i}.png`;
           scopedDigits.push(filename);
-          results.push({ filename, dataUrl: makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h) });
+          const rendered = makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h);
+          results.push({ filename, dataUrl: rendered.dataUrl });
+          parityBitmaps.push({ char: String(i), width: rendered.width, height: rendered.height });
         }
         elementUpdates.set(el.id, { fontArray: scopedDigits });
+        logDigitParityReport(el, parityBitmaps);
       }
     }
   }

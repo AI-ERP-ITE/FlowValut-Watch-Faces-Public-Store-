@@ -2039,6 +2039,44 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* Preview test values — digit widgets */}
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG') && (
+        <Section label="Preview Test Value">
+          <div className="space-y-2">
+            <Input
+              value={element.previewValue ?? ''}
+              onChange={(e) => update({ previewValue: e.target.value })}
+              placeholder={
+                element.type === 'IMG_DATE'
+                  ? '31'
+                  : element.type === 'IMG_TIME'
+                    ? '10'
+                    : '888'
+              }
+              className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
+            />
+            <div className="grid grid-cols-5 gap-1">
+              {['05', '11', '28', '31', '88'].map((sample) => (
+                <button
+                  key={sample}
+                  onClick={() => update({ previewValue: sample })}
+                  className="h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/70 hover:border-cyan-500/50 hover:text-white"
+                >
+                  {sample}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => update({ previewValue: undefined })}
+              className="h-6 rounded border border-white/10 bg-white/5 px-2 text-[10px] text-white/50 hover:border-white/30 hover:text-white/80"
+            >
+              Clear Custom Value
+            </button>
+            <p className="text-[9px] text-white/35">Preview-only test sample for alignment/parity checks. Export runtime value binding is unchanged.</p>
+          </div>
+        </Section>
+      )}
+
       {/* Font style picker — text/digit elements */}
       {['IMG_TIME', 'TEXT_IMG', 'TEXT', 'IMG_DATE', 'IMG_WEEK'].includes(element.type) && (
         <Section label="Font Style">
