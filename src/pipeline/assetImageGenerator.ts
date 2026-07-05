@@ -12,7 +12,7 @@ import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { createDefaultGaugePointerDataUrl } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
-import { drawOpticallyCenteredDigit } from '@/lib/digitOpticalCentering';
+import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering';
 
 // ─── Canvas Utility ─────────────────────────────────────────────────────────────
 
@@ -81,17 +81,37 @@ export function generateDigitImages(
   const images: ElementImage[] = [];
   for (let i = 0; i < 10; i++) {
     const name = `${prefix}_${i}.png`;
-    const dataUrl = createCanvasImage(width, height, (ctx, w, h) => {
+    const fontSize = Math.floor(height * 0.75);
+    const measureCanvas = document.createElement('canvas');
+    const measureCtx = measureCanvas.getContext('2d');
+    let canvasWidth = width;
+    if (measureCtx) {
+      measureCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      let maxGlyphW = 0;
+      for (let d = 0; d <= 9; d++) {
+        const metrics = measureCtx.measureText(String(d));
+        maxGlyphW = Math.max(maxGlyphW, Math.ceil(metrics.width));
+      }
+      canvasWidth = Math.max(width, Math.max(maxGlyphW + 4, 10));
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvasWidth, height);
       drawOpticallyCenteredDigit(
         ctx,
-        w,
-        h,
+        canvasWidth,
+        height,
         String(i),
         color,
-        `${fontWeight} ${Math.floor(h * 0.75)}px ${fontFamily}`,
+        `${fontWeight} ${fontSize}px ${fontFamily}`,
       );
-    });
-    images.push({ name, dataUrl, bounds: { x: 0, y: 0, width, height }, type: 'IMG' });
+    }
+    const trimmed = trimHorizontalTransparentPadding(canvas);
+    const dataUrl = trimmed.canvas.toDataURL('image/png');
+    images.push({ name, dataUrl, bounds: { x: 0, y: 0, width: trimmed.width, height: trimmed.height }, type: 'IMG' });
   }
   return images;
 }

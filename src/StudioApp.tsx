@@ -76,7 +76,7 @@ import {
   resolveImageSwitcherFrameCount,
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
-import { drawOpticallyCenteredDigit } from '@/lib/digitOpticalCentering';
+import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering';
 import { logDigitParityReport } from '@/lib/digitParityValidator';
 import type { DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import type { PointerParityResult, PointerParityStage } from '@/types';
@@ -1333,12 +1333,12 @@ function regenerateDigitFilesFromElements(
       const m = measureCtx.measureText(String(d));
       maxGlyphW = Math.max(maxGlyphW, Math.ceil(m.width));
     }
-    // Canvas width = widest glyph + 2px margin on each side, capped by caller's max
-    const canvasW = Math.min(w, Math.max(maxGlyphW + 4, 10));
+    const canvasW = Math.max(w, Math.max(maxGlyphW + 4, 10));
 
     const canvas = document.createElement('canvas');
     canvas.width = canvasW; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvasW, h);
     drawOpticallyCenteredDigit(
       ctx,
       canvasW,
@@ -1347,7 +1347,8 @@ function regenerateDigitFilesFromElements(
       color,
       `${fontWeight} ${fontSize}px ${fontFamily}`,
     );
-    return { dataUrl: canvas.toDataURL('image/png'), width: canvasW, height: h };
+    const trimmed = trimHorizontalTransparentPadding(canvas);
+    return { dataUrl: trimmed.canvas.toDataURL('image/png'), width: trimmed.width, height: trimmed.height };
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {

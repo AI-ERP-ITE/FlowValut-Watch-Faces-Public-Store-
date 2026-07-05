@@ -38,6 +38,15 @@ export interface DigitCenteringResult {
   metrics: DigitInkMetrics;
 }
 
+export interface DigitTrimResult {
+  canvas: HTMLCanvasElement;
+  leftPadding: number;
+  rightPadding: number;
+  width: number;
+  height: number;
+  hasInk: boolean;
+}
+
 function measureInkMetrics(ctx: CanvasRenderingContext2D, width: number, height: number): DigitInkMetrics {
   const imageData = ctx.getImageData(0, 0, width, height).data;
   let minX = width;
@@ -114,6 +123,72 @@ function measureInkMetrics(ctx: CanvasRenderingContext2D, width: number, height:
     pixelCentroidY,
     offsetToTargetX: targetX - opticalCenterX,
     offsetToTargetY: targetY - opticalCenterY,
+  };
+}
+
+export function trimHorizontalTransparentPadding(source: HTMLCanvasElement): DigitTrimResult {
+  const ctx = source.getContext('2d');
+  if (!ctx) {
+    return {
+      canvas: source,
+      leftPadding: 0,
+      rightPadding: 0,
+      width: source.width,
+      height: source.height,
+      hasInk: false,
+    };
+  }
+
+  const imageData = ctx.getImageData(0, 0, source.width, source.height).data;
+  let minX = source.width;
+  let maxX = -1;
+
+  for (let y = 0; y < source.height; y++) {
+    for (let x = 0; x < source.width; x++) {
+      const idx = (y * source.width + x) * 4;
+      if (imageData[idx + 3] <= 0) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+    }
+  }
+
+  if (maxX < minX) {
+    return {
+      canvas: source,
+      leftPadding: 0,
+      rightPadding: 0,
+      width: source.width,
+      height: source.height,
+      hasInk: false,
+    };
+  }
+
+  const trimmedWidth = Math.max(1, maxX - minX + 1);
+  const out = document.createElement('canvas');
+  out.width = trimmedWidth;
+  out.height = source.height;
+  const outCtx = out.getContext('2d');
+  if (!outCtx) {
+    return {
+      canvas: source,
+      leftPadding: minX,
+      rightPadding: Math.max(0, source.width - 1 - maxX),
+      width: source.width,
+      height: source.height,
+      hasInk: true,
+    };
+  }
+
+  outCtx.clearRect(0, 0, out.width, out.height);
+  outCtx.drawImage(source, minX, 0, trimmedWidth, source.height, 0, 0, trimmedWidth, source.height);
+
+  return {
+    canvas: out,
+    leftPadding: minX,
+    rightPadding: Math.max(0, source.width - 1 - maxX),
+    width: trimmedWidth,
+    height: source.height,
+    hasInk: true,
   };
 }
 
