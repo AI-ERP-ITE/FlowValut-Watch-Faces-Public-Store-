@@ -1191,36 +1191,6 @@ function parsePivotRatioFromSource(code?: string): { x: number; y: number } | nu
   };
 }
 
-function getAlphaBoundsFromImageData(data: Uint8ClampedArray, width: number, height: number) {
-  let minX = width;
-  let minY = height;
-  let maxX = -1;
-  let maxY = -1;
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const alpha = data[(y * width + x) * 4 + 3];
-      if (alpha > 0) {
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-
-  if (maxX < 0 || maxY < 0) {
-    return null;
-  }
-
-  return {
-    x: minX,
-    y: minY,
-    width: Math.max(1, maxX - minX + 1),
-    height: Math.max(1, maxY - minY + 1),
-  };
-}
-
 async function preparePointerGeometryForExport(
   dataUrl: string,
   layer: PointerLayer,
@@ -1310,15 +1280,9 @@ async function preparePointerGeometryForExport(
   let sy = 0;
   let sw = width;
   let sh = height;
-  if (!sourceMode || layer === 'cover') {
-    const bounds = getAlphaBoundsFromImageData(ctx.getImageData(0, 0, width, height).data, width, height);
-    if (bounds) {
-      sx = bounds.x;
-      sy = bounds.y;
-      sw = bounds.width;
-      sh = bounds.height;
-    }
-  }
+  // Export parity fix: keep full source canvas for pointer layers.
+  // Cropping to alpha bounds changes aspect and can clip fine tip pixels,
+  // which makes on-device hands look longer/wider than preview.
 
   const out = document.createElement('canvas');
   out.width = finalTargetW + effectPad * 2;
