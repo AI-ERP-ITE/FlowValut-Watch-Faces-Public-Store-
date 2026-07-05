@@ -1773,20 +1773,34 @@ function drawDigitElement(
   onLoad: (() => void) | undefined,
 ) {
   const { x, y, width: w, height: h } = el.bounds;
+  const resolveAlignH = (): 'LEFT' | 'CENTER_H' | 'RIGHT' => {
+    const raw = String(el.alignH ?? '').toUpperCase();
+    if (raw === 'LEFT' || raw === 'CENTER_H' || raw === 'RIGHT') return raw;
+    if (el.type === 'TEXT_IMG' || el.type === 'IMG_DATE' || el.type === 'IMG_WEEK') return 'CENTER_H';
+    return 'LEFT';
+  };
+  const alignH = resolveAlignH();
+  const hSpace = Number.isFinite(Number(el.hSpace)) ? Math.max(0, Math.floor(Number(el.hSpace))) : 0;
 
   // If digit images available, draw them
   const images = el.images ?? el.fontArray;
   if (images && images.length > 0 && digitCache) {
     const sampleText = getPlaceholderText(el);
     const digitCount = Math.max(1, sampleText.replace(/[^0-9A-Za-z]/g, '').length);
-    const digitW = Math.floor(w / digitCount);
+    const digitW = Math.max(1, Math.floor((w - hSpace * Math.max(0, digitCount - 1)) / digitCount));
+    const totalW = digitW * digitCount + hSpace * Math.max(0, digitCount - 1);
+    const startX = alignH === 'CENTER_H'
+      ? Math.floor(x + (w - totalW) / 2)
+      : alignH === 'RIGHT'
+        ? x + w - totalW
+        : x;
     let drawn = false;
     for (let i = 0; i < Math.min(digitCount, images.length); i++) {
       const imgSrc = images[i];
       if (!imgSrc) continue;
       const img = getCachedImage(imgSrc, digitCache, onLoad);
       if (img?.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, x + i * digitW, y, digitW, h);
+        ctx.drawImage(img, startX + i * (digitW + hSpace), y, digitW, h);
         drawn = true;
       }
     }
@@ -1811,9 +1825,10 @@ function drawDigitElement(
   ctx.save();
   ctx.fillStyle = color;
   ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-  ctx.textAlign = 'left';
+  ctx.textAlign = alignH === 'CENTER_H' ? 'center' : alignH === 'RIGHT' ? 'right' : 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, x, y + h / 2, w);
+  const textX = alignH === 'CENTER_H' ? x + w / 2 : alignH === 'RIGHT' ? x + w : x;
+  ctx.fillText(text, textX, y + h / 2, w);
   ctx.restore();
 }
 

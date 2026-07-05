@@ -589,10 +589,17 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
                 });`;
 }
 
+function normalizeAlignH(value: string | undefined, fallback: 'LEFT' | 'CENTER_H' | 'RIGHT'): 'LEFT' | 'CENTER_H' | 'RIGHT' {
+  const raw = String(value ?? '').toUpperCase();
+  if (raw === 'LEFT' || raw === 'CENTER_H' || raw === 'RIGHT') return raw;
+  return fallback;
+}
+
 // Generate IMG_DATE widget with day arrays
 function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 92;
   const y = element.bounds.y || 198;
+  const alignH = normalizeAlignH(element.alignH, 'CENTER_H');
 
   const raw = element.fontArray ?? element.images;
   const dayDigits = Array.isArray(raw) && raw.length > 0
@@ -610,7 +617,7 @@ function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, s
                     day_en_array: ${digitArrayStr},
                     day_zero: 1,
                     day_space: 0,
-                    day_align: hmUI.align.LEFT,
+                    day_align: hmUI.align.${alignH},
                     day_is_character: false,
                     show_level: hmUI.show_level.${showLevel}
                 });`;
@@ -621,6 +628,7 @@ function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, s
 function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 105;
   const y = element.bounds.y || 198;
+  const alignH = normalizeAlignH(element.alignH, 'CENTER_H');
   const explicitMonthArray = Array.isArray(element.images) && element.images.length >= 12
     ? element.images.slice(0, 12)
     : null;
@@ -641,7 +649,7 @@ function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, 
                     month_zero: 0,
                     month_space: 0,
                     month_is_character: true,
-                    month_align: hmUI.align.LEFT,
+                    month_align: hmUI.align.${alignH},
                     show_level: hmUI.show_level.${showLevel}
                 });`;
 }
@@ -895,7 +903,7 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
     : '';
 
   const hSpace = element.hSpace ?? 1;
-  const alignH = element.alignH ?? 'LEFT';
+  const alignH = normalizeAlignH(element.alignH, 'CENTER_H');
 
   return `
                 // ${element.name} - TEXT_IMG Widget
