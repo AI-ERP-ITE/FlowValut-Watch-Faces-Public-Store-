@@ -2,13 +2,13 @@
   "480-round": {
     "resolution": "480x480",
     "shape": "round",
-    "supportedConfigVersions": ["v2", "v3"],
+    "supportedConfigVersions": ["v2"],
     "thumbnail": "324x324"
   },
   "466-round": {
     "resolution": "466x466",
     "shape": "round",
-    "supportedConfigVersions": ["v2", "v3"],
+    "supportedConfigVersions": ["v2"],
     "thumbnail": "314x314"
   },
   "454-round": {
@@ -27,20 +27,20 @@
     "resolution": "390x450",
     "shape": "square",
     "cornerRadius": 86,
-    "supportedConfigVersions": ["v2", "v3"],
+    "supportedConfigVersions": ["v2"],
     "thumbnail": "266x307"
   },
   "360-round": {
     "resolution": "360x360",
     "shape": "round",
-    "supportedConfigVersions": ["v3"],
+    "supportedConfigVersions": ["v2"],
     "thumbnail": "243x243"
   },
   "320x380-square": {
     "resolution": "320x380",
     "shape": "square",
     "cornerRadius": 69,
-    "supportedConfigVersions": ["v2", "v3"],
+    "supportedConfigVersions": ["v2"],
     "thumbnail": "200x238"
   }
 }

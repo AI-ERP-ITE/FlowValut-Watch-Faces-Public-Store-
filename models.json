@@ -1,6 +1,8 @@
 {
   "balance":            { "name": "Amazfit Balance",              "brand": "amazfit", "specGroup": "480-round",      "deviceSources": [8519936, 8519937, 8519939] },
   "balance-2":          { "name": "Amazfit Balance 2",            "brand": "amazfit", "specGroup": "480-round",      "deviceSources": [9568512, 9568513, 9568515] },
+  "balance-3":          { "name": "Amazfit Balance 3",            "brand": "amazfit", "specGroup": "480-round",      "deviceSources": [9568512, 9568513, 9568515] },
+  "balance-ultra":      { "name": "Amazfit Balance Ultra",        "brand": "amazfit", "specGroup": "480-round",      "deviceSources": [9568512, 9568513, 9568515] },
   "cheetah-pro":        { "name": "Amazfit Cheetah Pro",          "brand": "amazfit", "specGroup": "480-round",      "deviceSources": [8126720, 8126721] },
   "t-rex-3":            { "name": "Amazfit T-Rex 3",              "brand": "amazfit", "specGroup": "480-round",      "deviceSources": [8716544, 8716545, 8716547] },
   "t-rex-ultra-2":      { "name": "Amazfit T-Rex Ultra 2",        "brand": "amazfit", "specGroup": "480-round",      "deviceSources": [10879232, 10879233, 10879235] },
