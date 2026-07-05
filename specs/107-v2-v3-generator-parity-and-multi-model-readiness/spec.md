@@ -43,6 +43,7 @@ Out of scope for this spec phase:
 ### D. Multi-model editor readiness risks (non-generator)
 - Interactive canvas uses fixed square constants that can distort square/rect model preview behavior.
 - Some background/render helper paths still assume single-dimension resolution behavior.
+- Digit sprite layout currently needs explicit advance metadata so trimmed digit bitmaps do not collapse the intended per-glyph spacing.
 
 ## Requirements
 
@@ -84,6 +85,7 @@ Define required editor behavior:
 - Rect models preserve rect viewport framing.
 - Background generation uses both width and height.
 - Drag/resize bounds clamp to active model dimensions.
+- Digit widgets preserve original advance width and bearing metadata even when transparent padding is trimmed from the rendered sprite.
 
 ### R4. Pointer model-independence clarification
 Document that pointer pivot is element-local (hand image pivot + center coords) and should remain independent of model class, provided editor coordinate space is correct.

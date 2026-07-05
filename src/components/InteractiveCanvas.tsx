@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
-import type { BackgroundTransform, WatchFaceElement } from '@/types';
+import type { BackgroundTransform, ElementImage, WatchFaceElement } from '@/types';
 import { getIconByKey } from '@/lib/iconLibrary';
 import { getFontStyle } from '@/lib/fontLibrary';
 import { generateWeatherSet } from '@/lib/weatherIconSets';
@@ -63,6 +63,7 @@ export interface InteractiveCanvasProps {
   backgroundImage?: string;
   backgroundTransform?: BackgroundTransform;
   elements: WatchFaceElement[];
+    elementImages?: ElementImage[];
   selectedElementId?: string | null;
   onSelectElement?: (id: string | null) => void;
   onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
@@ -105,6 +106,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   backgroundImage,
   backgroundTransform,
   elements,
+  elementImages,
   selectedElementId,
   onSelectElement,
   onUpdateElement,
@@ -156,6 +158,10 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   showGridRef.current = showGrid;
   const iconImageCache = useRef(new Map<string, HTMLImageElement>());
   const digitImageCache = useRef(new Map<string, HTMLImageElement>());
+  const digitImageMap = new Map<string, ElementImage>();
+  for (const image of elementImages ?? []) {
+    digitImageMap.set(image.name, image);
+  }
   // handImageCache: style key → { hour, minute, second, cover } images
   const handImageCache = useRef(new Map<string, Map<string, HTMLImageElement>>());
   const lastWarningsKeyRef = useRef<string>('');
@@ -197,7 +203,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     if (showGridRef.current) drawGrid(ctx);
 
     // Elements
-    drawElements(ctx, elements, iconImageCache.current, digitImageCache.current, draw, handImageCache.current, customHandStylesRef.current);
+    drawElements(ctx, elements, iconImageCache.current, digitImageCache.current, draw, handImageCache.current, customHandStylesRef.current, digitImageMap);
 
     let sceneFlickerMask: Uint8Array | null = null;
 
@@ -1320,7 +1326,7 @@ function applyFlickerOverlayWithMask(ctx: CanvasRenderingContext2D, invalidMask:
 
 // ─── Element Dispatcher ─────────────────────────────────────────────────────────
 
-function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[], iconCache?: Map<string, HTMLImageElement>, digitCache?: Map<string, HTMLImageElement>, onIconLoaded?: () => void, handCache?: Map<string, Map<string, HTMLImageElement>>, customHands?: CustomHandRecord[]) {
+function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[], iconCache?: Map<string, HTMLImageElement>, digitCache?: Map<string, HTMLImageElement>, onIconLoaded?: () => void, handCache?: Map<string, Map<string, HTMLImageElement>>, customHands?: CustomHandRecord[], digitAssets?: Map<string, ElementImage>) {
   const sorted = [...elements].filter(e => e.visible).sort((a, b) => a.zIndex - b.zIndex);
 
   for (const el of sorted) {
@@ -1377,7 +1383,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'TEXT_IMG':
         ctx.save();
         applyShadow(ctx, el);
-        drawDigitElement(ctx, el, digitCache, onIconLoaded);
+        drawDigitElement(ctx, el, digitCache, onIconLoaded, digitAssets);
         clearShadow(ctx);
         ctx.restore();
         break;
@@ -1772,6 +1778,7 @@ function drawDigitElement(
   el: WatchFaceElement,
   digitCache: Map<string, HTMLImageElement> | undefined,
   onLoad: (() => void) | undefined,
+  digitAssets?: Map<string, ElementImage>,
 ) {
   const { x, y, width: w, height: h } = el.bounds;
   const resolveAlignH = (): 'LEFT' | 'CENTER_H' | 'RIGHT' => {
@@ -1806,7 +1813,18 @@ function drawDigitElement(
       charSrcMap.set(char, src);
       const img = getCachedImage(src, digitCache, onLoad);
       if (img?.complete && img.naturalWidth > 0) {
-        bitmapMetrics.push({ char, width: img.naturalWidth, height: img.naturalHeight || h });
+        const meta = digitAssets?.get(src);
+        bitmapMetrics.push({
+          char,
+          width: img.naturalWidth,
+          height: img.naturalHeight || h,
+          advanceWidth: meta?.digitMetrics?.advanceWidth,
+          advanceHeight: meta?.digitMetrics?.advanceHeight,
+          trimLeft: meta?.digitMetrics?.trimLeft,
+          trimRight: meta?.digitMetrics?.trimRight,
+          trimTop: meta?.digitMetrics?.trimTop,
+          trimBottom: meta?.digitMetrics?.trimBottom,
+        });
       }
     }
 

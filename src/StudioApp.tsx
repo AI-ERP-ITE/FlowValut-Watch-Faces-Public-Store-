@@ -643,35 +643,51 @@ async function mockKimiAnalysis(
       `bold ${Math.floor(h * 0.7)}px Arial`,
     );
   }
+
+  function makeTrimmedDigitImage(
+    filename: string,
+    digit: string,
+    color: string,
+    size: { w: number; h: number },
+    type: 'IMG' | 'TEXT_IMG',
+  ): ElementImage {
+    const canvas = document.createElement('canvas');
+    canvas.width = size.w;
+    canvas.height = size.h;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, size.w, size.h);
+      drawDigit(ctx, size.w, size.h, digit, color);
+    }
+    const trimmed = trimHorizontalTransparentPadding(canvas);
+    return {
+      name: filename,
+      dataUrl: trimmed.canvas.toDataURL('image/png'),
+      bounds: { x: 0, y: 0, width: trimmed.width, height: trimmed.height },
+      type,
+      digitMetrics: {
+        advanceWidth: size.w,
+        advanceHeight: size.h,
+        trimLeft: trimmed.leftPadding,
+        trimRight: trimmed.rightPadding,
+        trimTop: 0,
+        trimBottom: 0,
+      },
+    };
+  }
   
   // Generate TIME digit images (0-9) - used by IMG_TIME for hours and minutes
   const timeDigitSize = { w: 30, h: 50 };
   for (let i = 0; i < 10; i++) {
     const filename = `time_digit_${i}.png`;
-    const dataUrl = createCanvasImage(timeDigitSize.w, timeDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#FFFFFF');
-    });
-    elementImages.push({
-      name: filename,
-      dataUrl,
-      bounds: { x: 0, y: 0, width: timeDigitSize.w, height: timeDigitSize.h },
-      type: 'IMG',
-    });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#FFFFFF', timeDigitSize, 'IMG'));
   }
   
   // Generate DATE digit images (0-9) - used by IMG_DATE for day numbers
   const dateDigitSize = { w: 20, h: 30 };
   for (let i = 0; i < 10; i++) {
     const filename = `date_digit_${i}.png`;
-    const dataUrl = createCanvasImage(dateDigitSize.w, dateDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#CCCCCC');
-    });
-    elementImages.push({
-      name: filename,
-      dataUrl,
-      bounds: { x: 0, y: 0, width: dateDigitSize.w, height: dateDigitSize.h },
-      type: 'IMG',
-    });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#CCCCCC', dateDigitSize, 'IMG'));
   }
   
   // Generate WEEK images (7 days) - used by IMG_WEEK
@@ -698,105 +714,63 @@ async function mockKimiAnalysis(
   const battDigitSize = { w: 16, h: 25 };
   for (let i = 0; i < 10; i++) {
     const filename = `batt_digit_${i}.png`;
-    const dataUrl = createCanvasImage(battDigitSize.w, battDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#00CC88');
-    });
-    elementImages.push({
-      name: filename,
-      dataUrl,
-      bounds: { x: 0, y: 0, width: battDigitSize.w, height: battDigitSize.h },
-      type: 'TEXT_IMG',
-    });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#00CC88', battDigitSize, 'TEXT_IMG'));
   }
 
   // Generate HEART RATE digit images (0-9) - used by TEXT_IMG
   const heartDigitSize = { w: 18, h: 30 };
   for (let i = 0; i < 10; i++) {
     const filename = `heart_digit_${i}.png`;
-    const dataUrl = createCanvasImage(heartDigitSize.w, heartDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#FF6B6B');
-    });
-    elementImages.push({
-      name: filename,
-      dataUrl,
-      bounds: { x: 0, y: 0, width: heartDigitSize.w, height: heartDigitSize.h },
-      type: 'TEXT_IMG',
-    });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#FF6B6B', heartDigitSize, 'TEXT_IMG'));
   }
 
   // Generate STEPS digit images (0-9) - used by TEXT_IMG
   const stepDigitSize = { w: 18, h: 30 };
   for (let i = 0; i < 10; i++) {
     const filename = `step_digit_${i}.png`;
-    const dataUrl = createCanvasImage(stepDigitSize.w, stepDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#FFD93D');
-    });
-    elementImages.push({
-      name: filename,
-      dataUrl,
-      bounds: { x: 0, y: 0, width: stepDigitSize.w, height: stepDigitSize.h },
-      type: 'TEXT_IMG',
-    });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#FFD93D', stepDigitSize, 'TEXT_IMG'));
   }
 
   // Generate CALORIES digit images (0-9) - used by TEXT_IMG CAL
   const calDigitSize = { w: 16, h: 25 };
   for (let i = 0; i < 10; i++) {
     const filename = `cal_digit_${i}.png`;
-    const dataUrl = createCanvasImage(calDigitSize.w, calDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#FF9F43');
-    });
-    elementImages.push({ name: filename, dataUrl, bounds: { x: 0, y: 0, width: calDigitSize.w, height: calDigitSize.h }, type: 'TEXT_IMG' });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#FF9F43', calDigitSize, 'TEXT_IMG'));
   }
 
   // Generate DISTANCE digit images (0-9) - used by TEXT_IMG DIST
   const distDigitSize = { w: 16, h: 25 };
   for (let i = 0; i < 10; i++) {
     const filename = `dist_digit_${i}.png`;
-    const dataUrl = createCanvasImage(distDigitSize.w, distDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#54A0FF');
-    });
-    elementImages.push({ name: filename, dataUrl, bounds: { x: 0, y: 0, width: distDigitSize.w, height: distDigitSize.h }, type: 'TEXT_IMG' });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#54A0FF', distDigitSize, 'TEXT_IMG'));
   }
 
   // Generate PAI digit images (0-9) - used by TEXT_IMG PAI_DAILY
   const paiDigitSize = { w: 16, h: 25 };
   for (let i = 0; i < 10; i++) {
     const filename = `pai_digit_${i}.png`;
-    const dataUrl = createCanvasImage(paiDigitSize.w, paiDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#5F27CD');
-    });
-    elementImages.push({ name: filename, dataUrl, bounds: { x: 0, y: 0, width: paiDigitSize.w, height: paiDigitSize.h }, type: 'TEXT_IMG' });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#5F27CD', paiDigitSize, 'TEXT_IMG'));
   }
 
   // Generate SPO2 digit images (0-9) - used by TEXT_IMG SPO2
   const spo2DigitSize = { w: 16, h: 25 };
   for (let i = 0; i < 10; i++) {
     const filename = `spo2_digit_${i}.png`;
-    const dataUrl = createCanvasImage(spo2DigitSize.w, spo2DigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#EE5A24');
-    });
-    elementImages.push({ name: filename, dataUrl, bounds: { x: 0, y: 0, width: spo2DigitSize.w, height: spo2DigitSize.h }, type: 'TEXT_IMG' });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#EE5A24', spo2DigitSize, 'TEXT_IMG'));
   }
 
   // Generate HUMIDITY digit images (0-9) - used by TEXT_IMG HUMIDITY
   const humDigitSize = { w: 16, h: 25 };
   for (let i = 0; i < 10; i++) {
     const filename = `hum_digit_${i}.png`;
-    const dataUrl = createCanvasImage(humDigitSize.w, humDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#0ABDE3');
-    });
-    elementImages.push({ name: filename, dataUrl, bounds: { x: 0, y: 0, width: humDigitSize.w, height: humDigitSize.h }, type: 'TEXT_IMG' });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#0ABDE3', humDigitSize, 'TEXT_IMG'));
   }
 
   // Generate UVI digit images (0-9) - used by TEXT_IMG UVI
   const uviDigitSize = { w: 16, h: 25 };
   for (let i = 0; i < 10; i++) {
     const filename = `uvi_digit_${i}.png`;
-    const dataUrl = createCanvasImage(uviDigitSize.w, uviDigitSize.h, (ctx, w, h) => {
-      drawDigit(ctx, w, h, String(i), '#FFC312');
-    });
-    elementImages.push({ name: filename, dataUrl, bounds: { x: 0, y: 0, width: uviDigitSize.w, height: uviDigitSize.h }, type: 'TEXT_IMG' });
+    elementImages.push(makeTrimmedDigitImage(filename, String(i), '#FFC312', uviDigitSize, 'TEXT_IMG'));
   }
 
   // Generate MONTH images (0-11) - used by IMG_DATE month (12-image array)
@@ -1320,7 +1294,7 @@ function regenerateDigitFilesFromElements(
   const results: { filename: string; dataUrl: string }[] = [];
   const elementUpdates = new Map<string, Partial<WatchFaceElement>>();
 
-  function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): { dataUrl: string; width: number; height: number } {
+  function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): { dataUrl: string; width: number; height: number; digitMetrics: NonNullable<import('@/types').ElementImage['digitMetrics']> } {
     // Pre-measure the widest digit (0-9) in this font so all digit images share the
     // same width (monospace-like), with minimal whitespace on the sides.
     // This prevents proportional glyphs like "1" from having huge empty margins
@@ -1348,7 +1322,19 @@ function regenerateDigitFilesFromElements(
       `${fontWeight} ${fontSize}px ${fontFamily}`,
     );
     const trimmed = trimHorizontalTransparentPadding(canvas);
-    return { dataUrl: trimmed.canvas.toDataURL('image/png'), width: trimmed.width, height: trimmed.height };
+    return {
+      dataUrl: trimmed.canvas.toDataURL('image/png'),
+      width: trimmed.width,
+      height: trimmed.height,
+      digitMetrics: {
+        advanceWidth: canvasW,
+        advanceHeight: h,
+        trimLeft: trimmed.leftPadding,
+        trimRight: trimmed.rightPadding,
+        trimTop: trimmed.canvas.height > 0 ? 0 : 0,
+        trimBottom: trimmed.canvas.height > 0 ? 0 : 0,
+      },
+    };
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
@@ -1391,7 +1377,17 @@ function regenerateDigitFilesFromElements(
         scopedDigits.push(filename);
         const rendered = makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h);
         results.push({ filename, dataUrl: rendered.dataUrl });
-        parityBitmaps.push({ char: String(i), width: rendered.width, height: rendered.height });
+        parityBitmaps.push({
+          char: String(i),
+          width: rendered.width,
+          height: rendered.height,
+          advanceWidth: rendered.digitMetrics.advanceWidth,
+          advanceHeight: rendered.digitMetrics.advanceHeight,
+          trimLeft: rendered.digitMetrics.trimLeft,
+          trimRight: rendered.digitMetrics.trimRight,
+          trimTop: rendered.digitMetrics.trimTop,
+          trimBottom: rendered.digitMetrics.trimBottom,
+        });
       }
       elementUpdates.set(el.id, { fontArray: scopedDigits });
       logDigitParityReport(el, parityBitmaps);
@@ -1405,7 +1401,17 @@ function regenerateDigitFilesFromElements(
         scopedDigits.push(filename);
         const rendered = makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h);
         results.push({ filename, dataUrl: rendered.dataUrl });
-        parityBitmaps.push({ char: String(i), width: rendered.width, height: rendered.height });
+        parityBitmaps.push({
+          char: String(i),
+          width: rendered.width,
+          height: rendered.height,
+          advanceWidth: rendered.digitMetrics.advanceWidth,
+          advanceHeight: rendered.digitMetrics.advanceHeight,
+          trimLeft: rendered.digitMetrics.trimLeft,
+          trimRight: rendered.digitMetrics.trimRight,
+          trimTop: rendered.digitMetrics.trimTop,
+          trimBottom: rendered.digitMetrics.trimBottom,
+        });
       }
       elementUpdates.set(el.id, { fontArray: scopedDigits });
       logDigitParityReport(el, parityBitmaps);
@@ -4720,6 +4726,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                       backgroundImage={activeBackgroundImage ?? undefined}
                       backgroundTransform={activeBackgroundTransform}
                       elements={activeElements}
+                      elementImages={state.elementImages}
                       selectedElementId={selectedElementId}
                       extraSelectedIds={extraSelectedIds}
                       onSelectElement={handleSelectElement}

@@ -288,6 +288,14 @@ export interface ElementImage {
     height: number;
   };
   type: string;
+  digitMetrics?: {
+    advanceWidth: number;
+    advanceHeight: number;
+    trimLeft: number;
+    trimRight: number;
+    trimTop: number;
+    trimBottom: number;
+  };
 }
 
 export interface GitHubUploadResult {

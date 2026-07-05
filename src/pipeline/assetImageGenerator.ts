@@ -111,7 +111,20 @@ export function generateDigitImages(
     }
     const trimmed = trimHorizontalTransparentPadding(canvas);
     const dataUrl = trimmed.canvas.toDataURL('image/png');
-    images.push({ name, dataUrl, bounds: { x: 0, y: 0, width: trimmed.width, height: trimmed.height }, type: 'IMG' });
+    images.push({
+      name,
+      dataUrl,
+      bounds: { x: 0, y: 0, width: trimmed.width, height: trimmed.height },
+      type: 'IMG',
+      digitMetrics: {
+        advanceWidth: canvasWidth,
+        advanceHeight: height,
+        trimLeft: trimmed.leftPadding,
+        trimRight: trimmed.rightPadding,
+        trimTop: 0,
+        trimBottom: 0,
+      },
+    });
   }
   return images;
 }

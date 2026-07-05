@@ -31,6 +31,7 @@ For each matrix entry above, verify:
 1. Canvas viewport matches selected model resolution/aspect ratio.
 2. Background frame and crop boundaries match model dimensions.
 3. Element drag/resize bounds clamp to active model dimensions.
+4. Digit sprites keep intended spacing after transparent padding is removed by using preserved advance metrics during placement.
 
 ## Regression Guardrails
 1. Existing 480x480 watchface exports unchanged for baseline cases.

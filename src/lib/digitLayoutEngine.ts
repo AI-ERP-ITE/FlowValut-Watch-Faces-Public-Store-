@@ -7,6 +7,12 @@ export interface DigitBitmapMetrics {
   char: string;
   width: number;
   height: number;
+  advanceWidth?: number;
+  advanceHeight?: number;
+  trimLeft?: number;
+  trimRight?: number;
+  trimTop?: number;
+  trimBottom?: number;
 }
 
 export interface DigitLayoutRequest {
@@ -24,6 +30,8 @@ export interface DigitGlyphBox {
   y: number;
   width: number;
   height: number;
+  offsetX: number;
+  advanceWidth: number;
 }
 
 export interface DigitLayoutResult {
@@ -58,7 +66,7 @@ function fallbackValue(widgetType: DigitWidgetType): string {
 
 function averageWidth(metrics: DigitBitmapMetrics[], fallback: number): number {
   if (metrics.length === 0) return fallback;
-  const sum = metrics.reduce((acc, m) => acc + Math.max(1, m.width), 0);
+  const sum = metrics.reduce((acc, m) => acc + Math.max(1, m.advanceWidth ?? m.width), 0);
   return sum / metrics.length;
 }
 
@@ -116,7 +124,18 @@ export function computeDigitBitmapLayout(request: DigitLayoutRequest): DigitLayo
     return Math.max(1, fallbackW);
   });
 
-  const totalWidth = widths.reduce((acc, w) => acc + w, 0) + hSpace * Math.max(0, widths.length - 1);
+  const advanceWidths = chars.map((char, index) => {
+    const metric = byChar.get(char);
+    if (metric) {
+      const sourceAdvance = Math.max(1, metric.advanceWidth ?? metric.width);
+      const sourceHeight = Math.max(1, metric.advanceHeight ?? metric.height);
+      return Math.max(1, Math.round((sourceAdvance / sourceHeight) * bounds.height));
+    }
+    if (/[-.:]/.test(char)) return Math.max(2, Math.round(avgKnownW * 0.5));
+    return widths[index];
+  });
+
+  const totalWidth = advanceWidths.reduce((acc, w) => acc + w, 0) + hSpace * Math.max(0, advanceWidths.length - 1);
   const startX = alignH === 'CENTER_H'
     ? Math.floor(bounds.x + (bounds.width - totalWidth) / 2)
     : alignH === 'RIGHT'
@@ -126,15 +145,22 @@ export function computeDigitBitmapLayout(request: DigitLayoutRequest): DigitLayo
   const glyphs: DigitGlyphBox[] = [];
   let cursor = startX;
   for (let i = 0; i < chars.length; i++) {
+    const metric = byChar.get(chars[i]);
     const w = widths[i];
+    const advanceWidth = advanceWidths[i];
+    const offsetX = metric
+      ? Math.max(0, Math.round(((metric.trimLeft ?? 0) / Math.max(1, metric.advanceHeight ?? metric.height)) * bounds.height))
+      : 0;
     glyphs.push({
       char: chars[i],
       x: cursor,
       y: bounds.y,
       width: w,
       height: bounds.height,
+      offsetX,
+      advanceWidth,
     });
-    cursor += w + hSpace;
+    cursor += advanceWidth + hSpace;
   }
 
   return {
