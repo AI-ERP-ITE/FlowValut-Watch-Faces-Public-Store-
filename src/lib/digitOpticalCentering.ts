@@ -1,8 +1,11 @@
+export type DigitCenterMode = 'auto' | 'alpha' | 'bbox' | 'pixel' | 'blend';
+
 export interface DigitInkMetrics {
   hasInk: boolean;
   targetX: number;
   targetY: number;
   opticalCenterX: number;
+  opticalCenterY: number;
   bboxCenterX: number;
   bboxCenterY: number;
   alphaCentroidX: number;
@@ -14,6 +17,13 @@ export interface DigitInkMetrics {
 }
 
 export interface DigitCenteringOptions {
+  mode?: DigitCenterMode;
+  xMode?: Exclude<DigitCenterMode, 'auto'>;
+  yMode?: Exclude<DigitCenterMode, 'auto'>;
+  xBlendAlphaWeight?: number;
+  yBlendAlphaWeight?: number;
+  xBiasPx?: number;
+  yBiasPx?: number;
   thresholdPxX?: number;
   thresholdPxY?: number;
   maxIterations?: number;
@@ -69,6 +79,7 @@ function measureInkMetrics(ctx: CanvasRenderingContext2D, width: number, height:
       targetX,
       targetY,
       opticalCenterX: targetX,
+      opticalCenterY: targetY,
       bboxCenterX: targetX,
       bboxCenterY: targetY,
       alphaCentroidX: targetX,
@@ -86,14 +97,15 @@ function measureInkMetrics(ctx: CanvasRenderingContext2D, width: number, height:
   const alphaCentroidY = alphaWeightedY / alphaWeightSum;
   const pixelCentroidX = pixelXSum / pixelCount;
   const pixelCentroidY = pixelYSum / pixelCount;
-  // Horizontal optical center uses a bbox-heavy blend to avoid anti-aliased edge bias
-  // that can make numerals appear slightly left-shifted on device.
-  const opticalCenterX = bboxCenterX * 0.7 + alphaCentroidX * 0.3;
+  // Defaults are resolved in drawOpticallyCenteredDigit based on mode.
+  const opticalCenterX = alphaCentroidX;
+  const opticalCenterY = alphaCentroidY;
   return {
     hasInk: true,
     targetX,
     targetY,
     opticalCenterX,
+    opticalCenterY,
     bboxCenterX,
     bboxCenterY,
     alphaCentroidX,
@@ -101,8 +113,34 @@ function measureInkMetrics(ctx: CanvasRenderingContext2D, width: number, height:
     pixelCentroidX,
     pixelCentroidY,
     offsetToTargetX: targetX - opticalCenterX,
-    offsetToTargetY: targetY - alphaCentroidY,
+    offsetToTargetY: targetY - opticalCenterY,
   };
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function pickCenter(
+  mode: Exclude<DigitCenterMode, 'auto'>,
+  bbox: number,
+  alpha: number,
+  pixel: number,
+  alphaWeight: number,
+): number {
+  switch (mode) {
+    case 'bbox':
+      return bbox;
+    case 'pixel':
+      return pixel;
+    case 'blend': {
+      const w = clamp01(alphaWeight);
+      return alpha * w + bbox * (1 - w);
+    }
+    case 'alpha':
+    default:
+      return alpha;
+  }
 }
 
 export function drawOpticallyCenteredDigit(
@@ -114,8 +152,16 @@ export function drawOpticallyCenteredDigit(
   font: string,
   options?: DigitCenteringOptions,
 ): DigitCenteringResult {
-  const thresholdPxX = options?.thresholdPxX ?? 0.15;
-  const thresholdPxY = options?.thresholdPxY ?? 0.15;
+  const mode = options?.mode ?? 'auto';
+  const resolvedXMode: Exclude<DigitCenterMode, 'auto'> = mode === 'auto' ? 'blend' : (options?.xMode ?? mode);
+  const resolvedYMode: Exclude<DigitCenterMode, 'auto'> = mode === 'auto' ? 'alpha' : (options?.yMode ?? mode);
+  // Auto policy tuned for watchface digits: X uses visual-mass dominant blend, Y uses alpha center.
+  const xBlendAlphaWeight = options?.xBlendAlphaWeight ?? (mode === 'auto' ? 0.65 : 0.7);
+  const yBlendAlphaWeight = options?.yBlendAlphaWeight ?? 0.6;
+  const xBiasPx = options?.xBiasPx ?? 0;
+  const yBiasPx = options?.yBiasPx ?? 0;
+  const thresholdPxX = options?.thresholdPxX ?? 0.25;
+  const thresholdPxY = options?.thresholdPxY ?? 0.25;
   const maxIterations = options?.maxIterations ?? 3;
   const debug = options?.debug ?? false;
   const debugTag = options?.debugTag ?? 'digit';
@@ -127,7 +173,7 @@ export function drawOpticallyCenteredDigit(
 
   let drawX = width / 2;
   let drawY = height / 2;
-  let metrics = measureInkMetrics(ctx, width, height);
+  let metrics!: DigitInkMetrics;
   let iterations = 0;
 
   for (let i = 0; i < maxIterations; i++) {
@@ -137,6 +183,29 @@ export function drawOpticallyCenteredDigit(
     metrics = measureInkMetrics(ctx, width, height);
 
     if (!metrics.hasInk) break;
+
+    const centerX = pickCenter(
+      resolvedXMode,
+      metrics.bboxCenterX,
+      metrics.alphaCentroidX,
+      metrics.pixelCentroidX,
+      xBlendAlphaWeight,
+    );
+    const centerY = pickCenter(
+      resolvedYMode,
+      metrics.bboxCenterY,
+      metrics.alphaCentroidY,
+      metrics.pixelCentroidY,
+      yBlendAlphaWeight,
+    );
+    const offsetToTargetX = metrics.targetX + xBiasPx - centerX;
+    const offsetToTargetY = metrics.targetY + yBiasPx - centerY;
+
+    metrics.opticalCenterX = centerX;
+    metrics.opticalCenterY = centerY;
+    metrics.offsetToTargetX = offsetToTargetX;
+    metrics.offsetToTargetY = offsetToTargetY;
+
     if (debug) {
       console.log('[DigitCenter]', debugTag, {
         iteration: iterations,
