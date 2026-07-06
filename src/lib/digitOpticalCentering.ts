@@ -1,3 +1,14 @@
+/**
+ * @deprecated by Spec 114 (Bitmap Geometry Refactor).
+ *
+ * The iterative optical centering approach has been replaced by the geometry engine
+ * in digitBitmapGeometry.ts. That engine measures actual glyph ink, computes the
+ * optimal bitmap size, and renders digits with minimal padding — making optical
+ * compensation unnecessary.
+ *
+ * This file is kept for diagnostic purposes only.
+ * Do NOT use drawOpticallyCenteredDigit or trimHorizontalTransparentPadding in new code.
+ */
 export type DigitCenterMode = 'auto' | 'alpha' | 'bbox' | 'pixel' | 'blend';
 
 export interface DigitInkMetrics {

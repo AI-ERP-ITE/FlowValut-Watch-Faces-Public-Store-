@@ -12,8 +12,7 @@ import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
 import { createDefaultGaugePointerDataUrl } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
-import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering';
-import { extractVisibleGlyphMetrics, buildPairCorrectionTable } from '@/lib/digitGlyphMetrics';
+import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
 
 // ─── Canvas Utility ─────────────────────────────────────────────────────────────
 
@@ -70,57 +69,31 @@ export function generateCurvedTextImage(
 
 // ─── Digit Generator ────────────────────────────────────────────────────────────
 
+/**
+ * Spec 114 — Geometry-correct digit image generation.
+ * Replaces the previous trimming+optical-centering approach.
+ * All 10 digits share the same optimized bitmap size derived from measured ink.
+ */
 export function generateDigitImages(
   prefix: string,
-  width: number,
+  _width: number,
   height: number,
   color: string,
   style?: { fontFamily: string; fontWeight: string },
 ): ElementImage[] {
   const fontFamily = style?.fontFamily ?? 'Arial';
   const fontWeight = style?.fontWeight ?? 'bold';
-  const fontSize = Math.floor(height * 0.75);
-  // Pre-measure max glyph width so canvas is wide enough before trimming
-  const measureCanvas = document.createElement('canvas');
-  const measureCtx = measureCanvas.getContext('2d');
-  let canvasWidth = width;
-  if (measureCtx) {
-    measureCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
-    let maxGlyphW = 0;
-    for (let d = 0; d <= 9; d++) {
-      maxGlyphW = Math.max(maxGlyphW, Math.ceil(measureCtx.measureText(String(d)).width));
-    }
-    canvasWidth = Math.max(width, Math.max(maxGlyphW + 4, 10));
-  }
 
-  // Spec 113: collect per-digit glyph metrics so we can build a pair correction table
-  const glyphMetricsList: import('@/lib/digitGlyphMetrics').GlyphMetrics[] = [];
-  const rendered: { name: string; dataUrl: string; w: number; h: number; gm: import('@/lib/digitGlyphMetrics').GlyphMetrics }[] = [];
+  // Spec 114: one call generates all 10 digits at the optimized size
+  const family = generateOptimizedDigitBitmaps(fontFamily, fontWeight, height, color);
 
-  for (let i = 0; i < 10; i++) {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasWidth;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, canvasWidth, height);
-    drawOpticallyCenteredDigit(ctx, canvasWidth, height, String(i), color, `${fontWeight} ${fontSize}px ${fontFamily}`);
-    const gm = extractVisibleGlyphMetrics(ctx, canvasWidth, height, String(i));
-    glyphMetricsList.push(gm);
-    const trimmed = trimHorizontalTransparentPadding(canvas);
-    rendered.push({ name: `${prefix}_${i}.png`, dataUrl: trimmed.canvas.toDataURL('image/png'), w: trimmed.width, h: trimmed.height, gm });
-  }
-
-  const table = buildPairCorrectionTable(glyphMetricsList, height);
-  const images: ElementImage[] = rendered.map((r, idx) => ({
-    name: r.name,
-    dataUrl: r.dataUrl,
-    bounds: { x: 0, y: 0, width: r.w, height: r.h },
+  return family.map((d) => ({
+    name: `${prefix}_${d.char}.png`,
+    dataUrl: d.dataUrl,
+    bounds: { x: 0, y: 0, width: d.width, height: d.height },
     type: 'IMG',
-    glyphMetrics: r.gm,
-    ...(idx === 0 ? { pairCorrectionTable: table } : {}),
+    glyphMetrics: d.measurement as unknown as import('@/types').ElementImage['glyphMetrics'],
   }));
-
-  return images;
 }
 
 // ─── Text Label Generator ───────────────────────────────────────────────────────

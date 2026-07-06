@@ -1778,7 +1778,7 @@ function drawDigitElement(
   el: WatchFaceElement,
   digitCache: Map<string, HTMLImageElement> | undefined,
   onLoad: (() => void) | undefined,
-  digitAssets?: Map<string, ElementImage>,
+  _digitAssets?: Map<string, ElementImage>,
 ) {
   const { x, y, width: w, height: h } = el.bounds;
   const resolveAlignH = (): 'LEFT' | 'CENTER_H' | 'RIGHT' => {
@@ -1813,33 +1813,16 @@ function drawDigitElement(
       charSrcMap.set(char, src);
       const img = getCachedImage(src, digitCache, onLoad);
       if (img?.complete && img.naturalWidth > 0) {
-        const meta = digitAssets?.get(src);
-        // Spec 113: prefer visible-ink glyph metrics; fall back to old advance metrics
-        const gm = meta?.glyphMetrics;
+        // Spec 114: advance = bitmap width. No ink metrics needed at runtime.
         bitmapMetrics.push({
           char,
           width: img.naturalWidth,
           height: img.naturalHeight || h,
-          // Spec 113 visible-ink fields
-          inkWidth: gm?.inkWidth,
-          inkHeight: gm?.inkHeight,
-          inkLeft: gm?.inkLeft,
-          opticalCenterX: gm?.opticalCenterX,
-          sourceHeight: gm?.sourceHeight,
-          sourceWidth: gm?.sourceWidth,
-          // Legacy fallback
-          advanceWidth: meta?.digitMetrics?.advanceWidth,
-          advanceHeight: meta?.digitMetrics?.advanceHeight,
-          trimLeft: meta?.digitMetrics?.trimLeft,
-          trimRight: meta?.digitMetrics?.trimRight,
         });
       }
     }
 
-    // Spec 113: look up pair correction table from the _0 image if available
-    const firstSrc = images[0];
-    const pairCorrectionTable = firstSrc ? digitAssets?.get(firstSrc)?.pairCorrectionTable : undefined;
-
+    // Spec 114: pairCorrectionTable removed — geometry engine provides correct spacing.
     if (allDigitsMapped) {
       const layout = computeDigitBitmapLayout({
         widgetType: el.type,
@@ -1848,7 +1831,6 @@ function drawDigitElement(
         alignH,
         hSpace,
         bitmaps: bitmapMetrics,
-        pairCorrectionTable,
       });
 
       let drawn = false;

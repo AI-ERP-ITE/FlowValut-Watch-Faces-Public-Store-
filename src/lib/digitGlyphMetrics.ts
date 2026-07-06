@@ -1,8 +1,14 @@
 /**
  * Spec 113 — Visible Glyph Metrics for Automatic Optical Pair Centering
  *
- * All geometry is measured from visible ink pixels only.
- * Canvas/PNG dimensions are never used for layout calculations.
+ * @deprecated (pair correction portion) by Spec 114 (Bitmap Geometry Refactor).
+ *
+ * The pair correction table approach (buildPairCorrectionTable, computeAllPairCorrections)
+ * has been replaced. The geometry engine in digitBitmapGeometry.ts eliminates the need
+ * for runtime or export-time pair corrections by ensuring canvas ≈ ink from the start.
+ *
+ * The ink measurement utilities (extractVisibleGlyphMetrics, validatePairCorrectionTable)
+ * remain useful for diagnostics and are kept.
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
