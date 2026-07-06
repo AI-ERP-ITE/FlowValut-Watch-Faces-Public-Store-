@@ -78,6 +78,8 @@ import {
 } from '@/lib/elementDataRules';
 import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering';
 import { logDigitParityReport } from '@/lib/digitParityValidator';
+import { extractVisibleGlyphMetrics, buildPairCorrectionTable, logValidationReport, validatePairCorrectionTable } from '@/lib/digitGlyphMetrics';
+import type { GlyphMetrics } from '@/lib/digitGlyphMetrics';
 import type { DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -659,20 +661,14 @@ async function mockKimiAnalysis(
       ctx.clearRect(0, 0, size.w, size.h);
       drawDigit(ctx, size.w, size.h, digit, color);
     }
+    const glyphMetrics = ctx ? extractVisibleGlyphMetrics(ctx, size.w, size.h, digit) : undefined;
     const trimmed = trimHorizontalTransparentPadding(canvas);
     return {
       name: filename,
       dataUrl: trimmed.canvas.toDataURL('image/png'),
       bounds: { x: 0, y: 0, width: trimmed.width, height: trimmed.height },
       type,
-      digitMetrics: {
-        advanceWidth: size.w,
-        advanceHeight: size.h,
-        trimLeft: trimmed.leftPadding,
-        trimRight: trimmed.rightPadding,
-        trimTop: 0,
-        trimBottom: 0,
-      },
+      ...(glyphMetrics ? { glyphMetrics } : {}),
     };
   }
   
@@ -1294,11 +1290,9 @@ function regenerateDigitFilesFromElements(
   const results: { filename: string; dataUrl: string }[] = [];
   const elementUpdates = new Map<string, Partial<WatchFaceElement>>();
 
-  function makeDigitCanvas(digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): { dataUrl: string; width: number; height: number; digitMetrics: NonNullable<import('@/types').ElementImage['digitMetrics']> } {
-    // Pre-measure the widest digit (0-9) in this font so all digit images share the
-    // same width (monospace-like), with minimal whitespace on the sides.
-    // This prevents proportional glyphs like "1" from having huge empty margins
-    // that appear as large visual gaps (e.g. "0  1" on device).
+  function makeDigitCanvas(
+    digit: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number,
+  ): { dataUrl: string; width: number; height: number; glyphMetrics: GlyphMetrics } {
     const fontSize = Math.floor(h * 0.75);
     const measureCtx = document.createElement('canvas').getContext('2d')!;
     measureCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
@@ -1308,32 +1302,19 @@ function regenerateDigitFilesFromElements(
       maxGlyphW = Math.max(maxGlyphW, Math.ceil(m.width));
     }
     const canvasW = Math.max(w, Math.max(maxGlyphW + 4, 10));
-
     const canvas = document.createElement('canvas');
     canvas.width = canvasW; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, canvasW, h);
-    drawOpticallyCenteredDigit(
-      ctx,
-      canvasW,
-      h,
-      digit,
-      color,
-      `${fontWeight} ${fontSize}px ${fontFamily}`,
-    );
+    drawOpticallyCenteredDigit(ctx, canvasW, h, digit, color, `${fontWeight} ${fontSize}px ${fontFamily}`);
+    // Spec 113: extract visible glyph metrics BEFORE trimming (metrics use source canvas coords)
+    const glyphMetrics = extractVisibleGlyphMetrics(ctx, canvasW, h, digit);
     const trimmed = trimHorizontalTransparentPadding(canvas);
     return {
       dataUrl: trimmed.canvas.toDataURL('image/png'),
       width: trimmed.width,
       height: trimmed.height,
-      digitMetrics: {
-        advanceWidth: canvasW,
-        advanceHeight: h,
-        trimLeft: trimmed.leftPadding,
-        trimRight: trimmed.rightPadding,
-        trimTop: trimmed.canvas.height > 0 ? 0 : 0,
-        trimBottom: trimmed.canvas.height > 0 ? 0 : 0,
-      },
+      glyphMetrics,
     };
   }
 
@@ -1371,50 +1352,50 @@ function regenerateDigitFilesFromElements(
       const w = Math.max(Math.floor((el.bounds.width || 60) / 2), 12);
       const h = Math.max(el.bounds.height || 50, 16);
       const scopedDigits: string[] = [];
-      const parityBitmaps: DigitBitmapMetrics[] = [];
+      const collectedGlyphs: GlyphMetrics[] = [];
+      const renderedSet: { filename: string; rendered: ReturnType<typeof makeDigitCanvas> }[] = [];
       for (let i = 0; i < 10; i++) {
         const filename = `time_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);
         const rendered = makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h);
-        results.push({ filename, dataUrl: rendered.dataUrl });
-        parityBitmaps.push({
-          char: String(i),
-          width: rendered.width,
-          height: rendered.height,
-          advanceWidth: rendered.digitMetrics.advanceWidth,
-          advanceHeight: rendered.digitMetrics.advanceHeight,
-          trimLeft: rendered.digitMetrics.trimLeft,
-          trimRight: rendered.digitMetrics.trimRight,
-          trimTop: rendered.digitMetrics.trimTop,
-          trimBottom: rendered.digitMetrics.trimBottom,
-        });
+        renderedSet.push({ filename, rendered });
+        collectedGlyphs.push(rendered.glyphMetrics);
+      }
+      const table = buildPairCorrectionTable(collectedGlyphs, h);
+      logValidationReport(validatePairCorrectionTable(table), `IMG_TIME ${el.name}`);
+      for (let i = 0; i < renderedSet.length; i++) {
+        const { filename, rendered } = renderedSet[i];
+        results.push({
+          filename, dataUrl: rendered.dataUrl,
+          glyphMetrics: rendered.glyphMetrics,
+          ...(i === 0 ? { pairCorrectionTable: table } : {}),
+        } as Parameters<typeof results.push>[0]);
       }
       elementUpdates.set(el.id, { fontArray: scopedDigits });
-      logDigitParityReport(el, parityBitmaps);
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const w = Math.max(Math.floor((el.bounds.width || 40) / 2), 8);
       const h = Math.max(el.bounds.height || 30, 12);
       const scopedDigits: string[] = [];
-      const parityBitmaps: DigitBitmapMetrics[] = [];
+      const collectedGlyphs: GlyphMetrics[] = [];
+      const renderedSet: { filename: string; rendered: ReturnType<typeof makeDigitCanvas> }[] = [];
       for (let i = 0; i < 10; i++) {
         const filename = `date_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);
         const rendered = makeDigitCanvas(String(i), color, fontFamily, fontWeight, w, h);
-        results.push({ filename, dataUrl: rendered.dataUrl });
-        parityBitmaps.push({
-          char: String(i),
-          width: rendered.width,
-          height: rendered.height,
-          advanceWidth: rendered.digitMetrics.advanceWidth,
-          advanceHeight: rendered.digitMetrics.advanceHeight,
-          trimLeft: rendered.digitMetrics.trimLeft,
-          trimRight: rendered.digitMetrics.trimRight,
-          trimTop: rendered.digitMetrics.trimTop,
-          trimBottom: rendered.digitMetrics.trimBottom,
-        });
+        renderedSet.push({ filename, rendered });
+        collectedGlyphs.push(rendered.glyphMetrics);
+      }
+      const table = buildPairCorrectionTable(collectedGlyphs, h);
+      logValidationReport(validatePairCorrectionTable(table), `IMG_DATE ${el.name}`);
+      for (let i = 0; i < renderedSet.length; i++) {
+        const { filename, rendered } = renderedSet[i];
+        results.push({
+          filename, dataUrl: rendered.dataUrl,
+          glyphMetrics: rendered.glyphMetrics,
+          ...(i === 0 ? { pairCorrectionTable: table } : {}),
+        } as Parameters<typeof results.push>[0]);
       }
       elementUpdates.set(el.id, { fontArray: scopedDigits });
-      logDigitParityReport(el, parityBitmaps);
     } else if (el.type === 'IMG_WEEK') {
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];

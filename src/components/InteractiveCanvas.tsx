@@ -1814,19 +1814,31 @@ function drawDigitElement(
       const img = getCachedImage(src, digitCache, onLoad);
       if (img?.complete && img.naturalWidth > 0) {
         const meta = digitAssets?.get(src);
+        // Spec 113: prefer visible-ink glyph metrics; fall back to old advance metrics
+        const gm = meta?.glyphMetrics;
         bitmapMetrics.push({
           char,
           width: img.naturalWidth,
           height: img.naturalHeight || h,
+          // Spec 113 visible-ink fields
+          inkWidth: gm?.inkWidth,
+          inkHeight: gm?.inkHeight,
+          inkLeft: gm?.inkLeft,
+          opticalCenterX: gm?.opticalCenterX,
+          sourceHeight: gm?.sourceHeight,
+          sourceWidth: gm?.sourceWidth,
+          // Legacy fallback
           advanceWidth: meta?.digitMetrics?.advanceWidth,
           advanceHeight: meta?.digitMetrics?.advanceHeight,
           trimLeft: meta?.digitMetrics?.trimLeft,
           trimRight: meta?.digitMetrics?.trimRight,
-          trimTop: meta?.digitMetrics?.trimTop,
-          trimBottom: meta?.digitMetrics?.trimBottom,
         });
       }
     }
+
+    // Spec 113: look up pair correction table from the _0 image if available
+    const firstSrc = images[0];
+    const pairCorrectionTable = firstSrc ? digitAssets?.get(firstSrc)?.pairCorrectionTable : undefined;
 
     if (allDigitsMapped) {
       const layout = computeDigitBitmapLayout({
@@ -1836,6 +1848,7 @@ function drawDigitElement(
         alignH,
         hSpace,
         bitmaps: bitmapMetrics,
+        pairCorrectionTable,
       });
 
       let drawn = false;

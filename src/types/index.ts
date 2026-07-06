@@ -288,6 +288,11 @@ export interface ElementImage {
     height: number;
   };
   type: string;
+  /** Spec 113: visible-ink glyph metrics for optical pair centering. Replaces old advanceWidth approach. */
+  glyphMetrics?: import('./glyphMetricsTypes').GlyphMetrics;
+  /** Spec 113: full pair correction table for this digit font set. Set on the _0.png image; looked up by font prefix. */
+  pairCorrectionTable?: import('./glyphMetricsTypes').PairCorrectionTable;
+  /** @deprecated Use glyphMetrics instead. Kept for backward compat during migration. */
   digitMetrics?: {
     advanceWidth: number;
     advanceHeight: number;
