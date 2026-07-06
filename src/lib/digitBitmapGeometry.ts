@@ -24,13 +24,7 @@ const MARGIN_V = 2;
 /** Scratch canvas multiplier: render at this multiple of target height to avoid clipping during measurement. */
 const SCRATCH_SCALE = 4;
 
-/**
- * Minimum ink fraction: narrow digits (like "1") are scaled up so their ink width
- * is at least MIN_INK_FRACTION * maxInkW. Prevents large visible gaps in pairs like "11", "18", "31".
- * 0.85 = 15/15 pairs pass ≤6px gap threshold for Arial bold.
- * This is automatic and font-independent — no font-specific hacks.
- */
-const MIN_INK_FRACTION = 0.85;
+// MIN_INK_FRACTION removed — bitmap now sized to element bounds, not ink. No scaling needed.
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -249,61 +243,40 @@ function renderDigitToBitmap(
  * Narrow digits (e.g. "1") are scaled up to MIN_INK_FRACTION * maxInkW so they
  * fill the cell visually — eliminating large gaps in pairs like "11", "18", "31".
  */
+/**
+ * Spec 114 — Generate 10 digit bitmaps sized exactly to element bounds.
+ * bitmapW and bitmapH are passed by the caller (element bounds / digit count).
+ * Font size = largest that fits. No transparent-padding compensation needed.
+ */
 export function generateOptimizedDigitBitmaps(
   fontFamily: string,
   fontWeight: string,
   targetHeight: number,
   color: string,
+  targetWidth?: number, // if provided, each digit is targetWidth wide
 ): RenderedDigit[] {
-  const fontSize = Math.floor(targetHeight * 0.75);
+  const bitmapH = targetHeight;
+  const bitmapW = targetWidth ?? targetHeight; // fallback: square if width not given
 
-  // Phase 1: measure all 10 digits
+  // Find largest fontSize where maxInkH+2 <= bitmapH AND maxInkW+2 <= bitmapW
+  let fontSize = Math.floor(bitmapH * 0.9); // start near full height
+  for (let attempt = 0; attempt < 20 && fontSize > 4; attempt++) {
+    const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
+    const maxInkW = Math.max(...measurements.map(m => m.visibleWidth));
+    const maxInkH = Math.max(...measurements.map(m => m.visibleHeight));
+    if (maxInkH + MARGIN_V <= bitmapH && maxInkW + MARGIN_H <= bitmapW) break;
+    fontSize = Math.floor(fontSize * 0.93); // reduce until it fits
+  }
+
   const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
+  const size: OptimizedBitmapSize = { bitmapW, bitmapH, maxInkW: 0, maxInkH: 0 };
+  const font = `${fontWeight} ${fontSize}px ${fontFamily}`;
 
-  // Phase 2: compute optimized bitmap size
-  const size = computeOptimizedBitmapSize(measurements);
-
-  const minInkW = Math.max(1, Math.round(size.maxInkW * MIN_INK_FRACTION));
-
-  // Phase 3: render each digit — scale up narrow digits to avoid large gaps
-  return measurements.map((m) => {
-    const char = m.char;
-    let renderFontSize = fontSize;
-    let renderMeasurement = m;
-
-    if (m.visibleWidth < minInkW) {
-      // Scale up: increase fontSize until ink width meets minimum threshold
-      // Binary search between fontSize and fontSize * 4
-      let lo = fontSize;
-      let hi = fontSize * 4;
-      for (let iter = 0; iter < 12; iter++) {
-        const mid = Math.round((lo + hi) / 2);
-        const scratchH = mid * SCRATCH_SCALE;
-        const scratchW = scratchH * 2;
-        const testM = measureGlyph(char, scratchW, scratchH, `${fontWeight} ${mid}px ${fontFamily}`, color);
-        // Scale testM.visibleWidth back to target coordinate space
-        const scaledInkW = Math.round(testM.visibleWidth * (fontSize / mid));
-        if (scaledInkW >= minInkW) {
-          hi = mid;
-          renderFontSize = mid;
-          renderMeasurement = testM;
-        } else {
-          lo = mid + 1;
-        }
-      }
-      // Final measure at chosen fontSize
-      const scratchH = renderFontSize * SCRATCH_SCALE;
-      const scratchW = scratchH * 2;
-      renderMeasurement = measureGlyph(char, scratchW, scratchH, `${fontWeight} ${renderFontSize}px ${fontFamily}`, color);
-    }
-
-    const font = `${fontWeight} ${renderFontSize}px ${fontFamily}`;
-    return {
-      char,
-      dataUrl: renderDigitToBitmap(char, renderMeasurement, size, font, color),
-      width: size.bitmapW,
-      height: size.bitmapH,
-      measurement: renderMeasurement,
-    };
-  });
+  return measurements.map(m => ({
+    char: m.char,
+    dataUrl: renderDigitToBitmap(m.char, m, size, font, color),
+    width: bitmapW,
+    height: bitmapH,
+    measurement: m,
+  }));
 }

@@ -599,7 +599,8 @@ function normalizeAlignH(value: string | undefined, fallback: 'LEFT' | 'CENTER_H
 function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const x = element.bounds.x || 92;
   const y = element.bounds.y || 198;
-  const alignH = normalizeAlignH(element.alignH, 'CENTER_H');
+  // LEFT confirmed from reference watchface reverse-engineering. No CENTER_H assumption.
+  const hSpace = Math.max(0, Math.floor(Number(element.hSpace) || 0));
 
   const raw = element.fontArray ?? element.images;
   const dayDigits = Array.isArray(raw) && raw.length > 0
@@ -616,8 +617,8 @@ function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, s
                     day_tc_array: ${digitArrayStr},
                     day_en_array: ${digitArrayStr},
                     day_zero: 1,
-                    day_space: 0,
-                    day_align: hmUI.align.${alignH},
+                    day_space: ${hSpace},
+                    day_align: hmUI.align.LEFT,
                     day_is_character: false,
                     show_level: hmUI.show_level.${showLevel}
                 });`;

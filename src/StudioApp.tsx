@@ -1291,10 +1291,11 @@ function regenerateDigitFilesFromElements(
    * Phase 1: measure all digits → Phase 2: compute optimal size → Phase 3: render.
    * No optical compensation. No pair corrections. Simple centered draw in optimal bitmap.
    */
+  // Skipped wrapper — callers pass w and h directly
   function makeDigitFamily(
-    color: string, fontFamily: string, fontWeight: string, targetH: number,
+    color: string, fontFamily: string, fontWeight: string, targetH: number, targetW?: number,
   ) {
-    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, targetH, color);
+    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, targetH, color, targetW);
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
@@ -1329,8 +1330,10 @@ function regenerateDigitFilesFromElements(
 
     if (el.type === 'IMG_TIME') {
       const h = Math.max(el.bounds.height || 50, 16);
+      // 4 digits for hours+minutes combined, or 2 per component — use half width per digit
+      const digitW = Math.max(Math.floor(el.bounds.width / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
-      const family = makeDigitFamily(color, fontFamily, fontWeight, h);
+      const family = makeDigitFamily(color, fontFamily, fontWeight, h, digitW);
       for (let i = 0; i < 10; i++) {
         const filename = `time_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);
@@ -1343,8 +1346,11 @@ function regenerateDigitFilesFromElements(
       elementUpdates.set(el.id, { fontArray: scopedDigits });
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const h = Math.max(el.bounds.height || 30, 12);
+      const hSpace = Math.max(0, Math.floor(Number(el.hSpace) || 0));
+      // 2 digits for day — each digit gets half the element width minus spacing
+      const digitW = Math.max(Math.floor((el.bounds.width - hSpace) / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
-      const family = makeDigitFamily(color, fontFamily, fontWeight, h);
+      const family = makeDigitFamily(color, fontFamily, fontWeight, h, digitW);
       for (let i = 0; i < 10; i++) {
         const filename = `date_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);
