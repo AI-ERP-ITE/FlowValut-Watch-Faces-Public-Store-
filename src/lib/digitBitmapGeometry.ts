@@ -189,10 +189,8 @@ export function computeOptimizedBitmapSize(measurements: GlyphMeasurement[]): Op
 
 /**
  * Phase 3: Render one digit into the optimized bitmap.
- *
- * The digit is centered so that its visible ink center aligns with the bitmap center.
- * Transparent padding ≤ MARGIN_H / 2 on each side for the widest glyph.
- * Left ≈ right margin (symmetric for non-italic fonts).
+ * Stretches the ink to fill the full bitmapW × bitmapH — zero transparent padding.
+ * This eliminates inter-digit gaps caused by centering narrow glyphs in wide cells.
  */
 function renderDigitToBitmap(
   char: string,
@@ -202,31 +200,30 @@ function renderDigitToBitmap(
   color: string,
 ): string {
   const { bitmapW, bitmapH } = size;
+
+  // Step 1: render glyph on scratch canvas at its natural size
+  const scratch = document.createElement('canvas');
+  scratch.width = measurement.scratchW;
+  scratch.height = measurement.scratchH;
+  const sCtx = scratch.getContext('2d')!;
+  sCtx.clearRect(0, 0, measurement.scratchW, measurement.scratchH);
+  sCtx.fillStyle = color;
+  sCtx.font = font;
+  sCtx.textAlign = 'center';
+  sCtx.textBaseline = 'middle';
+  sCtx.fillText(char, measurement.scratchW / 2, measurement.scratchH / 2);
+
+  // Step 2: stretch only the ink region to fill the full bitmapW × bitmapH
+  const { left, top, right, bottom } = measurement.visibleBBox;
+  const inkW = right - left + 1;
+  const inkH = bottom - top + 1;
+
   const canvas = document.createElement('canvas');
   canvas.width = bitmapW;
   canvas.height = bitmapH;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, bitmapW, bitmapH);
-  ctx.fillStyle = color;
-  ctx.font = font;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  // Compute the scale factor between scratch canvas and target bitmap
-  const scale = bitmapH / measurement.scratchH;
-
-  // Where the ink center is on the scratch canvas
-  const inkCenterX = (measurement.visibleBBox.left + measurement.visibleBBox.right + 1) / 2;
-  const inkCenterY = (measurement.visibleBBox.top + measurement.visibleBBox.bottom + 1) / 2;
-
-  // We want the ink center to map to bitmap center
-  const scratchMidX = measurement.scratchW / 2;
-  const scratchMidY = measurement.scratchH / 2;
-  const shiftX = (inkCenterX - scratchMidX) * scale;
-  const shiftY = (inkCenterY - scratchMidY) * scale;
-
-  // Draw at bitmap center, compensating for ink offset
-  ctx.fillText(char, bitmapW / 2 - shiftX, bitmapH / 2 - shiftY);
+  ctx.drawImage(scratch, left, top, inkW, inkH, 0, 0, bitmapW, bitmapH);
 
   return canvas.toDataURL('image/png');
 }
