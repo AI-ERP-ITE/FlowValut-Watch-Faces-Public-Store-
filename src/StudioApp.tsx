@@ -3342,7 +3342,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       // This replaces any stale images from initial generation so UI choices reach the device.
       // CSS scale: maps design-space pixels to what user actually sees, so bitmap matches preview.
       const canvasEl = canvasRef.current;
-      const cssScaleFactor = canvasEl ? canvasEl.getBoundingClientRect().width / canvasEl.width : 1;
+      // CSS scale: ratio of displayed size to design-space size. Cap at 1 — never upscale.
+      const cssScaleFactor = canvasEl
+        ? Math.min(1, canvasEl.clientWidth / canvasEl.width)
+        : 1;
       const mainDigitAssets = regenerateDigitFilesFromElements(mainEditorElements, 'main', cssScaleFactor);
       const aodDigitAssets = aodEditorElements
         ? regenerateDigitFilesFromElements(aodEditorElements, 'aod', cssScaleFactor)
