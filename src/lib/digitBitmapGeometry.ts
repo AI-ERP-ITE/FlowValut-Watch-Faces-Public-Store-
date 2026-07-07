@@ -255,14 +255,15 @@ export function generateOptimizedDigitBitmaps(
   const bitmapH = targetHeight;
   const bitmapW = targetWidth ?? targetHeight; // fallback: square if width not given
 
-  // Find largest fontSize where maxInkH+2 <= bitmapH AND maxInkW+2 <= bitmapW
-  let fontSize = Math.floor(bitmapH * 0.9); // start near full height
-  for (let attempt = 0; attempt < 20 && fontSize > 4; attempt++) {
+  // Find largest fontSize where inkH fills bitmapH (so stretch ratio ≈ 1:1) AND inkW fits bitmapW.
+  // Start high (bitmapH / 0.7 ≈ fontSize that produces ink filling full height) and reduce until both fit.
+  let fontSize = Math.max(4, Math.round(bitmapH / 0.7));
+  for (let attempt = 0; attempt < 30 && fontSize > 4; attempt++) {
     const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
     const maxInkW = Math.max(...measurements.map(m => m.visibleWidth));
     const maxInkH = Math.max(...measurements.map(m => m.visibleHeight));
-    if (maxInkH + MARGIN_V <= bitmapH && maxInkW + MARGIN_H <= bitmapW) break;
-    fontSize = Math.floor(fontSize * 0.93); // reduce until it fits
+    if (maxInkH <= bitmapH && maxInkW <= bitmapW) break;
+    fontSize = Math.floor(fontSize * 0.93);
   }
 
   const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
