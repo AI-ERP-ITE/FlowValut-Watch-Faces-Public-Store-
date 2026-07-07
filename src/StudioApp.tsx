@@ -3811,7 +3811,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             }
             const resolvedPack = resolveCustomHandPack(customHand);
             const sourceMode = resolvedPack?.mode === 'source-based-custom';
-            const coverDataUrl = sourceMode ? (resolvedPack?.sources.cover ?? customHand.coverDataUrl) : customHand.coverDataUrl;
+            // Cover always uses the pre-baked PNG (trimmed + fitted at save time, dimensions
+            // match coverWidth/coverHeight). Raw SVG path used for hands does not apply here
+            // because the hub widget specifies explicit w/h — image and dimensions must agree.
+            const coverDataUrl = customHand.coverDataUrl ?? resolvedPack?.sources.cover ?? null;
             const sourcePivotRatios = sourceMode
               ? {
                 hour: parsePivotRatioFromSource(customHand.sourceHourHtml)
