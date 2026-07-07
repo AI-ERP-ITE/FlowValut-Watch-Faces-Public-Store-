@@ -1052,6 +1052,7 @@ async function applyPointerEffectsForZPK(
   const hasBasePointerEffects = effects.brightness === 0
     && effects.contrast === 0
     && effects.saturation === 0
+    && effects.hue === 0
     && effects.opacity === 1;
   const hasHandVisualEffects = shadowIntensity > 0 || glowIntensity > 0 || trailIntensity > 0 || !!tintColor;
   const isSvgDataUrl = /^data:image\/svg\+xml/i.test(dataUrl);
@@ -1078,6 +1079,7 @@ async function applyPointerEffectsForZPK(
     brightness: effects.brightness,
     contrast: effects.contrast,
     saturation: effects.saturation,
+    hueDeg: effects.hue,
     saturationMode: 'delta',
     opacity: effects.opacity,
   });
