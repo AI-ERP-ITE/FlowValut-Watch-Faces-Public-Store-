@@ -539,14 +539,14 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
   };
 
   // Hour position: from hoursEl, or fallback
-  const hx = hoursEl ? hoursEl.bounds.x : (refEl.bounds.x);
-  const hy = hoursEl ? hoursEl.bounds.y : (refEl.bounds.y);
-  // Digit width derived from hours element (2 digits fill the width)
+  // Use layout-engine computed startX so device position matches canvas preview.
+  const hx = hoursEl ? (hoursEl.layoutStartX ?? hoursEl.bounds.x) : refEl.bounds.x;
+  const hy = hoursEl ? hoursEl.bounds.y : refEl.bounds.y;
   const hW = hoursEl ? hoursEl.bounds.width : Math.floor(refEl.bounds.width * 2 / 5);
   const digitW = Math.floor(hW / 2);
 
-  // Minute position: from minutesEl if available, else derive from hoursEl
-  const mx = minutesEl ? minutesEl.bounds.x : (hx + hW + Math.max(4, digitW));
+  // Minute position: from layout-engine computed startX if available
+  const mx = minutesEl ? (minutesEl.layoutStartX ?? minutesEl.bounds.x) : (hx + hW + Math.max(4, digitW));
   const my = minutesEl ? minutesEl.bounds.y : hy;
 
   // Second position: from secondsEl if present
@@ -597,9 +597,10 @@ function normalizeAlignH(value: string | undefined, fallback: 'LEFT' | 'CENTER_H
 
 // Generate IMG_DATE widget with day arrays
 function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  const x = element.bounds.x || 92;
+  // Use layout-engine computed startX (stored at ZPK build time by regenerateDigitFilesFromElements).
+  // This is the same value the canvas uses, so device and preview are always in sync.
+  const x = element.layoutStartX ?? element.bounds.x;
   const y = element.bounds.y || 198;
-  // LEFT confirmed from reference watchface reverse-engineering. No CENTER_H assumption.
   const hSpace = Math.max(0, Math.floor(Number(element.hSpace) || 0));
 
   const raw = element.fontArray ?? element.images;

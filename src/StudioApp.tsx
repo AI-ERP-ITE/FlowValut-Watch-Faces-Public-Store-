@@ -78,6 +78,7 @@ import {
 } from '@/lib/elementDataRules';
 import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering'; // @deprecated by Spec 114
 import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
+import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -1334,7 +1335,6 @@ function regenerateDigitFilesFromElements(
 
     if (el.type === 'IMG_TIME') {
       const h = Math.max(el.bounds.height || 50, 16);
-      // 4 digits for hours+minutes combined, or 2 per component — use half width per digit
       const digitW = Math.max(Math.floor(el.bounds.width / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
       const family = makeDigitFamily(color, fontFamily, fontWeight, h, digitW);
@@ -1347,11 +1347,20 @@ function regenerateDigitFilesFromElements(
           glyphMetrics: family[i].measurement as unknown as import('@/lib/digitGlyphMetrics').GlyphMetrics,
         } as Parameters<typeof results.push>[0]);
       }
-      elementUpdates.set(el.id, { fontArray: scopedDigits });
+      // Compute layout once (same as canvas) and store startX for the code generator.
+      const timeBitmaps: DigitBitmapMetrics[] = family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height }));
+      const timeLayout = computeDigitBitmapLayout({
+        widgetType: 'IMG_TIME',
+        bounds: { x: el.bounds.x, y: el.bounds.y, width: el.bounds.width, height: h },
+        value: getDigitPreviewValue(el),
+        alignH: el.alignH,
+        hSpace: Number(el.hSpace) || 0,
+        bitmaps: timeBitmaps,
+      });
+      elementUpdates.set(el.id, { fontArray: scopedDigits, layoutStartX: timeLayout.startX });
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const h = Math.max(el.bounds.height || 30, 12);
       const hSpace = Math.max(0, Math.floor(Number(el.hSpace) || 0));
-      // 2 digits for day — each digit gets half the element width minus spacing
       const digitW = Math.max(Math.floor((el.bounds.width - hSpace) / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
       const family = makeDigitFamily(color, fontFamily, fontWeight, h, digitW);
@@ -1364,7 +1373,17 @@ function regenerateDigitFilesFromElements(
           glyphMetrics: family[i].measurement as unknown as import('@/lib/digitGlyphMetrics').GlyphMetrics,
         } as Parameters<typeof results.push>[0]);
       }
-      elementUpdates.set(el.id, { fontArray: scopedDigits });
+      // Compute layout once (same as canvas) and store startX for the code generator.
+      const dateBitmaps: DigitBitmapMetrics[] = family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height }));
+      const dateLayout = computeDigitBitmapLayout({
+        widgetType: 'IMG_DATE',
+        bounds: { x: el.bounds.x, y: el.bounds.y, width: el.bounds.width, height: h },
+        value: getDigitPreviewValue(el),
+        alignH: el.alignH,
+        hSpace,
+        bitmaps: dateBitmaps,
+      });
+      elementUpdates.set(el.id, { fontArray: scopedDigits, layoutStartX: dateLayout.startX });
     } else if (el.type === 'IMG_WEEK') {
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -1408,7 +1427,16 @@ function regenerateDigitFilesFromElements(
           scopedDigits.push(filename);
           results.push({ filename, dataUrl: family[i].dataUrl });
         }
-        elementUpdates.set(el.id, { fontArray: scopedDigits });
+        const textImgBitmaps: DigitBitmapMetrics[] = family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height }));
+        const textImgLayout = computeDigitBitmapLayout({
+          widgetType: 'TEXT_IMG',
+          bounds: { x: el.bounds.x, y: el.bounds.y, width: el.bounds.width, height: h },
+          value: getDigitPreviewValue(el),
+          alignH: el.alignH,
+          hSpace: Number(el.hSpace) || 0,
+          bitmaps: textImgBitmaps,
+        });
+        elementUpdates.set(el.id, { fontArray: scopedDigits, layoutStartX: textImgLayout.startX });
       }
     }
   }
