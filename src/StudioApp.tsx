@@ -77,7 +77,7 @@ import {
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering'; // @deprecated by Spec 114
-import { generateOptimizedDigitBitmaps, measureAllGlyphs } from '@/lib/digitBitmapGeometry';
+import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -1293,28 +1293,13 @@ function regenerateDigitFilesFromElements(
    */
   // Skipped wrapper — callers pass w and h directly
   function makeDigitFamily(
-    color: string, fontFamily: string, fontWeight: string, targetH: number, targetW?: number,
+    color: string, fontFamily: string, fontWeight: string, targetH: number, _targetW?: number,
   ) {
-    // Use design-space dimensions directly — device pixel dimensions must match the
-    // element bounds, not the browser display size.
+    // Each digit PNG is rendered at fontSize = targetH × 0.8 (matching the canvas
+    // text-fallback) with width = natural font advance per digit. No fill ratio.
+    // No shared fixed width. Device advances by naturalWidth → matches canvas exactly.
     const h = Math.max(targetH, 8);
-    const w = targetW !== undefined ? Math.max(targetW, 4) : undefined;
-
-    // Measure fill ratio from the canvas preview font size so device appearance
-    // matches what the user sees in the editor. The preview renders at h * 0.8;
-    // we measure that glyph's actual ink fraction and pass it to the generator.
-    // This decouples glyph scale (appearance) from bitmap size (spacing).
-    const refFontSize = Math.max(4, Math.floor(h * 0.8));
-    const refMeasurements = measureAllGlyphs(fontFamily, fontWeight, refFontSize, color);
-    const refMaxInkH = Math.max(1, ...refMeasurements.map(m => m.visibleHeight));
-    const refMaxInkW = Math.max(1, ...refMeasurements.map(m => m.visibleWidth));
-    // Fill ratio = how much of the bitmap the ink covers at the preview font size
-    const fillRatioY = Math.min(0.97, Math.max(0.3, refMaxInkH / h));
-    const fillRatioX = w !== undefined
-      ? Math.min(0.97, Math.max(0.3, refMaxInkW / w))
-      : fillRatioY;
-
-    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, w, fillRatioX, fillRatioY);
+    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color);
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {

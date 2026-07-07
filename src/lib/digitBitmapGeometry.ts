@@ -185,117 +185,68 @@ export function computeOptimizedBitmapSize(measurements: GlyphMeasurement[]): Op
   };
 }
 
-// ─── Phase 3: Render each digit ──────────────────────────────────────────────
-
-/**
- * Phase 3: Render one digit into the optimized bitmap.
- *
- * Bitmap geometry (bitmapW × bitmapH) controls Zepp's advance/spacing — unchanged.
- * Glyph scale is controlled independently via fillRatioX/fillRatioY so the visual
- * size matches the canvas preview. The glyph is centered with transparent margins;
- * those margins do NOT affect spacing because Zepp advances by bitmap width.
- */
-function renderDigitToBitmap(
-  char: string,
-  measurement: GlyphMeasurement,
-  size: OptimizedBitmapSize,
-  font: string,
-  color: string,
-  fillRatioX: number,
-  fillRatioY: number,
-): string {
-  const { bitmapW, bitmapH } = size;
-
-  // Step 1: render glyph on scratch canvas at its natural size
-  const scratch = document.createElement('canvas');
-  scratch.width = measurement.scratchW;
-  scratch.height = measurement.scratchH;
-  const sCtx = scratch.getContext('2d')!;
-  sCtx.clearRect(0, 0, measurement.scratchW, measurement.scratchH);
-  sCtx.fillStyle = color;
-  sCtx.font = font;
-  sCtx.textAlign = 'center';
-  sCtx.textBaseline = 'middle';
-  sCtx.fillText(char, measurement.scratchW / 2, measurement.scratchH / 2);
-
-  // Step 2: compute destination size — scale ink uniformly to fit within the
-  // target fill area (fillRatioX × bitmapW by fillRatioY × bitmapH), then center.
-  const { left, top, right, bottom } = measurement.visibleBBox;
-  const inkW = right - left + 1;
-  const inkH = bottom - top + 1;
-
-  const targetW = Math.max(1, Math.round(bitmapW * fillRatioX));
-  const targetH = Math.max(1, Math.round(bitmapH * fillRatioY));
-  const scale = Math.min(targetW / inkW, targetH / inkH);
-  const destW = Math.max(1, Math.round(inkW * scale));
-  const destH = Math.max(1, Math.round(inkH * scale));
-  const destX = Math.floor((bitmapW - destW) / 2);
-  const destY = Math.floor((bitmapH - destH) / 2);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = bitmapW;
-  canvas.height = bitmapH;
-  const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, bitmapW, bitmapH);
-  ctx.drawImage(scratch, left, top, inkW, inkH, destX, destY, destW, destH);
-
-  return canvas.toDataURL('image/png');
-}
-
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Full pipeline: measure all digits, compute optimal size, render all 10 bitmaps.
+ * Generate 10 digit bitmaps that match exactly what the canvas preview draws.
  *
- * Returns 10 RenderedDigit objects, all at the same bitmapW × bitmapH.
- * No optical compensation. No pair corrections. No runtime image processing.
- * Everything derived automatically from measured glyph geometry.
+ * Strategy: mirror the canvas text-fallback rendering.
+ *   - fontSize = Math.floor(targetHeight × 0.8)  ← same as InteractiveCanvas fallback
+ *   - bitmapH  = targetHeight                    ← full element height
+ *   - bitmapW  = ctx.measureText(digit).width    ← natural font advance, per digit
+ *   - Glyph drawn centered vertically (textBaseline='middle', y = targetHeight/2)
  *
- * Narrow digits (e.g. "1") are scaled up to MIN_INK_FRACTION * maxInkW so they
- * fill the cell visually — eliminating large gaps in pairs like "11", "18", "31".
- */
-/**
- * Spec 114 — Generate 10 digit bitmaps sized exactly to element bounds.
- *
- * fillRatioX / fillRatioY control how much of the bitmap the glyph ink occupies.
- * They are measured from the canvas preview rendering so device matches preview.
- * Bitmap size is fixed (controls Zepp spacing). Glyph scale is independent.
+ * Each digit gets its natural advance width (variable per digit, just like a real font).
+ * Zepp advances by image.naturalWidth → advances match canvas text-fallback advances.
+ * No transparent horizontal padding → no artificial inter-digit gaps.
+ * No stretching → glyph size matches preview exactly.
  */
 export function generateOptimizedDigitBitmaps(
   fontFamily: string,
   fontWeight: string,
   targetHeight: number,
   color: string,
-  targetWidth?: number,
-  fillRatioX = 0.85,  // fraction of bitmapW the widest ink should occupy
-  fillRatioY = 0.85,  // fraction of bitmapH the tallest ink should occupy
+  _targetWidth?: number,   // ignored — width is now per-digit natural advance
+  _fillRatioX?: number,    // ignored — superseded by natural-advance approach
+  _fillRatioY?: number,    // ignored — superseded by natural-advance approach
 ): RenderedDigit[] {
-  const bitmapH = targetHeight;
-  const bitmapW = targetWidth ?? targetHeight;
-
-  // Target ink area: glyph must fit within fillRatio × bitmap dimensions
-  const targetInkH = Math.max(1, Math.round(bitmapH * fillRatioY));
-  const targetInkW = Math.max(1, Math.round(bitmapW * fillRatioX));
-
-  // Find largest fontSize where maxInkH ≤ targetInkH AND maxInkW ≤ targetInkW
-  let fontSize = Math.max(4, Math.round(targetInkH / 0.7));
-  for (let attempt = 0; attempt < 30 && fontSize > 4; attempt++) {
-    const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
-    const maxInkW = Math.max(...measurements.map(m => m.visibleWidth));
-    const maxInkH = Math.max(...measurements.map(m => m.visibleHeight));
-    if (maxInkH <= targetInkH && maxInkW <= targetInkW) break;
-    fontSize = Math.floor(fontSize * 0.93);
-  }
-
-  const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
-  const size: OptimizedBitmapSize = { bitmapW, bitmapH, maxInkW: 0, maxInkH: 0 };
+  const bitmapH = Math.max(4, targetHeight);
+  // Match the canvas preview font size exactly (InteractiveCanvas fallback uses h * 0.8)
+  const fontSize = Math.max(4, Math.floor(bitmapH * 0.8));
   const font = `${fontWeight} ${fontSize}px ${fontFamily}`;
 
-  return measurements.map(m => ({
-    char: m.char,
-    dataUrl: renderDigitToBitmap(m.char, m, size, font, color, fillRatioX, fillRatioY),
-    width: bitmapW,
-    height: bitmapH,
-    measurement: m,
-  }));
+  // Measure natural advance widths using the same canvas API the browser uses for layout
+  const measureCanvas = document.createElement('canvas');
+  measureCanvas.width = fontSize * 6;
+  measureCanvas.height = bitmapH;
+  const mCtx = measureCanvas.getContext('2d')!;
+  mCtx.font = font;
+
+  const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
+
+  return measurements.map((m, i) => {
+    const digit = String(i);
+    // Natural advance = what the browser font renderer advances per character.
+    // This is exactly what ctx.fillText uses, so canvas and device advances are identical.
+    const bitmapW = Math.max(2, Math.ceil(mCtx.measureText(digit).width));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmapW;
+    canvas.height = bitmapH;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, bitmapW, bitmapH);
+    ctx.fillStyle = color;
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(digit, bitmapW / 2, bitmapH / 2);
+
+    return {
+      char: digit,
+      dataUrl: canvas.toDataURL('image/png'),
+      width: bitmapW,
+      height: bitmapH,
+      measurement: m,
+    };
+  });
 }
