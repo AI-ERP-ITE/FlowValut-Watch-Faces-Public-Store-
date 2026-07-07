@@ -108,6 +108,7 @@ function withNormalizedPointerEffects(config: WatchFaceConfig): WatchFaceConfig 
       pointerBrightness: effects.brightness,
       pointerContrast: effects.contrast,
       pointerSaturation: effects.saturation,
+      pointerHue: effects.hue,
       pointerOpacity: effects.opacity,
       ...(gaugePivot
         ? {

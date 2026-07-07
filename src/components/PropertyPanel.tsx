@@ -1677,6 +1677,21 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
           </div>
           <div className="space-y-1 mt-2">
             <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Hue</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerHue ?? 0)}deg</span>
+            </div>
+            <input
+              type="range"
+              min="-180"
+              max="180"
+              step="1"
+              value={element.pointerHue ?? 0}
+              onChange={e => update({ pointerHue: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
               <span className="text-[10px] text-white/50">Opacity</span>
               <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round((element.pointerOpacity ?? 1) * 100)}%</span>
             </div>

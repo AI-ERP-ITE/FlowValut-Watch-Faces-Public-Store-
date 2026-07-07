@@ -161,6 +161,7 @@ export interface WatchFaceElement {
   pointerBrightness?: number; // -100..100, default 0
   pointerContrast?: number;   // -100..100, default 0
   pointerSaturation?: number; // -100..100, default 0
+  pointerHue?: number;        // -180..180, default 0
   pointerOpacity?: number;    // 0..1, default 1
 
   // Font library

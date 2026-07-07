@@ -8,6 +8,7 @@ export const POINTER_EFFECT_LIMITS = {
   brightness: { min: -100, max: 100 },
   contrast: { min: -100, max: 100 },
   saturation: { min: -100, max: 100 },
+  hue: { min: -180, max: 180 },
   opacity: { min: 0, max: 1 },
 } as const;
 
@@ -15,6 +16,7 @@ export const POINTER_EFFECT_DEFAULTS = {
   brightness: 0,
   contrast: 0,
   saturation: 0,
+  hue: 0,
   opacity: 1,
 } as const;
 
@@ -22,6 +24,7 @@ export interface NormalizedPointerEffects {
   brightness: number;
   contrast: number;
   saturation: number;
+  hue: number;
   opacity: number;
 }
 
@@ -30,7 +33,7 @@ function clamp(v: number, min: number, max: number): number {
 }
 
 export function normalizePointerEffects(
-  input: Partial<Pick<WatchFaceElement, 'pointerBrightness' | 'pointerContrast' | 'pointerSaturation' | 'pointerOpacity'>>,
+  input: Partial<Pick<WatchFaceElement, 'pointerBrightness' | 'pointerContrast' | 'pointerSaturation' | 'pointerHue' | 'pointerOpacity'>>,
 ): NormalizedPointerEffects {
   const brightness = clamp(
     input.pointerBrightness ?? POINTER_EFFECT_DEFAULTS.brightness,
@@ -47,20 +50,25 @@ export function normalizePointerEffects(
     POINTER_EFFECT_LIMITS.saturation.min,
     POINTER_EFFECT_LIMITS.saturation.max,
   );
+  const hue = clamp(
+    input.pointerHue ?? POINTER_EFFECT_DEFAULTS.hue,
+    POINTER_EFFECT_LIMITS.hue.min,
+    POINTER_EFFECT_LIMITS.hue.max,
+  );
   const opacity = clamp(
     input.pointerOpacity ?? POINTER_EFFECT_DEFAULTS.opacity,
     POINTER_EFFECT_LIMITS.opacity.min,
     POINTER_EFFECT_LIMITS.opacity.max,
   );
 
-  return { brightness, contrast, saturation, opacity };
+  return { brightness, contrast, saturation, hue, opacity };
 }
 
 export function pointerEffectsToCanvasFilter(effects: NormalizedPointerEffects): string {
   const brightnessFactor = 1 + effects.brightness / 100;
   const contrastFactor = 1 + effects.contrast / 100;
   const saturationFactor = 1 + effects.saturation / 100;
-  return `brightness(${brightnessFactor}) contrast(${contrastFactor}) saturate(${saturationFactor})`;
+  return `brightness(${brightnessFactor}) contrast(${contrastFactor}) saturate(${saturationFactor}) hue-rotate(${effects.hue}deg)`;
 }
 
 export function hasNonDefaultPointerEffects(effects: NormalizedPointerEffects): boolean {
@@ -69,6 +77,7 @@ export function hasNonDefaultPointerEffects(effects: NormalizedPointerEffects): 
     Math.abs(effects.brightness - POINTER_EFFECT_DEFAULTS.brightness) > epsilon
     || Math.abs(effects.contrast - POINTER_EFFECT_DEFAULTS.contrast) > epsilon
     || Math.abs(effects.saturation - POINTER_EFFECT_DEFAULTS.saturation) > epsilon
+    || Math.abs(effects.hue - POINTER_EFFECT_DEFAULTS.hue) > epsilon
     || Math.abs(effects.opacity - POINTER_EFFECT_DEFAULTS.opacity) > epsilon
   );
 }

@@ -173,9 +173,40 @@ export function BackgroundCropTool({ file, onConfirm, onCancel, width, height, s
     const newScale = parseFloat(e.target.value);
     const img = imgRef.current;
     if (!img) return;
+    const oldScale = scale;
+    const zoomRatio = newScale / oldScale;
+    const centerX = csW / 2;
+    const centerY = csH / 2;
     setScale(newScale);
-    setOffset(prev => constrain(prev.x, prev.y, newScale, img));
-  }, [constrain]);
+    setOffset(prev => {
+      // Keep canvas-center anchored while zoom changes; user can still pan afterward.
+      const anchoredX = centerX - (centerX - prev.x) * zoomRatio;
+      const anchoredY = centerY - (centerY - prev.y) * zoomRatio;
+      return constrain(anchoredX, anchoredY, newScale, img);
+    });
+  }, [constrain, csH, csW, scale]);
+
+  const onOffsetInputChange = useCallback((axis: 'x' | 'y', rawValue: string) => {
+    const img = imgRef.current;
+    if (!img) return;
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return;
+    const next = Math.round(parsed);
+    setOffset(prev => {
+      const candidate = axis === 'x'
+        ? { x: next, y: prev.y }
+        : { x: prev.x, y: next };
+      return constrain(candidate.x, candidate.y, scale, img);
+    });
+  }, [constrain, scale]);
+
+  const handleRecenterPosition = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const centeredX = (csW - img.naturalWidth * scale) / 2;
+    const centeredY = (csH - img.naturalHeight * scale) / 2;
+    setOffset(constrain(centeredX, centeredY, scale, img));
+  }, [constrain, csH, csW, scale]);
 
   // ── T019: Reset ───────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
@@ -187,7 +218,7 @@ export function BackgroundCropTool({ file, onConfirm, onCancel, width, height, s
       x: (csW - img.naturalWidth * ms) / 2,
       y: (csH - img.naturalHeight * ms) / 2,
     });
-  }, []);
+  }, [csH, csW]);
 
   // ── T016–T018: Export ─────────────────────────────────────────────────────
   const handleConfirm = useCallback(() => {
@@ -241,6 +272,38 @@ export function BackgroundCropTool({ file, onConfirm, onCancel, width, height, s
         >
           <Grid3X3 className="h-4 w-4" />
         </button>
+      </div>
+
+      <div className="w-full max-w-xs grid grid-cols-2 gap-3">
+        <label className="text-[11px] text-zinc-400 flex items-center gap-2">
+          X
+          <input
+            type="number"
+            step={1}
+            value={Math.round(offset.x)}
+            onChange={(e) => onOffsetInputChange('x', e.target.value)}
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
+          />
+        </label>
+        <label className="text-[11px] text-zinc-400 flex items-center gap-2">
+          Y
+          <input
+            type="number"
+            step={1}
+            value={Math.round(offset.y)}
+            onChange={(e) => onOffsetInputChange('y', e.target.value)}
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
+          />
+        </label>
+      </div>
+      <div className="w-full max-w-xs flex justify-end">
+        <Button
+          variant="outline"
+          className="h-7 border-zinc-700 bg-zinc-900 px-2 text-[10px] text-zinc-300"
+          onClick={handleRecenterPosition}
+        >
+          Recenter Position
+        </Button>
       </div>
 
       {/* T019/T020: Reset + Confirm + Cancel */}

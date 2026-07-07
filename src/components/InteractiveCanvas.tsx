@@ -2115,6 +2115,7 @@ function drawTimePointer(
           brightness: pointerEffects.brightness,
           contrast: pointerEffects.contrast,
           saturation: pointerEffects.saturation,
+          hueDeg: pointerEffects.hue,
           saturationMode: 'delta',
           opacity: pointerEffects.opacity,
         })
@@ -2282,6 +2283,7 @@ function drawGaugePointer(
         brightness: pointerEffects.brightness,
         contrast: pointerEffects.contrast,
         saturation: pointerEffects.saturation,
+        hueDeg: pointerEffects.hue,
         saturationMode: 'delta',
         opacity: pointerEffects.opacity,
       })
