@@ -1260,6 +1260,27 @@ async function preparePointerGeometryForExport(
   // Cropping to alpha bounds changes aspect and can clip fine tip pixels,
   // which makes on-device hands look longer/wider than preview.
 
+  // ── Diagnostic logging (temporary) ──────────────────────────────────────
+  if (ctx) {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const d = imgData.data;
+    let bMinX = width, bMinY = height, bMaxX = -1, bMaxY = -1;
+    for (let py = 0; py < height; py++) {
+      for (let px = 0; px < width; px++) {
+        if (d[(py * width + px) * 4 + 3] > 4) {
+          if (px < bMinX) bMinX = px;
+          if (px > bMaxX) bMaxX = px;
+          if (py < bMinY) bMinY = py;
+          if (py > bMaxY) bMaxY = py;
+        }
+      }
+    }
+    const bW = bMaxX >= 0 ? bMaxX - bMinX + 1 : 0;
+    const bH = bMaxY >= 0 ? bMaxY - bMinY + 1 : 0;
+    console.log(`[HUB-DIAG] layer=${layer} | SVG canvas=${width}×${height} | content bounds x=${bMinX} y=${bMinY} w=${bW} h=${bH} | export target=${finalTargetW}×${finalTargetH}`);
+  }
+  // ── End diagnostic logging ───────────────────────────────────────────────
+
   const out = document.createElement('canvas');
   out.width = finalTargetW + effectPad * 2;
   out.height = finalTargetH + effectPad * 2;
