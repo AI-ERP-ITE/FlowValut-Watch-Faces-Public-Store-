@@ -77,7 +77,7 @@ import {
   normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering'; // @deprecated by Spec 114
-import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
+import { generateOptimizedDigitBitmaps, measureAllGlyphs } from '@/lib/digitBitmapGeometry';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -1279,7 +1279,6 @@ async function preparePointerGeometryForExport(
 function regenerateDigitFilesFromElements(
   elements: WatchFaceElement[],
   scope: 'main' | 'aod',
-  cssScale = 1,
 ): {
   files: { filename: string; dataUrl: string }[];
   elementUpdates: Map<string, Partial<WatchFaceElement>>;
@@ -1296,10 +1295,26 @@ function regenerateDigitFilesFromElements(
   function makeDigitFamily(
     color: string, fontFamily: string, fontWeight: string, targetH: number, targetW?: number,
   ) {
-    // Apply CSS scale so bitmap matches what user sees in preview (not design-space pixels)
-    const h = Math.max(Math.round(targetH * cssScale), 8);
-    const w = targetW !== undefined ? Math.max(Math.round(targetW * cssScale), 4) : undefined;
-    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, w);
+    // Use design-space dimensions directly — device pixel dimensions must match the
+    // element bounds, not the browser display size.
+    const h = Math.max(targetH, 8);
+    const w = targetW !== undefined ? Math.max(targetW, 4) : undefined;
+
+    // Measure fill ratio from the canvas preview font size so device appearance
+    // matches what the user sees in the editor. The preview renders at h * 0.8;
+    // we measure that glyph's actual ink fraction and pass it to the generator.
+    // This decouples glyph scale (appearance) from bitmap size (spacing).
+    const refFontSize = Math.max(4, Math.floor(h * 0.8));
+    const refMeasurements = measureAllGlyphs(fontFamily, fontWeight, refFontSize, color);
+    const refMaxInkH = Math.max(1, ...refMeasurements.map(m => m.visibleHeight));
+    const refMaxInkW = Math.max(1, ...refMeasurements.map(m => m.visibleWidth));
+    // Fill ratio = how much of the bitmap the ink covers at the preview font size
+    const fillRatioY = Math.min(0.97, Math.max(0.3, refMaxInkH / h));
+    const fillRatioX = w !== undefined
+      ? Math.min(0.97, Math.max(0.3, refMaxInkW / w))
+      : fillRatioY;
+
+    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, w, fillRatioX, fillRatioY);
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
@@ -3345,10 +3360,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       // CSS scale: ratio of displayed size to design-space size. Cap at 1 — never upscale.
       const rawScale = canvasEl ? canvasEl.clientWidth / canvasEl.width : 1;
       const cssScaleFactor = Math.min(1, rawScale);
-      console.log('[DigitGen] canvas clientWidth=', canvasEl?.clientWidth, 'canvas.width=', canvasEl?.width, 'scale=', rawScale, 'capped=', cssScaleFactor);
-      const mainDigitAssets = regenerateDigitFilesFromElements(mainEditorElements, 'main', cssScaleFactor);
+      console.log('[DigitGen] canvas clientWidth=', canvasEl?.clientWidth, 'canvas.width=', canvasEl?.width, 'scale=', rawScale, 'capped=', cssScaleFactor, '(cssScale no longer applied — fill ratio drives glyph scale)');
+      const mainDigitAssets = regenerateDigitFilesFromElements(mainEditorElements, 'main');
       const aodDigitAssets = aodEditorElements
-        ? regenerateDigitFilesFromElements(aodEditorElements, 'aod', cssScaleFactor)
+        ? regenerateDigitFilesFromElements(aodEditorElements, 'aod')
         : { files: [], elementUpdates: new Map<string, Partial<WatchFaceElement>>() };
       const freshDigits = [...mainDigitAssets.files, ...aodDigitAssets.files];
       for (const { filename, dataUrl } of freshDigits) {

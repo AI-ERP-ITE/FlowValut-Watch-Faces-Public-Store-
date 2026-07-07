@@ -189,8 +189,11 @@ export function computeOptimizedBitmapSize(measurements: GlyphMeasurement[]): Op
 
 /**
  * Phase 3: Render one digit into the optimized bitmap.
- * Stretches the ink to fill the full bitmapW × bitmapH — zero transparent padding.
- * This eliminates inter-digit gaps caused by centering narrow glyphs in wide cells.
+ *
+ * Bitmap geometry (bitmapW × bitmapH) controls Zepp's advance/spacing — unchanged.
+ * Glyph scale is controlled independently via fillRatioX/fillRatioY so the visual
+ * size matches the canvas preview. The glyph is centered with transparent margins;
+ * those margins do NOT affect spacing because Zepp advances by bitmap width.
  */
 function renderDigitToBitmap(
   char: string,
@@ -198,6 +201,8 @@ function renderDigitToBitmap(
   size: OptimizedBitmapSize,
   font: string,
   color: string,
+  fillRatioX: number,
+  fillRatioY: number,
 ): string {
   const { bitmapW, bitmapH } = size;
 
@@ -213,17 +218,26 @@ function renderDigitToBitmap(
   sCtx.textBaseline = 'middle';
   sCtx.fillText(char, measurement.scratchW / 2, measurement.scratchH / 2);
 
-  // Step 2: stretch only the ink region to fill the full bitmapW × bitmapH
+  // Step 2: compute destination size — scale ink uniformly to fit within the
+  // target fill area (fillRatioX × bitmapW by fillRatioY × bitmapH), then center.
   const { left, top, right, bottom } = measurement.visibleBBox;
   const inkW = right - left + 1;
   const inkH = bottom - top + 1;
+
+  const targetW = Math.max(1, Math.round(bitmapW * fillRatioX));
+  const targetH = Math.max(1, Math.round(bitmapH * fillRatioY));
+  const scale = Math.min(targetW / inkW, targetH / inkH);
+  const destW = Math.max(1, Math.round(inkW * scale));
+  const destH = Math.max(1, Math.round(inkH * scale));
+  const destX = Math.floor((bitmapW - destW) / 2);
+  const destY = Math.floor((bitmapH - destH) / 2);
 
   const canvas = document.createElement('canvas');
   canvas.width = bitmapW;
   canvas.height = bitmapH;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, bitmapW, bitmapH);
-  ctx.drawImage(scratch, left, top, inkW, inkH, 0, 0, bitmapW, bitmapH);
+  ctx.drawImage(scratch, left, top, inkW, inkH, destX, destY, destW, destH);
 
   return canvas.toDataURL('image/png');
 }
@@ -242,27 +256,34 @@ function renderDigitToBitmap(
  */
 /**
  * Spec 114 — Generate 10 digit bitmaps sized exactly to element bounds.
- * bitmapW and bitmapH are passed by the caller (element bounds / digit count).
- * Font size = largest that fits. No transparent-padding compensation needed.
+ *
+ * fillRatioX / fillRatioY control how much of the bitmap the glyph ink occupies.
+ * They are measured from the canvas preview rendering so device matches preview.
+ * Bitmap size is fixed (controls Zepp spacing). Glyph scale is independent.
  */
 export function generateOptimizedDigitBitmaps(
   fontFamily: string,
   fontWeight: string,
   targetHeight: number,
   color: string,
-  targetWidth?: number, // if provided, each digit is targetWidth wide
+  targetWidth?: number,
+  fillRatioX = 0.85,  // fraction of bitmapW the widest ink should occupy
+  fillRatioY = 0.85,  // fraction of bitmapH the tallest ink should occupy
 ): RenderedDigit[] {
   const bitmapH = targetHeight;
-  const bitmapW = targetWidth ?? targetHeight; // fallback: square if width not given
+  const bitmapW = targetWidth ?? targetHeight;
 
-  // Find largest fontSize where inkH fills bitmapH (so stretch ratio ≈ 1:1) AND inkW fits bitmapW.
-  // Start high (bitmapH / 0.7 ≈ fontSize that produces ink filling full height) and reduce until both fit.
-  let fontSize = Math.max(4, Math.round(bitmapH / 0.7));
+  // Target ink area: glyph must fit within fillRatio × bitmap dimensions
+  const targetInkH = Math.max(1, Math.round(bitmapH * fillRatioY));
+  const targetInkW = Math.max(1, Math.round(bitmapW * fillRatioX));
+
+  // Find largest fontSize where maxInkH ≤ targetInkH AND maxInkW ≤ targetInkW
+  let fontSize = Math.max(4, Math.round(targetInkH / 0.7));
   for (let attempt = 0; attempt < 30 && fontSize > 4; attempt++) {
     const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
     const maxInkW = Math.max(...measurements.map(m => m.visibleWidth));
     const maxInkH = Math.max(...measurements.map(m => m.visibleHeight));
-    if (maxInkH <= bitmapH && maxInkW <= bitmapW) break;
+    if (maxInkH <= targetInkH && maxInkW <= targetInkW) break;
     fontSize = Math.floor(fontSize * 0.93);
   }
 
@@ -272,7 +293,7 @@ export function generateOptimizedDigitBitmaps(
 
   return measurements.map(m => ({
     char: m.char,
-    dataUrl: renderDigitToBitmap(m.char, m, size, font, color),
+    dataUrl: renderDigitToBitmap(m.char, m, size, font, color, fillRatioX, fillRatioY),
     width: bitmapW,
     height: bitmapH,
     measurement: m,
