@@ -3343,9 +3343,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       // CSS scale: maps design-space pixels to what user actually sees, so bitmap matches preview.
       const canvasEl = canvasRef.current;
       // CSS scale: ratio of displayed size to design-space size. Cap at 1 — never upscale.
-      const cssScaleFactor = canvasEl
-        ? Math.min(1, canvasEl.clientWidth / canvasEl.width)
-        : 1;
+      const rawScale = canvasEl ? canvasEl.clientWidth / canvasEl.width : 1;
+      const cssScaleFactor = Math.min(1, rawScale);
+      console.log('[DigitGen] canvas clientWidth=', canvasEl?.clientWidth, 'canvas.width=', canvasEl?.width, 'scale=', rawScale, 'capped=', cssScaleFactor);
       const mainDigitAssets = regenerateDigitFilesFromElements(mainEditorElements, 'main', cssScaleFactor);
       const aodDigitAssets = aodEditorElements
         ? regenerateDigitFilesFromElements(aodEditorElements, 'aod', cssScaleFactor)
