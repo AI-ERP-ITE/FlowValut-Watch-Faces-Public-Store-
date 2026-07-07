@@ -1279,6 +1279,7 @@ async function preparePointerGeometryForExport(
 function regenerateDigitFilesFromElements(
   elements: WatchFaceElement[],
   scope: 'main' | 'aod',
+  cssScale = 1,
 ): {
   files: { filename: string; dataUrl: string }[];
   elementUpdates: Map<string, Partial<WatchFaceElement>>;
@@ -1295,7 +1296,10 @@ function regenerateDigitFilesFromElements(
   function makeDigitFamily(
     color: string, fontFamily: string, fontWeight: string, targetH: number, targetW?: number,
   ) {
-    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, targetH, color, targetW);
+    // Apply CSS scale so bitmap matches what user sees in preview (not design-space pixels)
+    const h = Math.max(Math.round(targetH * cssScale), 8);
+    const w = targetW !== undefined ? Math.max(Math.round(targetW * cssScale), 4) : undefined;
+    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, w);
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
@@ -3336,9 +3340,12 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
       // Regenerate digit images with current element colors + font styles.
       // This replaces any stale images from initial generation so UI choices reach the device.
-      const mainDigitAssets = regenerateDigitFilesFromElements(mainEditorElements, 'main');
+      // CSS scale: maps design-space pixels to what user actually sees, so bitmap matches preview.
+      const canvasEl = canvasRef.current;
+      const cssScaleFactor = canvasEl ? canvasEl.getBoundingClientRect().width / canvasEl.width : 1;
+      const mainDigitAssets = regenerateDigitFilesFromElements(mainEditorElements, 'main', cssScaleFactor);
       const aodDigitAssets = aodEditorElements
-        ? regenerateDigitFilesFromElements(aodEditorElements, 'aod')
+        ? regenerateDigitFilesFromElements(aodEditorElements, 'aod', cssScaleFactor)
         : { files: [], elementUpdates: new Map<string, Partial<WatchFaceElement>>() };
       const freshDigits = [...mainDigitAssets.files, ...aodDigitAssets.files];
       for (const { filename, dataUrl } of freshDigits) {
