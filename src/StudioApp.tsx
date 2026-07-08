@@ -3131,10 +3131,13 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         if (!config || !config.elements) throw new Error('Invalid project file');
         const requestedName = watchFaceName?.trim();
         const effectiveName = requestedName || config.name || file.name;
-        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects({
+        const normalizedConfig = withNormalizedPointerEffects({
           ...config,
           name: effectiveName,
-        })));
+        });
+        dispatch(actions.setWatchFaceConfig(normalizedConfig));
+        // Restore AOD local state from file — enables AOD button if saved AOD data is present
+        setAodElements(normalizedConfig.aodElements && normalizedConfig.aodElements.length > 0 ? normalizedConfig.aodElements : null);
         if (bgImage) {
           dispatch(actions.setBackgroundImage(bgImage));
           // Build a backgroundFile so ZPK export works if user re-exports
@@ -3173,11 +3176,14 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         );
         const requestedName = watchFaceName?.trim();
         const effectiveName = requestedName || config.name || file.name;
-        dispatch(actions.setWatchFaceConfig(withNormalizedPointerEffects({
+        const normalizedConfig = withNormalizedPointerEffects({
           ...config,
           name: effectiveName,
           elements: patchedElements,
-        })));
+        });
+        dispatch(actions.setWatchFaceConfig(normalizedConfig));
+        // Restore AOD local state from file — enables AOD button if saved AOD data is present
+        setAodElements(normalizedConfig.aodElements && normalizedConfig.aodElements.length > 0 ? normalizedConfig.aodElements : null);
         toast.success(`Widgets loaded: ${file.name}`);
       } catch {
         toast.error('Failed to load project file. Make sure it is a valid .fvwf file.');

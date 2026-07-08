@@ -216,6 +216,13 @@ export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | null;
 
 export type FilterKind = 'shadow' | 'glow' | 'blur' | null;
 
+export interface Surface3DParams {
+  mode: 'emboss' | 'engrave';
+  lightAngleDeg: number;  // 0–360, feDistantLight azimuth
+  depth: number;          // 1–20, maps to surfaceScale
+  crispness: number;      // 0–1, controls specularExponent + blur stdDeviation
+}
+
 export interface AppearanceItem {
   id: string;
   fill: Fill;
@@ -225,6 +232,7 @@ export interface AppearanceItem {
   blendMode?: BlendMode;
   clipPath?: string | null;
   filter?: FilterKind;
+  surface3D?: Surface3DParams | null;
 }
 
 export interface AppearanceInherit {

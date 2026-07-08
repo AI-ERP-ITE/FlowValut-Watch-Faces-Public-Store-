@@ -22,6 +22,7 @@ import type {
   MergedElement,
   MergedSpec,
   Stroke,
+  Surface3DParams,
   VisualEnvelope,
 } from '@/types/visualSpec';
 import { isAppearanceInherit, isGeometryInherit } from '@/types/visualSpec';
@@ -193,6 +194,44 @@ function buildFilterDef(
   return ref;
 }
 
+function buildSurface3DFilterDef(
+  ctx: DefsContext,
+  params: Surface3DParams | null | undefined,
+): string | null {
+  if (!params) return null;
+  const key = JSON.stringify(params);
+  if (ctx.filterRefs.has(key)) return ctx.filterRefs.get(key)!;
+
+  const id = defsId('filter', ctx.gradientCounter++);
+  const blurSD = (1 - params.crispness) * 2.5 + 0.5;                 // 3.0 → 0.5
+  const specExp = params.crispness * 55 + 5;                          // 5 → 60
+  const scale = params.depth;
+  const azimuth = ((params.mode === 'engrave'
+    ? params.lightAngleDeg + 180
+    : params.lightAngleDeg) % 360 + 360) % 360;
+  const azBack = (azimuth + 180) % 360;
+
+  ctx.defs.push(
+    `<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">` +
+    `<feGaussianBlur in="SourceAlpha" stdDeviation="${blurSD.toFixed(2)}" result="bump"/>` +
+    `<feSpecularLighting in="bump" surfaceScale="${scale}" specularConstant="0.6" specularExponent="${specExp.toFixed(1)}" lighting-color="white" result="spec">` +
+    `<feDistantLight azimuth="${azimuth.toFixed(1)}" elevation="45"/>` +
+    `</feSpecularLighting>` +
+    `<feComposite in="spec" in2="SourceAlpha" operator="in" result="specMasked"/>` +
+    `<feDiffuseLighting in="bump" surfaceScale="${scale}" diffuseConstant="0.8" lighting-color="white" result="diff">` +
+    `<feDistantLight azimuth="${azBack.toFixed(1)}" elevation="30"/>` +
+    `</feDiffuseLighting>` +
+    `<feComposite in="diff" in2="SourceAlpha" operator="in" result="diffMasked"/>` +
+    `<feComposite in="SourceGraphic" in2="specMasked" operator="arithmetic" k1="0" k2="1" k3="0.8" k4="0" result="lit"/>` +
+    `<feBlend in="lit" in2="diffMasked" mode="multiply"/>` +
+    `</filter>`,
+  );
+
+  const ref = `url(#${id})`;
+  ctx.filterRefs.set(key, ref);
+  return ref;
+}
+
 // ─── Shape rendering ──────────────────────────────────────────────────────────
 
 function renderShapeOnly(g: GeometryEntry): string {
@@ -320,7 +359,7 @@ function renderElement(
 
   let clipRef: string | null = null;
   if (item?.clipPath) clipRef = buildClipPathDef(ctx, item.clipPath, merged);
-  const filterRef = buildFilterDef(ctx, item?.filter ?? null);
+  const filterRef = buildSurface3DFilterDef(ctx, item?.surface3D) ?? buildFilterDef(ctx, item?.filter ?? null);
 
   const attrs = [
     `data-id="${escapeXml(inv.id)}"`,
@@ -368,7 +407,7 @@ function renderGroupChild(
   const fillValue = buildFillForElement(ctx, inv.id, fill);
   let clipRef: string | null = null;
   if (item?.clipPath) clipRef = buildClipPathDef(ctx, item.clipPath, merged);
-  const filterRef = buildFilterDef(ctx, item?.filter ?? null);
+  const filterRef = buildSurface3DFilterDef(ctx, item?.surface3D) ?? buildFilterDef(ctx, item?.filter ?? null);
   const enriched = shapeXml.replace(
     /^<(\w+)/,
     `<$1 fill="${fillValue}"${fillOpacityAttr(fill, item?.opacity)}${strokeAttrs(stroke)}`,
