@@ -69,6 +69,8 @@ import {
   gaugePointerAssetName,
   normalizeGaugePivot,
 } from '@/lib/gaugePointerDefaults';
+import { detectGauge } from '@/lib/gaugeDetector';
+import { renderGaugeAssets } from '@/lib/gaugeRenderer';
 import {
   getAllowedDataTypesForElement,
   getDataTypeLabel,
@@ -3556,6 +3558,38 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
       // Inject inline IMG assets — any IMG element with a data URL src (e.g. gauge background PNG).
       // These are not handled by the icon-effects loop above (no iconKey, no effects).
+      //
+      // Recovery step: if el.src has been mutated to a filename (e.g. from a previous export
+      // or an old saved .fvwf), attempt to regenerate the background data URL from the original
+      // SVG stored in the custom gauge pointer library. This makes export work on old files too.
+      for (const el of allEditorElements) {
+        if (
+          el.type === 'IMG' && !el.iconKey && el.gaugePairId &&
+          el.src && !el.src.startsWith('data:')
+        ) {
+          const siblingPointer = allEditorElements.find(
+            s => s.type === 'GAUGE_POINTER' && s.gaugePairId === el.gaugePairId
+          );
+          if (siblingPointer?.handStyle?.startsWith('custom_gauge:')) {
+            const gaugeKey = siblingPointer.handStyle.replace('custom_gauge:', '');
+            const record = customGaugePointers.find(r => r.key === gaugeKey);
+            if (record?.sourceHtml) {
+              try {
+                const parsed = detectGauge(record.sourceHtml);
+                if (parsed) {
+                  const rendered = await renderGaugeAssets(parsed, 400);
+                  if (rendered.backgroundPng) {
+                    el.src = rendered.backgroundPng; // restore data URL for pipeline
+                  }
+                }
+              } catch (e) {
+                console.warn('[Export] Failed to recover gauge BG data URL for', el.name, e);
+              }
+            }
+          }
+        }
+      }
+
       for (const el of allEditorElements) {
         if (el.type !== 'IMG' || el.iconKey || !el.src?.startsWith('data:')) continue;
         const filename = el.assetFilename || `img_inline_${el.id}.png`;
