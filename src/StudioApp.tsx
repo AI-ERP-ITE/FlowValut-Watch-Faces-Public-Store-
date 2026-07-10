@@ -3757,6 +3757,12 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             el.src = filename;
             el.assetFilename = filename;
           }
+          if (el.type === 'IMG' && !el.iconKey) {
+            // Plain IMG (e.g. gauge background) — update src to shadow filename,
+            // matching the same pattern used for IMG_STATUS and GAUGE_POINTER.
+            el.src = filename;
+            el.assetFilename = filename;
+          }
           if (el.type === 'GAUGE_POINTER') {
             const pivot = normalizeGaugePivot(el);
             const oldW = Math.max(1, el.bounds.width || 1);

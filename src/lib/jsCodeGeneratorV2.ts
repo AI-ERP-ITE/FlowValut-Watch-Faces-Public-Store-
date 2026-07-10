@@ -49,6 +49,7 @@ function _shadowImgWidget(
                     w: px(${w}),
                     h: px(${h}),
                   src: '${filename}',
+                    alpha: 255,
                     show_level: hmUI.show_level.${showLevel}
                 });`;
 }
