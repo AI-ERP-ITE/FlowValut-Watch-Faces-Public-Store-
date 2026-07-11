@@ -2067,23 +2067,14 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               onChange={e => {
                 const fs = Number(e.target.value);
                 if (!fs || fs <= 0) return;
-                // Estimate width from font size × char count per type/format
-                const sampleText =
-                  element.type === 'IMG_TIME' ? (element.previewValue ?? '10')
-                  : element.type === 'IMG_DATE' ? (element.previewValue ?? '31')
-                  : element.type === 'IMG_WEEK'
-                    ? ((element as { weekFormat?: string }).weekFormat === 'full' ? 'Wednesday'
-                      : (element as { weekFormat?: string }).weekFormat === 'initial' ? 'We.'
-                      : 'WED')
-                  : (element.previewValue ?? '888');
-                const estimatedW = Math.ceil(fs * 0.68 * sampleText.length);
-                // fontSize is the source of truth — always sync bounds to font size
+                // Only sync bounds.height to fontSize — leave bounds.width untouched.
+                // Canvas handles tight widths via effectiveW/xShift.
+                // Code generator uses bounds.x/bounds.width directly for layout, so don't corrupt them.
                 update({
                   fontSize: fs,
                   bounds: {
                     ...element.bounds,
                     height: fs,
-                    width: estimatedW,
                   },
                 });
               }}

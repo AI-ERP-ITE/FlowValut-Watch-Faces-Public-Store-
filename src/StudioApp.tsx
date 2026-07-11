@@ -1339,7 +1339,7 @@ function regenerateDigitFilesFromElements(
     const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
 
     if (el.type === 'IMG_TIME') {
-      const h = Math.max(el.bounds.height || 50, 16);
+      const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 50, 16);
       const digitW = Math.max(Math.floor(el.bounds.width / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
       const family = makeDigitFamily(color, fontFamily, fontWeight, h, digitW);
@@ -1364,7 +1364,7 @@ function regenerateDigitFilesFromElements(
       });
       elementUpdates.set(el.id, { fontArray: scopedDigits, layoutStartX: timeLayout.startX });
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
-      const h = Math.max(el.bounds.height || 30, 12);
+      const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 30, 12);
       const hSpace = Math.max(0, Math.floor(Number(el.hSpace) || 0));
       const digitW = Math.max(Math.floor((el.bounds.width - hSpace) / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
@@ -1424,7 +1424,7 @@ function regenerateDigitFilesFromElements(
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
       const prefix = getTextImgPrefixForDataType(el.dataType);
       if (prefix) {
-        const h = Math.max(el.bounds.height || 25, 12);
+        const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 25, 12);
         const scopedDigits: string[] = [];
         const family = makeDigitFamily(color, fontFamily, fontWeight, h);
         for (let i = 0; i < 10; i++) {
