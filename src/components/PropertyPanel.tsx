@@ -2067,16 +2067,11 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               onChange={e => {
                 const fs = Number(e.target.value);
                 if (!fs || fs <= 0) return;
-                // Only sync bounds.height to fontSize — leave bounds.width untouched.
-                // Canvas handles tight widths via effectiveW/xShift.
-                // Code generator uses bounds.x/bounds.width directly for layout, so don't corrupt them.
-                update({
-                  fontSize: fs,
-                  bounds: {
-                    ...element.bounds,
-                    height: fs,
-                  },
-                });
+                // Only set fontSize — do NOT touch bounds.
+                // Canvas uses el.fontSize directly; bake uses el.fontSize ?? bounds.height.
+                // Updating bounds triggers linked-frame sync in the reducer which can corrupt
+                // nearby IMG elements that are linked as decorative frames.
+                update({ fontSize: fs });
               }}
               className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
             />
