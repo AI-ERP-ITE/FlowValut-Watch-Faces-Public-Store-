@@ -2055,7 +2055,7 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       )}
 
       {/* Digit size — digit widgets */}
-      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG') && (
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG' || element.type === 'IMG_WEEK') && (
         <Section label="Digit Size">
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-white/40 w-14">Font size</span>
@@ -2064,11 +2064,30 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               value={element.fontSize ?? element.bounds.height}
               min={8}
               max={400}
-              onChange={e => update({ fontSize: Number(e.target.value) })}
+              onChange={e => {
+                const fs = Number(e.target.value);
+                if (!fs || fs <= 0) return;
+                // Estimate minimum width needed for this font size
+                const sampleText =
+                  element.type === 'IMG_TIME' ? (element.previewValue ?? '10')
+                  : element.type === 'IMG_DATE' ? (element.previewValue ?? '31')
+                  : element.type === 'IMG_WEEK' ? 'WED'
+                  : (element.previewValue ?? '888');
+                const estimatedW = Math.ceil(fs * 0.7 * sampleText.length);
+                // Always sync bounds.height to fontSize; expand bounds.width if too tight
+                update({
+                  fontSize: fs,
+                  bounds: {
+                    ...element.bounds,
+                    height: fs,
+                    width: Math.max(element.bounds.width, estimatedW),
+                  },
+                });
+              }}
               className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
             />
           </div>
-          <p className="text-[9px] text-white/35 mt-1">Controls rendered digit height. Frame only moves the element.</p>
+          <p className="text-[9px] text-white/35 mt-1">Font size is the source of truth for render size. Frame auto-adjusts to fit.</p>
           {element.fontSize && (
             <button
               onClick={() => update({ fontSize: undefined })}

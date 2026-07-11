@@ -1824,17 +1824,29 @@ function drawDigitElement(
 
     // Spec 114: pairCorrectionTable removed — geometry engine provides correct spacing.
     if (allDigitsMapped) {
-      // If fontSize is set, use it as the render height; frame height only controls selection/position.
+      // fontSize is the source of truth — frame height/width do not constrain render size.
       const renderH = (el.fontSize && el.fontSize > 0) ? el.fontSize : h;
       const renderOffsetY = Math.round((h - renderH) / 2);
+      // Use a generous effective width so tight frames don't misplace glyphs.
+      // After layout, reposition using totalWidth for correct alignment.
+      const effectiveW = Math.max(w, renderH * 10);
       const layout = computeDigitBitmapLayout({
         widgetType: el.type,
-        bounds: { x, y: y + renderOffsetY, width: w, height: renderH },
+        bounds: { x, y: y + renderOffsetY, width: effectiveW, height: renderH },
         value: sampleText,
         alignH,
         hSpace,
         bitmaps: bitmapMetrics,
       });
+
+      // Re-anchor to actual element x using totalWidth for alignment
+      const totalW = layout.totalWidth;
+      const anchorX = alignH === 'CENTER_H'
+        ? Math.round(x + w / 2 - totalW / 2)
+        : alignH === 'RIGHT'
+          ? x + w - totalW
+          : x;
+      const xShift = anchorX - layout.startX;
 
       let drawn = false;
       for (const glyph of layout.glyphs) {
@@ -1842,7 +1854,7 @@ function drawDigitElement(
         if (!src) continue;
         const img = digitCache.get(src);
         if (!img?.complete || img.naturalWidth <= 0) continue;
-        ctx.drawImage(img, glyph.x, glyph.y, glyph.width, glyph.height);
+        ctx.drawImage(img, glyph.x + xShift, glyph.y, glyph.width, glyph.height);
         drawn = true;
       }
       if (drawn) return;
