@@ -1396,7 +1396,7 @@ function regenerateDigitFilesFromElements(
       const fmt = el.weekFormat ?? 'full';
       const days = fmt === 'full' ? WEEK_FULL : fmt === 'initial' ? WEEK_INITIAL : WEEK_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
-      const h = Math.max(el.bounds.height || 20, 12);
+      const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 20, 12);
       const prefix = `week_${scope}_${safeId}`;
       const scopedWeekImages: string[] = [];
       for (let i = 0; i < 7; i++) {
@@ -1412,7 +1412,7 @@ function regenerateDigitFilesFromElements(
       const mfmt = (el as { monthFormat?: string }).monthFormat ?? 'short';
       const monthNames = mfmt === 'full' ? MONTH_FULL : mfmt === 'initial' ? MONTH_INITIAL : MONTH_SHORT;
       const w = Math.max(el.bounds.width || 40, 20);
-      const h = Math.max(el.bounds.height || 20, 12);
+      const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 20, 12);
       const prefix = `month_${scope}_${safeId}`;
       const scopedMonthImages: string[] = [];
       for (let i = 0; i < 12; i++) {
