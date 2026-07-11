@@ -2067,20 +2067,23 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               onChange={e => {
                 const fs = Number(e.target.value);
                 if (!fs || fs <= 0) return;
-                // Estimate minimum width needed for this font size
+                // Estimate width from font size × char count per type/format
                 const sampleText =
                   element.type === 'IMG_TIME' ? (element.previewValue ?? '10')
                   : element.type === 'IMG_DATE' ? (element.previewValue ?? '31')
-                  : element.type === 'IMG_WEEK' ? 'WED'
+                  : element.type === 'IMG_WEEK'
+                    ? ((element as { weekFormat?: string }).weekFormat === 'full' ? 'Wednesday'
+                      : (element as { weekFormat?: string }).weekFormat === 'initial' ? 'We.'
+                      : 'WED')
                   : (element.previewValue ?? '888');
-                const estimatedW = Math.ceil(fs * 0.7 * sampleText.length);
-                // Always sync bounds.height to fontSize; expand bounds.width if too tight
+                const estimatedW = Math.ceil(fs * 0.68 * sampleText.length);
+                // fontSize is the source of truth — always sync bounds to font size
                 update({
                   fontSize: fs,
                   bounds: {
                     ...element.bounds,
                     height: fs,
-                    width: Math.max(element.bounds.width, estimatedW),
+                    width: estimatedW,
                   },
                 });
               }}

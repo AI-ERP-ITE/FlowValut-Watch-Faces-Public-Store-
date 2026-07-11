@@ -1826,7 +1826,8 @@ function drawDigitElement(
     if (allDigitsMapped) {
       // fontSize is the source of truth — frame height/width do not constrain render size.
       const renderH = (el.fontSize && el.fontSize > 0) ? el.fontSize : h;
-      const renderOffsetY = Math.round((h - renderH) / 2);
+      // Always render from bounds.y when fontSize is explicitly set (avoid negative offset).
+      const renderOffsetY = (el.fontSize && el.fontSize > 0) ? 0 : Math.round((h - renderH) / 2);
       // Use a generous effective width so tight frames don't misplace glyphs.
       // After layout, reposition using totalWidth for correct alignment.
       const effectiveW = Math.max(w, renderH * 10);
@@ -1874,17 +1875,18 @@ function drawDigitElement(
       : getPlaceholderText(el);
   const color = el.color ? parseZeppColor(el.color) : (style?.color ?? '#FFFFFF');
   // Use fontSize if set; otherwise fit to bounds height
-  const renderH = (el.fontSize && el.fontSize > 0) ? el.fontSize : h;
-  const maxFontSize = el.fontSize ? el.fontSize : Math.min(Math.floor(h * 0.8), Math.floor(w / (text.length * 0.6)));
+  const maxFontSize = (el.fontSize && el.fontSize > 0) ? el.fontSize : Math.min(Math.floor(h * 0.8), Math.floor(w / (text.length * 0.6)));
   const fontSize = Math.max(10, maxFontSize);
-  const textY = y + Math.round((h - renderH) / 2) + Math.round(renderH / 2);
+  // Always render from bounds.y when fontSize is explicit (no centering math that can go negative)
+  const textY = (el.fontSize && el.fontSize > 0) ? y + Math.round(el.fontSize / 2) : y + Math.round(h / 2);
   ctx.save();
   ctx.fillStyle = color;
   ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.textAlign = alignH === 'CENTER_H' ? 'center' : alignH === 'RIGHT' ? 'right' : 'left';
   ctx.textBaseline = 'middle';
   const textX = alignH === 'CENTER_H' ? x + w / 2 : alignH === 'RIGHT' ? x + w : x;
-  ctx.fillText(text, textX, textY, w);
+  // Do NOT pass maxWidth — it would compress text into a tight frame even when fontSize is correct
+  ctx.fillText(text, textX, textY);
   ctx.restore();
 }
 
