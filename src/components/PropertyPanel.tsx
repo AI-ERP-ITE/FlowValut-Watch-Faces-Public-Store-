@@ -2054,6 +2054,32 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
         </Section>
       )}
 
+      {/* Digit size — digit widgets */}
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG') && (
+        <Section label="Digit Size">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-white/40 w-14">Font size</span>
+            <input
+              type="number"
+              value={element.fontSize ?? element.bounds.height}
+              min={8}
+              max={400}
+              onChange={e => update({ fontSize: Number(e.target.value) })}
+              className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
+            />
+          </div>
+          <p className="text-[9px] text-white/35 mt-1">Controls rendered digit height. Frame only moves the element.</p>
+          {element.fontSize && (
+            <button
+              onClick={() => update({ fontSize: undefined })}
+              className="mt-1 h-6 rounded border border-white/10 bg-white/5 px-2 text-[10px] text-white/50 hover:border-white/30 hover:text-white/80"
+            >
+              Reset to frame height
+            </button>
+          )}
+        </Section>
+      )}
+
       {/* Preview test values — digit widgets */}
       {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG') && (
         <Section label="Preview Test Value">

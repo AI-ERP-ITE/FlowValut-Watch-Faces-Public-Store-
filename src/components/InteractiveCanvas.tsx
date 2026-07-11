@@ -1824,9 +1824,12 @@ function drawDigitElement(
 
     // Spec 114: pairCorrectionTable removed — geometry engine provides correct spacing.
     if (allDigitsMapped) {
+      // If fontSize is set, use it as the render height; frame height only controls selection/position.
+      const renderH = (el.fontSize && el.fontSize > 0) ? el.fontSize : h;
+      const renderOffsetY = Math.round((h - renderH) / 2);
       const layout = computeDigitBitmapLayout({
         widgetType: el.type,
-        bounds: { x, y, width: w, height: h },
+        bounds: { x, y: y + renderOffsetY, width: w, height: renderH },
         value: sampleText,
         alignH,
         hSpace,
@@ -1858,16 +1861,18 @@ function drawDigitElement(
       ? (monthFmt === 'full' ? 'April' : monthFmt === 'initial' ? 'Apr.' : 'APR')
       : getPlaceholderText(el);
   const color = el.color ? parseZeppColor(el.color) : (style?.color ?? '#FFFFFF');
-  // Fit font size to bounds height, but also ensure it doesn't overflow width
-  const maxFontSize = Math.min(Math.floor(h * 0.8), Math.floor(w / (text.length * 0.6)));
+  // Use fontSize if set; otherwise fit to bounds height
+  const renderH = (el.fontSize && el.fontSize > 0) ? el.fontSize : h;
+  const maxFontSize = el.fontSize ? el.fontSize : Math.min(Math.floor(h * 0.8), Math.floor(w / (text.length * 0.6)));
   const fontSize = Math.max(10, maxFontSize);
+  const textY = y + Math.round((h - renderH) / 2) + Math.round(renderH / 2);
   ctx.save();
   ctx.fillStyle = color;
   ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.textAlign = alignH === 'CENTER_H' ? 'center' : alignH === 'RIGHT' ? 'right' : 'left';
   ctx.textBaseline = 'middle';
   const textX = alignH === 'CENTER_H' ? x + w / 2 : alignH === 'RIGHT' ? x + w : x;
-  ctx.fillText(text, textX, y + h / 2, w);
+  ctx.fillText(text, textX, textY, w);
   ctx.restore();
 }
 
