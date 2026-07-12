@@ -207,39 +207,63 @@ export default function ImageSwitcherLab() {
     setTimeout(() => setBakeAllMsg(''), 3000);
   };
 
-  // Download definition as JSON file — exclude dataUrl (re-baked on import)
+  // Download as plain-text .switcher file — HTML stored raw (no JSON escaping), easy to find-replace
   const handleDownload = () => {
-    const cleanRanges = slots.map(({ dataUrl: _omit, baked: _omit2, ...rest }) => rest);
-    const def = { id: editingId ?? makeId(), name: name.trim() || 'switcher', dataType, policyType, slotCount: slots.length, ranges: cleanRanges };
-    const blob = new Blob([JSON.stringify(def, null, 2)], { type: 'application/json' });
+    const meta = { id: editingId ?? makeId(), name: name.trim() || 'switcher', dataType, policyType, slotCount: slots.length };
+    const lines: string[] = [JSON.stringify(meta)];
+    for (const slot of slots) {
+      lines.push(`===SLOT_${slot.slotIndex}|${slot.label}|code:${slot.code ?? slot.slotIndex}|min:${slot.min ?? ''}|max:${slot.max ?? ''}===`);
+      lines.push(slot.sourceHtml ?? '');
+    }
+    lines.push('===END===');
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${def.name.replace(/\s+/g, '_')}.switcher.json`; a.click();
+    const a = document.createElement('a'); a.href = url;
+    a.download = `${meta.name.replace(/\s+/g, '_')}.switcher`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  // Upload definition from JSON file
+  // Upload .switcher plain-text file — parses raw HTML per slot
   const uploadRef = useRef<HTMLInputElement>(null);
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        // Strip BOM and trim before parsing
-        const text = ((evt.target?.result as string) ?? '').replace(/^\uFEFF/, '').trim();
-        const def = JSON.parse(text) as Partial<ImageSwitcherDefinition>;
-        if (def.ranges && Array.isArray(def.ranges) && def.ranges.length > 0) {
-          setEditingId(def.id ?? null);
-          setName(def.name ?? '');
-          if (def.dataType) setDataType(def.dataType);
-          setSlots((def.ranges as RangeSlot[]).map(r => ({ ...r })));
-          if (def.userProfile) setProfile(def.userProfile);
-          setSaveMsg('✓ Loaded');
-          setErrors([]);
-        } else {
-          setSaveMsg('✗ No ranges found in file');
+        const text = ((evt.target?.result as string) ?? '').replace(/^\uFEFF/, '');
+        const lines = text.split('\n');
+        const meta = JSON.parse(lines[0].trim()) as Record<string, unknown>;
+        if (!meta.dataType) { setSaveMsg('✗ Missing metadata on first line'); return; }
+        const parsedSlots: RangeSlot[] = [];
+        let currentSlot: RangeSlot | null = null;
+        let htmlLines: string[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.startsWith('===SLOT_')) {
+            if (currentSlot) { parsedSlots.push({ ...currentSlot, sourceHtml: htmlLines.join('\n').trim() }); htmlLines = []; }
+            const parts = line.replace(/===/g, '').split('|');
+            const idx = parseInt(parts[0].replace('SLOT_', ''), 10);
+            const label = parts[1] ?? `Slot ${idx}`;
+            const code = parseInt((parts[2] ?? '').replace('code:', ''), 10);
+            const min = parts[3] ? parseFloat(parts[3].replace('min:', '')) || undefined : undefined;
+            const max = parts[4] ? parseFloat(parts[4].replace('max:', '')) || undefined : undefined;
+            currentSlot = { slotIndex: idx, label, code: isNaN(code) ? undefined : code, min, max };
+          } else if (line.startsWith('===END===')) {
+            if (currentSlot) parsedSlots.push({ ...currentSlot, sourceHtml: htmlLines.join('\n').trim() });
+          } else if (currentSlot) {
+            htmlLines.push(line);
+          }
         }
+        if (parsedSlots.length === 0) { setSaveMsg('✗ No slots found in file'); return; }
+        setEditingId((meta.id as string) ?? null);
+        setName((meta.name as string) ?? '');
+        if (meta.dataType) setDataType(meta.dataType as string);
+        setSlots(parsedSlots);
+        setSaveMsg(`✓ Loaded ${parsedSlots.length} slot(s)`);
+        setErrors([]);
       } catch (err) {
-        setSaveMsg(`✗ Parse error: ${(err as Error).message?.slice(0, 60)}`);
+        setSaveMsg(`✗ Error: ${(err as Error).message?.slice(0, 60)}`);
       }
     };
     reader.readAsText(file);
@@ -444,7 +468,7 @@ export default function ImageSwitcherLab() {
           >
             ↑ Import JSON
           </button>
-          <input ref={uploadRef} type="file" accept=".json" onChange={handleUpload} className="hidden" />
+          <input ref={uploadRef} type="file" accept=".switcher,.json,.txt" onChange={handleUpload} className="hidden" />
           {editingId && (
             <button
               onClick={resetEditor}
