@@ -19,6 +19,12 @@ interface Props {
 
 const BAKE_SIZE = 128;
 
+/** Extract just the <svg>...</svg> tag from a full HTML document string. */
+function extractSvg(html: string): string | null {
+  const m = html.match(/<svg[\s\S]*?<\/svg>/i);
+  return m ? m[0] : null;
+}
+
 export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpdate, onRemove }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expanded, setExpanded] = useState(false);
@@ -39,6 +45,14 @@ export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpda
     if (!slot.sourceHtml || !slot.sourceHash || !liveHash) return false;
     return liveHash !== slot.sourceHash;
   }, [slot.sourceHtml, slot.sourceHash, liveHash]);
+
+  // Extract SVG for live preview (avoids body-size conflicts from full HTML pages)
+  const previewSvg = useMemo(() => extractSvg(slot.sourceHtml ?? ''), [slot.sourceHtml]);
+
+  const previewSrcDoc = useMemo(() => {
+    const content = previewSvg ?? (slot.sourceHtml ?? '');
+    return `<!doctype html><html><head><style>html,body{margin:0;padding:0;background:transparent;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}svg,img{max-width:100%;max-height:100%;display:block;}</style></head><body>${content}</body></html>`;
+  }, [previewSvg, slot.sourceHtml]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -225,7 +239,7 @@ export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpda
                 <iframe
                   title={`slot-${slot.slotIndex}-preview`}
                   sandbox=""
-                  srcDoc={`<!doctype html><html><head><style>html,body{margin:0;padding:0;background:transparent;display:flex;align-items:center;justify-content:center;height:100%;width:100%;}svg,img{max-width:100%;max-height:100%;}</style></head><body>${slot.sourceHtml ?? ''}</body></html>`}
+                  srcDoc={previewSrcDoc}
                   style={{ width: 128, height: 128, border: 'none', background: 'transparent' }}
                 />
               </div>
