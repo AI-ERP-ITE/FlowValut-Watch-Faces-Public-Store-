@@ -232,7 +232,7 @@ export default function ImageSwitcherLab() {
     reader.onload = (evt) => {
       try {
         const text = ((evt.target?.result as string) ?? '').replace(/^\uFEFF/, '');
-        const lines = text.split('\n');
+        const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
         const meta = JSON.parse(lines[0].trim()) as Record<string, unknown>;
         if (!meta.dataType) { setSaveMsg('✗ Missing metadata on first line'); return; }
         const parsedSlots: RangeSlot[] = [];
@@ -241,7 +241,7 @@ export default function ImageSwitcherLab() {
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i];
           if (line.startsWith('===SLOT_')) {
-            if (currentSlot) { parsedSlots.push({ ...currentSlot, sourceHtml: htmlLines.join('\n').trim() }); htmlLines = []; }
+            if (currentSlot) { parsedSlots.push({ ...currentSlot, sourceHtml: htmlLines.join('\n').replace(/\r/g, '').trim() }); htmlLines = []; }
             const parts = line.replace(/===/g, '').split('|');
             const idx = parseInt(parts[0].replace('SLOT_', ''), 10);
             const label = parts[1] ?? `Slot ${idx}`;
@@ -250,7 +250,7 @@ export default function ImageSwitcherLab() {
             const max = parts[4] ? parseFloat(parts[4].replace('max:', '')) || undefined : undefined;
             currentSlot = { slotIndex: idx, label, code: isNaN(code) ? undefined : code, min, max };
           } else if (line.startsWith('===END===')) {
-            if (currentSlot) parsedSlots.push({ ...currentSlot, sourceHtml: htmlLines.join('\n').trim() });
+            if (currentSlot) parsedSlots.push({ ...currentSlot, sourceHtml: htmlLines.join('\n').replace(/\r/g, '').trim() });
           } else if (currentSlot) {
             htmlLines.push(line);
           }
