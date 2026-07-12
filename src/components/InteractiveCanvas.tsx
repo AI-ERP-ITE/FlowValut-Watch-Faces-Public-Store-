@@ -1434,7 +1434,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
             : null;
 
           const cacheKey = sourceFrame
-            ? `__weather_custom_${el.id}_${simulatedWeatherCode}_${sourceFrame}`
+            ? `__weather_custom_${el.id}_${simulatedWeatherCode}_${sourceFrame.length}|${sourceFrame.slice(0, 80)}`
             : `__weather_builtin_${wStyle}_${simulatedWeatherCode}`;
 
           const cached = iconCache.get(cacheKey);

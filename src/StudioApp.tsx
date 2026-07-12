@@ -2289,10 +2289,10 @@ function StudioApp() {
           backfillHandsToFirestore().catch(err =>
             console.warn('[StudioApp] hand backfill failed:', err)
           );
-          pullSwitcherDefinitions().catch(err =>
-            console.warn('[StudioApp] switcher pull failed:', err)
-          );
-          return applyLocalAssets();
+          // Await switcher pull so slot PNGs are in IDB before applyLocalAssets reads them
+          return pullSwitcherDefinitions()
+            .catch(err => console.warn('[StudioApp] switcher pull failed:', err))
+            .then(() => applyLocalAssets());
         })
         .catch(err => console.warn('[StudioApp] Firestore pull on startup failed:', err));
     });
