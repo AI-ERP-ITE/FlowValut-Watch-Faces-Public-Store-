@@ -3,7 +3,7 @@
  * Full Image Switcher editor — create / edit definitions, upload slot PNGs, save to IDB + cloud.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ImageSwitcherDefinition, RangeSlot, UserProfile } from '@/types/imageSwitcher';
@@ -22,6 +22,8 @@ import {
   getDataTypeLabel,
 } from '@/lib/elementDataRules';
 import { pushSwitcherDefinition, deleteSwitcherFromCloud } from '@/lib/imageSwitcherSync';
+import { renderHtmlToDataUrl } from '@/lib/customIconStore';
+import { sha256Hex } from '@/lib/firebaseStorageClient';
 import ImageSwitcherSlotRow from './ImageSwitcherSlotRow';
 import ImageSwitcherPreview from './ImageSwitcherPreview';
 import { cn } from '@/lib/utils';
@@ -177,6 +179,64 @@ export default function ImageSwitcherLab() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Bake All slots that have sourceHtml
+  const [bakingAll, setBakingAll] = useState(false);
+  const [bakeAllMsg, setBakeAllMsg] = useState('');
+  const handleBakeAll = async () => {
+    const htmlSlots = slots.filter(s => (s.sourceHtml ?? '').trim());
+    if (htmlSlots.length === 0) { setBakeAllMsg('No slots have HTML source'); return; }
+    setBakingAll(true);
+    setBakeAllMsg(`Baking 0 / ${htmlSlots.length}…`);
+    let done = 0;
+    const updated = [...slots];
+    for (const slot of htmlSlots) {
+      try {
+        const dataUrl = await renderHtmlToDataUrl(slot.sourceHtml!, 128);
+        const hash = await sha256Hex(slot.sourceHtml!);
+        const idx = updated.findIndex(s => s.slotIndex === slot.slotIndex);
+        if (idx >= 0) updated[idx] = { ...updated[idx], dataUrl, sourceHash: hash };
+      } catch { /* skip failed slot */ }
+      done++;
+      setBakeAllMsg(`Baking ${done} / ${htmlSlots.length}…`);
+    }
+    setSlots(updated);
+    setBakingAll(false);
+    setBakeAllMsg(`✓ Baked ${done} slot(s)`);
+    setTimeout(() => setBakeAllMsg(''), 3000);
+  };
+
+  // Download definition as JSON file
+  const handleDownload = () => {
+    const def = { id: editingId ?? makeId(), name: name.trim() || 'switcher', dataType, policyType, slotCount: slots.length, ranges: slots };
+    const blob = new Blob([JSON.stringify(def, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${def.name.replace(/\s+/g, '_')}.switcher.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Upload definition from JSON file
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const def = JSON.parse(evt.target?.result as string) as Partial<ImageSwitcherDefinition>;
+        if (def.ranges) {
+          setEditingId(def.id ?? null);
+          setName(def.name ?? '');
+          if (def.dataType) setDataType(def.dataType);
+          setSlots((def.ranges as RangeSlot[]).map(r => ({ ...r })));
+          if (def.userProfile) setProfile(def.userProfile);
+          setSaveMsg('');
+          setErrors([]);
+        }
+      } catch { setSaveMsg('✗ Invalid JSON file'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   // Delete
@@ -340,7 +400,7 @@ export default function ImageSwitcherLab() {
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
@@ -353,6 +413,31 @@ export default function ImageSwitcherLab() {
           >
             {saving ? 'Saving…' : editingId ? 'Update Switcher' : 'Save Switcher'}
           </button>
+          <button
+            onClick={handleBakeAll}
+            disabled={bakingAll || !slots.some(s => (s.sourceHtml ?? '').trim())}
+            className={cn(
+              'text-[11px] px-2.5 py-1.5 rounded border font-medium transition-colors',
+              bakingAll || !slots.some(s => (s.sourceHtml ?? '').trim())
+                ? 'border-white/10 text-white/30 cursor-not-allowed'
+                : 'border-amber-400/50 bg-amber-500/12 hover:bg-amber-500/22 text-amber-200',
+            )}
+          >
+            {bakingAll ? bakeAllMsg : 'Bake All'}
+          </button>
+          <button
+            onClick={handleDownload}
+            className="text-[11px] px-2.5 py-1.5 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+          >
+            ↓ Export JSON
+          </button>
+          <button
+            onClick={() => uploadRef.current?.click()}
+            className="text-[11px] px-2.5 py-1.5 rounded border border-white/15 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+          >
+            ↑ Import JSON
+          </button>
+          <input ref={uploadRef} type="file" accept=".json" onChange={handleUpload} className="hidden" />
           {editingId && (
             <button
               onClick={resetEditor}
@@ -360,6 +445,11 @@ export default function ImageSwitcherLab() {
             >
               Cancel
             </button>
+          )}
+          {bakeAllMsg && !bakingAll && (
+            <span className={cn('text-[10px]', bakeAllMsg.startsWith('✓') ? 'text-green-400' : 'text-amber-400')}>
+              {bakeAllMsg}
+            </span>
           )}
           {saveMsg && (
             <span className={cn('text-[10px]', saveMsg.startsWith('✓') ? 'text-green-400' : 'text-red-400')}>
