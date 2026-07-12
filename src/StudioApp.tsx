@@ -1998,6 +1998,20 @@ function StudioApp() {
     if (editorMode === 'AOD') return aodElements ?? [];
     return state.watchFaceConfig.elements;
   }, [aodElements, editorMode, state.watchFaceConfig]);
+
+  // Canvas-only override: inject custom switcher slot dataUrls into el.images[] for preview.
+  // This does NOT mutate stored state — it's a derived render-only view.
+  const canvasElements = useMemo(() => {
+    if (switcherDefinitions.length === 0) return activeElements;
+    return activeElements.map(el => {
+      if (el.type !== 'IMG_LEVEL' || !el.imageSwitcherDefinitionId) return el;
+      const def = switcherDefinitions.find(d => d.id === el.imageSwitcherDefinitionId);
+      if (!def) return el;
+      const dataUrls = def.ranges.map(s => s.dataUrl ?? '').filter(Boolean);
+      if (dataUrls.length === 0) return el;
+      return { ...el, images: dataUrls };
+    });
+  }, [activeElements, switcherDefinitions]);
   const activeResolutionW = state.watchFaceConfig?.resolution?.width ?? 480;
   const activeResolutionH = state.watchFaceConfig?.resolution?.height ?? activeResolutionW;
   const activeResolution = activeResolutionW;
@@ -3419,9 +3433,20 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       for (const el of allEditorElements) {
         if (el.type !== 'IMG_LEVEL') continue;
 
-        const configuredFrames = Array.isArray(el.images)
-          ? el.images.map((name) => (typeof name === 'string' ? name.trim() : '')).filter((name) => name.length > 0)
+        // If a custom switcher definition is linked, use its slot dataUrls as the frames.
+        // This overrides el.images[] so the ZPK gets the custom images.
+        const switcherOverrideUrls = el.imageSwitcherDefinitionId
+          ? switcherSlotImages
+              .filter(img => img.name.startsWith(`switcher_${el.id}_`))
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(img => img.dataUrl)
           : [];
+
+        const configuredFrames = switcherOverrideUrls.length > 0
+          ? switcherOverrideUrls
+          : Array.isArray(el.images)
+            ? el.images.map((name) => (typeof name === 'string' ? name.trim() : '')).filter((name) => name.length > 0)
+            : [];
         const explicitCount = el.imageSwitcherFrameCount
           ?? (configuredFrames.length > 0 ? configuredFrames.length : undefined);
         const policy = resolveImageSwitcherFrameCount(el.dataType, { explicitCount });
@@ -4769,7 +4794,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                       ref={canvasRef}
                       backgroundImage={activeBackgroundImage ?? undefined}
                       backgroundTransform={activeBackgroundTransform}
-                      elements={activeElements}
+                      elements={canvasElements}
                       elementImages={state.elementImages}
                       selectedElementId={selectedElementId}
                       extraSelectedIds={extraSelectedIds}
