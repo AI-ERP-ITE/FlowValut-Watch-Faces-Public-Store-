@@ -207,9 +207,10 @@ export default function ImageSwitcherLab() {
     setTimeout(() => setBakeAllMsg(''), 3000);
   };
 
-  // Download definition as JSON file
+  // Download definition as JSON file — exclude dataUrl (re-baked on import)
   const handleDownload = () => {
-    const def = { id: editingId ?? makeId(), name: name.trim() || 'switcher', dataType, policyType, slotCount: slots.length, ranges: slots };
+    const cleanRanges = slots.map(({ dataUrl: _omit, baked: _omit2, ...rest }) => rest);
+    const def = { id: editingId ?? makeId(), name: name.trim() || 'switcher', dataType, policyType, slotCount: slots.length, ranges: cleanRanges };
     const blob = new Blob([JSON.stringify(def, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `${def.name.replace(/\s+/g, '_')}.switcher.json`; a.click();
