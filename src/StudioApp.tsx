@@ -43,13 +43,16 @@ import { BackgroundPhotoEditor } from '@/components/BackgroundPhotoEditor';
 import { DesignInput } from '@/components/DesignInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { IconLab } from '@/components/IconLab';
+import ImageSwitcherLab from '@/components/ImageSwitcherLab';
 import { loadCustomIcons } from '@/lib/customIconStore';
 import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
 import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
 import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
 import { loadCustomGaugePointers, type CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
-import { getSwitcherDefinition } from '@/lib/imageSwitcherStore';
+import { loadSwitcherDefinitions, getSwitcherDefinition } from '@/lib/imageSwitcherStore';
+import { pullSwitcherDefinitions } from '@/lib/imageSwitcherSync';
+import type { ImageSwitcherDefinition } from '@/types/imageSwitcher';
 
 import { pullLabAssetsFromFirestore, backfillIconsToFirestore, backfillGaugePointersToFirestore, backfillHandsToFirestore } from '@/lib/firestoreLabSync';
 import { subscribeAuthState } from '@/lib/firebaseAuthClient';
@@ -1980,11 +1983,13 @@ function StudioApp() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showAddElement, setShowAddElement] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
+  const [showSwitcherLab, setShowSwitcherLab] = useState(false);
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
   const [iconLibraryKey, setIconLibraryKey] = useState(0);
   const [fontLibraryKey, setFontLibraryKey] = useState(0);
   const [customHandStyles, setCustomHandStyles] = useState<CustomHandRecord[]>([]);
   const [customGaugePointers, setCustomGaugePointers] = useState<CustomGaugePointerRecord[]>([]);
+  const [switcherDefinitions, setSwitcherDefinitions] = useState<ImageSwitcherDefinition[]>([]);
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
@@ -2220,26 +2225,30 @@ function StudioApp() {
   // Phase 2: after auth settles, pull from Firestore then re-load to pick up synced data.
   useEffect(() => {
     const applyLocalAssets = async () => {
-      const [iconsRes, , fontNamesRes, handsRes, gaugeRes] = await Promise.allSettled([
+      const [iconsRes, , fontNamesRes, handsRes, gaugeRes, switcherRes] = await Promise.allSettled([
         loadCustomIcons(),
         loadCustomFonts(),
         registerCustomFonts(),
         loadCustomHandStyles(),
         loadCustomGaugePointers(),
+        loadSwitcherDefinitions(),
       ]);
       const icons = iconsRes.status === 'fulfilled' ? iconsRes.value : [];
       const loadedFontNames = fontNamesRes.status === 'fulfilled' ? fontNamesRes.value : [];
       const hands = handsRes.status === 'fulfilled' ? handsRes.value : [];
       const gaugePointers = gaugeRes.status === 'fulfilled' ? gaugeRes.value : [];
-      console.log(`[StudioApp] applyLocalAssets: icons=${icons.length} fonts=${loadedFontNames.length} hands=${hands.length} gaugePointers=${gaugePointers.length}`);
+      const switchers = switcherRes.status === 'fulfilled' ? switcherRes.value : [];
+      console.log(`[StudioApp] applyLocalAssets: icons=${icons.length} fonts=${loadedFontNames.length} hands=${hands.length} gaugePointers=${gaugePointers.length} switchers=${switchers.length}`);
       if (iconsRes.status === 'rejected') console.warn('[StudioApp] loadCustomIcons failed:', iconsRes.reason);
       if (fontNamesRes.status === 'rejected') console.warn('[StudioApp] registerCustomFonts failed:', fontNamesRes.reason);
       if (handsRes.status === 'rejected') console.warn('[StudioApp] loadCustomHandStyles failed:', handsRes.reason);
       if (gaugeRes.status === 'rejected') console.warn('[StudioApp] loadCustomGaugePointers failed:', gaugeRes.reason);
+      if (switcherRes.status === 'rejected') console.warn('[StudioApp] loadSwitcherDefinitions failed:', switcherRes.reason);
       if (icons.length > 0) registerCustomIconsInLibrary(icons);
       if (loadedFontNames.length > 0) registerCustomFontsInLibrary(loadedFontNames);
       if (hands.length > 0) setCustomHandStyles(hands);
       if (gaugePointers.length > 0) setCustomGaugePointers(gaugePointers);
+      setSwitcherDefinitions(switchers);
       if (icons.length > 0) setIconLibraryKey(k => k + 1);
       setFontLibraryKey(k => k + 1);
     };
@@ -2265,6 +2274,9 @@ function StudioApp() {
           );
           backfillHandsToFirestore().catch(err =>
             console.warn('[StudioApp] hand backfill failed:', err)
+          );
+          pullSwitcherDefinitions().catch(err =>
+            console.warn('[StudioApp] switcher pull failed:', err)
           );
           return applyLocalAssets();
         })
@@ -4799,6 +4811,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                         fontLibraryKey={fontLibraryKey}
                         customHandStyles={customHandStyles}
                         customGaugePointers={customGaugePointers}
+                        switcherDefinitions={switcherDefinitions}
+                        onOpenSwitcherLab={() => setShowSwitcherLab(true)}
                         onAddSiblingElement={(partialEl) => {
                           addActiveElement({ ...partialEl, id: generateId() } as import('@/types').WatchFaceElement);
                           // Keep GAUGE_POINTER selected — do NOT call setSelectedElementId
@@ -4847,6 +4861,21 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                   onHandsSaved={handleLabHandsSaved}
                   onGaugePointersSaved={handleLabGaugePointersSaved}
                 />
+
+                {/* Image Switcher Lab modal */}
+                <Dialog open={showSwitcherLab} onOpenChange={(open) => {
+                  if (!open) {
+                    setShowSwitcherLab(false);
+                    loadSwitcherDefinitions().then(setSwitcherDefinitions).catch(console.warn);
+                  }
+                }}>
+                  <DialogContent className="bg-[#111] border-zinc-800 text-white max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="text-white text-base">Image Switcher Lab</DialogTitle>
+                    </DialogHeader>
+                    <ImageSwitcherLab />
+                  </DialogContent>
+                </Dialog>
 
                 {/* Add Element Dialog */}
                 <Dialog open={showAddElement} onOpenChange={setShowAddElement}>
@@ -5225,6 +5254,21 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
           onHandsSaved={handleLabHandsSaved}
           onGaugePointersSaved={handleLabGaugePointersSaved}
         />
+
+        {/* Image Switcher Lab modal */}
+        <Dialog open={showSwitcherLab} onOpenChange={(open) => {
+          if (!open) {
+            setShowSwitcherLab(false);
+            loadSwitcherDefinitions().then(setSwitcherDefinitions).catch(console.warn);
+          }
+        }}>
+          <DialogContent className="bg-[#111] border-zinc-800 text-white max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white text-base">Image Switcher Lab</DialogTitle>
+            </DialogHeader>
+            <ImageSwitcherLab />
+          </DialogContent>
+        </Dialog>
 
         {/* Tips */}
         {state.currentStep === 'upload' && (
