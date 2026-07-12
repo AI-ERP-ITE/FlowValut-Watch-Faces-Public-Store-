@@ -2007,7 +2007,8 @@ function StudioApp() {
       if (el.type !== 'IMG_LEVEL' || !el.imageSwitcherDefinitionId) return el;
       const def = switcherDefinitions.find(d => d.id === el.imageSwitcherDefinitionId);
       if (!def) return el;
-      const dataUrls = def.ranges.map(s => s.dataUrl ?? '').filter(Boolean);
+      // Use local dataUrl first; fall back to Firebase CDN URL if local IDB copy absent
+      const dataUrls = def.ranges.map(s => s.dataUrl || s.baked?.downloadURL || '').filter(Boolean);
       if (dataUrls.length === 0) return el;
       return { ...el, images: dataUrls };
     });

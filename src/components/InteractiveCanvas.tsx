@@ -1447,28 +1447,29 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
             const candidateSrc = (sourceFrameIsUrl ? sourceFrame : null) || dataUrls[clampedIndex] || dataUrls[0];
             if (candidateSrc) {
               const img = new Image();
+              if (candidateSrc.startsWith('https://')) img.crossOrigin = 'anonymous';
               img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
               img.src = candidateSrc;
             }
             drawPlaceholder(ctx, el);
           }
         } else if (Array.isArray(el.images) && el.images.length > 0 && iconCache) {
-          // Non-weather IMG_LEVEL (e.g. gauge arc frames from Spec 093).
-          // Only render if frames are data: URLs — Firebase Storage URLs are
-          // not renderable cross-origin and must stay as placeholder.
-          // Use gaugeProgress so this arc visually matches the GAUGE_POINTER needle angle.
+          // Non-weather IMG_LEVEL (e.g. custom switcher frames, gauge arc frames).
+          // Supports both data: URLs and https:// Firebase CDN URLs (with CORS).
           const frameIdx = el.dataType
             ? Math.round(gaugeProgress(el) * (el.images.length - 1))
             : Math.floor(el.images.length / 2);
           const frameSrc = el.images[frameIdx];
-          const isDataUrl = typeof frameSrc === 'string' && frameSrc.startsWith('data:');
-          if (isDataUrl) {
-            const cacheKey = `__imglvl_${el.id}_f${frameIdx}`;
+          const isRenderable = typeof frameSrc === 'string' &&
+            (frameSrc.startsWith('data:') || frameSrc.startsWith('https://'));
+          if (isRenderable) {
+            const cacheKey = `__imglvl_${el.id}_f${frameIdx}_${String(frameSrc).length}|${String(frameSrc).slice(0, 60)}`;
             const cached = iconCache.get(cacheKey);
             if (cached) {
               ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
             } else {
               const img = new Image();
+              if (frameSrc.startsWith('https://')) img.crossOrigin = 'anonymous';
               img.onload = () => { iconCache.set(cacheKey, img); onIconLoaded?.(); };
               img.src = frameSrc;
               drawPlaceholder(ctx, el);
