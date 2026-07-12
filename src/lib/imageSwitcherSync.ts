@@ -32,6 +32,15 @@ import {
   sha256Hex,
 } from './firebaseStorageClient';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Remove keys with undefined values — Firestore rejects undefined fields. */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined),
+  ) as T;
+}
+
 // ── Firestore helpers ─────────────────────────────────────────────────────────
 
 function getDb() {
@@ -251,13 +260,13 @@ export async function pushSwitcherDefinition(def: ImageSwitcherDefinition): Prom
       dataType: def.dataType,
       policyType: def.policyType,
       slotCount: def.slotCount,
-      slots: updatedSlots,
+      slots: updatedSlots.map(s => stripUndefined(s as unknown as Record<string, unknown>) as unknown as SlotMeta),
       userProfile: def.userProfile,
       createdAt: def.createdAt,
       updatedAt: Date.now(),
     };
 
-    await setDoc(switcherDocRef(uid, def.id), firestoreMeta);
+    await setDoc(switcherDocRef(uid, def.id), stripUndefined(firestoreMeta as unknown as Record<string, unknown>));
   } catch (err) {
     console.warn('[imageSwitcherSync] push failed:', err);
   }
