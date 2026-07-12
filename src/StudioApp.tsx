@@ -2002,13 +2002,17 @@ function StudioApp() {
   // Canvas-only override: inject custom switcher slot dataUrls into el.images[] for preview.
   // This does NOT mutate stored state — it's a derived render-only view.
   const canvasElements = useMemo(() => {
+    console.log('[canvasElements] switcherDefs count:', switcherDefinitions.length,
+      switcherDefinitions.map(d => ({ id: d.id, name: d.name, slotsWithImg: d.ranges.filter(s => !!(s.dataUrl || s.baked?.downloadURL)).length, totalSlots: d.ranges.length })));
     if (switcherDefinitions.length === 0) return activeElements;
     return activeElements.map(el => {
       if (el.type !== 'IMG_LEVEL' || !el.imageSwitcherDefinitionId) return el;
       const def = switcherDefinitions.find(d => d.id === el.imageSwitcherDefinitionId);
+      console.log('[canvasElements] IMG_LEVEL el.id:', el.id, 'defId:', el.imageSwitcherDefinitionId, 'def found:', !!def);
       if (!def) return el;
       // Use local dataUrl first; fall back to Firebase CDN URL if local IDB copy absent
       const dataUrls = def.ranges.map(s => s.dataUrl || s.baked?.downloadURL || '').filter(Boolean);
+      console.log('[canvasElements] dataUrls injected:', dataUrls.length, 'first50:', dataUrls[0]?.slice(0, 50));
       if (dataUrls.length === 0) return el;
       return { ...el, images: dataUrls };
     });
