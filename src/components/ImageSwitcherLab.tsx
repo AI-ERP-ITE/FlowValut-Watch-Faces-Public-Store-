@@ -223,17 +223,23 @@ export default function ImageSwitcherLab() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const def = JSON.parse(evt.target?.result as string) as Partial<ImageSwitcherDefinition>;
-        if (def.ranges) {
+        // Strip BOM and trim before parsing
+        const text = ((evt.target?.result as string) ?? '').replace(/^\uFEFF/, '').trim();
+        const def = JSON.parse(text) as Partial<ImageSwitcherDefinition>;
+        if (def.ranges && Array.isArray(def.ranges) && def.ranges.length > 0) {
           setEditingId(def.id ?? null);
           setName(def.name ?? '');
           if (def.dataType) setDataType(def.dataType);
           setSlots((def.ranges as RangeSlot[]).map(r => ({ ...r })));
           if (def.userProfile) setProfile(def.userProfile);
-          setSaveMsg('');
+          setSaveMsg('✓ Loaded');
           setErrors([]);
+        } else {
+          setSaveMsg('✗ No ranges found in file');
         }
-      } catch { setSaveMsg('✗ Invalid JSON file'); }
+      } catch (err) {
+        setSaveMsg(`✗ Parse error: ${(err as Error).message?.slice(0, 60)}`);
+      }
     };
     reader.readAsText(file);
     e.target.value = '';
