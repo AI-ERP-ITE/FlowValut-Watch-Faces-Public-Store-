@@ -1717,10 +1717,10 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               {WEATHER_STYLES.map(ws => (
                 <button
                   key={ws.key}
-                  onClick={() => update({ weatherStyle: ws.key, images: generateWeatherSet(ws.key as WeatherStyle) })}
+                  onClick={() => update({ weatherStyle: ws.key, images: generateWeatherSet(ws.key as WeatherStyle), imageSwitcherDefinitionId: undefined })}
                   className={cn(
                     'flex-1 h-7 rounded border text-[10px]',
-                    (element.weatherStyle ?? 'flat') === ws.key
+                    !element.imageSwitcherDefinitionId && (element.weatherStyle ?? 'flat') === ws.key
                       ? 'border-cyan-500 bg-cyan-500/20 text-white'
                       : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
                   )}
