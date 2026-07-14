@@ -9,6 +9,7 @@ import { FONT_STYLES } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
+import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
 
 function _safeAssetIdV3(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -765,7 +766,7 @@ function generateTextImgWidgetV3(element: WatchFaceElement): string {
     ? `\n                    type: hmUI.data_type.${element.dataType},`
     : '';
   const hSpace = element.hSpace ?? 1;
-  const alignH = element.alignH ?? 'LEFT';
+  const alignH = normalizeHorizontalDigitAlign(element.alignH, 'LEFT');
 
   return `
                 // ${element.name} - TEXT_IMG Widget

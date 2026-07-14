@@ -1,9 +1,14 @@
 import type { WatchFaceElement } from '@/types';
+import {
+  getDefaultDigitAlignment,
+  normalizeHorizontalDigitAlign,
+  type HorizontalDigitAlign,
+} from './digitAlignment';
 import { getNumericPreviewValue } from './numericFitPolicy';
 // Note: PairCorrectionTable import removed by Spec 114 — pair correction path deleted.
 
 export type DigitWidgetType = 'IMG_DATE' | 'IMG_TIME' | 'TEXT_IMG';
-export type HorizontalAlign = 'LEFT' | 'CENTER_H' | 'RIGHT';
+export type HorizontalAlign = HorizontalDigitAlign;
 
 export interface DigitBitmapMetrics {
   char: string;
@@ -64,17 +69,6 @@ export interface DigitLayoutResult {
   glyphs: DigitGlyphBox[];
 }
 
-function normalizeAlignH(value: string | undefined, fallback: HorizontalAlign): HorizontalAlign {
-  const raw = String(value ?? '').toUpperCase();
-  if (raw === 'LEFT' || raw === 'CENTER_H' || raw === 'RIGHT') return raw;
-  return fallback;
-}
-
-function defaultAlign(widgetType: DigitWidgetType): HorizontalAlign {
-  if (widgetType === 'IMG_TIME') return 'LEFT';
-  return 'CENTER_H';
-}
-
 function resolveSpacing(widgetType: DigitWidgetType, hSpace?: number): number {
   if (widgetType === 'TEXT_IMG') return Number.isFinite(Number(hSpace)) ? Math.max(0, Math.floor(Number(hSpace))) : 1;
   return 0;
@@ -110,7 +104,10 @@ export function computeDigitBitmapLayout(request: DigitLayoutRequest): DigitLayo
    * No pair correction. No centroid analysis. No alpha scanning. No runtime image processing.
    */
   const value = request.value && request.value.length > 0 ? request.value : fallbackValue(request.widgetType);
-  const alignH = normalizeAlignH(request.alignH, defaultAlign(request.widgetType));
+  const alignH = normalizeHorizontalDigitAlign(
+    request.alignH,
+    getDefaultDigitAlignment(request.widgetType),
+  );
   const hSpace = resolveSpacing(request.widgetType, request.hSpace);
   const bounds = request.bounds;
   const chars = value.split('');
