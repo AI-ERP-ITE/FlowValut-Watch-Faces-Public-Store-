@@ -27,6 +27,8 @@ import { extractFramesFromMarkup } from '@/lib/markupFrameExtractor';
 import { detectGauge } from '@/lib/gaugeDetector';
 import { renderGaugeAssets } from '@/lib/gaugeRenderer';
 import { normalizeHorizontalDigitAlign, type HorizontalDigitAlign } from '@/lib/digitAlignment';
+import { fitDigitFrameToContent } from '@/lib/digitFrameFit';
+import { measureDigitWidgetContent } from '@/lib/digitFrameMeasurement';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -2112,15 +2114,37 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
               className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
             />
           </div>
-          <p className="text-[9px] text-white/35 mt-1">Font size is the source of truth for render size. Frame auto-adjusts to fit.</p>
-          {element.fontSize && (
-            <button
-              onClick={() => update({ fontSize: undefined })}
-              className="mt-1 h-6 rounded border border-white/10 bg-white/5 px-2 text-[10px] text-white/50 hover:border-white/30 hover:text-white/80"
-            >
-              Reset to frame height
-            </button>
-          )}
+          <p className="text-[9px] text-white/35 mt-1">Font size is the source of truth for render size.</p>
+          <button
+            type="button"
+            onClick={() => {
+              const font = getFontStyle(element.fontStyle ?? 'orbitron');
+              const fontSize = Math.max(4, Math.floor((element.fontSize ?? element.bounds.height) * 0.8));
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                toast.error('Unable to measure this font.');
+                return;
+              }
+              ctx.font = `${font.fontWeight} ${fontSize}px ${font.fontFamily}`;
+              const content = measureDigitWidgetContent(element, text => ctx.measureText(text).width);
+              const alignH = element.type === 'TEXT_IMG'
+                ? normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H')
+                : element.type === 'IMG_TIME'
+                  ? 'LEFT'
+                  : 'CENTER_H';
+              const bounds = fitDigitFrameToContent({
+                bounds: element.bounds,
+                contentWidth: content.width,
+                contentHeight: content.height,
+                alignH,
+              });
+              update({ bounds });
+            }}
+            className="mt-1 h-6 rounded border border-white/10 bg-white/5 px-2 text-[10px] text-white/60 hover:border-cyan-500/50 hover:text-white"
+          >
+            Reset Frame to Content / Range
+          </button>
         </Section>
       )}
 
