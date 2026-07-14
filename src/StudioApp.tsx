@@ -84,6 +84,7 @@ import {
 import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering'; // @deprecated by Spec 114
 import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
+import { buildProjectFileConfig } from '@/lib/projectFileConfig';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -3282,7 +3283,14 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     // After export pipeline runs, el.src is mutated to filenames (not data: URLs) and the
     // saved JSON would be unloadable. Saving here captures the pristine config.
     try {
-      downloadProjectFile(state.watchFaceConfig, state.backgroundImage);
+      const projectFileConfig = buildProjectFileConfig(state.watchFaceConfig, {
+        aodElements,
+        backgroundTransform: mainBackgroundTransform,
+        aodBackgroundMode,
+        aodSolidColor,
+        aodBackgroundTransform,
+      });
+      downloadProjectFile(withNormalizedPointerEffects(projectFileConfig), state.backgroundImage);
     } catch (e) {
       console.warn('[App] Project file download failed:', e);
     }
