@@ -15,4 +15,4 @@
 - [x] T3 — Add PNG Hand Pack authoring/editing UI; filter editor grids by inferred source kind and route missing identifiers to HTML unless the record is baked-only legacy. (`npx.cmd tsc --noEmit` passed.)
 - [x] T4 — Connect one unified hand selection library and preview/export compatibility without changing Firebase Auth, rules, or Zepp runtime assets. (`npx.cmd tsc --noEmit` passed.)
 - [x] T5 — Add regression checks for optional/empty identification, Firebase PNG round-trip, GitHub-bridge hand exclusion, and legacy fallback; validate locally. (`npx.cmd tsc --noEmit`, 38/38 verifier checks, and private production build passed.)
-- [ ] T6 — Private deployment and live verification after unrelated dirty entry-file changes are resolved.
+- [x] T6 — Private deployment and live verification using the working-tree-safe atomic deploy path; unrelated dirty entry files were preserved. (Bundle `index-DhtWbROL.js`, deploy commit `5d3596c3`.)
