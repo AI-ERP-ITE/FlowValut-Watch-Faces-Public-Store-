@@ -1,4 +1,5 @@
 import type { WatchFaceElement } from '@/types';
+import { getNumericPreviewValue } from './numericFitPolicy';
 // Note: PairCorrectionTable import removed by Spec 114 — pair correction path deleted.
 
 export type DigitWidgetType = 'IMG_DATE' | 'IMG_TIME' | 'TEXT_IMG';
@@ -97,24 +98,7 @@ export function getDigitPreviewValue(element: WatchFaceElement): string {
     return '10';
   }
   if (element.type === 'TEXT_IMG') {
-    switch (element.dataType) {
-      case 'STEP':
-        return '88888';
-      case 'BATTERY':
-      case 'HEART':
-      case 'SPO2':
-      case 'STRESS':
-      case 'HUMIDITY':
-        return '100';
-      case 'CAL':
-        return '8888';
-      case 'DISTANCE':
-        return '99.9';
-      case 'UVI':
-        return '5';
-      default:
-        return '888';
-    }
+    return getNumericPreviewValue(element.dataType);
   }
   return '888';
 }
