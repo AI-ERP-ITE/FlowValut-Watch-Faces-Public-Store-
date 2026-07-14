@@ -26,6 +26,7 @@ import { renderHtmlToDataUrl, renderSvgToDataUrl } from '@/lib/customIconStore';
 import { extractFramesFromMarkup } from '@/lib/markupFrameExtractor';
 import { detectGauge } from '@/lib/gaugeDetector';
 import { renderGaugeAssets } from '@/lib/gaugeRenderer';
+import { normalizeHorizontalDigitAlign, type HorizontalDigitAlign } from '@/lib/digitAlignment';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -2058,6 +2059,38 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
       )}
 
       {/* Digit size — digit widgets */}
+      {element.type === 'TEXT_IMG' && (
+        <Section label="Alignment">
+          <div className="grid grid-cols-3 gap-1">
+            {([
+              { value: 'LEFT', label: 'Left' },
+              { value: 'CENTER_H', label: 'Center' },
+              { value: 'RIGHT', label: 'Right' },
+            ] as const satisfies ReadonlyArray<{ value: HorizontalDigitAlign; label: string }>).map(option => {
+              const current = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => update({ alignH: option.value })}
+                  className={cn(
+                    'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                    current === option.value
+                      ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30',
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[9px] text-white/35 mt-1">
+            Aligns the complete runtime value inside this widget frame.
+          </p>
+        </Section>
+      )}
+
       {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG' || element.type === 'IMG_WEEK') && (
         <Section label="Digit Size">
           <div className="flex items-center gap-2">
