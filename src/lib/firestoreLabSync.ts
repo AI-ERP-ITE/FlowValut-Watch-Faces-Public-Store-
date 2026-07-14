@@ -32,7 +32,7 @@ import {
 
 import { getCurrentAuthUser } from './firebaseAuthClient';
 import type { CustomIconRecord } from './customIconStore';
-import type { CustomHandRecord } from './customHandStore';
+import { getCustomHandSourceKind, type CustomHandRecord } from './customHandStore';
 import type { CustomFontRecord } from './customFontStore';
 import {
   loadCustomIcons,
@@ -95,6 +95,7 @@ interface HandStorageMeta {
   createdAt: number;
   updatedAt: number;
   handRenderVersion: number;
+  sourceKind?: 'html' | 'png';
   pivotOffsets?: {
     hour: { x: number; y: number };
     minute: { x: number; y: number };
@@ -122,6 +123,31 @@ interface HandStorageMeta {
   bakedPaths: { hour: string; minute: string; second: string; cover: string; swatch: string };
   downloadURLs: { hour: string; minute: string; second: string; cover: string; swatch: string };
   bakedVersion: number;
+}
+
+function handGeometryHashInput(record: Pick<CustomHandRecord,
+  'pivotOffsets' | 'hourSvgPivotNorm' | 'minuteSvgPivotNorm' | 'secondSvgPivotNorm' |
+  'hourPivotNorm' | 'minutePivotNorm' | 'secondPivotNorm' |
+  'hourPosX' | 'hourPosY' | 'minutePosX' | 'minutePosY' | 'secondPosX' | 'secondPosY' |
+  'coverWidth' | 'coverHeight'
+>): string {
+  return JSON.stringify({
+    pivotOffsets: record.pivotOffsets ?? null,
+    hourSvgPivotNorm: record.hourSvgPivotNorm ?? null,
+    minuteSvgPivotNorm: record.minuteSvgPivotNorm ?? null,
+    secondSvgPivotNorm: record.secondSvgPivotNorm ?? null,
+    hourPivotNorm: record.hourPivotNorm ?? null,
+    minutePivotNorm: record.minutePivotNorm ?? null,
+    secondPivotNorm: record.secondPivotNorm ?? null,
+    hourPosX: record.hourPosX ?? null,
+    hourPosY: record.hourPosY ?? null,
+    minutePosX: record.minutePosX ?? null,
+    minutePosY: record.minutePosY ?? null,
+    secondPosX: record.secondPosX ?? null,
+    secondPosY: record.secondPosY ?? null,
+    coverWidth: record.coverWidth ?? null,
+    coverHeight: record.coverHeight ?? null,
+  });
 }
 
 function isValidPivotOffsets(
@@ -573,12 +599,21 @@ async function pullHands(uid: string): Promise<void> {
         blobToDataUrl(coverBlob),
         blobToDataUrl(swatchBlob),
       ]);
-      const [sourceHourHtml, sourceMinuteHtml, sourceSecondHtml, sourceHubHtml] = await Promise.all([
-        meta.sourceURLs?.hour   ? downloadText(meta.sourceURLs.hour).catch(() => '')   : Promise.resolve(''),
-        meta.sourceURLs?.minute ? downloadText(meta.sourceURLs.minute).catch(() => '') : Promise.resolve(''),
-        meta.sourceURLs?.second ? downloadText(meta.sourceURLs.second).catch(() => '') : Promise.resolve(''),
-        meta.sourceURLs?.hub    ? downloadText(meta.sourceURLs.hub).catch(() => '')    : Promise.resolve(''),
-      ]);
+      // Firestore sourceKind was introduced by Spec 116. Missing, empty, or
+      // otherwise unknown values are old HTML records; only an explicit "png"
+      // selects the binary-master path.
+      const sourceKind: 'html' | 'png' = meta.sourceKind === 'png' ? 'png' : 'html';
+      const sourceDownloads = await Promise.all(
+        [meta.sourceURLs?.hour, meta.sourceURLs?.minute, meta.sourceURLs?.second, meta.sourceURLs?.hub].map(async (url) => {
+          if (!url) return '';
+          if (sourceKind === 'png') return blobToDataUrl(await downloadBlob(url));
+          return downloadText(url).catch(() => '');
+        }),
+      );
+      const [sourceHour, sourceMinute, sourceSecond, sourceHub] = sourceDownloads;
+      const localSourceKind = meta.sourceKind === 'png'
+        ? 'png' as const
+        : (meta.sourceKind === 'html' || sourceDownloads.some(Boolean) ? 'html' as const : undefined);
       localMap.set(meta.key, {
         key: meta.key,
         name: meta.name,
@@ -587,10 +622,18 @@ async function pullHands(uid: string): Promise<void> {
         secondDataUrl,
         coverDataUrl,
         swatchDataUrl,
-        sourceHourHtml,
-        sourceMinuteHtml,
-        sourceSecondHtml,
-        sourceHubHtml,
+        ...(localSourceKind ? { sourceKind: localSourceKind } : {}),
+        ...(sourceKind === 'png' ? {
+          sourceHourPng: sourceHour,
+          sourceMinutePng: sourceMinute,
+          sourceSecondPng: sourceSecond,
+          sourceHubPng: sourceHub,
+        } : {
+          sourceHourHtml: sourceHour,
+          sourceMinuteHtml: sourceMinute,
+          sourceSecondHtml: sourceSecond,
+          sourceHubHtml: sourceHub,
+        }),
         handRenderVersion: meta.handRenderVersion,
         pivotOffsets: meta.pivotOffsets,
         // Restore all pivot norm fields so SVG-native render and tip/tail work after sync
@@ -622,12 +665,14 @@ async function pullHands(uid: string): Promise<void> {
 }
 
 async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
-  const sourceHour   = record.sourceHourHtml   ?? '';
-  const sourceMinute = record.sourceMinuteHtml ?? '';
-  const sourceSecond = record.sourceSecondHtml ?? '';
-  const sourceHub    = record.sourceHubHtml    ?? '';
+  const inferredKind = getCustomHandSourceKind(record);
+  const sourceKind: 'html' | 'png' = inferredKind === 'png' ? 'png' : 'html';
+  const sourceHour   = sourceKind === 'png' ? record.sourceHourPng ?? '' : record.sourceHourHtml ?? '';
+  const sourceMinute = sourceKind === 'png' ? record.sourceMinutePng ?? '' : record.sourceMinuteHtml ?? '';
+  const sourceSecond = sourceKind === 'png' ? record.sourceSecondPng ?? '' : record.sourceSecondHtml ?? '';
+  const sourceHub    = sourceKind === 'png' ? record.sourceHubPng ?? '' : record.sourceHubHtml ?? '';
 
-  const combinedSource = sourceHour + sourceMinute + sourceSecond + sourceHub;
+  const combinedSource = [sourceKind, sourceHour, sourceMinute, sourceSecond, sourceHub, handGeometryHashInput(record)].join('\u0000');
   const newHash = await sha256Hex(combinedSource || record.hourDataUrl);
 
   const base = `users/${uid}/labAssets/hands/${record.key}`;
@@ -655,12 +700,17 @@ async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
   let downloadURLs  = existingDownloadURLs;
 
   if (needsRebake) {
-    const sourceUploads = await Promise.all([
-      sourceHour.trim()   ? uploadSourceText(`${base}/source_hour.html`,   sourceHour)   : Promise.resolve({ storagePath: '', downloadURL: '' }),
-      sourceMinute.trim() ? uploadSourceText(`${base}/source_minute.html`, sourceMinute) : Promise.resolve({ storagePath: '', downloadURL: '' }),
-      sourceSecond.trim() ? uploadSourceText(`${base}/source_second.html`, sourceSecond) : Promise.resolve({ storagePath: '', downloadURL: '' }),
-      sourceHub.trim()    ? uploadSourceText(`${base}/source_hub.html`,    sourceHub)    : Promise.resolve({ storagePath: '', downloadURL: '' }),
-    ]);
+    const sourceNames = sourceKind === 'png'
+      ? ['source_png/hour.png', 'source_png/minute.png', 'source_png/second.png', 'source_png/hub.png']
+      : ['source_hour.html', 'source_minute.html', 'source_second.html', 'source_hub.html'];
+    const sources = [sourceHour, sourceMinute, sourceSecond, sourceHub];
+    const sourceUploads = await Promise.all(sources.map((source, index) => {
+      if (!source.trim()) return Promise.resolve({ storagePath: '', downloadURL: '' });
+      if (sourceKind === 'png') {
+        return uploadBinaryBlob(`${base}/${sourceNames[index]}`, dataUrlToBlob(source), 'image/png');
+      }
+      return uploadSourceText(`${base}/${sourceNames[index]}`, source);
+    }));
     sourceURLs = {
       hour:   sourceUploads[0].downloadURL,
       minute: sourceUploads[1].downloadURL,
@@ -691,11 +741,12 @@ async function pushHand(uid: string, record: CustomHandRecord): Promise<void> {
     createdAt: record.createdAt,
     updatedAt: Date.now(),
     handRenderVersion: record.handRenderVersion ?? 4,
+    sourceKind,
     sourcePaths: {
-      hour:   `${base}/source_hour.html`,
-      minute: `${base}/source_minute.html`,
-      second: `${base}/source_second.html`,
-      hub:    `${base}/source_hub.html`,
+      hour:   sourceKind === 'png' ? `${base}/source_png/hour.png` : `${base}/source_hour.html`,
+      minute: sourceKind === 'png' ? `${base}/source_png/minute.png` : `${base}/source_minute.html`,
+      second: sourceKind === 'png' ? `${base}/source_png/second.png` : `${base}/source_second.html`,
+      hub:    sourceKind === 'png' ? `${base}/source_png/hub.png` : `${base}/source_hub.html`,
     },
     sourceURLs,
     sourceHash: newHash,
@@ -987,6 +1038,8 @@ export async function deleteLabAssetFromFirestore(
       storagePaths.push(
         `${base}/source_hour.html`, `${base}/source_minute.html`,
         `${base}/source_second.html`, `${base}/source_hub.html`,
+        `${base}/source_png/hour.png`, `${base}/source_png/minute.png`,
+        `${base}/source_png/second.png`, `${base}/source_png/hub.png`,
         `${base}/baked_hour.png`, `${base}/baked_minute.png`,
         `${base}/baked_second.png`, `${base}/baked_cover.png`, `${base}/baked_swatch.png`,
       );

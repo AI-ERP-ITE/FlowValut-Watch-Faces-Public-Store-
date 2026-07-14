@@ -75,6 +75,13 @@ export interface CustomHandRecord {
   sourceMinuteHtml?: string;
   sourceSecondHtml?: string;
   sourceHubHtml?: string;
+  /** Explicit editable-source type. Missing is inferred for pre-Spec-116 records. */
+  sourceKind?: 'html' | 'png';
+  /** High-resolution editable PNG masters. Baked fields above remain ZPK assets. */
+  sourceHourPng?: string;
+  sourceMinutePng?: string;
+  sourceSecondPng?: string;
+  sourceHubPng?: string;
   handRenderVersion?: number;
   hubRenderVersion?: number;
   /** SHA-256 at last cloud sync — used to skip re-download on pull */
@@ -94,6 +101,7 @@ export interface SaveCustomHandStyleOptions {
     secondHtml: string;
     hubHtml: string;
   };
+  pngSources?: PngHandSources;
   pivotOffsets?: {
     hour: { x: number; y: number };
     minute: { x: number; y: number };
@@ -111,7 +119,22 @@ export interface SaveCustomHandStyleOptions {
   };
 }
 
+export interface PngHandSources {
+  hourPng: string;
+  minutePng: string;
+  secondPng: string;
+  hubPng: string;
+}
+
 export type CustomHandPackMode = 'source-based-custom' | 'legacy-normalized';
+
+/** Infer old records without forcing users to reopen or resave them. */
+export function getCustomHandSourceKind(record: CustomHandRecord): 'html' | 'png' | 'legacy' {
+  if (record.sourceKind === 'png' || record.sourceKind === 'html') return record.sourceKind;
+  if (record.sourceHourPng || record.sourceMinutePng || record.sourceSecondPng || record.sourceHubPng) return 'png';
+  if (record.sourceHourHtml || record.sourceMinuteHtml || record.sourceSecondHtml || record.sourceHubHtml) return 'html';
+  return 'legacy';
+}
 
 export interface ResolvedCustomHandPack {
   mode: CustomHandPackMode;
@@ -329,19 +352,15 @@ function htmlToSvgDataUrl(code?: string): string | null {
 export function resolveCustomHandPack(record: CustomHandRecord | null | undefined): ResolvedCustomHandPack | null {
   if (!record) return null;
 
-  const hasAnySource = !!(
-    record.sourceHourHtml
-    || record.sourceMinuteHtml
-    || record.sourceSecondHtml
-    || record.sourceHubHtml
-  );
+  const sourceKind = getCustomHandSourceKind(record);
+  const hasAnySource = sourceKind !== 'legacy';
 
   const mode: CustomHandPackMode = hasAnySource ? 'source-based-custom' : 'legacy-normalized';
 
-  const sourceHour = htmlToSvgDataUrl(record.sourceHourHtml);
-  const sourceMinute = htmlToSvgDataUrl(record.sourceMinuteHtml);
-  const sourceSecond = htmlToSvgDataUrl(record.sourceSecondHtml);
-  const sourceCover = htmlToSvgDataUrl(record.sourceHubHtml);
+  const sourceHour = sourceKind === 'png' ? record.sourceHourPng ?? null : htmlToSvgDataUrl(record.sourceHourHtml);
+  const sourceMinute = sourceKind === 'png' ? record.sourceMinutePng ?? null : htmlToSvgDataUrl(record.sourceMinuteHtml);
+  const sourceSecond = sourceKind === 'png' ? record.sourceSecondPng ?? null : htmlToSvgDataUrl(record.sourceSecondHtml);
+  const sourceCover = sourceKind === 'png' ? record.sourceHubPng ?? null : htmlToSvgDataUrl(record.sourceHubHtml);
 
   const sources = {
     hour: mode === 'source-based-custom' ? (sourceHour ?? record.hourDataUrl ?? null) : (record.hourDataUrl ?? null),
@@ -399,6 +418,7 @@ export async function saveCustomHandStyle(
   const cleanedSvg = stripPivotMarkers(sourceSvg);
 
   const composed = options?.composedSources;
+  const pngSources = options?.pngSources;
   const hasComposedSources = !!(
     composed
     && composed.hourHtml.trim()
@@ -406,34 +426,58 @@ export async function saveCustomHandStyle(
     && composed.secondHtml.trim()
     && composed.hubHtml.trim()
   );
+  const hasPngSources = !!(
+    pngSources
+    && pngSources.hourPng.trim()
+    && pngSources.minutePng.trim()
+    && pngSources.secondPng.trim()
+    && pngSources.hubPng.trim()
+  );
+  if (hasComposedSources && hasPngSources) {
+    throw new Error('A hand style must use either HTML/SVG or PNG sources, not both.');
+  }
 
   // One-input composite support:
   // if the user provides a stacked SVG with tagged groups (hour/minute/second/hub),
   // extract each layer so exported assets stay clean and don't bleed into each other.
-  const hourSvg = hasComposedSources
+  const hourSvg = hasPngSources
+    ? pngSources!.hourPng
+    : hasComposedSources
     ? stripPivotMarkers(extractSvgFromCode(composed!.hourHtml))
     : (extractLayerFromCompositeSvg(cleanedSvg, 'hour') ?? cleanedSvg);
-  const minuteSvg = hasComposedSources
+  const minuteSvg = hasPngSources
+    ? pngSources!.minutePng
+    : hasComposedSources
     ? stripPivotMarkers(extractSvgFromCode(composed!.minuteHtml))
     : (extractLayerFromCompositeSvg(cleanedSvg, 'minute') ?? cleanedSvg);
-  const secondSvg = hasComposedSources
+  const secondSvg = hasPngSources
+    ? pngSources!.secondPng
+    : hasComposedSources
     ? stripPivotMarkers(extractSvgFromCode(composed!.secondHtml))
     : (extractLayerFromCompositeSvg(cleanedSvg, 'second') ?? cleanedSvg);
-  const hubSvg = hasComposedSources
+  const hubSvg = hasPngSources
+    ? pngSources!.hubPng
+    : hasComposedSources
     ? stripPivotMarkers(extractSvgFromCode(composed!.hubHtml))
     : (extractLayerFromCompositeSvg(cleanedSvg, 'hub') ?? cleanedSvg);
 
-  const hourSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.hourHtml) : sourceSvg;
-  const minuteSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.minuteHtml) : sourceSvg;
-  const secondSourceSvg = hasComposedSources ? extractSvgFromCode(composed!.secondHtml) : sourceSvg;
+  const hourSourceSvg = hasPngSources ? pngSources!.hourPng : hasComposedSources ? extractSvgFromCode(composed!.hourHtml) : sourceSvg;
+  const minuteSourceSvg = hasPngSources ? pngSources!.minutePng : hasComposedSources ? extractSvgFromCode(composed!.minuteHtml) : sourceSvg;
+  const secondSourceSvg = hasPngSources ? pngSources!.secondPng : hasComposedSources ? extractSvgFromCode(composed!.secondHtml) : sourceSvg;
 
-  const extractedHourPivot = hasComposedSources
+  const extractedHourPivot = hasPngSources
+    ? null
+    : hasComposedSources
     ? (extractPivotFromSvg(hourSourceSvg) ?? inferCenteredPivot(hourSourceSvg))
     : parsedPivot;
-  const extractedMinutePivot = hasComposedSources
+  const extractedMinutePivot = hasPngSources
+    ? null
+    : hasComposedSources
     ? (extractPivotFromSvg(minuteSourceSvg) ?? inferCenteredPivot(minuteSourceSvg))
     : parsedPivot;
-  const extractedSecondPivot = hasComposedSources
+  const extractedSecondPivot = hasPngSources
+    ? null
+    : hasComposedSources
     ? (extractPivotFromSvg(secondSourceSvg) ?? inferCenteredPivot(secondSourceSvg))
     : parsedPivot;
 
@@ -604,10 +648,20 @@ export async function saveCustomHandStyle(
     secondPivotNorm,
     ...(secondLayer.artBoundsY ? { secondArtMinY: secondLayer.artBoundsY.minY, secondArtMaxY: secondLayer.artBoundsY.maxY } : {}),
     ...(hasComposedSources ? {
+      sourceKind: 'html' as const,
       sourceHourHtml: composed!.hourHtml,
       sourceMinuteHtml: composed!.minuteHtml,
       sourceSecondHtml: composed!.secondHtml,
       sourceHubHtml: composed!.hubHtml,
+      handRenderVersion: HAND_RENDER_VERSION,
+      hubRenderVersion: HUB_RENDER_VERSION,
+    } : {}),
+    ...(hasPngSources ? {
+      sourceKind: 'png' as const,
+      sourceHourPng: pngSources!.hourPng,
+      sourceMinutePng: pngSources!.minutePng,
+      sourceSecondPng: pngSources!.secondPng,
+      sourceHubPng: pngSources!.hubPng,
       handRenderVersion: HAND_RENDER_VERSION,
       hubRenderVersion: HUB_RENDER_VERSION,
     } : {}),
@@ -623,6 +677,32 @@ export async function saveCustomHandStyle(
     const req = tx.objectStore(STORE).put(record);
     req.onsuccess = () => resolve(record);
     req.onerror = () => reject(req.error);
+  });
+}
+
+/**
+ * Save a direct-PNG hand pack while preserving the original masters for future
+ * edits. Normalized PNGs are still generated through the same hand/hub bake
+ * pipeline used by HTML styles, so export geometry stays single-source.
+ */
+export async function saveCustomPngHandStyle(
+  name: string,
+  sources: PngHandSources,
+  options?: Omit<SaveCustomHandStyleOptions, 'composedSources' | 'pngSources'>,
+): Promise<CustomHandRecord> {
+  const layers = [sources.hourPng, sources.minutePng, sources.secondPng, sources.hubPng];
+  if (layers.some(value => !value.startsWith('data:image/png'))) {
+    throw new Error('PNG Hand Pack requires a PNG image for hour, minute, second, and hub.');
+  }
+  const pivots = options?.pivotNormOverrides ?? {
+    hour: 0.843,
+    minute: 0.860,
+    second: 0.750,
+  };
+  return saveCustomHandStyle(name, sources.hourPng, {
+    ...options,
+    pngSources: sources,
+    pivotNormOverrides: pivots,
   });
 }
 
@@ -783,18 +863,22 @@ function padBounds(
   };
 }
 
+function imageSourceFromCode(code: string): { src: string; dispose: () => void } {
+  if (/^data:image\//i.test(code)) return { src: code, dispose: () => {} };
+  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
+  const blob = new Blob([svgMatch ? svgMatch[0] : code], { type: 'image/svg+xml' });
+  const src = URL.createObjectURL(blob);
+  return { src, dispose: () => URL.revokeObjectURL(src) };
+}
+
 async function renderHandToPngWithPivot(
   code: string,
   outW: number,
   outH: number,
   pivotSource: ParsedPivot | null,
 ): Promise<{ dataUrl: string; pivot: { x: number; y: number } | null; artBoundsY: { minY: number; maxY: number } | null }> {
-  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
-  const svgCode = svgMatch ? svgMatch[0] : code;
-
   return new Promise((resolve) => {
-    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+    const source = imageSourceFromCode(code);
     const img = new Image();
     img.onload = async () => {
       const nw = Math.max(1, img.naturalWidth || outW);
@@ -810,7 +894,7 @@ async function renderHandToPngWithPivot(
       sampleCanvas.height = sampleH;
       const sampleCtx = sampleCanvas.getContext('2d');
       if (!sampleCtx) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         const fallback = await renderToHandPng(code, outW, outH);
         resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
         return;
@@ -822,7 +906,7 @@ async function renderHandToPngWithPivot(
 
       const rawBounds = findOpaqueBounds(sampleCanvas);
       if (!rawBounds) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         const fallback = await renderToHandPng(code, outW, outH);
         resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
         return;
@@ -837,7 +921,7 @@ async function renderHandToPngWithPivot(
       outCanvas.height = outH;
       const outCtx = outCanvas.getContext('2d');
       if (!outCtx) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         const fallback = await renderToHandPng(code, outW, outH);
         resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
         return;
@@ -874,15 +958,15 @@ async function renderHandToPngWithPivot(
       const outArtBounds = findOpaqueBounds(outCanvas);
       const artBoundsY = outArtBounds ? { minY: outArtBounds.minY, maxY: outArtBounds.maxY } : null;
 
-      URL.revokeObjectURL(url);
+      source.dispose();
       resolve({ dataUrl: outCanvas.toDataURL('image/png'), pivot, artBoundsY });
     };
     img.onerror = async () => {
-      URL.revokeObjectURL(url);
+      source.dispose();
       const fallback = await renderToHandPng(code, outW, outH);
       resolve({ dataUrl: fallback, pivot: pivotSource ? computePivotPx(pivotSource, outW, outH) : null, artBoundsY: null });
     };
-    img.src = url;
+    img.src = source.src;
   });
 }
 
@@ -926,11 +1010,8 @@ export function resolveHubBakeSize(svg: string): { width: number; height: number
  * Used to compute hub-ratio proportional geometry.
  */
 function measureHandArtSize(code: string): Promise<{ w: number; h: number }> {
-  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
-  const svgCode = svgMatch ? svgMatch[0] : code;
   return new Promise((resolve) => {
-    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+    const source = imageSourceFromCode(code);
     const img = new Image();
     img.onload = () => {
       const nw = Math.max(1, img.naturalWidth || 22);
@@ -943,10 +1024,10 @@ function measureHandArtSize(code: string): Promise<{ w: number; h: number }> {
       canvas.width = sampleW;
       canvas.height = sampleH;
       const ctx = canvas.getContext('2d');
-      if (!ctx) { URL.revokeObjectURL(url); resolve({ w: nw, h: nh }); return; }
+      if (!ctx) { source.dispose(); resolve({ w: nw, h: nh }); return; }
       ctx.clearRect(0, 0, sampleW, sampleH);
       ctx.drawImage(img, 0, 0, sampleW, sampleH);
-      URL.revokeObjectURL(url);
+      source.dispose();
       const bounds = findOpaqueBounds(canvas);
       if (!bounds) { resolve({ w: nw, h: nh }); return; }
       // Back-project to natural coords
@@ -955,18 +1036,15 @@ function measureHandArtSize(code: string): Promise<{ w: number; h: number }> {
         h: Math.max(1, Math.round((bounds.maxY - bounds.minY + 1) / downscale)),
       });
     };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve({ w: 22, h: 140 }); };
-    img.src = url;
+    img.onerror = () => { source.dispose(); resolve({ w: 22, h: 140 }); };
+    img.src = source.src;
   });
 }
 
 export function measureHubArtSize(code: string): Promise<{ width: number; height: number }> {
-  const fallback = resolveHubBakeSize(code);
-  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
-  const svgCode = svgMatch ? svgMatch[0] : code;
+  const fallback = /^data:image\//i.test(code) ? { width: HUB_DEFAULT_SIDE, height: HUB_DEFAULT_SIDE } : resolveHubBakeSize(code);
   return new Promise((resolve) => {
-    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+    const source = imageSourceFromCode(code);
     const img = new Image();
     img.onload = () => {
       const nw = Math.max(1, img.naturalWidth || fallback.width);
@@ -980,13 +1058,13 @@ export function measureHubArtSize(code: string): Promise<{ width: number; height
       canvas.height = sampleH;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         resolve(fallback);
         return;
       }
       ctx.clearRect(0, 0, sampleW, sampleH);
       ctx.drawImage(img, 0, 0, sampleW, sampleH);
-      URL.revokeObjectURL(url);
+      source.dispose();
       const bounds = findOpaqueBounds(canvas);
       if (!bounds) {
         resolve(fallback);
@@ -1005,10 +1083,10 @@ export function measureHubArtSize(code: string): Promise<{ width: number; height
       resolve({ width: w, height: h });
     };
     img.onerror = () => {
-      URL.revokeObjectURL(url);
+      source.dispose();
       resolve(fallback);
     };
-    img.src = url;
+    img.src = source.src;
   });
 }
 
@@ -1017,11 +1095,8 @@ export function measureHubArtSize(code: string): Promise<{ width: number; height
  * trimming transparent padding first so the artwork fills the box.
  */
 function renderHubToFittedPng(code: string, outW: number, outH: number): Promise<string> {
-  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
-  const svgCode = svgMatch ? svgMatch[0] : code;
   return new Promise((resolve) => {
-    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+    const source = imageSourceFromCode(code);
     const img = new Image();
     img.onload = () => {
       const nw = Math.max(1, img.naturalWidth || outW);
@@ -1035,7 +1110,7 @@ function renderHubToFittedPng(code: string, outW: number, outH: number): Promise
       sample.height = sampleH;
       const sctx = sample.getContext('2d');
       if (!sctx) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         renderToContainPng(code, Math.max(outW, outH)).then(resolve);
         return;
       }
@@ -1053,7 +1128,7 @@ function renderHubToFittedPng(code: string, outW: number, outH: number): Promise
       out.height = outH;
       const octx = out.getContext('2d');
       if (!octx) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         renderToContainPng(code, Math.max(outW, outH)).then(resolve);
         return;
       }
@@ -1064,23 +1139,20 @@ function renderHubToFittedPng(code: string, outW: number, outH: number): Promise
       const dW = cropW * scale;
       const dH = cropH * scale;
       octx.drawImage(sample, cropX, cropY, cropW, cropH, (outW - dW) / 2, (outH - dH) / 2, dW, dH);
-      URL.revokeObjectURL(url);
+      source.dispose();
       resolve(out.toDataURL('image/png'));
     };
     img.onerror = () => {
-      URL.revokeObjectURL(url);
+      source.dispose();
       renderToContainPng(code, Math.max(outW, outH)).then(resolve);
     };
-    img.src = url;
+    img.src = source.src;
   });
 }
 
 function renderHubToContainPng(code: string, size: number): Promise<string> {
-  const svgMatch = code.match(/<svg[\s\S]*<\/svg>/i);
-  const svgCode = svgMatch ? svgMatch[0] : code;
   return new Promise((resolve) => {
-    const blob = new Blob([svgCode], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+    const source = imageSourceFromCode(code);
     const img = new Image();
     img.onload = () => {
       const nw = Math.max(1, img.naturalWidth || size);
@@ -1095,7 +1167,7 @@ function renderHubToContainPng(code: string, size: number): Promise<string> {
       sampleCanvas.height = sampleH;
       const sampleCtx = sampleCanvas.getContext('2d');
       if (!sampleCtx) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         renderToContainPng(code, size).then(resolve);
         return;
       }
@@ -1121,7 +1193,7 @@ function renderHubToContainPng(code: string, size: number): Promise<string> {
       }
 
       if (maxX < minX || maxY < minY) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         renderToContainPng(code, size).then(resolve);
         return;
       }
@@ -1140,7 +1212,7 @@ function renderHubToContainPng(code: string, size: number): Promise<string> {
       outCanvas.height = size;
       const outCtx = outCanvas.getContext('2d');
       if (!outCtx) {
-        URL.revokeObjectURL(url);
+        source.dispose();
         renderToContainPng(code, size).then(resolve);
         return;
       }
@@ -1155,14 +1227,14 @@ function renderHubToContainPng(code: string, size: number): Promise<string> {
       const dy = (size - dh) / 2;
       outCtx.drawImage(sampleCanvas, minX, minY, cropW, cropH, dx, dy, dw, dh);
 
-      URL.revokeObjectURL(url);
+      source.dispose();
       resolve(outCanvas.toDataURL('image/png'));
     };
     img.onerror = () => {
-      URL.revokeObjectURL(url);
+      source.dispose();
       renderToContainPng(code, size).then(resolve);
     };
-    img.src = url;
+    img.src = source.src;
   });
 }
 

@@ -48,7 +48,7 @@ import { loadCustomIcons } from '@/lib/customIconStore';
 import { loadCustomFonts, registerCustomFonts } from '@/lib/customFontStore';
 import { registerCustomIconsInLibrary } from '@/lib/iconLibrary';
 import { registerCustomFontsInLibrary } from '@/lib/fontLibrary';
-import { loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
+import { getCustomHandSourceKind, loadCustomHandStyles, getCustomHandByKey, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
 import { loadCustomGaugePointers, type CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
 import { loadSwitcherDefinitions, getSwitcherDefinition } from '@/lib/imageSwitcherStore';
 import { pullSwitcherDefinitions } from '@/lib/imageSwitcherSync';
@@ -3894,7 +3894,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
               timePointerEl.coverHeight = customHand.coverHeight;
             }
             const resolvedPack = resolveCustomHandPack(customHand);
-            const sourceMode = resolvedPack?.mode === 'source-based-custom';
+            // HTML/SVG keeps the source-native geometry path. PNG masters are authoring
+            // sources only; Studio preview/export must consume the normalized baked PNGs.
+            const sourceMode = resolvedPack?.mode === 'source-based-custom'
+              && getCustomHandSourceKind(customHand) === 'html';
             // Cover always uses the pre-baked PNG (trimmed + fitted at save time, dimensions
             // match coverWidth/coverHeight). Raw SVG path used for hands does not apply here
             // because the hub widget specifies explicit w/h — image and dimensions must agree.

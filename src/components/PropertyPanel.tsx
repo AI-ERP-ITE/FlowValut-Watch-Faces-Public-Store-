@@ -11,7 +11,7 @@ import { FONT_STYLES, getCustomFontStyles, getFontStyle } from '@/lib/fontLibrar
 import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
-import type { CustomHandRecord } from '@/lib/customHandStore';
+import { getCustomHandSourceKind, type CustomHandRecord } from '@/lib/customHandStore';
 import type { CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -1428,6 +1428,9 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                         style={{ borderRadius: 2, border: active ? '1px solid #22d3ee' : '1px solid rgba(100,200,255,0.15)' }}
                       />
                       <span className="leading-tight text-center truncate w-full px-0.5 mt-0.5">{ch.name}</span>
+                      <span className="text-[7px] uppercase tracking-wide rounded border border-white/10 px-1 py-0.5 text-white/40">
+                        {getCustomHandSourceKind(ch) === 'png' ? 'PNG' : getCustomHandSourceKind(ch) === 'html' ? 'HTML' : 'Legacy'}
+                      </span>
                     </button>
                   );
                 })}

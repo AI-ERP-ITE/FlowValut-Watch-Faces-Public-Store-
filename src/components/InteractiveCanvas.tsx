@@ -7,7 +7,7 @@ import { generateWeatherSet } from '@/lib/weatherIconSets';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { generateHandSet } from '@/lib/handStyles';
 import type { HandStyleKey } from '@/lib/handStyles';
-import { resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
+import { getCustomHandSourceKind, resolveCustomHandPack, type CustomHandRecord } from '@/lib/customHandStore';
 import { normalizeEngraveFrameForParity, renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/pointerEffects';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
@@ -1970,15 +1970,17 @@ function loadHandImages(
   const customRecord = customHands?.find(h => h.key === style);
   if (customRecord) {
     const resolved = resolveCustomHandPack(customRecord);
+    const useEditableSource = getCustomHandSourceKind(customRecord) === 'html';
     srcs = {
-      // Source-backed custom hands: use the source SVG data URL.
+      // HTML source-backed custom hands use the source SVG data URL.
       // The canvas SVG-native render path (spec 109) draws the SVG at its natural
       // dimensions × canvas scale, so aspect ratio is always preserved and ornate
-      // detail is not lost. Cover still uses the baked PNG (hub sizing is separate).
-      hour: resolved?.sources.hour ?? customRecord.hourDataUrl ?? null,
-      minute: resolved?.sources.minute ?? customRecord.minuteDataUrl ?? null,
-      second: resolved?.sources.second ?? customRecord.secondDataUrl ?? null,
-      cover: resolved?.sources.cover ?? customRecord.coverDataUrl ?? null,
+      // detail is not lost. PNG masters stay authoring-only; canvas/export use their
+      // normalized baked assets so device geometry remains stable.
+      hour: useEditableSource ? (resolved?.sources.hour ?? customRecord.hourDataUrl ?? null) : customRecord.hourDataUrl,
+      minute: useEditableSource ? (resolved?.sources.minute ?? customRecord.minuteDataUrl ?? null) : customRecord.minuteDataUrl,
+      second: useEditableSource ? (resolved?.sources.second ?? customRecord.secondDataUrl ?? null) : customRecord.secondDataUrl,
+      cover: useEditableSource ? (resolved?.sources.cover ?? customRecord.coverDataUrl ?? null) : customRecord.coverDataUrl,
     };
   } else {
     const set = generateHandSet(style as HandStyleKey);

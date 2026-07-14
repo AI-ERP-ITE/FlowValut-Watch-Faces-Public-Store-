@@ -30,7 +30,9 @@ import {
 } from '@/lib/customFontStore';
 import {
   saveCustomHandStyle,
+  saveCustomPngHandStyle,
   deleteCustomHandStyle,
+  getCustomHandSourceKind,
   loadCustomHandStyles,
   type CustomHandRecord,
 } from '@/lib/customHandStore';
@@ -84,6 +86,7 @@ interface PointerLayerAnchor {
 }
 
 type ComposerLayerKey = 'hour' | 'minute' | 'second' | 'hub';
+type PointerSourceMode = 'html' | 'png';
 type ComposerLayerValidation = {
   state: 'idle' | 'valid' | 'error';
   message: string;
@@ -96,6 +99,7 @@ const POINTER_COMPOSER_AXIS_KEY = 'zepp-pointer-composer-axis-v3';
 // rotates near its base (not its center) by default.
 const DEFAULT_AXIS: PointerAxisAdjustments = { hour: 0.843, minute: 0.860, second: 0.750 };
 const COMPOSER_PREVIEW_RASTER_SIZE = 512;
+const PNG_HAND_SOURCE_LIMIT_BYTES = 12 * 1024 * 1024;
 
 // ── Stage 3: single source of truth for tip/tail pivot resolution (Spec 106) ──
 // Resolves the initial tip/tail axis (0–1) from parsed HTML/SVG pivot data.
@@ -282,6 +286,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
 
   // ── Clock hand state ──────────────────────────────────────────────────────
   const [savedHands, setSavedHands] = useState<CustomHandRecord[]>([]);
+  const [pointerSourceMode, setPointerSourceMode] = useState<PointerSourceMode>('html');
   const [saveHandName, setSaveHandName] = useState('');
   const [savingHand, setSavingHand] = useState(false);
   const [saveHandMsg, setSaveHandMsg] = useState('');
@@ -314,6 +319,9 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     minute: '',
     second: '',
     hub: '',
+  });
+  const [pngHandSources, setPngHandSources] = useState<Record<ComposerLayerKey, string>>({
+    hour: '', minute: '', second: '', hub: '',
   });
   const [validatingComposer, setValidatingComposer] = useState(false);
   const composerCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -470,7 +478,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   }, [composerAxis]);
 
   useEffect(() => {
-    if (activeTab !== 'pointers') return;
+    if (activeTab !== 'pointers' || pointerSourceMode !== 'html') return;
     const hasAny = !!(
       composerDraft.hourHtml.trim()
       || composerDraft.minuteHtml.trim()
@@ -532,7 +540,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       ]);
     }, 250);
     return () => clearTimeout(t);
-  }, [activeTab, composerDraft.hourHtml, composerDraft.minuteHtml, composerDraft.secondHtml, composerDraft.hubHtml]);
+  }, [activeTab, pointerSourceMode, composerDraft.hourHtml, composerDraft.minuteHtml, composerDraft.secondHtml, composerDraft.hubHtml]);
+
+  useEffect(() => {
+    if (pointerSourceMode === 'png') setComposerLayerPng(pngHandSources);
+  }, [pointerSourceMode, pngHandSources]);
 
   // ── Derive unique categories from saved icons ──────────────────────────────
   const categories = ['My Icons', ...Array.from(new Set(savedIcons.map(i => i.category))).filter(c => c !== 'My Icons')];
@@ -696,6 +708,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
 
   // ── Save as Clock Hand Style ───────────────────────────────────────────────
   const handleSaveAsHand = async () => {
+    const hasPngSources = Object.values(pngHandSources).every(Boolean);
     const hasComposedSources = !!(
       composerDraft.hourHtml.trim()
       && composerDraft.minuteHtml.trim()
@@ -703,7 +716,11 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
       && composerDraft.hubHtml.trim()
     );
     if (!saveHandName.trim()) return;
-    if (!hasComposedSources && !code.trim()) {
+    if (pointerSourceMode === 'png' && !hasPngSources) {
+      setSaveHandMsg('✗ Upload valid PNG files for hour, minute, second, and hub');
+      return;
+    }
+    if (pointerSourceMode === 'html' && !hasComposedSources && !code.trim()) {
       setSaveHandMsg('✗ Provide hand code or all four composer layers');
       return;
     }
@@ -723,27 +740,35 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
         minute: resolveSaveAxis('minute'),
         second: resolveSaveAxis('second'),
       };
-      const seedCode = hasComposedSources ? composerDraft.hourHtml : code;
-      const record = await saveCustomHandStyle(
-        saveHandName.trim(),
-        seedCode,
-        hasComposedSources
-          ? {
-              composedSources: {
-                hourHtml: composerDraft.hourHtml,
-                minuteHtml: composerDraft.minuteHtml,
-                secondHtml: composerDraft.secondHtml,
-                hubHtml: composerDraft.hubHtml,
-              },
-              pivotNormOverrides,
-            }
-          : { pivotNormOverrides },
-      );
+      const record = pointerSourceMode === 'png'
+        ? await saveCustomPngHandStyle(saveHandName.trim(), {
+            hourPng: pngHandSources.hour,
+            minutePng: pngHandSources.minute,
+            secondPng: pngHandSources.second,
+            hubPng: pngHandSources.hub,
+          }, { pivotNormOverrides })
+        : await saveCustomHandStyle(
+            saveHandName.trim(),
+            hasComposedSources ? composerDraft.hourHtml : code,
+            hasComposedSources
+              ? {
+                  composedSources: {
+                    hourHtml: composerDraft.hourHtml,
+                    minuteHtml: composerDraft.minuteHtml,
+                    secondHtml: composerDraft.secondHtml,
+                    hubHtml: composerDraft.hubHtml,
+                  },
+                  pivotNormOverrides,
+                }
+              : { pivotNormOverrides },
+          );
       setSavedHands(prev => {
         const filtered = prev.filter(h => h.key !== record.key);
         return [...filtered, record].sort((a, b) => a.createdAt - b.createdAt);
       });
-      setSaveHandMsg(hasComposedSources
+      setSaveHandMsg(pointerSourceMode === 'png'
+        ? '✓ Saved PNG hand pack (masters + baked assets + pivots)'
+        : hasComposedSources
         ? '✓ Saved composed hand set (hour/minute/second/hub + pivots)'
         : '✓ Saved — clear code editor and enter a new SVG to create another style');
       setSaveHandName('');
@@ -819,16 +844,33 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   };
 
   const handleLoadHand = (hand: CustomHandRecord) => {
-    if (!hand.sourceHourHtml && !hand.sourceMinuteHtml && !hand.sourceSecondHtml && !hand.sourceHubHtml) {
-      setSaveHandMsg('✗ No source HTML stored for this style — legacy record, cannot load into editor');
+    const sourceKind = getCustomHandSourceKind(hand);
+    if (sourceKind === 'png') {
+      if (!hand.sourceHourPng || !hand.sourceMinutePng || !hand.sourceSecondPng || !hand.sourceHubPng) {
+        setSaveHandMsg('✗ One or more PNG masters are unavailable; the baked style remains selectable');
+        return;
+      }
+      const sources = {
+        hour: hand.sourceHourPng,
+        minute: hand.sourceMinutePng,
+        second: hand.sourceSecondPng,
+        hub: hand.sourceHubPng,
+      };
+      setPointerSourceMode('png');
+      setPngHandSources(sources);
+      setComposerLayerPng(sources);
+    } else if (sourceKind === 'html') {
+      setPointerSourceMode('html');
+      updateComposerDraft({
+        hourHtml: hand.sourceHourHtml ?? '',
+        minuteHtml: hand.sourceMinuteHtml ?? '',
+        secondHtml: hand.sourceSecondHtml ?? '',
+        hubHtml: hand.sourceHubHtml ?? '',
+      });
+    } else {
+      setSaveHandMsg('✗ Source unavailable for this legacy baked-only style');
       return;
     }
-    updateComposerDraft({
-      hourHtml:   hand.sourceHourHtml   ?? '',
-      minuteHtml: hand.sourceMinuteHtml ?? '',
-      secondHtml: hand.sourceSecondHtml ?? '',
-      hubHtml:    hand.sourceHubHtml    ?? '',
-    });
     setSaveHandName(hand.name);
     // Restore tip/tail axis from stored SVG-space pivot norms if available.
     // Falls back to hourPivotNorm (baked-PNG-space norm, close enough).
@@ -839,7 +881,7 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
     });
     setComposerAxisTouched({ hour: false, minute: false, second: false });
     setActiveTab('pointers');
-    setSaveHandMsg('✓ Loaded into composer — adjust if needed then Save');
+    setSaveHandMsg(`✓ Loaded ${sourceKind === 'png' ? 'PNG pack' : 'HTML source'} — adjust then Save to update, or rename to save a copy`);
   };
 
   // ── Font upload ────────────────────────────────────────────────────────────
@@ -968,6 +1010,46 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
   };
   const setLayerAnchor = (key: 'hour' | 'minute' | 'second', next: PointerLayerAnchor) => {
     setComposerLayerAnchor(prev => ({ ...prev, [key]: next }));
+  };
+
+  const handlePngHandFile = async (key: ComposerLayerKey, file: File | undefined) => {
+    if (!file) return;
+    if (file.type !== 'image/png') {
+      setLayerValidation(key, { state: 'error', message: 'PNG files only' });
+      return;
+    }
+    if (!Number.isFinite(file.size) || file.size <= 0 || file.size > PNG_HAND_SOURCE_LIMIT_BYTES) {
+      setLayerValidation(key, { state: 'error', message: 'PNG must be non-empty and no larger than 12 MB' });
+      return;
+    }
+    try {
+      const bitmap = await createImageBitmap(file);
+      const width = bitmap.width;
+      const height = bitmap.height;
+      bitmap.close();
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+        throw new Error('PNG has invalid dimensions');
+      }
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read PNG'));
+        reader.onerror = () => reject(reader.error ?? new Error('Could not read PNG'));
+        reader.readAsDataURL(file);
+      });
+      if (!dataUrl.startsWith('data:image/png')) throw new Error('File did not decode as PNG');
+      const wasEmpty = !pngHandSources[key];
+      setPngHandSources(prev => ({ ...prev, [key]: dataUrl }));
+      setLayerValidation(key, { state: 'valid', message: `${width}×${height} PNG · ${(file.size / 1024).toFixed(0)} KB` });
+      if (key !== 'hub') {
+        setLayerAnchor(key, { xRatio: 0.5, yRatio: DEFAULT_AXIS[key], markerFound: false });
+        if (wasEmpty) {
+          setComposerAxis(prev => ({ ...prev, [key]: DEFAULT_AXIS[key] }));
+          setComposerAxisTouched(prev => ({ ...prev, [key]: false }));
+        }
+      }
+    } catch (err) {
+      setLayerValidation(key, { state: 'error', message: (err as Error).message || 'Invalid PNG' });
+    }
   };
 
   const validateLayer = async (key: ComposerLayerKey, codeText: string) => {
@@ -1572,17 +1654,35 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                 {/* Left: separated layer editors */}
                 <div className="space-y-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-cyan-300 font-medium">Pointer HTML Composer</p>
-                    <button
-                      onClick={validateAllComposerLayers}
-                      disabled={validatingComposer}
-                      className="text-[10px] px-2.5 py-1 rounded border border-cyan-500/40 bg-cyan-600/20 text-cyan-200 hover:bg-cyan-600/30 disabled:opacity-50"
-                    >
-                      {validatingComposer ? 'Validating…' : 'Revalidate'}
-                    </button>
+                    <p className="text-xs text-cyan-300 font-medium">Pointer Source Composer</p>
+                    {pointerSourceMode === 'html' && (
+                      <button
+                        onClick={validateAllComposerLayers}
+                        disabled={validatingComposer}
+                        className="text-[10px] px-2.5 py-1 rounded border border-cyan-500/40 bg-cyan-600/20 text-cyan-200 hover:bg-cyan-600/30 disabled:opacity-50"
+                      >
+                        {validatingComposer ? 'Validating…' : 'Revalidate'}
+                      </button>
+                    )}
                   </div>
-                  <p className="text-[10px] text-white/40">Paste each layer separately. Validation and preview run per-layer with no silent fallback.</p>
+                  <div className="grid grid-cols-2 gap-1 rounded bg-zinc-950 p-1 border border-white/10">
+                    {(['html', 'png'] as const).map(mode => (
+                      <button
+                        key={mode}
+                        onClick={() => setPointerSourceMode(mode)}
+                        className={`rounded px-3 py-1.5 text-[10px] font-medium transition-colors ${pointerSourceMode === mode ? 'bg-cyan-700 text-white' : 'text-white/45 hover:text-white/75'}`}
+                      >
+                        {mode === 'html' ? 'HTML / SVG Composer' : 'PNG Hand Pack'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-white/40">
+                    {pointerSourceMode === 'html'
+                      ? 'Paste each layer separately. Validation and preview run per-layer with no silent fallback.'
+                      : 'Upload transparent PNG masters. Original resolution is preserved; the export-sized assets are baked when you save.'}
+                  </p>
 
+                  {pointerSourceMode === 'html' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
@@ -1644,6 +1744,42 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                       <p className={`text-[10px] ${composerValidation.hub.state === 'error' ? 'text-red-400' : composerValidation.hub.state === 'valid' ? 'text-green-400' : 'text-white/30'}`}>{composerValidation.hub.message}</p>
                     </div>
                   </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {([
+                        { key: 'hour', label: 'Hour PNG' },
+                        { key: 'minute', label: 'Minute PNG' },
+                        { key: 'second', label: 'Second PNG' },
+                        { key: 'hub', label: 'Hub PNG' },
+                      ] as const).map(layer => (
+                        <label key={layer.key} className="group rounded border border-dashed border-white/15 bg-zinc-900/70 p-3 hover:border-cyan-500/50 cursor-pointer transition-colors">
+                          <input
+                            type="file"
+                            accept="image/png"
+                            className="hidden"
+                            onChange={e => {
+                              void handlePngHandFile(layer.key, e.target.files?.[0]);
+                              e.target.value = '';
+                            }}
+                          />
+                          <div className="flex items-center gap-3">
+                            <div className="h-24 w-24 shrink-0 rounded bg-zinc-950 border border-white/10 flex items-center justify-center overflow-hidden">
+                              {pngHandSources[layer.key]
+                                ? <img src={pngHandSources[layer.key]} alt={layer.label} className="max-h-full max-w-full object-contain" />
+                                : <Upload className="h-5 w-5 text-white/25 group-hover:text-cyan-400" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[11px] text-white/70 font-medium">{layer.label}</p>
+                              <p className="text-[10px] text-white/35 mt-1">{pngHandSources[layer.key] ? 'Click to replace this master' : 'Click to upload PNG'}</p>
+                              <p className={`text-[9px] mt-1 ${composerValidation[layer.key].state === 'error' ? 'text-red-400' : composerValidation[layer.key].state === 'valid' ? 'text-green-400' : 'text-white/25'}`}>
+                                {composerValidation[layer.key].message}
+                              </p>
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Right: preview + pivot + save */}
@@ -1712,11 +1848,13 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                     </button>
                   </div>
 
-                  {savedHands.length > 0 && (
+                  {savedHands.some(hand => getCustomHandSourceKind(hand) === pointerSourceMode) && (
                     <div className="rounded-lg border border-white/10 bg-zinc-900/80 p-3 space-y-2">
-                      <span className="text-[10px] text-white/40 uppercase tracking-widest">Saved Pointer Styles ({savedHands.length})</span>
+                      <span className="text-[10px] text-white/40 uppercase tracking-widest">
+                        Saved {pointerSourceMode === 'png' ? 'PNG' : 'HTML'} Pointer Styles ({savedHands.filter(hand => getCustomHandSourceKind(hand) === pointerSourceMode).length})
+                      </span>
                       <div className="grid grid-cols-4 gap-1.5">
-                        {savedHands.map(hand => (
+                        {savedHands.filter(hand => getCustomHandSourceKind(hand) === pointerSourceMode).map(hand => (
                           <div key={hand.key} className="relative group">
                             <div
                               className="w-full aspect-square rounded border border-white/10 bg-zinc-800 overflow-hidden flex items-end justify-center pb-0.5"
@@ -1730,15 +1868,13 @@ export function IconLab({ open, onClose, onIconsSaved, onFontsSaved, onHandsSave
                               />
                             </div>
                             <p className="text-[8px] text-white/40 text-center truncate mt-0.5">{hand.name}</p>
-                            {(hand.sourceHourHtml || hand.sourceHubHtml) && (
-                              <button
-                                onClick={() => handleLoadHand(hand)}
-                                className="absolute -bottom-1 left-1/2 -translate-x-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-emerald-600 rounded-full text-white"
-                                title="Load into composer for editing"
-                              >
-                                <Pencil className="h-2.5 w-2.5" />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => handleLoadHand(hand)}
+                              className="absolute -bottom-1 left-1/2 -translate-x-1/2 hidden group-hover:flex items-center justify-center w-4 h-4 bg-emerald-600 rounded-full text-white"
+                              title="Load into composer for editing"
+                            >
+                              <Pencil className="h-2.5 w-2.5" />
+                            </button>
                             <button
                               onClick={() => handleDeleteHand(hand.key)}
                               className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 bg-red-600 rounded-full text-white"

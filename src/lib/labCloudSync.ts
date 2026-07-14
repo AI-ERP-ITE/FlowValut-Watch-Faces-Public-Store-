@@ -7,7 +7,6 @@ import {
   registerCustomFonts,
   type SerializableCustomFontRecord,
 } from '@/lib/customFontStore';
-import { replaceCustomHandStyles, type CustomHandRecord } from '@/lib/customHandStore';
 import {
   fetchLabManifest,
   isBackendBridgeConfigured,
@@ -47,18 +46,17 @@ export function isLabCloudSyncEnabled(): boolean {
 }
 
 export async function pullAllLabAssetsFromCloud(): Promise<void> {
-  const [icons, hands, fonts] = await Promise.all([
+  // Hands intentionally do not use this admin Cloud Function/GitHub-manifest
+  // bridge. Their source and baked assets are synced by the signed-in user's
+  // owner-scoped Firestore/Storage path in firestoreLabSync.ts.
+  const [icons, fonts] = await Promise.all([
     getEnvelope<CustomIconRecord>('icons'),
-    getEnvelope<CustomHandRecord>('hands'),
     getEnvelope<SerializableCustomFontRecord>('fonts'),
   ]);
 
   // Only replace local store if cloud has actual items — never wipe on empty/missing file.
   if (isRecordArray<CustomIconRecord>(icons.items) && icons.items.length > 0) {
     await replaceCustomIcons(icons.items);
-  }
-  if (isRecordArray<CustomHandRecord>(hands.items) && hands.items.length > 0) {
-    await replaceCustomHandStyles(hands.items);
   }
   if (isRecordArray<SerializableCustomFontRecord>(fonts.items) && fonts.items.length > 0) {
     await replaceCustomFonts(deserializeCustomFonts(fonts.items));

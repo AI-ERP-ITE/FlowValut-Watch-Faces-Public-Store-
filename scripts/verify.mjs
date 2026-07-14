@@ -505,12 +505,17 @@ function readSrc(rel) {
     fail('Hand save cleanup', "setSaveHandName('') or setCode('') not found after hand save in IconLab.tsx");
   }
 
-  // 6j: TIME_POINTER paths in generator must be normalized to assets/ prefix
+  // 6j: TIME_POINTER paths use the proven Zepp filename convention. Any incoming
+  // assets/ prefix is stripped, and cover remains optional.
   const generatorSrc = readSrc('lib/jsCodeGenerator.ts');
-  if (generatorSrc.includes("return `assets/${clean}`") && generatorSrc.includes("const coverSrc = toAssetPath(element.coverSrc);")) {
-    ok('TIME_POINTER generator: paths normalized to assets/ and cover remains optional');
+  if (
+    generatorSrc.includes("const clean = src.replace(/^assets\\//, '').trim();")
+    && generatorSrc.includes('return clean;')
+    && generatorSrc.includes('const coverSrc = toAssetPath(element.coverSrc);')
+  ) {
+    ok('TIME_POINTER generator: paths normalized to runtime filenames and cover remains optional');
   } else {
-    fail('TIME_POINTER generator path normalization', 'assets/ normalization or optional cover handling missing in jsCodeGenerator.ts');
+    fail('TIME_POINTER generator path normalization', 'runtime filename normalization or optional cover handling missing in jsCodeGenerator.ts');
   }
 
   // 6k: Export pipeline must block build when referenced TIME_POINTER assets are missing
@@ -529,6 +534,68 @@ function readSrc(rel) {
     ok('Drop shadow: shared normalization wired in preview and export paths');
   } else {
     fail('Drop shadow normalization wiring', `export=${usesShadowNormalizationInExport}, preview=${usesShadowNormalizationInPreview}`);
+  }
+}
+
+// ─── 7. SPEC 116 PNG HAND SOURCE ROUNDTRIP ──────────────────────────────────
+section('7. PNG Hand Pack Source Roundtrip');
+
+{
+  const handStoreSrc = readSrc('lib/customHandStore.ts');
+  const firestoreSyncSrc = readSrc('lib/firestoreLabSync.ts');
+  const cloudSyncSrc = readSrc('lib/labCloudSync.ts');
+  const labSrc = readSrc('components/IconLab.tsx');
+  const panelSrc = readSrc('components/PropertyPanel.tsx');
+  const studioSrc = readSrc('StudioApp.tsx');
+
+  if (
+    handStoreSrc.includes("sourceKind?: 'html' | 'png'")
+    && handStoreSrc.includes("record.sourceKind === 'png' || record.sourceKind === 'html'")
+    && handStoreSrc.includes("return 'legacy'")
+  ) {
+    ok('Spec 116: optional source kind supports HTML, PNG, and baked-only legacy inference');
+  } else {
+    fail('Spec 116 source-kind inference', 'Optional HTML/PNG/legacy inference contract is missing');
+  }
+
+  const pngPaths = ['hour.png', 'minute.png', 'second.png', 'hub.png']
+    .every(name => firestoreSyncSrc.includes(`source_png/${name}`));
+  if (pngPaths && firestoreSyncSrc.includes("meta.sourceKind === 'png' ? 'png' : 'html'")) {
+    ok('Spec 116: Firebase sync has four PNG master paths and missing/empty kind defaults to HTML');
+  } else {
+    fail('Spec 116 Firebase PNG paths', 'PNG master paths or optional-kind normalization is missing');
+  }
+
+  if (
+    firestoreSyncSrc.includes('handGeometryHashInput(record)')
+    && firestoreSyncSrc.includes('sourceHour, sourceMinute, sourceSecond, sourceHub')
+  ) {
+    ok('Spec 116: cloud source hash includes all masters and pointer geometry');
+  } else {
+    fail('Spec 116 complete source hash', 'All four layers and geometry are not represented in the hash input');
+  }
+
+  if (!cloudSyncSrc.includes("getEnvelope<CustomHandRecord>('hands')") && cloudSyncSrc.includes("if (type === 'hands') return")) {
+    ok('Spec 116: admin Cloud Function/GitHub bridge excludes hands from pull and push');
+  } else {
+    fail('Spec 116 GitHub hand exclusion', 'Hands still enter the GitHub manifest bridge');
+  }
+
+  if (
+    labSrc.includes("PNG Hand Pack")
+    && labSrc.includes('saveCustomPngHandStyle')
+    && labSrc.includes("file.type !== 'image/png'")
+    && labSrc.includes('getCustomHandSourceKind(hand) === pointerSourceMode')
+  ) {
+    ok('Spec 116: PNG authoring, validation, saving, and source-filtered editor library are wired');
+  } else {
+    fail('Spec 116 PNG authoring UI', 'One or more PNG composer contracts are missing');
+  }
+
+  if (panelSrc.includes("getCustomHandSourceKind(ch) === 'png' ? 'PNG'") && studioSrc.includes("getCustomHandSourceKind(customHand) === 'html'")) {
+    ok('Spec 116: unified picker badges source kind and PNG export remains baked-asset based');
+  } else {
+    fail('Spec 116 selection/export compatibility', 'Source-kind badge or baked PNG export gate is missing');
   }
 }
 
