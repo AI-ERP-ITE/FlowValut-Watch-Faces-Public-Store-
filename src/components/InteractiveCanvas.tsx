@@ -15,6 +15,7 @@ import { normalizeDropShadowForBake, pointerShadowToDropShadow } from '@/lib/eff
 import { analyzeFlicker } from '@/utils/flickerEngine';
 import { drawImageWithPhotoEdit, DEFAULT_PHOTO_EDIT } from '@/lib/photoEditUtils';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
+import { getDefaultDigitAlignment, normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
   createDefaultGaugePointerDataUrl,
@@ -1782,13 +1783,13 @@ function drawDigitElement(
   _digitAssets?: Map<string, ElementImage>,
 ) {
   const { x, y, width: w, height: h } = el.bounds;
-  const resolveAlignH = (): 'LEFT' | 'CENTER_H' | 'RIGHT' => {
-    const raw = String(el.alignH ?? '').toUpperCase();
-    if (raw === 'LEFT' || raw === 'CENTER_H' || raw === 'RIGHT') return raw;
-    if (el.type === 'TEXT_IMG' || el.type === 'IMG_DATE' || el.type === 'IMG_WEEK') return 'CENTER_H';
-    return 'LEFT';
-  };
-  const alignH = resolveAlignH();
+  const digitWidgetType = el.type === 'IMG_TIME' || el.type === 'IMG_DATE' || el.type === 'IMG_WEEK'
+    ? el.type
+    : 'TEXT_IMG';
+  const alignH = normalizeHorizontalDigitAlign(
+    el.alignH,
+    getDefaultDigitAlignment(digitWidgetType),
+  );
   const hSpace = Number.isFinite(Number(el.hSpace)) ? Math.max(0, Math.floor(Number(el.hSpace))) : 0;
 
   // If digit images available, draw them
