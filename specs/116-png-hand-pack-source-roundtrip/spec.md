@@ -2,7 +2,13 @@
 
 ## Status
 
-Approved for implementation.
+**Complete — implemented, validated, privately deployed, and closed on 2026-07-15.**
+
+Implementation commit: `494bf679`
+
+Documentation/deployment record: `cac3461e`
+
+Private deployment commit: `5d3596c3` (`index-DhtWbROL.js`)
 
 ## Problem
 
@@ -84,3 +90,7 @@ Existing HTML objects retain their current paths (`source_hour.html`, etc.) to a
 5. HTML styles continue loading/editing without manual migration.
 6. PNG styles appear only in the PNG composer library; HTML styles appear only in the HTML composer library; both remain selectable from the Property Panel.
 7. Generated ZPKs contain the expected hour/minute/second/hub device PNG assets and preserve pointer pivots.
+
+## Closure
+
+All dependency-ordered tasks are complete. TypeScript, the 38-check verifier, Firebase private-environment preflight, and the private production build passed. The canonical private deployment completed successfully, and the root, Studio, and Parametric redirect-query entrypoints served the same production bundle with live JS/CSS assets returning HTTP 200. The implementation preserved the existing HTML/SVG hand workflow, kept PNG masters in owner-scoped Firebase Storage rather than Firestore, and did not modify GAUGE_POINTER storage or rendering paths.

@@ -16,3 +16,7 @@
 - [x] T4 — Connect one unified hand selection library and preview/export compatibility without changing Firebase Auth, rules, or Zepp runtime assets. (`npx.cmd tsc --noEmit` passed.)
 - [x] T5 — Add regression checks for optional/empty identification, Firebase PNG round-trip, GitHub-bridge hand exclusion, and legacy fallback; validate locally. (`npx.cmd tsc --noEmit`, 38/38 verifier checks, and private production build passed.)
 - [x] T6 — Private deployment and live verification using the working-tree-safe atomic deploy path; unrelated dirty entry files were preserved. (Bundle `index-DhtWbROL.js`, deploy commit `5d3596c3`.)
+
+## Closure
+
+**CLOSED — 2026-07-15.** All 6 tasks are complete; no follow-up implementation task remains in Spec 116.
