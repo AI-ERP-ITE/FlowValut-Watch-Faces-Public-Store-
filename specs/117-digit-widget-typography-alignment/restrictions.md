@@ -5,7 +5,7 @@
 The following are prohibited because Git history already demonstrated failure:
 
 1. **Preview-only pair corrections** — Spec 113 generated 100 pair corrections, but Zepp received none of them.
-2. **Universal widest-cell padding** — Spec 114 produced a 22 px gap for `11` while `88` had a 3 px gap.
+2. **Universal widest-cell padding across all digit widgets** — Spec 114 applied it too broadly and produced a 22 px gap for variable numeric `11` while `88` had a 3 px gap.
 3. **Narrow-glyph enlargement** — `MIN_INK_FRACTION` altered individual glyph scale and damaged font fidelity.
 4. **Frame-derived bitmap width** — tied frame resizing back to typography and caused device/preview inconsistency.
 5. **Single-sample permanent positioning** — centering `10`, `31`, or `58` cannot center every proportional runtime pair.
@@ -22,6 +22,13 @@ The following are prohibited because Git history already demonstrated failure:
 - Do not hardcode `align_h` when a supported widget has a stored user selection.
 - Do not change working month-name or weekday image families without a failing test.
 - Do not share MAIN/AOD generated filenames.
+
+## Approved time-only exception
+
+- `IMG_TIME` hours, minutes, and seconds are always zero-padded two-digit values, so they may use one common cell width derived from the widest measured 0–9 advance.
+- Each time glyph must be centered inside the common cell and must never be horizontally stretched.
+- The exception must not apply to `TEXT_IMG`, numeric `IMG_DATE`, weekday, month, or free-text rendering.
+- Time placement is centered in Studio, then converted to a deterministic Zepp left origin from the generated pair width. Pair-specific correction tables remain prohibited.
 
 ## Deployment restrictions
 
@@ -44,4 +51,3 @@ Stop implementation and return to design if any test shows:
 - preview geometry depending on metadata unavailable to Zepp;
 - private build auth preflight failure;
 - live bundle hash mismatch.
-

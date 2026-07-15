@@ -52,3 +52,15 @@
 - [x] T064 Run `npm run deploy:full:private`.
 - [x] T065 Verify origin hash, live bundle hash, asset HTTP 200, root/Studio parity, and deep-link redirect flow.
 - [x] T066 Complete validation and deployment reports.
+
+## Time-only tabular centering follow-up
+
+- [x] T070 Amend the approved design to permit tabular cells only for fixed two-digit `IMG_TIME` components.
+- [ ] T071 Add a pure common-cell/pair-width and center-to-left-origin geometry utility.
+- [ ] T072 Generate equal-width 0–9 PNG cells for MAIN/AOD `IMG_TIME` only and persist the generated cell width in export state.
+- [ ] T073 Force hour/minute/second preview layout to the center of each component frame while preserving variable numeric alignment controls.
+- [ ] T074 Convert each centered time frame to a deterministic Zepp left origin in V2 export.
+- [ ] T075 Add unit tests for equal pair widths, glyph non-distortion, legacy alignment override, centered origins, and MAIN/AOD parity.
+- [ ] T076 Update the background verification script to require time-only tabularization and natural-width non-time digits.
+- [ ] T077 Run focused tests, full TypeScript/build validation, and the Spec 117 background verifier.
+- [ ] T078 Commit implementation separately, deploy private Pages, and verify live bundle/hash parity.

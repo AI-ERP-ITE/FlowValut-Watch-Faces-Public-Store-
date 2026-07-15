@@ -27,7 +27,7 @@ The system must preserve the selected font, separate font size from frame geomet
 3. Expose Left, Center, and Right alignment for variable numeric `TEXT_IMG` widgets.
 4. Make frame reset obey the widget's configured alignment and preserve its visual anchor.
 5. Prevent reset from modifying linked decorative frames or unrelated elements.
-6. Preserve natural-width proportional digits unless genuine tabular glyph output is verified.
+6. Preserve natural-width proportional digits for variable numeric/date widgets; use explicit tabular cells for fixed-width two-digit time components.
 7. Eliminate preview/export disagreement caused by using one sample pair as a permanent device position where the native widget can align dynamically.
 8. Apply the same behavior to MAIN and AOD.
 9. Provide automated, repeatable regression evidence without requiring exhaustive manual testing.
@@ -49,7 +49,8 @@ The system must preserve the selected font, separate font size from frame geomet
 - `TEXT_IMG` must expose all three choices in Property Panel.
 - Preview and generated Zepp code must consume the same stored value.
 - Existing files without `alignH` retain current widget defaults.
-- `IMG_TIME` alignment remains governed by its native component contract until automated ZPK and device evidence proves a bounded alignment control is safe.
+- `IMG_TIME` is always a zero-padded two-digit component and is centered within its stored frame.
+- Zepp's native left-origin coordinates are derived from that frame center and the generated two-cell width; no preview-sample offset is persisted.
 
 ### FR-2 — Font/frame separation
 
@@ -96,9 +97,11 @@ Existing decimal/unit behavior must not regress. Unsupported types use a documen
 
 - Continue using native `IMG_TIME` and ten digit images.
 - Never apply pair-specific preview offsets that cannot be exported.
-- Never use a shared maximum-width cell for arbitrary proportional fonts.
-- Keep natural advance widths for proportional fonts.
-- Genuine tabular numeral support may be added only behind a capability check that proves the rasterized 0–9 output is tabular; otherwise fall back to natural advances.
+- For `IMG_TIME` only, measure natural advances for 0–9, choose the widest advance as the common cell width, and center every glyph in that cell without scaling or distortion.
+- Keep natural advance widths for `TEXT_IMG` and numeric `IMG_DATE`; the time-only rule must not leak into variable-length values.
+- The two-cell hour/minute/second width must be constant for every pair, including `11`, `18`, `31`, `58`, and `88`.
+- Time components ignore legacy left/right alignment metadata and use the frame center as their canonical Studio anchor.
+- Export converts the canonical center to Zepp's required left origin using `frameCenterX - generatedPairWidth / 2` while retaining native `LEFT` alignment.
 - Time preview, generated PNG dimensions, generated start coordinates, and native alignment values must be validated together.
 
 ### FR-6 — Day/month character mode boundary
@@ -135,4 +138,3 @@ Existing decimal/unit behavior must not regress. Unsupported types use a documen
 - Private production bundle is deployed to `origin/main`.
 - Live root and Studio routes serve the same new hashed JS asset.
 - No public remote is touched.
-
