@@ -49,7 +49,7 @@
 
 Status: **PASSED — IMPLEMENTED, AUTOMATED, BUILT, AND PRIVATELY DEPLOYED**
 
-One installed-watch proportional-time smoke test remains recommended because native firmware rendering cannot be fully emulated in Node.
+Physical-watch verification is complete. An existing FVWF was loaded without recreating its time widgets; Studio re-centered the elements immediately, the newly exported ZPK regenerated tabular time assets, and the installed watchface displayed the time alignment correctly.
 # Time-only tabular centering follow-up — 2026-07-15
 
 - Focused Vitest: 5 files, 24 tests passed.

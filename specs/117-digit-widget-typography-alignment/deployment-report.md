@@ -30,9 +30,9 @@ Each run of `node scripts/verifyDigitTypography.mjs` writes local evidence to:
 
 The output directory is intentionally ignored so timestamped verification artifacts cannot be swept into atomic deployment commits.
 
-## Remaining manual recommendation
+## Physical-watch confirmation
 
-Install one generated face using a proportional-font `IMG_TIME` and inspect representative pairs such as `11`, `18`, and `58`. This is a firmware smoke test, not a blocker for the completed automated and deployment gates.
+Completed on 2026-07-15. The user loaded a previously saved FVWF, observed the new centering immediately in Studio, exported and installed a fresh ZPK, and confirmed the time alignment was perfect on the watch. Recreating the time widgets was not required because export regenerated their digit families and time-cell metadata.
 # Time-only tabular centering follow-up — 2026-07-15
 
 - Specification commit: `49091e63`.

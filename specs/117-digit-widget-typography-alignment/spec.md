@@ -2,7 +2,7 @@
 
 **Feature branch:** `main`  
 **Created:** 2026-07-15  
-**Status:** Approved for staged implementation  
+**Status:** Complete — automated, deployed, and verified on physical watch  
 **Domain:** ZEP P system task / shared Studio core  
 **Deployment target:** Private Pages only (`origin/main`)
 
@@ -138,3 +138,7 @@ Existing decimal/unit behavior must not regress. Unsupported types use a documen
 - Private production bundle is deployed to `origin/main`.
 - Live root and Studio routes serve the same new hashed JS asset.
 - No public remote is touched.
+
+## Final physical-device result
+
+On 2026-07-15, the user loaded an existing FVWF without recreating its time widgets. Studio immediately applied the canonical centered time layout. After generating and installing the ZPK, the hour/minute alignment was reported as perfect on the physical watch. This closes the firmware smoke-test recommendation and confirms that export-time tabular regeneration works for previously saved FVWF projects.
