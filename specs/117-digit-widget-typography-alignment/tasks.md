@@ -49,6 +49,6 @@
 - [x] T061 Load `.env.private.local` and run private Firebase preflight.
 - [x] T062 Run `npm run build:private`.
 - [x] T063 Commit implementation/tests separately from specs.
-- [ ] T064 Run `npm run deploy:full:private`.
-- [ ] T065 Verify origin hash, live bundle hash, asset HTTP 200, root/Studio parity, and deep-link redirect flow.
-- [ ] T066 Complete validation and deployment reports.
+- [x] T064 Run `npm run deploy:full:private`.
+- [x] T065 Verify origin hash, live bundle hash, asset HTTP 200, root/Studio parity, and deep-link redirect flow.
+- [x] T066 Complete validation and deployment reports.

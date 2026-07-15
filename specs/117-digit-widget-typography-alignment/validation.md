@@ -37,14 +37,16 @@
 
 ## Deployment validation
 
-- [ ] `.env.private.local` loaded.
-- [ ] Private Firebase preflight passes.
-- [ ] Only `origin/main` is pushed.
-- [ ] Root, Studio, and Parametric entrypoints reference the same JS hash.
-- [ ] Hashed JS/CSS assets return HTTP 200.
-- [ ] Production HTML contains no `/src/main.tsx`.
-- [ ] Deep-link redirect query reaches Studio auth flow.
+- [x] `.env.private.local` loaded.
+- [x] Private Firebase preflight passes.
+- [x] Only `origin/main` is pushed.
+- [x] Root, Studio, and Parametric entrypoints reference `index-6IAIMdgc.js`.
+- [x] Hashed JS/CSS assets return HTTP 200.
+- [x] Production HTML contains no `/src/main.tsx`.
+- [x] Deep-link redirect queries for Studio and Parametric return the production private entrypoint.
 
 ## Final result
 
-Status: **PENDING IMPLEMENTATION**
+Status: **PASSED — IMPLEMENTED, AUTOMATED, BUILT, AND PRIVATELY DEPLOYED**
+
+One installed-watch proportional-time smoke test remains recommended because native firmware rendering cannot be fully emulated in Node.
