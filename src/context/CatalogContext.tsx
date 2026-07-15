@@ -17,6 +17,7 @@ export interface CatalogEntry {
   downloads: number;
   zpkPath: string;
   previewPath: string;
+  aodPreviewPath?: string;
   qrPath: string;
   sourcePath?: string;
   published?: boolean;

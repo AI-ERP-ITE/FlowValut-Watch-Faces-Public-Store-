@@ -94,6 +94,7 @@ export interface StudioUploadResult {
   paths: {
     zpkPath: string;
     previewPath: string;
+    aodPreviewPath: string;
     qrPath: string;
     sourcePath: string;
   };
@@ -105,6 +106,7 @@ export async function uploadStudioArtifactsToFirebase(input: {
   qrDataUrl?: string;
   qrMode?: 'KEEP_EXISTING' | 'REGENERATE';
   previewDataUrl?: string;
+  aodPreviewDataUrl?: string;
   sourceJson: unknown;
 }): Promise<StudioUploadResult> {
   const zpkBase64 = await blobToBase64(input.zpkBlob);
@@ -115,6 +117,7 @@ export async function uploadStudioArtifactsToFirebase(input: {
     qrMode: input.qrMode || 'REGENERATE',
     qrBase64: input.qrDataUrl || null,
     previewBase64: input.previewDataUrl || null,
+    aodPreviewBase64: input.aodPreviewDataUrl || input.previewDataUrl || null,
     sourceJson: input.sourceJson,
   };
 

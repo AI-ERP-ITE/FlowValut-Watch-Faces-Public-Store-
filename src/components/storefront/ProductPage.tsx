@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCatalog } from '@/context/CatalogContext';
+import { getStorePreviewPaths } from '@/lib/storePreview';
 
 export function ProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -8,6 +9,7 @@ export function ProductPage() {
   const { getById, models, specGroups, baseUrl, loading, error } = useCatalog();
 
   const entry = id ? getById(id) : null;
+  const [previewMode, setPreviewMode] = useState<'MAIN' | 'AOD'>('MAIN');
 
   // All models compatible with this watchface (same spec group)
   const compatibleModels = useMemo(() => {
@@ -18,6 +20,12 @@ export function ProductPage() {
   const specGroup = entry ? specGroups[entry.specGroup] : null;
 
   const isFree = !entry || entry.price === 0;
+
+  const { main: mainPreviewPath, aod: aodPreviewPath } = entry
+    ? getStorePreviewPaths(entry)
+    : { main: '', aod: '' };
+  const selectedPreviewPath = previewMode === 'AOD' ? aodPreviewPath : mainPreviewPath;
+  const assetUrl = (path: string) => /^https?:\/\//i.test(path) ? path : `${baseUrl}${path}`;
 
   if (loading) {
     return (
@@ -87,15 +95,37 @@ export function ProductPage() {
           <div className="space-y-4">
             {/* Main preview */}
             <div className="aspect-square rounded-2xl overflow-hidden bg-[#121418] border border-[#2f3743] flex items-center justify-center">
-              {entry.previewPath ? (
+              {selectedPreviewPath ? (
                 <img
-                  src={/^https?:\/\//i.test(entry.previewPath) ? entry.previewPath : `${baseUrl}${entry.previewPath}`}
-                  alt={`${entry.name} preview`}
+                  src={assetUrl(selectedPreviewPath)}
+                  alt={`${entry.name} ${previewMode === 'AOD' ? 'AOD' : 'Main'} preview`}
                   className="w-full h-full object-contain"
                 />
               ) : (
                 <span className="text-6xl text-[#6e7786]">⌚</span>
               )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3" aria-label="Watchface preview mode">
+              {([
+                ['MAIN', 'Main', mainPreviewPath],
+                ['AOD', 'AOD', aodPreviewPath],
+              ] as const).map(([mode, label, path]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setPreviewMode(mode)}
+                  aria-pressed={previewMode === mode}
+                  className={`rounded-xl border p-2 text-left transition-colors ${previewMode === mode ? 'border-[#C7A86F] bg-[#C7A86F]/10' : 'border-[#2f3743] bg-[#121418] hover:border-[#596273]'}`}
+                >
+                  <img
+                    src={assetUrl(path)}
+                    alt=""
+                    className="aspect-square w-full rounded-lg object-contain bg-[#0d0f12]"
+                  />
+                  <span className="mt-2 block text-center text-xs font-medium text-[#E1E4EA]">{label}</span>
+                </button>
+              ))}
             </div>
 
             {/* QR code */}

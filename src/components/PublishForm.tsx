@@ -143,7 +143,8 @@ export function PublishForm({
       createdAt:   new Date().toISOString(),
       downloads:   0,
       zpkPath:     `zpk/${watchfaceId}.zpk`,
-      previewPath: `preview/${watchfaceId}.png`,
+      previewPath: `preview/${watchfaceId}-main.png`,
+      aodPreviewPath: `preview/${watchfaceId}-aod.png`,
       qrPath:      `qr/${watchfaceId}.png`,
     };
 

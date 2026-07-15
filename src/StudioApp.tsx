@@ -3238,6 +3238,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
     // Capture canvas screenshot FIRST before step change unmounts the canvas
     let previewDataUrl: string | null = null;
+    let aodPreviewDataUrl: string | null = null;
     try {
       const canvas = canvasRef.current;
       if (canvas) {
@@ -3245,10 +3246,19 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         setPreviewImageUrl(previewDataUrl);
         console.log('[App] Canvas screenshot captured, size:', previewDataUrl.length);
         capturePointerParitySnapshotFromCanvas('composer-preview');
+
+        if (aodElements) {
+          setEditorMode('AOD');
+          await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+          aodPreviewDataUrl = canvasRef.current?.toDataURL('image/png') ?? previewDataUrl;
+        } else {
+          aodPreviewDataUrl = previewDataUrl;
+        }
       }
     } catch (e) {
       console.warn('[App] Canvas capture failed (tainted?), falling back to backgroundImage', e);
       previewDataUrl = state.backgroundImage;
+      aodPreviewDataUrl = previewDataUrl;
       if (previewDataUrl) setPreviewImageUrl(previewDataUrl);
     }
 
@@ -4093,6 +4103,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         qrMode: shouldGenerateQr ? 'REGENERATE' : 'KEEP_EXISTING',
         qrDataUrl: qrDataUrl ?? undefined,
         previewDataUrl: previewDataUrl ?? undefined,
+        aodPreviewDataUrl: aodPreviewDataUrl ?? previewDataUrl ?? undefined,
         sourceJson,
       });
 
