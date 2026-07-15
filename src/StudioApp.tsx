@@ -1356,17 +1356,7 @@ function regenerateDigitFilesFromElements(
           glyphMetrics: family[i].measurement as unknown as import('@/lib/digitGlyphMetrics').GlyphMetrics,
         } as Parameters<typeof results.push>[0]);
       }
-      // Compute layout once (same as canvas) and store startX for the code generator.
-      const timeBitmaps: DigitBitmapMetrics[] = family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height }));
-      const timeLayout = computeDigitBitmapLayout({
-        widgetType: 'IMG_TIME',
-        bounds: { x: el.bounds.x, y: el.bounds.y, width: el.bounds.width, height: h },
-        value: getDigitPreviewValue(el),
-        alignH: el.alignH,
-        hSpace: Number(el.hSpace) || 0,
-        bitmaps: timeBitmaps,
-      });
-      elementUpdates.set(el.id, { fontArray: scopedDigits, layoutStartX: timeLayout.startX });
+      elementUpdates.set(el.id, { fontArray: scopedDigits });
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 30, 12);
       const hSpace = Math.max(0, Math.floor(Number(el.hSpace) || 0));
@@ -1382,17 +1372,7 @@ function regenerateDigitFilesFromElements(
           glyphMetrics: family[i].measurement as unknown as import('@/lib/digitGlyphMetrics').GlyphMetrics,
         } as Parameters<typeof results.push>[0]);
       }
-      // Compute layout once (same as canvas) and store startX for the code generator.
-      const dateBitmaps: DigitBitmapMetrics[] = family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height }));
-      const dateLayout = computeDigitBitmapLayout({
-        widgetType: 'IMG_DATE',
-        bounds: { x: el.bounds.x, y: el.bounds.y, width: el.bounds.width, height: h },
-        value: getDigitPreviewValue(el),
-        alignH: el.alignH,
-        hSpace,
-        bitmaps: dateBitmaps,
-      });
-      elementUpdates.set(el.id, { fontArray: scopedDigits, layoutStartX: dateLayout.startX });
+      elementUpdates.set(el.id, { fontArray: scopedDigits });
     } else if (el.type === 'IMG_WEEK') {
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];

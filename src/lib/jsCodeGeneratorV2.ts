@@ -540,15 +540,14 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
     return Array.from({ length: 10 }, (_, i) => `time_digit_${i}.png`);
   };
 
-  // Hour position: from hoursEl, or fallback
-  // Use layout-engine computed startX so device position matches canvas preview.
-  const hx = hoursEl ? (hoursEl.layoutStartX ?? hoursEl.bounds.x) : refEl.bounds.x;
+  // Native IMG_TIME coordinates are stable component origins. A preview sample
+  // cannot provide a permanent offset for every proportional runtime pair.
+  const hx = hoursEl ? hoursEl.bounds.x : refEl.bounds.x;
   const hy = hoursEl ? hoursEl.bounds.y : refEl.bounds.y;
   const hW = hoursEl ? hoursEl.bounds.width : Math.floor(refEl.bounds.width * 2 / 5);
   const digitW = Math.floor(hW / 2);
 
-  // Minute position: from layout-engine computed startX if available
-  const mx = minutesEl ? (minutesEl.layoutStartX ?? minutesEl.bounds.x) : (hx + hW + Math.max(4, digitW));
+  const mx = minutesEl ? minutesEl.bounds.x : (hx + hW + Math.max(4, digitW));
   const my = minutesEl ? minutesEl.bounds.y : hy;
 
   // Second position: from secondsEl if present
@@ -593,9 +592,10 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
 
 // Generate IMG_DATE widget with day arrays
 function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  // Use layout-engine computed startX (stored at ZPK build time by regenerateDigitFilesFromElements).
-  // This is the same value the canvas uses, so device and preview are always in sync.
-  const x = element.layoutStartX ?? element.bounds.x;
+  // Native IMG_DATE starts at the stored frame origin. Ignore legacy
+  // sample-derived layoutStartX values because another day can have a
+  // different proportional width.
+  const x = element.bounds.x;
   const y = element.bounds.y || 198;
   const hSpace = Math.max(0, Math.floor(Number(element.hSpace) || 0));
 
