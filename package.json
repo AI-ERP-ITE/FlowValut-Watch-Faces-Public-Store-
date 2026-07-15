@@ -25,7 +25,8 @@
     "investigation:validate:minimums": "node scripts/validateRunMinimums.mjs",
     "investigation:validate:sc001": "node scripts/validateSc001MatrixIntegrity.mjs",
     "investigation:validate:coverage": "node scripts/validateTwoDeviceClassCoverage.mjs",
-    "investigation:validate:nonintrusive": "node scripts/checkInstrumentationNonIntrusive.mjs"
+    "investigation:validate:nonintrusive": "node scripts/checkInstrumentationNonIntrusive.mjs",
+    "verify:digit-typography": "node scripts/verifyDigitTypography.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

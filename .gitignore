@@ -35,6 +35,7 @@ yarn-error.log*
 temp/
 temp_validation_*/
 temp_zpk*/
+.verify-output/spec117/
 
 # Large reference docs (not source code, kept locally only)
 PIPELINE_FULL_SPEC.md
