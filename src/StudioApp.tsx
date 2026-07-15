@@ -2115,6 +2115,18 @@ function StudioApp() {
     });
   }, [dispatch, editorMode, state.watchFaceConfig]);
 
+  /** Selected-element-only update used by frame fitting; never resizes linked decorative frames. */
+  const updateActiveElementIsolated = useCallback((id: string, changes: Partial<WatchFaceElement>) => {
+    if (!state.watchFaceConfig) return;
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'UPDATE_ELEMENT_ISOLATED', payload: { id, changes } });
+      return;
+    }
+    setAodElements((prev) => (prev ?? []).map((el) =>
+      el.id === id ? { ...el, ...changes, version: (el.version ?? 1) + 1 } : el
+    ));
+  }, [dispatch, editorMode, state.watchFaceConfig]);
+
   /** Silent version — updates live state but does NOT push to undo stack. Use during drag mousemove. */
   const updateActiveElementSilent = useCallback((id: string, changes: Partial<WatchFaceElement>) => {
     if (!state.watchFaceConfig) return;
@@ -4841,6 +4853,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                       <PropertyPanel
                         element={activeSelectedElement}
                         onUpdateElement={updateActiveElement}
+                        onUpdateElementIsolated={updateActiveElementIsolated}
                         elements={activeElements}
                         onAddFrame={handleAddFrame}
                         onRemoveFrame={handleRemoveFrame}

@@ -33,6 +33,8 @@ import { measureDigitWidgetContent } from '@/lib/digitFrameMeasurement';
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
   onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
+  /** Updates only the selected element, bypassing linked-frame bounds synchronization. */
+  onUpdateElementIsolated?: (id: string, changes: Partial<WatchFaceElement>) => void;
   className?: string;
   elements?: WatchFaceElement[];
   onAddFrame?: (parent: WatchFaceElement) => void;
@@ -154,7 +156,7 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, onUpdateElement, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
+export function PropertyPanel({ element, onUpdateElement, onUpdateElementIsolated, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [fontSearch, setFontSearch] = useState('');
@@ -2139,7 +2141,8 @@ export function PropertyPanel({ element, onUpdateElement, className, elements, o
                 contentHeight: content.height,
                 alignH,
               });
-              update({ bounds });
+              if (onUpdateElementIsolated) onUpdateElementIsolated(element.id, { bounds });
+              else update({ bounds });
             }}
             className="mt-1 h-6 rounded border border-white/10 bg-white/5 px-2 text-[10px] text-white/60 hover:border-cyan-500/50 hover:text-white"
           >

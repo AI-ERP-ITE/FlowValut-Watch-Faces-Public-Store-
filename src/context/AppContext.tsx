@@ -43,6 +43,8 @@ type Action =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_GITHUB_REPO'; payload: string }
   | { type: 'UPDATE_ELEMENT'; payload: { id: string; changes: Partial<WatchFaceElement> } }
+  /** Selected-element-only update: records undo but never synchronizes linked frame bounds. */
+  | { type: 'UPDATE_ELEMENT_ISOLATED'; payload: { id: string; changes: Partial<WatchFaceElement> } }
   | { type: 'UPDATE_ELEMENTS_BATCH'; payload: Array<{ id: string; changes: Partial<WatchFaceElement> }> }
   /** Silent update: live state only, no undo stack push. Use during drag mousemove. */
   | { type: 'UPDATE_ELEMENT_SILENT'; payload: { id: string; changes: Partial<WatchFaceElement> } }
@@ -160,6 +162,19 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         watchFaceConfig: { ...state.watchFaceConfig, elements: updatedElements },
         undoStack: newUndoStack,
+        redoStack: [],
+      };
+    }
+    case 'UPDATE_ELEMENT_ISOLATED': {
+      if (!state.watchFaceConfig) return state;
+      const isolatedUndoStack = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
+      const isolatedElements = state.watchFaceConfig.elements.map((el) =>
+        el.id === action.payload.id ? bumpElementVersion({ ...el, ...action.payload.changes }) : el
+      );
+      return {
+        ...state,
+        watchFaceConfig: { ...state.watchFaceConfig, elements: isolatedElements },
+        undoStack: isolatedUndoStack,
         redoStack: [],
       };
     }
