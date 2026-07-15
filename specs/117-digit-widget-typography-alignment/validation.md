@@ -10,19 +10,19 @@
 
 ## Static validation
 
-- [ ] No prohibited algorithm reintroduced.
-- [ ] Alignment is stored and consumed consistently.
-- [ ] Frame-fit geometry is pure and immutable.
-- [ ] Reset path cannot mutate linked elements.
-- [ ] V2/V3 generator changes are parity-reviewed.
+- [x] No prohibited algorithm reintroduced.
+- [x] Alignment is stored and consumed consistently.
+- [x] Frame-fit geometry is pure and immutable.
+- [x] Reset path cannot mutate linked elements.
+- [x] V2/V3 generator changes are parity-reviewed (V3 retained only as compatibility coverage; current product uses V2).
 
 ## Automated validation
 
-- [ ] `verifyDigitTypography.mjs` exits 0.
-- [ ] JSON result reports zero failures.
-- [ ] TypeScript gate passes.
-- [ ] Private build passes.
-- [ ] Generated code assertions pass for V2/V3 and MAIN/AOD.
+- [x] `verifyDigitTypography.mjs` exits 0.
+- [x] JSON result reports zero failures (31 passed, 0 failed).
+- [x] TypeScript gate passes.
+- [x] Private build passes.
+- [x] Generated code assertions pass for V2/V3 and MAIN/AOD.
 
 ## Runtime matrix
 
@@ -48,4 +48,3 @@
 ## Final result
 
 Status: **PENDING IMPLEMENTATION**
-
