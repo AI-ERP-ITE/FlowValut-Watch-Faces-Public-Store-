@@ -29,6 +29,7 @@ import { renderGaugeAssets } from '@/lib/gaugeRenderer';
 import { normalizeHorizontalDigitAlign, type HorizontalDigitAlign } from '@/lib/digitAlignment';
 import { fitDigitFrameToContent } from '@/lib/digitFrameFit';
 import { measureDigitWidgetContent } from '@/lib/digitFrameMeasurement';
+import { isCompleteDayImageMode } from '@/lib/dateImageMode';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -122,6 +123,7 @@ function resolveSectionTab(label: string): PanelTab | null {
     || label === 'Shape'
     || label === 'Fill'
     || label === 'Padding'
+    || label === 'Complete Day Image Effects'
   ) {
     return 'effects';
   }
@@ -2095,6 +2097,33 @@ export function PropertyPanel({ element, onUpdateElement, onUpdateElementIsolate
         </Section>
       )}
 
+      {element.type === 'IMG_DATE' && element.subtype !== 'month' && (
+        <Section label="Widget Type">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.03] p-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium text-white/70">Complete Day Images (01–31)</p>
+                <p className="text-[9px] text-white/35">Off uses 10 compact tabular digits. On generates 31 complete frames for future decorations.</p>
+              </div>
+              <Switch
+                checked={isCompleteDayImageMode(element)}
+                onCheckedChange={checked => update({ dayImageMode: checked ? 'complete' : 'digits' })}
+                id={`day-mode-${element.id}`}
+              />
+            </div>
+            {isCompleteDayImageMode(element) && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('effects')}
+                className="h-6 w-full rounded border border-cyan-500/30 bg-cyan-500/10 px-2 text-[10px] text-cyan-300 hover:bg-cyan-500/20"
+              >
+                Open Effects
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
       {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG' || element.type === 'IMG_WEEK') && (
         <Section label="Digit Size">
           <div className="flex items-center gap-2">
@@ -2354,6 +2383,14 @@ export function PropertyPanel({ element, onUpdateElement, onUpdateElementIsolate
               </div>
             );
           })()}
+        </Section>
+      )}
+
+      {element.type === 'IMG_DATE' && element.subtype !== 'month' && isCompleteDayImageMode(element) && (
+        <Section label="Complete Day Image Effects">
+          <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-[10px] text-white/50">
+            Complete mode is ready to bake future effects into every image from 01 through 31. Current generic date shadows remain preview-only until their device bake is implemented and verified.
+          </div>
         </Section>
       )}
 

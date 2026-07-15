@@ -10,6 +10,7 @@ import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
 import { getCenteredTimeStartX } from '@/lib/timeDigitGeometry';
+import { getCenteredNumericDayStartX, isCompleteDayImageMode } from '@/lib/dateImageMode';
 
 function _safeAssetId(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -599,31 +600,34 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
 
 // Generate IMG_DATE widget with day arrays
 function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
-  // Native IMG_DATE starts at the stored frame origin. Ignore legacy
-  // sample-derived layoutStartX values because another day can have a
-  // different proportional width.
-  const x = element.bounds.x;
+  const completeMode = isCompleteDayImageMode(element);
+  const x = completeMode
+    ? element.bounds.x
+    : getCenteredNumericDayStartX(element.bounds, element.dayDigitCellWidth, element.hSpace);
   const y = element.bounds.y || 198;
   const hSpace = Math.max(0, Math.floor(Number(element.hSpace) || 0));
 
   const raw = element.fontArray ?? element.images;
-  const dayDigits = Array.isArray(raw) && raw.length > 0
-    ? raw
-    : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
-  const digitArrayStr = `[${dayDigits.map((d) => `'${d}'`).join(', ')}]`;
+  const expectedCount = completeMode ? 31 : 10;
+  const dayImages = Array.isArray(raw) && raw.length >= expectedCount
+    ? raw.slice(0, expectedCount)
+    : completeMode
+      ? Array.from({ length: 31 }, (_, i) => `date_day_${_safeAssetId(element.id)}_${String(i + 1).padStart(2, '0')}.png`)
+      : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
+  const imageArrayStr = `[${dayImages.map((d) => `'${d}'`).join(', ')}]`;
   
   return `
                 // ${element.name} - IMG_DATE Widget
                 let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_DATE, {
                     day_startX: px(${x}),
                     day_startY: px(${y}),
-                    day_sc_array: ${digitArrayStr},
-                    day_tc_array: ${digitArrayStr},
-                    day_en_array: ${digitArrayStr},
-                    day_zero: 1,
-                    day_space: ${hSpace},
+                    day_sc_array: ${imageArrayStr},
+                    day_tc_array: ${imageArrayStr},
+                    day_en_array: ${imageArrayStr},
+                    day_zero: ${completeMode ? 0 : 1},
+                    day_space: ${completeMode ? 0 : hSpace},
                     day_align: hmUI.align.LEFT,
-                    day_is_character: false,
+                    day_is_character: ${completeMode},
                     show_level: hmUI.show_level.${showLevel}
                 });`;
 }

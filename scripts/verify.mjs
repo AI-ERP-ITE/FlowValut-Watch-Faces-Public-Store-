@@ -599,6 +599,59 @@ section('7. PNG Hand Pack Source Roundtrip');
   }
 }
 
+// ─── 8. SPEC 118 IMG_DATE DUAL MODE ─────────────────────────────────────────
+section('8. IMG_DATE Dual-Mode Centering');
+
+{
+  const typesSrc = readSrc('types/index.ts');
+  const modeSrc = readSrc('lib/dateImageMode.ts');
+  const studioSrc = readSrc('StudioApp.tsx');
+  const panelSrc = readSrc('components/PropertyPanel.tsx');
+  const v2Src = readSrc('lib/jsCodeGeneratorV2.ts');
+  const v3Src = readSrc('lib/jsCodeGenerator.ts');
+
+  if (typesSrc.includes("dayImageMode?: 'digits' | 'complete'") && modeSrc.includes("value === 'complete' ? 'complete' : 'digits'")) {
+    ok('Spec 118: persisted day mode defaults legacy files to compact digits');
+  } else {
+    fail('Spec 118 mode contract', 'Optional mode field or legacy-safe normalization is missing');
+  }
+
+  if (studioSrc.includes('makeDigitFamily(color, fontFamily, fontWeight, h, true)') && studioSrc.includes('dayDigitCellWidth: family[0].width')) {
+    ok('Spec 118: numeric days use undistorted tabular cells with exported width metadata');
+  } else {
+    fail('Spec 118 numeric tabular generation', 'Tabular day family or cell-width metadata is missing');
+  }
+
+  if (studioSrc.includes('completeDayAssetNames(scope, el.id)') && studioSrc.includes('for (let i = 0; i < 31; i++)')) {
+    ok('Spec 118: complete mode generates 31 per-element, per-scope day images');
+  } else {
+    fail('Spec 118 complete image generation', '31-frame scoped generation loop is missing');
+  }
+
+  const generatorsSupportBothModes = [v2Src, v3Src].every(source =>
+    source.includes('getCenteredNumericDayStartX')
+    && source.includes('day_is_character: ${completeMode}')
+    && source.includes('const expectedCount = completeMode ? 31 : 10')
+  );
+  if (generatorsSupportBothModes) {
+    ok('Spec 118: V2/V3 generators share numeric centering and complete-character contracts');
+  } else {
+    fail('Spec 118 generator parity', 'V2 or V3 dual-mode contract is incomplete');
+  }
+
+  if (panelSrc.includes('Complete Day Images (01–31)') && panelSrc.includes("setActiveTab('effects')")) {
+    ok('Spec 118: day-only toggle exposes explicit Effects navigation');
+  } else {
+    fail('Spec 118 Property Panel controls', 'Complete-day toggle or Effects navigation is missing');
+  }
+
+  if (panelSrc.includes('Current generic date shadows remain preview-only')) {
+    ok('Spec 118: UI does not misrepresent unsupported date effects as device-baked');
+  } else {
+    fail('Spec 118 effects truthfulness', 'Preview-only effects boundary is not disclosed');
+  }
+}
+
 // ─── SUMMARY ─────────────────────────────────────────────────────────────────
 console.log(`\n═══════════════════════════════════════════════`);
 console.log(`Results: ${passed} passed, ${failed} failed`);

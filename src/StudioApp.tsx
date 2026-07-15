@@ -85,6 +85,7 @@ import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/
 import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import { buildProjectFileConfig } from '@/lib/projectFileConfig';
+import { completeDayAssetNames, isCompleteDayImageMode } from '@/lib/dateImageMode';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -1331,6 +1332,33 @@ function regenerateDigitFilesFromElements(
     return canvas.toDataURL('image/png');
   }
 
+  function makeCompleteDayCanvas(
+    label: string,
+    color: string,
+    fontFamily: string,
+    fontWeight: string,
+    width: number,
+    height: number,
+    targetFontHeight: number,
+  ): string {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width));
+    canvas.height = Math.max(1, Math.round(height));
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = color;
+    let fontSize = Math.max(6, Math.floor(targetFontHeight * 0.8));
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    while (fontSize > 6 && ctx.measureText(label).width > canvas.width * 0.95) {
+      fontSize--;
+      ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+    return canvas.toDataURL('image/png');
+  }
+
   for (const el of elements) {
     const rawColor = el.color ?? '#FFFFFF';
     // Normalise color: strip 0xRRGGBBAA → #RRGGBB
@@ -1362,18 +1390,32 @@ function regenerateDigitFilesFromElements(
       });
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 30, 12);
-      const scopedDigits: string[] = [];
-      const family = makeDigitFamily(color, fontFamily, fontWeight, h);
-      for (let i = 0; i < 10; i++) {
-        const filename = `date_digit_${scope}_${safeId}_${i}.png`;
-        scopedDigits.push(filename);
-        results.push({
-          filename,
-          dataUrl: family[i].dataUrl,
-          glyphMetrics: family[i].measurement as unknown as import('@/lib/digitGlyphMetrics').GlyphMetrics,
-        } as Parameters<typeof results.push>[0]);
+      if (isCompleteDayImageMode(el)) {
+        const completeDays = completeDayAssetNames(scope, el.id);
+        const canvasW = Math.max(1, Math.round(el.bounds.width || 40));
+        const canvasH = Math.max(1, Math.round(el.bounds.height || h));
+        for (let i = 0; i < 31; i++) {
+          const label = String(i + 1).padStart(2, '0');
+          results.push({
+            filename: completeDays[i],
+            dataUrl: makeCompleteDayCanvas(label, color, fontFamily, fontWeight, canvasW, canvasH, h),
+          });
+        }
+        elementUpdates.set(el.id, { fontArray: completeDays, dayDigitCellWidth: undefined });
+      } else {
+        const scopedDigits: string[] = [];
+        const family = makeDigitFamily(color, fontFamily, fontWeight, h, true);
+        for (let i = 0; i < 10; i++) {
+          const filename = `date_digit_${scope}_${safeId}_${i}.png`;
+          scopedDigits.push(filename);
+          results.push({
+            filename,
+            dataUrl: family[i].dataUrl,
+            glyphMetrics: family[i].measurement as unknown as import('@/lib/digitGlyphMetrics').GlyphMetrics,
+          } as Parameters<typeof results.push>[0]);
+        }
+        elementUpdates.set(el.id, { fontArray: scopedDigits, dayDigitCellWidth: family[0].width });
       }
-      elementUpdates.set(el.id, { fontArray: scopedDigits });
     } else if (el.type === 'IMG_WEEK') {
       const WEEK_FULL    = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       const WEEK_SHORT   = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];

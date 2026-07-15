@@ -92,4 +92,33 @@ describe('buildProjectFileConfig', () => {
     expect(reloaded.aodElements?.[0].bounds.x).toBe(120);
     expect(reloaded.elements[0].bounds.x).toBe(80);
   });
+
+  it('roundtrips independent MAIN/AOD day image modes', () => {
+    const mainDay = {
+      id: 'main-day',
+      name: 'Main day',
+      type: 'IMG_DATE',
+      dayImageMode: 'complete',
+      bounds: { x: 200, y: 110, width: 62, height: 50 },
+      visible: true,
+    } as WatchFaceElement;
+    const aodDay = {
+      ...mainDay,
+      id: 'aod-day',
+      name: 'AOD day',
+      dayImageMode: 'digits',
+    } as WatchFaceElement;
+
+    const saved = buildProjectFileConfig({ ...baseConfig, elements: [mainDay] }, {
+      aodElements: [aodDay],
+      backgroundTransform: transform,
+      aodBackgroundMode: 'USE_MAIN_BACKGROUND',
+      aodSolidColor: null,
+      aodBackgroundTransform: transform,
+    });
+    const reloaded = JSON.parse(JSON.stringify(saved)) as WatchFaceConfig;
+
+    expect(reloaded.elements[0].dayImageMode).toBe('complete');
+    expect(reloaded.aodElements?.[0].dayImageMode).toBe('digits');
+  });
 });

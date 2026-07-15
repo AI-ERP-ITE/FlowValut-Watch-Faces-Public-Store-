@@ -89,6 +89,8 @@ export interface WatchFaceElement {
 
   // IMG_DATE month specific
   monthFormat?: 'full' | 'short' | 'initial';
+  // IMG_DATE day mode. Missing values preserve the compact legacy numeric mode.
+  dayImageMode?: 'digits' | 'complete';
 
   // TEXT date-format mode (TEXT elements bound to date)
   dateFormat?: string; // e.g. 'DD/MM', 'MM/DD', 'DD/MM/YYYY', 'DD MMM', 'MMM DD'
@@ -97,6 +99,8 @@ export interface WatchFaceElement {
   fontArray?: string[];
   /** Generated common PNG cell width for fixed two-digit IMG_TIME components. */
   timeDigitCellWidth?: number;
+  /** Generated common PNG cell width for zero-padded numeric IMG_DATE day values. */
+  dayDigitCellWidth?: number;
   hSpace?: number;
   alignH?: string;
   // Preview-only custom sample value for digit widgets (IMG_DATE / IMG_TIME / TEXT_IMG)

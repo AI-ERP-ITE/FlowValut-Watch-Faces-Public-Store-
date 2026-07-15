@@ -10,6 +10,7 @@ import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDe
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
+import { getCenteredNumericDayStartX, isCompleteDayImageMode } from '@/lib/dateImageMode';
 
 function _safeAssetIdV3(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -521,7 +522,10 @@ function generateWidgetCode(element: WatchFaceElement): string {
 }
 
 function generateImgDateWidgetV3(element: WatchFaceElement): string {
-  const x = element.bounds.x ?? 92;
+  const completeMode = isCompleteDayImageMode(element);
+  const x = completeMode
+    ? (element.bounds.x ?? 92)
+    : getCenteredNumericDayStartX(element.bounds, element.dayDigitCellWidth, element.hSpace);
   const y = element.bounds.y ?? 198;
 
   if (element.subtype === 'month') {
@@ -550,10 +554,13 @@ function generateImgDateWidgetV3(element: WatchFaceElement): string {
   }
 
   const raw = element.fontArray ?? element.images;
-  const dayDigits = Array.isArray(raw) && raw.length > 0
-    ? raw
-    : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
-  const dayArray = dayDigits.map((d) => `'${d}'`);
+  const expectedCount = completeMode ? 31 : 10;
+  const dayImages = Array.isArray(raw) && raw.length >= expectedCount
+    ? raw.slice(0, expectedCount)
+    : completeMode
+      ? Array.from({ length: 31 }, (_, i) => `date_day_${_safeAssetIdV3(element.id)}_${String(i + 1).padStart(2, '0')}.png`)
+      : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
+  const dayArray = dayImages.map((d) => `'${d}'`);
   const dayArrayStr = `[${dayArray.join(', ')}]`;
   return `
                 // ${element.name} - IMG_DATE Widget
@@ -563,10 +570,10 @@ function generateImgDateWidgetV3(element: WatchFaceElement): string {
                     day_sc_array: ${dayArrayStr},
                     day_tc_array: ${dayArrayStr},
                     day_en_array: ${dayArrayStr},
-                    day_zero: 1,
-                    day_space: 0,
+                    day_zero: ${completeMode ? 0 : 1},
+                    day_space: ${completeMode ? 0 : Math.max(0, Math.floor(Number(element.hSpace) || 0))},
                     day_align: hmUI.align.LEFT,
-                    day_is_character: false,
+                    day_is_character: ${completeMode},
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
 }

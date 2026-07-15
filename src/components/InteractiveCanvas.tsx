@@ -16,6 +16,7 @@ import { analyzeFlicker } from '@/utils/flickerEngine';
 import { drawImageWithPhotoEdit, DEFAULT_PHOTO_EDIT } from '@/lib/photoEditUtils';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import { getDefaultDigitAlignment, normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
+import { isCompleteDayImageMode } from '@/lib/dateImageMode';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
   createDefaultGaugePointerDataUrl,
@@ -1795,6 +1796,15 @@ function drawDigitElement(
   const images = el.images ?? el.fontArray;
   if (images && images.length > 0 && digitCache && (el.type === 'IMG_DATE' || el.type === 'IMG_TIME' || el.type === 'TEXT_IMG')) {
     const sampleText = getPlaceholderText(el);
+    if (el.type === 'IMG_DATE' && el.subtype !== 'month' && isCompleteDayImageMode(el) && images.length >= 31) {
+      const day = Math.min(31, Math.max(1, Number.parseInt(sampleText, 10) || 31));
+      const src = images[day - 1];
+      const img = src ? getCachedImage(src, digitCache, onLoad) : null;
+      if (img?.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, x, y, w, h);
+        return;
+      }
+    }
     const chars = sampleText.split('');
 
     const bitmapMetrics: DigitBitmapMetrics[] = [];
