@@ -70,4 +70,16 @@ describe('V2 native time/date origins', () => {
     expect(generated.match(/minute_align:\s*hmUI\.align\.LEFT/g)).toHaveLength(2);
     expect(generated.match(/day_align:\s*hmUI\.align\.LEFT/g)).toHaveLength(2);
   });
+
+  test('keeps MAIN and AOD digit families separate under identical widget policy', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const generated = generateWatchFaceCodeV2(makeConfig()).watchfaceIndexJs;
+
+    expect(generated).toContain("'main-hours_0.png'");
+    expect(generated).toContain("'aod-hours_0.png'");
+    expect(generated).toContain("'main-day_9.png'");
+    expect(generated).toContain("'aod-day_9.png'");
+    expect(generated.match(/hour_array:\s*\[/g)).toHaveLength(2);
+    expect(generated.match(/day_sc_array:\s*\[/g)).toHaveLength(2);
+  });
 });

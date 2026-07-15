@@ -42,4 +42,54 @@ describe('buildProjectFileConfig', () => {
 
     expect(result.aodElements).toBeNull();
   });
+
+  it('roundtrips independent MAIN and AOD digit typography without mutation', () => {
+    const mainDigit = {
+      id: 'main-steps',
+      name: 'Main steps',
+      type: 'TEXT_IMG',
+      dataType: 'STEP',
+      alignH: 'RIGHT',
+      fontSize: 34,
+      bounds: { x: 80, y: 90, width: 150, height: 42 },
+      visible: true,
+    } as WatchFaceElement;
+    const aodDigit = {
+      ...mainDigit,
+      id: 'aod-steps',
+      name: 'AOD steps',
+      alignH: 'CENTER_H',
+      fontSize: 28,
+      bounds: { x: 120, y: 130, width: 110, height: 35 },
+    } as WatchFaceElement;
+    const config = { ...baseConfig, elements: [mainDigit] };
+
+    const saved = buildProjectFileConfig(config, {
+      aodElements: [aodDigit],
+      backgroundTransform: transform,
+      aodBackgroundMode: 'USE_MAIN_BACKGROUND',
+      aodSolidColor: null,
+      aodBackgroundTransform: transform,
+    });
+    const reloaded = JSON.parse(JSON.stringify(saved)) as WatchFaceConfig;
+    const reloadedMain = reloaded.elements[0];
+    const reloadedAod = reloaded.aodElements?.[0];
+
+    expect(reloadedMain).toMatchObject({
+      alignH: 'RIGHT',
+      fontSize: 34,
+      bounds: { x: 80, y: 90, width: 150, height: 42 },
+      dataType: 'STEP',
+    });
+    expect(reloadedAod).toMatchObject({
+      alignH: 'CENTER_H',
+      fontSize: 28,
+      bounds: { x: 120, y: 130, width: 110, height: 35 },
+      dataType: 'STEP',
+    });
+
+    aodDigit.bounds.x = 999;
+    expect(reloaded.aodElements?.[0].bounds.x).toBe(120);
+    expect(reloaded.elements[0].bounds.x).toBe(80);
+  });
 });
