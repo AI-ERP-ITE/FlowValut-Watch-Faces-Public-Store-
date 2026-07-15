@@ -33,3 +33,12 @@ The output directory is intentionally ignored so timestamped verification artifa
 ## Remaining manual recommendation
 
 Install one generated face using a proportional-font `IMG_TIME` and inspect representative pairs such as `11`, `18`, and `58`. This is a firmware smoke test, not a blocker for the completed automated and deployment gates.
+# Time-only tabular centering follow-up — 2026-07-15
+
+- Specification commit: `49091e63`.
+- Implementation/test commit: `983b302e`.
+- Private deployment commit: `d236e4c0`.
+- Deployed JavaScript bundle: `index-B2Z_ViHF.js`.
+- Root, Studio, and `?p=/studio` redirect flow returned HTTP 200 with the same bundle hash.
+- The deployed JavaScript asset returned HTTP 200.
+- `origin/main` matched deployment commit `d236e4c0` at live verification time.

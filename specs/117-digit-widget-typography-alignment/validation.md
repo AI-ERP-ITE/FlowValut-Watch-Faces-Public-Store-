@@ -50,3 +50,12 @@
 Status: **PASSED — IMPLEMENTED, AUTOMATED, BUILT, AND PRIVATELY DEPLOYED**
 
 One installed-watch proportional-time smoke test remains recommended because native firmware rendering cannot be fully emulated in Node.
+# Time-only tabular centering follow-up — 2026-07-15
+
+- Focused Vitest: 5 files, 24 tests passed.
+- TypeScript project build: passed.
+- `npm run verify:digit-typography`: 38 passed, 0 failed.
+- Private Firebase environment preflight: passed.
+- Explicit `npm run build:private`: passed.
+- Equal-width cells are enabled only for `IMG_TIME`; natural-width `TEXT_IMG` and numeric `IMG_DATE` generation remains unchanged.
+- V2 MAIN/AOD time start coordinates are derived from frame center and generated cell width while native `LEFT` alignment is retained.
