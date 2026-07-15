@@ -12,7 +12,7 @@ export function normalizeHorizontalDigitAlign(
 }
 
 export function getDefaultDigitAlignment(
-  widgetType: 'IMG_DATE' | 'IMG_TIME' | 'IMG_WEEK' | 'TEXT_IMG',
+  _widgetType: 'IMG_DATE' | 'IMG_TIME' | 'IMG_WEEK' | 'TEXT_IMG',
 ): HorizontalDigitAlign {
-  return widgetType === 'IMG_TIME' ? 'LEFT' : 'CENTER_H';
+  return 'CENTER_H';
 }

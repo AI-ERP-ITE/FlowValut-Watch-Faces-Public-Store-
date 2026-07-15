@@ -206,9 +206,7 @@ export function generateOptimizedDigitBitmaps(
   fontWeight: string,
   targetHeight: number,
   color: string,
-  _targetWidth?: number,   // ignored — width is now per-digit natural advance
-  _fillRatioX?: number,    // ignored — superseded by natural-advance approach
-  _fillRatioY?: number,    // ignored — superseded by natural-advance approach
+  options?: { tabular?: boolean },
 ): RenderedDigit[] {
   const bitmapH = Math.max(4, targetHeight);
   // Match the canvas preview font size exactly (InteractiveCanvas fallback uses h * 0.8)
@@ -223,12 +221,14 @@ export function generateOptimizedDigitBitmaps(
   mCtx.font = font;
 
   const measurements = measureAllGlyphs(fontFamily, fontWeight, fontSize, color);
+  const naturalWidths = measurements.map((_, i) => Math.max(2, Math.ceil(mCtx.measureText(String(i)).width)));
+  const tabularWidth = Math.max(...naturalWidths);
 
   return measurements.map((m, i) => {
     const digit = String(i);
     // Natural advance = what the browser font renderer advances per character.
     // This is exactly what ctx.fillText uses, so canvas and device advances are identical.
-    const bitmapW = Math.max(2, Math.ceil(mCtx.measureText(digit).width));
+    const bitmapW = options?.tabular ? tabularWidth : naturalWidths[i];
 
     const canvas = document.createElement('canvas');
     canvas.width = bitmapW;

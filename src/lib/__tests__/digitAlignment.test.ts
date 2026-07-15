@@ -12,16 +12,17 @@ const bitmaps = Array.from({ length: 10 }, (_, digit) => ({
 }));
 
 describe('digit alignment legacy defaults', () => {
-  test('keeps time left-aligned when alignH is missing', () => {
-    expect(getDefaultDigitAlignment('IMG_TIME')).toBe('LEFT');
+  test('forces time to frame center even when legacy alignment says left', () => {
+    expect(getDefaultDigitAlignment('IMG_TIME')).toBe('CENTER_H');
     const layout = computeDigitBitmapLayout({
       widgetType: 'IMG_TIME',
       bounds: { x: 100, y: 20, width: 80, height: 20 },
       value: '10',
       bitmaps,
+      alignH: 'LEFT',
     });
-    expect(layout.alignH).toBe('LEFT');
-    expect(layout.startX).toBe(100);
+    expect(layout.alignH).toBe('CENTER_H');
+    expect(layout.startX).toBe(130);
   });
 
   test('keeps TEXT_IMG centered when alignH is missing', () => {
@@ -54,4 +55,3 @@ describe('digit alignment legacy defaults', () => {
     expect(normalizeHorizontalDigitAlign('invalid', 'CENTER_H')).toBe('CENTER_H');
   });
 });
-

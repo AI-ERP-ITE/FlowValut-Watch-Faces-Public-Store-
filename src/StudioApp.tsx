@@ -1303,13 +1303,13 @@ function regenerateDigitFilesFromElements(
    */
   // Skipped wrapper — callers pass w and h directly
   function makeDigitFamily(
-    color: string, fontFamily: string, fontWeight: string, targetH: number, _targetW?: number,
+    color: string, fontFamily: string, fontWeight: string, targetH: number, tabular = false,
   ) {
     // Each digit PNG is rendered at fontSize = targetH × 0.8 (matching the canvas
     // text-fallback) with width = natural font advance per digit. No fill ratio.
     // No shared fixed width. Device advances by naturalWidth → matches canvas exactly.
     const h = Math.max(targetH, 8);
-    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color);
+    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, { tabular });
   }
 
   function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
@@ -1344,9 +1344,8 @@ function regenerateDigitFilesFromElements(
 
     if (el.type === 'IMG_TIME') {
       const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 50, 16);
-      const digitW = Math.max(Math.floor(el.bounds.width / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
-      const family = makeDigitFamily(color, fontFamily, fontWeight, h, digitW);
+      const family = makeDigitFamily(color, fontFamily, fontWeight, h, true);
       for (let i = 0; i < 10; i++) {
         const filename = `time_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);
@@ -1356,13 +1355,15 @@ function regenerateDigitFilesFromElements(
           glyphMetrics: family[i].measurement as unknown as import('@/lib/digitGlyphMetrics').GlyphMetrics,
         } as Parameters<typeof results.push>[0]);
       }
-      elementUpdates.set(el.id, { fontArray: scopedDigits });
+      elementUpdates.set(el.id, {
+        fontArray: scopedDigits,
+        alignH: 'CENTER_H',
+        timeDigitCellWidth: family[0].width,
+      });
     } else if (el.type === 'IMG_DATE' && el.subtype !== 'month') {
       const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 30, 12);
-      const hSpace = Math.max(0, Math.floor(Number(el.hSpace) || 0));
-      const digitW = Math.max(Math.floor((el.bounds.width - hSpace) / 2) || Math.floor(h * 0.6), 8);
       const scopedDigits: string[] = [];
-      const family = makeDigitFamily(color, fontFamily, fontWeight, h, digitW);
+      const family = makeDigitFamily(color, fontFamily, fontWeight, h);
       for (let i = 0; i < 10; i++) {
         const filename = `date_digit_${scope}_${safeId}_${i}.png`;
         scopedDigits.push(filename);

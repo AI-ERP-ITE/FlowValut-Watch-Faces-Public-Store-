@@ -34,15 +34,18 @@ function alphaBounds(canvas) {
   return right < 0 ? { width: 0, height: 0 } : { width: right - left + 1, height: bottom - top + 1 };
 }
 
-function measureFamily(name, family, fontPath, fontSize = 32, bitmapHeight = 40) {
+function measureFamily(name, family, fontPath, fontSize = 32, bitmapHeight = 40, tabular = false) {
   if (fontPath) registerFont(path.join(root, fontPath), { family });
   const measureCanvas = createCanvas(256, bitmapHeight);
   const measure = measureCanvas.getContext('2d');
   measure.font = `${fontSize}px "${family}"`;
+  const naturalWidths = Array.from({ length: 10 }, (_, digit) => Math.max(2, Math.ceil(measure.measureText(String(digit)).width)));
+  const tabularWidth = Math.max(...naturalWidths);
   const digits = [];
   for (let digit = 0; digit <= 9; digit++) {
     const char = String(digit);
-    const advance = Math.max(2, Math.ceil(measure.measureText(char).width));
+    const naturalAdvance = naturalWidths[digit];
+    const advance = tabular ? tabularWidth : naturalAdvance;
     const canvas = createCanvas(advance, bitmapHeight);
     const ctx = canvas.getContext('2d');
     ctx.font = `${fontSize}px "${family}"`;
@@ -50,13 +53,16 @@ function measureFamily(name, family, fontPath, fontSize = 32, bitmapHeight = 40)
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fff';
     ctx.fillText(char, advance / 2, bitmapHeight / 2);
-    digits.push({ char, fontSize, width: advance, height: bitmapHeight, ink: alphaBounds(canvas) });
+    digits.push({ char, fontSize, width: advance, naturalAdvance, height: bitmapHeight, ink: alphaBounds(canvas) });
   }
   geometry.fonts.push({ name, family, fontSize, bitmapHeight, digits });
   check('typography', `${name}: uniform requested font size`, digits.every((item) => item.fontSize === fontSize));
   check('typography', `${name}: uniform bitmap height`, digits.every((item) => item.height === bitmapHeight));
   check('typography', `${name}: visible glyphs`, digits.every((item) => item.ink.width > 0 && item.ink.height > 0));
-  check('typography', `${name}: natural advances retained`, digits.every((item) => item.width === Math.max(2, Math.ceil(measure.measureText(item.char).width))));
+  check('typography', `${name}: ${tabular ? 'common time cell retained' : 'natural advances retained'}`,
+    tabular
+      ? digits.every((item) => item.width === tabularWidth)
+      : digits.every((item) => item.width === item.naturalAdvance));
   return digits;
 }
 
@@ -94,14 +100,17 @@ const v2Source = source('src/lib/jsCodeGeneratorV2.ts');
 
 check('source guards', 'no active MIN_INK_FRACTION', !/^(?!\s*\/\/).*\b(?:const|let|var)\s+MIN_INK_FRACTION\b/m.test(bitmapSource));
 check('source guards', 'runtime layout imports no pair-correction table', !/import[\s\S]*PairCorrectionTable[\s\S]*from/.test(layoutSource));
-check('source guards', 'digit generation ignores frame-derived target width', /_targetWidth\?: number,[^]*?ignored/.test(bitmapSource));
-check('source guards', 'digit rasterization uses natural measured advance', /Math\.ceil\(mCtx\.measureText\(digit\)\.width\)/.test(bitmapSource));
+check('source guards', 'time tabular mode is explicit', /options\?: \{ tabular\?: boolean \}/.test(bitmapSource));
+check('source guards', 'digit rasterization measures natural advances before optional padding', /const naturalWidths = measurements\.map/.test(bitmapSource));
+check('source guards', 'tabular mode uses widest measured advance', /options\?\.tabular \? tabularWidth : naturalWidths\[i\]/.test(bitmapSource));
 check('source guards', 'digit rasterization contains no glyph drawImage distortion', !/generateOptimizedDigitBitmaps[\s\S]*?drawImage\(/.test(bitmapSource));
 check('source guards', 'time/date generation stores no sample-derived origin', !/widgetType:\s*'IMG_(?:TIME|DATE)'[\s\S]{0,400}layoutStartX/.test(studioSource));
 check('source guards', 'V2 time/date ignores legacy layoutStartX', !/(?:hour_startX|day_startX)[\s\S]{0,300}layoutStartX/.test(v2Source));
+check('source guards', 'V2 derives time left origin from centered pair geometry', /getCenteredTimeStartX\(el\.bounds, el\.timeDigitCellWidth\)/.test(v2Source));
 
 const proportional = measureFamily('proportional-style', 'Arial');
 const nearTabular = measureFamily('near-tabular', 'Spec117CascadiaMono', 'fonts/CascadiaMono.ttf');
+const timeTabular = measureFamily('time-tabular-proportional-style', 'Arial', undefined, 32, 40, true);
 for (const pair of ['11', '18', '31', '58', '88']) {
   geometry.pairs[pair] = {
     proportional: pairMetrics(proportional, pair),
@@ -111,6 +120,8 @@ for (const pair of ['11', '18', '31', '58', '88']) {
 check('typography', 'required pair metrics recorded', ['11', '18', '31', '58', '88'].every((pair) => geometry.pairs[pair]));
 check('typography', 'no false equal-pair constraint', new Set(Object.values(geometry.pairs).map((entry) => entry.proportional.totalAdvance)).size >= 1,
   'Pair widths are recorded as evidence; proportional equality is intentionally not required.');
+check('typography', 'all IMG_TIME pairs have equal two-cell width',
+  new Set(['11', '18', '31', '58', '88'].map((pair) => pairMetrics(timeTabular, pair, 0).totalAdvance)).size === 1);
 
 const bounds = { x: 100, y: 50, width: 160, height: 40 };
 const contentWidth = geometry.pairs['88'].proportional.totalAdvance;
@@ -149,6 +160,7 @@ const vitestFiles = [
   'src/lib/__tests__/jsCodeGeneratorV2DigitAlignment.test.ts',
   'src/lib/__tests__/jsCodeGeneratorV3DigitAlignment.test.ts',
   'src/lib/__tests__/jsCodeGeneratorV2NativeDigitOrigins.test.ts',
+  'src/lib/__tests__/timeDigitGeometry.test.ts',
   'src/lib/projectFileConfig.test.ts',
 ];
 const vitest = spawnSync('npx.cmd', ['vitest', 'run', ...vitestFiles], {

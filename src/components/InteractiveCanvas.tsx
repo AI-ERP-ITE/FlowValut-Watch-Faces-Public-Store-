@@ -1786,10 +1786,9 @@ function drawDigitElement(
   const digitWidgetType = el.type === 'IMG_TIME' || el.type === 'IMG_DATE' || el.type === 'IMG_WEEK'
     ? el.type
     : 'TEXT_IMG';
-  const alignH = normalizeHorizontalDigitAlign(
-    el.alignH,
-    getDefaultDigitAlignment(digitWidgetType),
-  );
+  const alignH = el.type === 'IMG_TIME'
+    ? 'CENTER_H'
+    : normalizeHorizontalDigitAlign(el.alignH, getDefaultDigitAlignment(digitWidgetType));
   const hSpace = Number.isFinite(Number(el.hSpace)) ? Math.max(0, Math.floor(Number(el.hSpace))) : 0;
 
   // If digit images available, draw them

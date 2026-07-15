@@ -14,7 +14,9 @@ function normalizeAlignH(value: string | undefined, fallback: 'LEFT' | 'CENTER_H
 
 function legacyPreviewLayout(element: WatchFaceElement, value: string): LegacyLayoutSummary {
   const { x, width } = element.bounds;
-  const alignH = normalizeAlignH(element.alignH, element.type === 'IMG_TIME' ? 'LEFT' : 'CENTER_H');
+  const alignH = element.type === 'IMG_TIME'
+    ? 'CENTER_H'
+    : normalizeAlignH(element.alignH, 'CENTER_H');
   const hSpace = Number.isFinite(Number(element.hSpace)) ? Math.max(0, Math.floor(Number(element.hSpace))) : 0;
   const digitCount = Math.max(1, value.replace(/[^0-9A-Za-z]/g, '').length);
   const digitW = Math.max(1, Math.floor((width - hSpace * Math.max(0, digitCount - 1)) / digitCount));

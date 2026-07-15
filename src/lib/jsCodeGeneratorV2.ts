@@ -9,6 +9,7 @@ import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDe
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
+import { getCenteredTimeStartX } from '@/lib/timeDigitGeometry';
 
 function _safeAssetId(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -540,19 +541,25 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
     return Array.from({ length: 10 }, (_, i) => `time_digit_${i}.png`);
   };
 
-  // Native IMG_TIME coordinates are stable component origins. A preview sample
-  // cannot provide a permanent offset for every proportional runtime pair.
-  const hx = hoursEl ? hoursEl.bounds.x : refEl.bounds.x;
+  const centeredStart = (el: WatchFaceElement | undefined, fallbackX: number): number => {
+    if (!el?.timeDigitCellWidth) return fallbackX;
+    return getCenteredTimeStartX(el.bounds, el.timeDigitCellWidth);
+  };
+
+  // Studio owns a centered two-digit frame. Zepp IMG_TIME consumes a left
+  // origin, so export derives that origin from the generated tabular pair.
+  const hx = centeredStart(hoursEl, hoursEl ? hoursEl.bounds.x : refEl.bounds.x);
   const hy = hoursEl ? hoursEl.bounds.y : refEl.bounds.y;
   const hW = hoursEl ? hoursEl.bounds.width : Math.floor(refEl.bounds.width * 2 / 5);
   const digitW = Math.floor(hW / 2);
 
-  const mx = minutesEl ? minutesEl.bounds.x : (hx + hW + Math.max(4, digitW));
+  const mxFallback = minutesEl ? minutesEl.bounds.x : (hx + hW + Math.max(4, digitW));
+  const mx = centeredStart(minutesEl, mxFallback);
   const my = minutesEl ? minutesEl.bounds.y : hy;
 
   // Second position: from secondsEl if present
   const hasSeconds = !!secondsEl;
-  const sx = secondsEl ? secondsEl.bounds.x : 0;
+  const sx = centeredStart(secondsEl, secondsEl ? secondsEl.bounds.x : 0);
   const sy = secondsEl ? secondsEl.bounds.y : 0;
 
   const hourDigits = resolveDigits(hoursEl ?? refEl);

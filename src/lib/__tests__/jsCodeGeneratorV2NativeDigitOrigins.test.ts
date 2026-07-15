@@ -16,6 +16,7 @@ function digitElement(
     name: id,
     bounds: { x, y: 80, width: 80, height: 40 },
     fontArray: Array.from({ length: 10 }, (_, digit) => `${id}_${digit}.png`),
+    timeDigitCellWidth: type === 'IMG_TIME' ? 30 : undefined,
     layoutStartX: legacyLayoutStartX,
     visible: true,
     zIndex: 1,
@@ -50,12 +51,12 @@ function coordinates(source: string, property: string): number[] {
 describe('V2 native time/date origins', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  test('uses frame origins and ignores legacy sample-derived offsets in MAIN and AOD', () => {
+  test('centers fixed two-cell time pairs and ignores legacy sample-derived offsets in MAIN and AOD', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const generated = generateWatchFaceCodeV2(makeConfig()).watchfaceIndexJs;
 
-    expect(coordinates(generated, 'hour_startX')).toEqual([100, 110]);
-    expect(coordinates(generated, 'minute_startX')).toEqual([220, 230]);
+    expect(coordinates(generated, 'hour_startX')).toEqual([110, 120]);
+    expect(coordinates(generated, 'minute_startX')).toEqual([230, 240]);
     expect(coordinates(generated, 'day_startX')).toEqual([300, 310]);
   });
 

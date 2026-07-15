@@ -104,10 +104,9 @@ export function computeDigitBitmapLayout(request: DigitLayoutRequest): DigitLayo
    * No pair correction. No centroid analysis. No alpha scanning. No runtime image processing.
    */
   const value = request.value && request.value.length > 0 ? request.value : fallbackValue(request.widgetType);
-  const alignH = normalizeHorizontalDigitAlign(
-    request.alignH,
-    getDefaultDigitAlignment(request.widgetType),
-  );
+  const alignH = request.widgetType === 'IMG_TIME'
+    ? 'CENTER_H'
+    : normalizeHorizontalDigitAlign(request.alignH, getDefaultDigitAlignment(request.widgetType));
   const hSpace = resolveSpacing(request.widgetType, request.hSpace);
   const bounds = request.bounds;
   const chars = value.split('');

@@ -95,6 +95,8 @@ export interface WatchFaceElement {
 
   // TEXT_IMG specific
   fontArray?: string[];
+  /** Generated common PNG cell width for fixed two-digit IMG_TIME components. */
+  timeDigitCellWidth?: number;
   hSpace?: number;
   alignH?: string;
   // Preview-only custom sample value for digit widgets (IMG_DATE / IMG_TIME / TEXT_IMG)

@@ -80,12 +80,13 @@ export function generateDigitImages(
   height: number,
   color: string,
   style?: { fontFamily: string; fontWeight: string },
+  options?: { tabular?: boolean },
 ): ElementImage[] {
   const fontFamily = style?.fontFamily ?? 'Arial';
   const fontWeight = style?.fontWeight ?? 'bold';
 
   // Spec 114: one call generates all 10 digits at the optimized size
-  const family = generateOptimizedDigitBitmaps(fontFamily, fontWeight, height, color);
+  const family = generateOptimizedDigitBitmaps(fontFamily, fontWeight, height, color, options);
 
   return family.map((d) => ({
     name: `${prefix}_${d.char}.png`,
@@ -255,7 +256,7 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
             ? (isHoursEl ? Math.floor(el.w / 2) : Math.floor(el.w / 5))
             : TIME_DIGIT.w;
           const timeDigitH = el.h ?? TIME_DIGIT.h;
-          images.push(...generateDigitImages('time_digit', timeDigitW, timeDigitH, color));
+          images.push(...generateDigitImages('time_digit', timeDigitW, timeDigitH, color, undefined, { tabular: true }));
           generatedSets.add('time_digits');
         }
         break;
