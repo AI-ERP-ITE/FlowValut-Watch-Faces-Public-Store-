@@ -603,12 +603,12 @@ section('7. PNG Hand Pack Source Roundtrip');
     && handStoreSrc.includes('140 / Math.max(1, hourArtSize.h)')
     && handStoreSrc.includes('200 / Math.max(1, minuteArtSize.h)')
     && handStoreSrc.includes('240 / Math.max(1, secondArtSize.h)')
-    && handStoreSrc.includes("record.sourceKind === 'png'")
-    && handStoreSrc.includes('record.hubRenderVersion !== PNG_HUB_RENDER_VERSION')
+    && handStoreSrc.includes('Do not automatically migrate PNG hubs')
+    && !handStoreSrc.includes("record.sourceKind === 'png'\n    && record.sourceHourPng")
   ) {
-    ok('PNG hand hub: high-resolution master is normalized with its hand pack and old PNG records migrate');
+    ok('PNG hand hub: new/updated high-resolution masters normalize without changing legacy workaround records');
   } else {
-    fail('PNG hand hub normalization', 'Master-to-device hub sizing or PNG-only migration is missing');
+    fail('PNG hand hub normalization', 'Master-to-device sizing or legacy-record preservation is missing');
   }
 
   const resolveTestHub = (hub, handHeights) => {

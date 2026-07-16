@@ -1303,15 +1303,11 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
     record.sourceHubHtml
     && record.hubRenderVersion !== HTML_HUB_RENDER_VERSION
   );
-  const shouldMigratePngHub = !!(
-    record.sourceKind === 'png'
-    && record.sourceHourPng
-    && record.sourceMinutePng
-    && record.sourceSecondPng
-    && record.sourceHubPng
-    && record.hubRenderVersion !== PNG_HUB_RENDER_VERSION
-  );
-  const shouldMigrateHub = shouldMigrateHtmlHub || shouldMigratePngHub;
+  // Do not automatically migrate PNG hubs. Some pre-v5 records already contain
+  // manually downscaled source masters used to compensate for the old bug; an
+  // automatic rebake would shrink those working hubs a second time. PNG v5 is
+  // applied when the user deliberately creates or updates the hand pack.
+  const shouldMigrateHub = shouldMigrateHtmlHub;
   if (!shouldMigrateHands && !shouldMigrateHub) return record;
 
   try {
@@ -1361,16 +1357,9 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
     }
 
     if (shouldMigrateHub) {
-      const hubSource = shouldMigratePngHub ? next.sourceHubPng! : extractSvgFromCode(next.sourceHubHtml!);
+      const hubSource = extractSvgFromCode(next.sourceHubHtml!);
       const hubMasterSize = await measureHubArtSize(hubSource);
-      const hubSize = shouldMigratePngHub
-        ? resolvePngHubDeviceSize(
-          hubMasterSize,
-          await measureHandArtSize(next.sourceHourPng!),
-          await measureHandArtSize(next.sourceMinutePng!),
-          await measureHandArtSize(next.sourceSecondPng!),
-        )
-        : hubMasterSize;
+      const hubSize = hubMasterSize;
       const [coverDataUrl, swatchDataUrl] = await Promise.all([
         renderHubToFittedPng(hubSource, hubSize.width, hubSize.height),
         renderHubToContainPng(hubSource, 24),
@@ -1381,7 +1370,7 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
         coverWidth: hubSize.width,
         coverHeight: hubSize.height,
         swatchDataUrl,
-        hubRenderVersion: shouldMigratePngHub ? PNG_HUB_RENDER_VERSION : HTML_HUB_RENDER_VERSION,
+        hubRenderVersion: HTML_HUB_RENDER_VERSION,
       };
     }
 
