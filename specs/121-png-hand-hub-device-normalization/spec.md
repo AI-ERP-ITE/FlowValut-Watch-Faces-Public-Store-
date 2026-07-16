@@ -23,7 +23,7 @@ Normalize only PNG Hand Pack hubs from master space into device space while pres
 3. Apply the conversion only to the baked hub output and its stored `coverWidth`/`coverHeight`.
 4. Preserve the original hub PNG master unchanged for future editing and Firebase source sync.
 5. Leave HTML/SVG hubs on their established authored logical-size path.
-6. Migrate existing source-backed PNG hand records by rebaking only their hub; do not rebake or reposition their hands.
+6. Preserve existing PNG records unchanged because some contain manually reduced hub masters; apply normalization only when a pack is created or deliberately updated.
 7. Keep Interactive Canvas and ZPK export on the same normalized baked hub asset and dimensions.
 
 ## Acceptance Criteria
@@ -31,7 +31,7 @@ Normalize only PNG Hand Pack hubs from master space into device space while pres
 1. A 2× pack whose hand art heights are 280, 400, and 480 maps a 60×60 hub master to a 30×30 device hub.
 2. A 1× pack whose hand art heights are 140, 200, and 240 keeps a 30×30 hub at 30×30.
 3. Non-square hub aspect ratio is preserved.
-4. Existing PNG records with editable masters migrate on load without changing hand PNGs or pivot metadata.
+4. Existing PNG records do not auto-migrate or change appearance.
 5. Existing HTML/SVG records do not enter the PNG migration.
 6. TypeScript, the repository verifier, and the private production build pass.
 
@@ -44,4 +44,4 @@ Normalize only PNG Hand Pack hubs from master space into device space while pres
 
 ## Closure
 
-All requirements are implemented. TypeScript/private production compilation passed, the repository verifier passed 52/52 checks, and the canonical private deployment pushed matching root, Studio, and Parametric entrypoints. Existing HTML/SVG hubs remain on render version 4; source-backed PNG hubs use render version 5 and migrate by rebaking the cover only.
+All requirements are implemented. TypeScript/private production compilation passed, the repository verifier passed 52/52 checks, and the canonical private deployment pushed matching root, Studio, and Parametric entrypoints. Existing HTML/SVG hubs remain on render version 4; newly created or deliberately updated PNG hubs use render version 5. Older PNG records are preserved to avoid double-scaling manually corrected masters.
