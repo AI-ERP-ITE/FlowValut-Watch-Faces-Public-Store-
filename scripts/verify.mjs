@@ -597,6 +597,40 @@ section('7. PNG Hand Pack Source Roundtrip');
   } else {
     fail('Spec 116 selection/export compatibility', 'Source-kind badge or baked PNG export gate is missing');
   }
+
+  if (
+    handStoreSrc.includes('resolvePngHubDeviceSize(')
+    && handStoreSrc.includes('140 / Math.max(1, hourArtSize.h)')
+    && handStoreSrc.includes('200 / Math.max(1, minuteArtSize.h)')
+    && handStoreSrc.includes('240 / Math.max(1, secondArtSize.h)')
+    && handStoreSrc.includes("record.sourceKind === 'png'")
+    && handStoreSrc.includes('record.hubRenderVersion !== PNG_HUB_RENDER_VERSION')
+  ) {
+    ok('PNG hand hub: high-resolution master is normalized with its hand pack and old PNG records migrate');
+  } else {
+    fail('PNG hand hub normalization', 'Master-to-device hub sizing or PNG-only migration is missing');
+  }
+
+  const resolveTestHub = (hub, handHeights) => {
+    const scales = [140 / handHeights[0], 200 / handHeights[1], 240 / handHeights[2]]
+      .sort((a, b) => a - b);
+    return {
+      width: Math.round(hub.width * scales[1]),
+      height: Math.round(hub.height * scales[1]),
+    };
+  };
+  const twoXHub = resolveTestHub({ width: 60, height: 60 }, [280, 400, 480]);
+  const oneXHub = resolveTestHub({ width: 30, height: 30 }, [140, 200, 240]);
+  const rectangularHub = resolveTestHub({ width: 80, height: 40 }, [280, 400, 480]);
+  if (
+    twoXHub.width === 30 && twoXHub.height === 30
+    && oneXHub.width === 30 && oneXHub.height === 30
+    && rectangularHub.width === 40 && rectangularHub.height === 20
+  ) {
+    ok('PNG hand hub: 2x, 1x, and non-square normalization examples preserve intended device geometry');
+  } else {
+    fail('PNG hand hub normalization examples', JSON.stringify({ twoXHub, oneXHub, rectangularHub }));
+  }
 }
 
 // ─── 8. SPEC 118 IMG_DATE DUAL MODE ─────────────────────────────────────────

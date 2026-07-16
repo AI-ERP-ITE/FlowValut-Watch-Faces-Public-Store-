@@ -8,7 +8,11 @@ const DB_NAME = 'zepp-studio-hands';
 const DB_VERSION = 1;
 const STORE = 'custom-hands';
 const HAND_RENDER_VERSION = 4;
-const HUB_RENDER_VERSION = 4;
+// HTML/SVG hubs use their authored logical size. PNG Hand Pack layers are
+// high-resolution masters, so their hub must use the same master-to-device
+// normalization as the three fixed-size hand bakes.
+const HTML_HUB_RENDER_VERSION = 4;
+const PNG_HUB_RENDER_VERSION = 5;
 
 export interface CustomHandRecord {
   key: string;           // 'custom_hand:slug'
@@ -504,19 +508,22 @@ export async function saveCustomHandStyle(
   // Derive cap dimensions from the actual rendered art (not the SVG viewBox),
   // so a 17px cap drawn inside a 120×120 viewBox bakes as ~34×34, not 120×120.
   // Falls back to 30×30 if measurement fails.
-  const hubSize = await measureHubArtSize(hubSvg);
+  const hubMasterSize = await measureHubArtSize(hubSvg);
   // Spec 104: measure natural art size of each hand for hub-ratio computation
   const [hourArtSize, minuteArtSize, secondArtSize] = await Promise.all([
     measureHandArtSize(hourSvg),
     measureHandArtSize(minuteSvg),
     measureHandArtSize(secondSvg),
   ]);
+  const hubSize = hasPngSources
+    ? resolvePngHubDeviceSize(hubMasterSize, hourArtSize, minuteArtSize, secondArtSize)
+    : hubMasterSize;
   const [hourLayer, minuteLayer, secondLayer, coverDataUrl, swatchDataUrl] =
     await Promise.all([
       renderHandToPngWithPivot(hourSvg, 22, 140, hourPivotSource),
       renderHandToPngWithPivot(minuteSvg, 16, 200, minutePivotSource),
       renderHandToPngWithPivot(secondSvg, 8, 240, secondPivotSource),
-      renderHubToFittedPng(hubSvg, hubSize.width, hubSize.height),  // hub at natural size
+      renderHubToFittedPng(hubSvg, hubSize.width, hubSize.height),
       renderHubToContainPng(hubSvg, 24),  // swatch: trim transparent bounds before fitting
     ]);
 
@@ -598,8 +605,8 @@ export async function saveCustomHandStyle(
 
   // ── Spec 104: Hub-ratio proportional geometry ──────────────────────────────
   // Reference: hub natural art dimensions. All hand sizes stored as ratios to hub.
-  const hubRefW = Math.max(1, hubSize.width);
-  const hubRefH = Math.max(1, hubSize.height);
+  const hubRefW = Math.max(1, hubMasterSize.width);
+  const hubRefH = Math.max(1, hubMasterSize.height);
   const hubRef = Math.max(hubRefW, hubRefH); // use longest side as scalar reference
   // pivotXRatio = 0.5 (center horizontally) unless marker data provides otherwise
   const hourPivotYRatio  = hourPivotNorm;
@@ -654,7 +661,7 @@ export async function saveCustomHandStyle(
       sourceSecondHtml: composed!.secondHtml,
       sourceHubHtml: composed!.hubHtml,
       handRenderVersion: HAND_RENDER_VERSION,
-      hubRenderVersion: HUB_RENDER_VERSION,
+      hubRenderVersion: HTML_HUB_RENDER_VERSION,
     } : {}),
     ...(hasPngSources ? {
       sourceKind: 'png' as const,
@@ -663,7 +670,7 @@ export async function saveCustomHandStyle(
       sourceSecondPng: pngSources!.secondPng,
       sourceHubPng: pngSources!.hubPng,
       handRenderVersion: HAND_RENDER_VERSION,
-      hubRenderVersion: HUB_RENDER_VERSION,
+      hubRenderVersion: PNG_HUB_RENDER_VERSION,
     } : {}),
     ...(pivotOffsets ? { pivotOffsets } : {}),
     // Spec 104: hub-ratio geometry (all hand sizes + pivots relative to hub)
@@ -1041,6 +1048,43 @@ function measureHandArtSize(code: string): Promise<{ w: number; h: number }> {
   });
 }
 
+/**
+ * Convert a high-resolution PNG hub master into device-space dimensions.
+ *
+ * The PNG composer previews all four masters in one shared coordinate space,
+ * while the saved hour/minute/second assets are normalized to 140/200/240 px
+ * high. Applying the median of those three height conversions to the hub keeps
+ * its authored proportion without assuming that every master is exactly 2x.
+ * A 2x pack therefore maps a 60 px hub to 30 device pixels; a 1x pack remains
+ * unchanged.
+ */
+export function resolvePngHubDeviceSize(
+  hubMasterSize: { width: number; height: number },
+  hourArtSize: { w: number; h: number },
+  minuteArtSize: { w: number; h: number },
+  secondArtSize: { w: number; h: number },
+): { width: number; height: number } {
+  const candidates = [
+    140 / Math.max(1, hourArtSize.h),
+    200 / Math.max(1, minuteArtSize.h),
+    240 / Math.max(1, secondArtSize.h),
+  ]
+    .filter(Number.isFinite)
+    .map((value) => clamp(value, 0.125, 4))
+    .sort((a, b) => a - b);
+  const masterToDeviceScale = candidates[1] ?? candidates[0] ?? 1;
+  const scaledW = Math.max(1, hubMasterSize.width * masterToDeviceScale);
+  const scaledH = Math.max(1, hubMasterSize.height * masterToDeviceScale);
+  const longest = Math.max(scaledW, scaledH);
+  let safetyScale = 1;
+  if (longest > HUB_MAX_SIDE) safetyScale = HUB_MAX_SIDE / longest;
+  else if (longest < HUB_MIN_SIDE) safetyScale = HUB_MIN_SIDE / longest;
+  return {
+    width: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(scaledW * safetyScale))),
+    height: Math.max(HUB_MIN_SIDE, Math.min(HUB_MAX_SIDE, Math.round(scaledH * safetyScale))),
+  };
+}
+
 export function measureHubArtSize(code: string): Promise<{ width: number; height: number }> {
   const fallback = /^data:image\//i.test(code) ? { width: HUB_DEFAULT_SIDE, height: HUB_DEFAULT_SIDE } : resolveHubBakeSize(code);
   return new Promise((resolve) => {
@@ -1255,7 +1299,19 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
     && record.sourceSecondHtml
     && record.handRenderVersion !== HAND_RENDER_VERSION
   );
-  const shouldMigrateHub = !!(record.sourceHubHtml && record.hubRenderVersion !== HUB_RENDER_VERSION);
+  const shouldMigrateHtmlHub = !!(
+    record.sourceHubHtml
+    && record.hubRenderVersion !== HTML_HUB_RENDER_VERSION
+  );
+  const shouldMigratePngHub = !!(
+    record.sourceKind === 'png'
+    && record.sourceHourPng
+    && record.sourceMinutePng
+    && record.sourceSecondPng
+    && record.sourceHubPng
+    && record.hubRenderVersion !== PNG_HUB_RENDER_VERSION
+  );
+  const shouldMigrateHub = shouldMigrateHtmlHub || shouldMigratePngHub;
   if (!shouldMigrateHands && !shouldMigrateHub) return record;
 
   try {
@@ -1305,10 +1361,19 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
     }
 
     if (shouldMigrateHub) {
-      const hubSize = await measureHubArtSize(extractSvgFromCode(next.sourceHubHtml!));
+      const hubSource = shouldMigratePngHub ? next.sourceHubPng! : extractSvgFromCode(next.sourceHubHtml!);
+      const hubMasterSize = await measureHubArtSize(hubSource);
+      const hubSize = shouldMigratePngHub
+        ? resolvePngHubDeviceSize(
+          hubMasterSize,
+          await measureHandArtSize(next.sourceHourPng!),
+          await measureHandArtSize(next.sourceMinutePng!),
+          await measureHandArtSize(next.sourceSecondPng!),
+        )
+        : hubMasterSize;
       const [coverDataUrl, swatchDataUrl] = await Promise.all([
-        renderHubToFittedPng(next.sourceHubHtml!, hubSize.width, hubSize.height),
-        renderHubToContainPng(next.sourceHubHtml!, 24),
+        renderHubToFittedPng(hubSource, hubSize.width, hubSize.height),
+        renderHubToContainPng(hubSource, 24),
       ]);
       next = {
         ...next,
@@ -1316,7 +1381,7 @@ async function maybeMigrateRecord(record: CustomHandRecord): Promise<CustomHandR
         coverWidth: hubSize.width,
         coverHeight: hubSize.height,
         swatchDataUrl,
-        hubRenderVersion: HUB_RENDER_VERSION,
+        hubRenderVersion: shouldMigratePngHub ? PNG_HUB_RENDER_VERSION : HTML_HUB_RENDER_VERSION,
       };
     }
 
