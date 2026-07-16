@@ -1,7 +1,7 @@
 # Spec 120 — Rearrangement, Render, and Export Parity
 
 **Created:** 2026-07-16  
-**Status:** Approved for implementation  
+**Status:** Closed — implemented and privately deployed  
 **Domain:** ZEP P shared Studio core  
 **Deployment:** Private Pages only (`origin/main`)
 
