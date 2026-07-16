@@ -15,7 +15,7 @@ Spec 119 established saved project resolution as coordinate authority, but its p
 2. Every widget participates in project-space placement conversion. No widget type is excluded from transforming its project-space anchor or center.
 3. `TIME_POINTER.center` and `TIME_POINTER.pointerCenter` transform into the target project space. Hand sources, natural dimensions, local pivots, `hourPos`, `minutePos`, `secondPos`, cover geometry, composer ratios, effects, and export preparation remain unchanged.
 4. MAIN and AOD are converted independently from the same source resolution in one transaction. Later manual MAIN edits do not silently overwrite a deliberately independent AOD layout.
-5. Safe layout sizes may scale only where the existing generator already regenerates or natively sizes the output. Specialized raster/frame/pointer/gauge assets retain their existing size when safe resizing would require changing their engine.
+5. Every already-created widget shell scales by the conservative uniform canvas ratio. This changes stored project bounds only: specialized raster/frame/pointer/gauge/HTML sources and their asset-local engine geometry remain unchanged.
 6. The dedicated MAIN background is normalized to the target canvas when rearrangement is selected. A dedicated uploaded AOD background follows the same rule when available. HTML-created element assets are not background-normalized.
 7. Rearrangement adopts the selected target model name together with its resolution. Firebase model/spec data remains the authority for model identity, compatibility, device sources, and generator-version capability.
 8. Export consumes the already-rearranged configuration exactly once. No generator or packager performs another coordinate conversion.
@@ -24,8 +24,9 @@ Spec 119 established saved project resolution as coordinate authority, but its p
 ## Safe size policy
 
 - Always transform positions, explicit centers, and pointer centers.
-- Scale simple generated/native layout metrics only: TEXT font size; generated digit/date/week/time bounds; ordinary geometric shape bounds/radius/line width.
-- Preserve specialized asset-local geometry and frame arrays.
+- Scale every finished widget's stored bounds uniformly; this is a project rearrangement and does not rebake its asset.
+- Scale extra generated/native layout metrics only where they are direct project metrics: TEXT font size; generated digit/date/week/time spacing; ordinary geometric shape radius/line width.
+- Preserve specialized asset-local geometry, source assets, pivots, and frame arrays.
 - Use independent X/Y position ratios. Use one uniform size ratio, `min(targetWidth/sourceWidth, targetHeight/sourceHeight)`, to avoid aspect distortion.
 - The project background is the sole mandatory raster resize because it defines the target canvas surface.
 
@@ -38,4 +39,3 @@ Spec 119 established saved project resolution as coordinate authority, but its p
 - A 466 background becomes a 480 background for a 466→480 rearrangement, matching Studio preview and device export.
 - V2 and V3 emit the transformed coordinates without a second scale.
 - Keep and Cancel retain their existing non-mutating behavior.
-
