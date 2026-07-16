@@ -11,6 +11,7 @@ import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
 import { getCenteredNumericDayStartX, isCompleteDayImageMode } from '@/lib/dateImageMode';
+import { isProjectBackgroundElement } from '@/lib/projectCanvasGeometry';
 
 function _safeAssetIdV3(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -342,7 +343,7 @@ function generateWatchfaceIndexJs(config: WatchFaceConfig): string {
   let widgetsCode = '';
   
   for (const element of elements) {
-    let code = generateWidgetCode(element);
+    let code = generateWidgetCode(element, config.resolution);
     // Skip types that can't have a sensible static tap rect (see V2 generator for rationale)
     const NO_OVERLAY_V3 = new Set(['BUTTON','TIME_POINTER','DATE_POINTER','ARC_PROGRESS','IMG_TIME','IMG_DATE','IMG_WEEK']);
     if (code && element.clickAction && !NO_OVERLAY_V3.has(element.type)) {
@@ -427,14 +428,14 @@ ${widgetsCode}
 }
 
 // Generate widget code for each element (V3)
-function generateWidgetCode(element: WatchFaceElement): string {
+function generateWidgetCode(element: WatchFaceElement, resolution = { width: 480, height: 480 }): string {
   // Skip minute/second hands - they're combined with hour hand in TIME_POINTER
   if (element.type === 'TIME_POINTER' && element.subtype && element.subtype !== 'hour') {
     return '';
   }
 
   // Skip background element - already handled
-  if (element.name === 'Background' || (element.type === 'IMG' && element.bounds.x === 0 && element.bounds.y === 0 && element.bounds.width >= 390 && element.bounds.height >= 390)) {
+  if (isProjectBackgroundElement(element, resolution)) {
     return '';
   }
 
@@ -488,7 +489,7 @@ function generateWidgetCode(element: WatchFaceElement): string {
     case 'IMG_PROGRESS':
       return generateImgProgressWidgetV3(element);
     case 'DATE_POINTER':
-      return generateDatePointerWidgetV3(element);
+      return generateDatePointerWidgetV3(element, resolution);
     case 'IMG_CLICK':
       return generateImgClickWidgetV3(element);
     case 'IMG':
@@ -1024,10 +1025,10 @@ function generateImgProgressWidgetV3(element: WatchFaceElement): string {
 }
 
 // DATE_POINTER - Analog pointer driven by date values
-function generateDatePointerWidgetV3(element: WatchFaceElement): string {
+function generateDatePointerWidgetV3(element: WatchFaceElement, resolution: { width: number; height: number }): string {
   const dateType = element.dateType ?? 'DAY';
-  const centerX = element.center?.x ?? 240;
-  const centerY = element.center?.y ?? 240;
+  const centerX = element.center?.x ?? resolution.width / 2;
+  const centerY = element.center?.y ?? resolution.height / 2;
   const posX = element.hourPos?.x ?? 10;
   const posY = element.hourPos?.y ?? 60;
   return `

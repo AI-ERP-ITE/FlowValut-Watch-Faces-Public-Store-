@@ -652,6 +652,63 @@ section('8. IMG_DATE Dual-Mode Centering');
   }
 }
 
+// --- 9. SPEC 119 PROJECT CANVAS AUTHORITY -------------------------------
+section('9. Project Canvas Coordinate Authority');
+
+{
+  const studioSrc = readSrc('StudioApp.tsx');
+  const panelSrc = readSrc('components/PropertyPanel.tsx');
+  const geometrySrc = readSrc('lib/projectCanvasGeometry.ts');
+  const v2Src = readSrc('lib/jsCodeGeneratorV2.ts');
+  const v3Src = readSrc('lib/jsCodeGenerator.ts');
+
+  if (
+    studioSrc.includes('state.watchFaceConfig?.resolution?.width ?? _resolvedResolution.w')
+    && studioSrc.includes('state.watchFaceConfig?.resolution?.height ?? _resolvedResolution.h')
+  ) {
+    ok('Spec 119: saved project resolution owns Interactive Canvas after creation');
+  } else {
+    fail('Spec 119 canvas authority', 'Interactive Canvas does not prefer saved config resolution');
+  }
+
+  if (
+    panelSrc.includes('clamp(v, 0, canvasWidth)')
+    && panelSrc.includes('clamp(v, 0, canvasHeight)')
+    && panelSrc.includes("element.type === 'TIME_POINTER' ? (")
+  ) {
+    ok('Spec 119: Property Panel uses project bounds while preserving TIME_POINTER controls');
+  } else {
+    fail('Spec 119 Property Panel geometry', 'Project clamps or protected TIME_POINTER branch is missing');
+  }
+
+  if (
+    geometrySrc.includes("element.type === 'TIME_POINTER'")
+    && geometrySrc.includes('layoutStartX: undefined')
+    && !geometrySrc.includes('width: element.bounds.width *')
+    && !geometrySrc.includes('height: element.bounds.height *')
+  ) {
+    ok('Spec 119: position-only helper excludes TIME_POINTER and preserves artwork size');
+  } else {
+    fail('Spec 119 position-only helper', 'Protected pointer guard or size-preservation contract is missing');
+  }
+
+  if (
+    studioSrc.includes('Keep original positions')
+    && studioSrc.includes('Rearrange positions')
+    && studioSrc.includes('structuredClone(pending.config)')
+  ) {
+    ok('Spec 119: FVWF mismatch offers safe keep/rearrange/cancel behavior');
+  } else {
+    fail('Spec 119 FVWF mismatch UX', 'Mismatch choices or cloned keep path is missing');
+  }
+
+  if ([v2Src, v3Src].every(source => source.includes('isProjectBackgroundElement(element, resolution)'))) {
+    ok('Spec 119: V2/V3 background recognition uses project resolution');
+  } else {
+    fail('Spec 119 generator background parity', 'V2 or V3 still lacks project-resolution background recognition');
+  }
+}
+
 // ─── SUMMARY ─────────────────────────────────────────────────────────────────
 console.log(`\n═══════════════════════════════════════════════`);
 console.log(`Results: ${passed} passed, ${failed} failed`);

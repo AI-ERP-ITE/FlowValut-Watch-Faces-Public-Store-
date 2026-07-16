@@ -754,8 +754,8 @@ function applyResize(
 
 /** Returns arc handle name if (x,y) is over a handle of the arc element */
 function hitTestArcHandle(x: number, y: number, el: WatchFaceElement): string | null {
-  const cx = el.center?.x ?? CX;
-  const cy = el.center?.y ?? CY;
+  const cx = el.center?.x ?? (el.bounds.x + el.bounds.width / 2);
+  const cy = el.center?.y ?? (el.bounds.y + el.bounds.height / 2);
   const r = el.radius ?? 100;
   // Stored angles are device convention (0=12PM); subtract 90° to get canvas position (0=3PM).
   const startDeg = (el.startAngle ?? 135) - 90;
@@ -815,8 +815,8 @@ function hitTestRect(
 }
 
 function hitTestArc(x: number, y: number, el: WatchFaceElement): boolean {
-  const cx = el.center?.x ?? CX;
-  const cy = el.center?.y ?? CY;
+  const cx = el.center?.x ?? (el.bounds.x + el.bounds.width / 2);
+  const cy = el.center?.y ?? (el.bounds.y + el.bounds.height / 2);
   const radius = el.radius ?? 100;
   const lineWidth = el.lineWidth ?? 8;
   const tolerance = 8;
@@ -889,8 +889,8 @@ function drawRectSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) 
 }
 
 function drawArcSelection(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
-  const cx = el.center?.x ?? CX;
-  const cy = el.center?.y ?? CY;
+  const cx = el.center?.x ?? (el.bounds.x + el.bounds.width / 2);
+  const cy = el.center?.y ?? (el.bounds.y + el.bounds.height / 2);
   const radius = el.radius ?? 100;
   const lineWidth = el.lineWidth ?? 8;
   const startDeg = (el.startAngle ?? 135) - 90;
@@ -1904,8 +1904,8 @@ function drawDigitElement(
 // ─── ARC_PROGRESS ───────────────────────────────────────────────────────────────
 
 function drawArc(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
-  const cx = el.center?.x ?? CX;
-  const cy = el.center?.y ?? CY;
+  const cx = el.center?.x ?? (el.bounds.x + el.bounds.width / 2);
+  const cy = el.center?.y ?? (el.bounds.y + el.bounds.height / 2);
   const radius = el.radius ?? 100;
   const startDeg = el.startAngle ?? 135;
   const endDeg = el.endAngle ?? 345;

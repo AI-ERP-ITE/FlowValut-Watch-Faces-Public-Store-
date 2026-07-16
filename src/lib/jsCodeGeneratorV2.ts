@@ -11,6 +11,7 @@ import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
 import { getCenteredTimeStartX } from '@/lib/timeDigitGeometry';
 import { getCenteredNumericDayStartX, isCompleteDayImageMode } from '@/lib/dateImageMode';
+import { isProjectBackgroundElement } from '@/lib/projectCanvasGeometry';
 
 function _safeAssetId(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -347,7 +348,7 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
     if (element.name.toLowerCase().includes('month')) {
       continue; // Skip month, handled above
     }
-    const code = generateWidgetCodeV2(element, normalWidgetCounter);
+    const code = generateWidgetCodeV2(element, normalWidgetCounter, false, config.resolution);
     if (code) {
       let finalCode = code;
       // Skip types that can't have a sensible static tap rect:
@@ -429,7 +430,7 @@ function generateWatchfaceIndexJsV2(config: WatchFaceConfig): string {
     if (element.type === 'BUTTON') {
       continue;
     }
-    const code = generateWidgetCodeV2(element, aodWidgetCounter, true);
+    const code = generateWidgetCodeV2(element, aodWidgetCounter, true, config.resolution);
     if (code) {
       aodWidgetsCode += code;
       aodWidgetCounter++;
@@ -689,13 +690,18 @@ function generateIMGWeekWidget(element: WatchFaceElement, widgetIndex: number, s
 }
 
 // Generate widget code for each element (V2 format)
-function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, isAod: boolean = false): string {
+function generateWidgetCodeV2(
+  element: WatchFaceElement,
+  widgetIndex: number,
+  isAod: boolean = false,
+  resolution = { width: 480, height: 480 },
+): string {
   console.log(`[JSGenV2] generateWidgetCodeV2: element=${element.name}, type=${element.type}, src=${element.src}`);
   
   // Skip background element - already handled.
   // Exception: gauge pair siblings (gaugePairId set) must never be skipped even if they
   // happen to cover the full screen (e.g. centered gauge on 480px face → bounds 0,0,480,480).
-  if (!element.gaugePairId && (element.name === 'Background' || element.type === 'IMG' && element.bounds.x === 0 && element.bounds.y === 0 && element.bounds.width === 480 && element.bounds.height === 480)) {
+  if (isProjectBackgroundElement(element, resolution)) {
     return '';
   }
   
@@ -760,7 +766,7 @@ function generateWidgetCodeV2(element: WatchFaceElement, widgetIndex: number, is
     case 'IMG_PROGRESS':
       return generateImgProgressWidget(element, widgetIndex, showLevel);
     case 'DATE_POINTER':
-      return generateDatePointerWidget(element, widgetIndex, showLevel);
+      return generateDatePointerWidget(element, widgetIndex, showLevel, resolution);
     case 'IMG_CLICK':
       return generateImgClickWidget(element, widgetIndex, showLevel);
     case 'IMG':
@@ -1284,10 +1290,15 @@ function generateImgProgressWidget(element: WatchFaceElement, widgetIndex: numbe
 // DATE_POINTER - Analog pointer driven by date values
 // dateType: MONTH | DAY | WEEK → maps to hmUI.date constant
 // ============================================================
-function generateDatePointerWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+function generateDatePointerWidget(
+  element: WatchFaceElement,
+  widgetIndex: number,
+  showLevel: string,
+  resolution: { width: number; height: number },
+): string {
   const dateType = element.dateType ?? 'DAY';
-  const centerX = element.center?.x ?? 240;
-  const centerY = element.center?.y ?? 240;
+  const centerX = element.center?.x ?? resolution.width / 2;
+  const centerY = element.center?.y ?? resolution.height / 2;
   const posX = element.hourPos?.x ?? 10;
   const posY = element.hourPos?.y ?? 60;
   return `

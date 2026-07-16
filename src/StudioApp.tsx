@@ -85,9 +85,23 @@ import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/
 import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import { buildProjectFileConfig } from '@/lib/projectFileConfig';
+import {
+  canvasResolutionsMatch,
+  isValidCanvasResolution,
+  rearrangeProjectPositions,
+  type CanvasResolution,
+} from '@/lib/projectCanvasGeometry';
 import { completeDayAssetNames, isCompleteDayImageMode } from '@/lib/dateImageMode';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
+
+interface PendingProjectLoad {
+  config: WatchFaceConfig;
+  backgroundImage: string | null;
+  fileName: string;
+  restoreBackground: boolean;
+  targetResolution: CanvasResolution;
+}
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
 function downloadProjectFile(config: WatchFaceConfig, backgroundImage: string | null): void {
@@ -2017,6 +2031,7 @@ function StudioApp() {
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
+  const [pendingProjectLoad, setPendingProjectLoad] = useState<PendingProjectLoad | null>(null);
   const activeElements = useMemo(() => {
     if (!state.watchFaceConfig) return [];
     if (editorMode === 'AOD') return aodElements ?? [];
@@ -2710,8 +2725,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) return { w: parts[0], h: parts[1] };
     return { w: 480, h: 480 };
   })();
-  const activeCanvasW: number = _resolvedResolution.w;
-  const activeCanvasH: number = _resolvedResolution.h;
+  // Before project creation the selected Firebase model initializes the canvas.
+  // Once a project exists, its persisted resolution is the editing/export authority.
+  const activeCanvasW: number = state.watchFaceConfig?.resolution?.width ?? _resolvedResolution.w;
+  const activeCanvasH: number = state.watchFaceConfig?.resolution?.height ?? _resolvedResolution.h;
   const activeShape: 'round' | 'square' = activeSpecGroup?.shape ?? 'round';
   const activeCornerRadius: number = activeSpecGroup?.cornerRadius ?? 0;
 
@@ -3179,6 +3196,51 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     matchesHtmlSlot,
   ]);
 
+  const commitProjectLoad = useCallback(async (
+    pending: PendingProjectLoad,
+    choice: 'keep' | 'rearrange',
+  ) => {
+    const chosenConfig = choice === 'rearrange'
+      ? rearrangeProjectPositions(pending.config, pending.targetResolution)
+      : structuredClone(pending.config);
+    setPendingProjectLoad(null);
+    dispatch(actions.setWatchFaceConfig(chosenConfig));
+    setAodElements(chosenConfig.aodElements && chosenConfig.aodElements.length > 0 ? chosenConfig.aodElements : null);
+
+    if (pending.restoreBackground && pending.backgroundImage) {
+      dispatch(actions.setBackgroundImage(pending.backgroundImage));
+      try {
+        const response = await fetch(pending.backgroundImage);
+        const blob = await response.blob();
+        dispatch(actions.setBackgroundFile(new File([blob], 'background.png', { type: blob.type || 'image/png' })));
+      } catch { /* non-critical: the project can still be edited */ }
+    }
+
+    dispatch(actions.setStep('preview'));
+    toast.success(`${pending.restoreBackground ? 'Project' : 'Widgets'} loaded: ${pending.fileName}`);
+  }, [dispatch]);
+
+  const requestProjectLoad = useCallback(async (pending: Omit<PendingProjectLoad, 'targetResolution'>) => {
+    const targetResolution = activeSpecGroup
+      ? { width: _resolvedResolution.w, height: _resolvedResolution.h }
+      : null;
+    if (
+      targetResolution
+      && isValidCanvasResolution(pending.config.resolution)
+      && !canvasResolutionsMatch(pending.config.resolution, targetResolution)
+    ) {
+      setPendingProjectLoad({ ...pending, targetResolution });
+      return;
+    }
+
+    await commitProjectLoad({
+      ...pending,
+      targetResolution: isValidCanvasResolution(pending.config.resolution)
+        ? pending.config.resolution
+        : { width: activeCanvasW, height: activeCanvasH },
+    }, 'keep');
+  }, [activeCanvasH, activeCanvasW, activeSpecGroup, _resolvedResolution.h, _resolvedResolution.w, commitProjectLoad]);
+
   // Load a .fvwf project file from disk and restore watchface onto canvas
   const handleLoadProject = useCallback(() => {
     const input = document.createElement('input');
@@ -3200,26 +3262,18 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
           ...config,
           name: effectiveName,
         });
-        dispatch(actions.setWatchFaceConfig(normalizedConfig));
-        // Restore AOD local state from file — enables AOD button if saved AOD data is present
-        setAodElements(normalizedConfig.aodElements && normalizedConfig.aodElements.length > 0 ? normalizedConfig.aodElements : null);
-        if (bgImage) {
-          dispatch(actions.setBackgroundImage(bgImage));
-          // Build a backgroundFile so ZPK export works if user re-exports
-          try {
-            const res = await fetch(bgImage);
-            const blob = await res.blob();
-            dispatch(actions.setBackgroundFile(new File([blob], 'background.png', { type: blob.type || 'image/png' })));
-          } catch { /* non-critical */ }
-        }
-        dispatch(actions.setStep('preview'));
-        toast.success(`Project loaded: ${effectiveName}`);
+        await requestProjectLoad({
+          config: normalizedConfig,
+          backgroundImage: bgImage,
+          fileName: effectiveName,
+          restoreBackground: true,
+        });
       } catch (e) {
         toast.error('Failed to load project file. Make sure it is a valid .fvwf file.');
       }
     };
     input.click();
-  }, [dispatch, watchFaceName]);
+  }, [requestProjectLoad, watchFaceName]);
 
   // Load widgets-only from a .fvwf file — keeps current background image intact
   const handleLoadWidgetsOnly = useCallback(() => {
@@ -3246,16 +3300,18 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
           name: effectiveName,
           elements: patchedElements,
         });
-        dispatch(actions.setWatchFaceConfig(normalizedConfig));
-        // Restore AOD local state from file — enables AOD button if saved AOD data is present
-        setAodElements(normalizedConfig.aodElements && normalizedConfig.aodElements.length > 0 ? normalizedConfig.aodElements : null);
-        toast.success(`Widgets loaded: ${file.name}`);
+        await requestProjectLoad({
+          config: normalizedConfig,
+          backgroundImage: null,
+          fileName: file.name,
+          restoreBackground: false,
+        });
       } catch {
         toast.error('Failed to load project file. Make sure it is a valid .fvwf file.');
       }
     };
     input.click();
-  }, [dispatch, state.backgroundImage, watchFaceName]);
+  }, [requestProjectLoad, state.backgroundImage, watchFaceName]);
 
   // Handle regenerate ZPK (local download, no GitHub upload)
   // Handle generate ZPK
@@ -4886,6 +4942,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                       <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
                       <PropertyPanel
                         element={activeSelectedElement}
+                        canvasWidth={activeCanvasW}
+                        canvasHeight={activeCanvasH}
                         onUpdateElement={updateActiveElement}
                         onUpdateElementIsolated={updateActiveElementIsolated}
                         elements={activeElements}
@@ -5387,6 +5445,34 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         isVisible={state.isLoading}
         title={state.loadingMessage || 'Processing...'}
       />
+
+      <Dialog open={!!pendingProjectLoad} onOpenChange={(open) => { if (!open) setPendingProjectLoad(null); }}>
+        <DialogContent className="max-w-md bg-[#1a1a1a] border-zinc-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white text-base">Project resolution differs</DialogTitle>
+          </DialogHeader>
+          {pendingProjectLoad && (
+            <div className="space-y-4 text-sm text-zinc-300">
+              <p>
+                This FVWF was saved as {pendingProjectLoad.config.resolution.width}×{pendingProjectLoad.config.resolution.height},
+                while the selected model uses {pendingProjectLoad.targetResolution.width}×{pendingProjectLoad.targetResolution.height}.
+              </p>
+              <p className="text-xs text-zinc-400">
+                Rearranging updates project-space positions only. Artwork sizes and TIME_POINTER geometry remain unchanged.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button variant="ghost" onClick={() => setPendingProjectLoad(null)}>Cancel</Button>
+                <Button variant="outline" onClick={() => void commitProjectLoad(pendingProjectLoad, 'keep')}>
+                  Keep original positions
+                </Button>
+                <Button onClick={() => void commitProjectLoad(pendingProjectLoad, 'rearrange')}>
+                  Rearrange positions
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Spec 023 — Background photo editor modal (T040–T043) */}
       {showPhotoEditor && photoEditorSource && (

@@ -33,6 +33,8 @@ import { isCompleteDayImageMode } from '@/lib/dateImageMode';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
+  canvasWidth?: number;
+  canvasHeight?: number;
   onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
   /** Updates only the selected element, bypassing linked-frame bounds synchronization. */
   onUpdateElementIsolated?: (id: string, changes: Partial<WatchFaceElement>) => void;
@@ -158,7 +160,7 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, onUpdateElement, onUpdateElementIsolated, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
+export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, onUpdateElement, onUpdateElementIsolated, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [fontSearch, setFontSearch] = useState('');
@@ -733,7 +735,7 @@ export function PropertyPanel({ element, onUpdateElement, onUpdateElementIsolate
     const changes: Partial<WatchFaceElement> = { type: newType };
     switch (newType) {
       case 'ARC_PROGRESS':
-        changes.center = element.center ?? { x: 240, y: 240 };
+        changes.center = element.center ?? { x: canvasWidth / 2, y: canvasHeight / 2 };
         changes.radius = element.radius ?? 100;
         changes.startAngle = element.startAngle ?? 135;
         changes.endAngle = element.endAngle ?? 345;
@@ -767,10 +769,10 @@ export function PropertyPanel({ element, onUpdateElement, onUpdateElementIsolate
     update(changes);
   };
 
-  const setX = (v: number) => update({ bounds: { ...element.bounds, x: clamp(v, 0, 480) } });
-  const setY = (v: number) => update({ bounds: { ...element.bounds, y: clamp(v, 0, 480) } });
-  const setW = (v: number) => update({ bounds: { ...element.bounds, width: clamp(v, 1, 480) } });
-  const setH = (v: number) => update({ bounds: { ...element.bounds, height: clamp(v, 1, 480) } });
+  const setX = (v: number) => update({ bounds: { ...element.bounds, x: clamp(v, 0, canvasWidth) } });
+  const setY = (v: number) => update({ bounds: { ...element.bounds, y: clamp(v, 0, canvasHeight) } });
+  const setW = (v: number) => update({ bounds: { ...element.bounds, width: clamp(v, 1, canvasWidth) } });
+  const setH = (v: number) => update({ bounds: { ...element.bounds, height: clamp(v, 1, canvasHeight) } });
 
   const handleCopyStyle = () => {
     _styleClipboard = {
@@ -877,10 +879,15 @@ export function PropertyPanel({ element, onUpdateElement, onUpdateElementIsolate
 
       {/* Position */}
       <Section label="Position">
-        {isCentered ? (
+        {element.type === 'TIME_POINTER' ? (
           <FieldRow>
             <NumField label="CX" value={element.center?.x ?? 240} onChange={v => update({ center: { x: clamp(v, 0, 480), y: element.center?.y ?? 240 } })} />
             <NumField label="CY" value={element.center?.y ?? 240} onChange={v => update({ center: { x: element.center?.x ?? 240, y: clamp(v, 0, 480) } })} />
+          </FieldRow>
+        ) : isCentered ? (
+          <FieldRow>
+            <NumField label="CX" value={element.center?.x ?? canvasWidth / 2} onChange={v => update({ center: { x: clamp(v, 0, canvasWidth), y: element.center?.y ?? canvasHeight / 2 } })} />
+            <NumField label="CY" value={element.center?.y ?? canvasHeight / 2} onChange={v => update({ center: { x: element.center?.x ?? canvasWidth / 2, y: clamp(v, 0, canvasHeight) } })} />
           </FieldRow>
         ) : (
           <FieldRow>
