@@ -30,15 +30,15 @@
 ## Completion evidence
 
 - Specification commit: `e886017c`; sizing clarification: `d4bf6988`.
-- Runtime and focused-test commits: `cc39ea0e`; legacy mixed-coordinate pointer guard: `ed30d72a`.
-- Latest private deployment commit: `ad810d6c`.
-- Private production bundle: `index-Czyea9cO.js`; stylesheet: `index-Cm4u4hPx.css`.
+- Runtime and focused-test commit: `cc39ea0e`.
+- Private deployment commit: `f0528970`.
+- Private production bundle: `index-qfKADbc3.js`; stylesheet: `index-Cm4u4hPx.css`.
 - TypeScript passed with `npx tsc --noEmit`.
-- Focused rearrangement/generator/background tests passed: 22/22.
+- Focused rearrangement/generator/background tests passed: 21/21.
 - Repository verifier passed: 50/50.
 - The full Vitest discovery retained 11 unrelated engine/effect failures plus four legacy non-Vitest script-suite failures; every Spec 120 test passed.
 - Canonical private root, Studio, and Parametric SPA-query routes returned HTTP 200 with identical bundle hashes; referenced JavaScript and CSS returned HTTP 200.
-- The latest runtime deployment reached `origin/main` as `ad810d6c6fda815eeedc4622b52c269636007856`; `public/main` was not changed.
+- `origin/main` equals `f052897005e65e2a30f29e8826aa098c1353971f`; `public/main` was not changed.
 
 ## Current status
 
