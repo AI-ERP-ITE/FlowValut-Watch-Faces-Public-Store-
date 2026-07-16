@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,7 @@ import type { HandStyleKey } from '@/lib/handStyles';
 import { generateWeatherSet } from '@/lib/weatherIconSets';
 
 import { buildSourceJson } from '@/lib/sourceJsonGenerator';
+import { captureStorePreviews } from '@/lib/storePreviewCapture';
 import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 import { PublishForm } from '@/components/PublishForm';
 import { AdminPanel } from '@/components/AdminPanel';
@@ -2042,9 +2042,9 @@ function StudioApp() {
 
   // Canvas-only override: inject custom switcher slot dataUrls into el.images[] for preview.
   // This does NOT mutate stored state — it's a derived render-only view.
-  const canvasElements = useMemo(() => {
-    if (switcherDefinitions.length === 0) return activeElements;
-    return activeElements.map(el => {
+  const resolveCanvasElements = useCallback((elements: WatchFaceElement[]) => {
+    if (switcherDefinitions.length === 0) return elements;
+    return elements.map(el => {
       if (el.type !== 'IMG_LEVEL' || !el.imageSwitcherDefinitionId) return el;
       const def = switcherDefinitions.find(d => d.id === el.imageSwitcherDefinitionId);
       if (!def) return el;
@@ -2053,7 +2053,19 @@ function StudioApp() {
       if (dataUrls.length === 0) return el;
       return { ...el, images: dataUrls };
     });
-  }, [activeElements, switcherDefinitions]);
+  }, [switcherDefinitions]);
+  const canvasElements = useMemo(
+    () => resolveCanvasElements(activeElements),
+    [activeElements, resolveCanvasElements],
+  );
+  const mainCaptureElements = useMemo(
+    () => resolveCanvasElements(state.watchFaceConfig?.elements ?? []),
+    [resolveCanvasElements, state.watchFaceConfig],
+  );
+  const aodCaptureElements = useMemo(
+    () => resolveCanvasElements(aodElements ?? []),
+    [aodElements, resolveCanvasElements],
+  );
   const activeResolutionW = state.watchFaceConfig?.resolution?.width ?? 480;
   const activeResolutionH = state.watchFaceConfig?.resolution?.height ?? activeResolutionW;
   const activeResolution = activeResolutionW;
@@ -2068,6 +2080,13 @@ function StudioApp() {
     if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
     return state.backgroundImage;
   }, [editorMode, aodElements, state.backgroundImage, aodBackgroundMode, aodSolidBackgroundImage, aodBackgroundImage]);
+  const aodCaptureBackgroundImage = useMemo(() => {
+    if (!aodElements) return state.backgroundImage;
+    if (aodBackgroundMode === 'NONE_BLACK') return null;
+    if (aodBackgroundMode === 'SOLID_COLOR') return aodSolidBackgroundImage;
+    if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
+    return state.backgroundImage;
+  }, [aodBackgroundImage, aodBackgroundMode, aodElements, aodSolidBackgroundImage, state.backgroundImage]);
   const activeBackgroundTransform = useMemo(
     () => (editorMode === 'AOD' && aodElements ? aodBackgroundTransform : mainBackgroundTransform),
     [aodBackgroundTransform, aodElements, editorMode, mainBackgroundTransform],
@@ -2272,6 +2291,8 @@ function StudioApp() {
     [addElType, addElSubtype]
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mainPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const aodPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const pointerParitySnapshotsRef = useRef<Partial<Record<PointerParityStage, ImageData>>>({});
   const pointerParityMissingAssetsRef = useRef<string[]>([]);
   const [pointerParityResult, setPointerParityResult] = useState<PointerParityResult | null>(null);
@@ -3349,11 +3370,6 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     // Temporarily hide grid so it doesn't appear in the preview screenshot
     const gridWasOn = showGrid;
     if (gridWasOn) setShowGrid(false);
-    // Temporarily force MAIN mode so preview always shows the main watchface (not AOD)
-    const prevEditorMode = editorMode;
-    if (editorMode === 'AOD') {
-      flushSync(() => setEditorMode('MAIN'));
-    }
     // Temporarily hide flicker overlay so it doesn't bake into the preview
     const flickerWasOn = flickerOverlayEnabled;
     if (flickerWasOn) setFlickerOverlayEnabled(false);
@@ -3364,24 +3380,18 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     let previewDataUrl: string | null = null;
     let aodPreviewDataUrl: string | null = null;
     try {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        previewDataUrl = canvas.toDataURL('image/png');
-        setPreviewImageUrl(previewDataUrl);
-        console.log('[App] Canvas screenshot captured, size:', previewDataUrl.length);
-        capturePointerParitySnapshotFromCanvas('composer-preview');
-
-        if (aodElements) {
-          // Commit the mode change before waiting for InteractiveCanvas' RAF draw.
-          // Without flushSync, React can defer this update and the two captures can
-          // read the opposite mode from the shared canvas.
-          flushSync(() => setEditorMode('AOD'));
-          await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-          aodPreviewDataUrl = canvasRef.current?.toDataURL('image/png') ?? previewDataUrl;
-        } else {
-          aodPreviewDataUrl = previewDataUrl;
-        }
-      }
+      const mainCanvas = mainPreviewCanvasRef.current;
+      if (!mainCanvas) throw new Error('Main preview canvas unavailable');
+      const captures = await captureStorePreviews({
+        mainCanvas,
+        aodCanvas: aodPreviewCanvasRef.current,
+        hasExplicitAod: !!aodElements,
+      });
+      previewDataUrl = captures.main;
+      aodPreviewDataUrl = captures.aod;
+      setPreviewImageUrl(previewDataUrl);
+      console.log('[App] Isolated Main/AOD previews captured');
+      capturePointerParitySnapshotFromCanvas('composer-preview');
     } catch (e) {
       console.warn('[App] Canvas capture failed (tainted?), falling back to backgroundImage', e);
       previewDataUrl = state.backgroundImage;
@@ -3389,9 +3399,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       if (previewDataUrl) setPreviewImageUrl(previewDataUrl);
     }
 
-    // Restore grid, editor mode, and flicker overlay after capture
+    // Restore grid and flicker overlay after capture
     if (gridWasOn) setShowGrid(true);
-    flushSync(() => setEditorMode(prevEditorMode));
     if (flickerWasOn) setFlickerOverlayEnabled(true);
 
     if (!state.watchFaceConfig) {
@@ -4965,6 +4974,51 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                       canvasShape={activeShape}
                       canvasCornerRadius={activeCornerRadius}
                     />
+                    <div
+                      aria-hidden="true"
+                      className="fixed left-[-10000px] top-0 h-px w-px overflow-hidden opacity-0 pointer-events-none"
+                    >
+                      <InteractiveCanvas
+                        ref={mainPreviewCanvasRef}
+                        backgroundImage={state.backgroundImage ?? undefined}
+                        backgroundTransform={mainBackgroundTransform}
+                        elements={mainCaptureElements}
+                        elementImages={state.elementImages}
+                        selectedElementId={null}
+                        extraSelectedIds={[]}
+                        showGrid={false}
+                        calibrationEnabled={calibrationEnabled}
+                        calibrationMode={calibrationMode}
+                        flickerAnalysisEnabled={false}
+                        flickerOverlayEnabled={false}
+                        customHandStyles={customHandStyles}
+                        canvasW={activeCanvasW}
+                        canvasH={activeCanvasH}
+                        canvasShape={activeShape}
+                        canvasCornerRadius={activeCornerRadius}
+                      />
+                      {aodElements && (
+                        <InteractiveCanvas
+                          ref={aodPreviewCanvasRef}
+                          backgroundImage={aodCaptureBackgroundImage ?? undefined}
+                          backgroundTransform={aodBackgroundTransform}
+                          elements={aodCaptureElements}
+                          elementImages={state.elementImages}
+                          selectedElementId={null}
+                          extraSelectedIds={[]}
+                          showGrid={false}
+                          calibrationEnabled={calibrationEnabled}
+                          calibrationMode={calibrationMode}
+                          flickerAnalysisEnabled={false}
+                          flickerOverlayEnabled={false}
+                          customHandStyles={customHandStyles}
+                          canvasW={activeCanvasW}
+                          canvasH={activeCanvasH}
+                          canvasShape={activeShape}
+                          canvasCornerRadius={activeCornerRadius}
+                        />
+                      )}
+                    </div>
                   </div>
                   <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(280px,340px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
                     <div className="space-y-4 xl:min-h-0 xl:pr-2">
