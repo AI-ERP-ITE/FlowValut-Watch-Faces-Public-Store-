@@ -29,7 +29,10 @@ export default defineConfig(({ mode }) => {
   const buildVersion = resolveBuildVersion();
   const routeModule = buildTarget === 'public' ? './src/AppPublic.tsx' : './src/AppPrivate.tsx';
   const providersModule = buildTarget === 'public' ? './src/AppProvidersPublic.tsx' : './src/AppProvidersPrivate.tsx';
-  const publicBase = env.VITE_PUBLIC_BASE || process.env.VITE_PUBLIC_BASE || '/FlowValut-Watch-Faces-Public-Store-/';
+  // The public storefront is served from the root of www.fvwatchfaces.com.
+  // Keep the tracked fallback correct so clean deployment clones do not depend
+  // on the ignored .env.public.local file.
+  const publicBase = env.VITE_PUBLIC_BASE || process.env.VITE_PUBLIC_BASE || '/';
   const privateBase = env.VITE_PRIVATE_BASE || process.env.VITE_PRIVATE_BASE || '/Watch-Faces/';
 
   return {
