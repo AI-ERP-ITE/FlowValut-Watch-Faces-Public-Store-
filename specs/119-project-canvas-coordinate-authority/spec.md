@@ -2,7 +2,7 @@
 
 **Feature branch:** `main`  
 **Created:** 2026-07-16  
-**Status:** Draft — awaiting implementation approval  
+**Status:** Closed — implemented and privately deployed  
 **Domain:** ZEP P system task / shared Studio core  
 **Deployment target after approval:** Private Pages only (`origin/main`)
 

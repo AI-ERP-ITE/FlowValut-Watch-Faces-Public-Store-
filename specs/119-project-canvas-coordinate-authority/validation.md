@@ -14,18 +14,18 @@
 
 ## Automated gates after approval
 
-- [ ] Saved-config resolution authority.
-- [ ] 480×480, 466×466, and rectangular canvas coverage.
-- [ ] HTML workflow non-regression guard.
-- [ ] Alignment-aware position-only transformations.
-- [ ] MAIN/AOD parity and cloned-config safety.
-- [ ] Legacy FVWF no-silent-conversion behavior.
-- [ ] TIME_POINTER protected baseline parity.
-- [ ] Gauge/digit/image/frame specialized-geometry parity.
-- [ ] V2/V3 coordinate parity.
-- [ ] Background semantic/config-resolution handling.
-- [ ] TypeScript and private production build.
-- [ ] Repository verifier with zero new failures.
+- [x] Saved-config resolution authority.
+- [x] 480×480, 466×466, and rectangular canvas coverage.
+- [x] HTML workflow non-regression guard.
+- [x] Alignment-aware position-only transformations.
+- [x] MAIN/AOD parity and cloned-config safety.
+- [x] Legacy FVWF no-silent-conversion behavior.
+- [x] TIME_POINTER protected baseline parity.
+- [x] Gauge/digit/image/frame specialized-geometry parity.
+- [x] V2/V3 coordinate parity.
+- [x] Background semantic/config-resolution handling.
+- [x] TypeScript and private production build.
+- [x] Repository verifier with zero new failures.
 
 ## Manual device/Studio checks after approval
 
@@ -39,13 +39,26 @@
 
 ## Deployment gates after approval
 
-- [ ] Private Firebase environment loaded and preflight passed.
-- [ ] `npm run deploy:full:private` used.
-- [ ] Only `origin/main` pushed.
-- [ ] Root, Studio, and Parametric entrypoints reference the same new bundle.
-- [ ] Live JavaScript and CSS assets return HTTP 200.
-- [ ] Production entrypoints contain no `/src/main.tsx`.
+- [x] Private Firebase environment loaded and preflight passed.
+- [x] `npm run deploy:full:private` used.
+- [x] Only `origin/main` pushed.
+- [x] Root, Studio, and Parametric entrypoints reference the same new bundle.
+- [x] Live JavaScript and CSS assets return HTTP 200.
+- [x] Production entrypoints contain no `/src/main.tsx`.
+
+## Completion evidence
+
+- Specification commit: `851bd93b`.
+- Runtime and focused-test commit: `dee537c2`.
+- Private deployment commit: `ed3e2abc`.
+- Private production bundle: `index-C9eDZ3S6.js`; stylesheet: `index-Cm4u4hPx.css`.
+- TypeScript passed with `npx tsc --noEmit`.
+- Focused canvas/generator/project tests passed: 20/20.
+- Repository verifier passed: 49/49.
+- The full Vitest run retained 11 previously documented Spec 118 engine/effect snapshot failures; Spec 119 introduced no new failures and every Spec 119 test passed.
+- Canonical private root, Studio, and Parametric SPA-query routes returned HTTP 200 with identical bundle hashes. The referenced JavaScript and CSS assets also returned HTTP 200.
+- `public/main` was not changed.
 
 ## Current status
 
-Specification complete. Runtime implementation, build, deployment, and issue-log closure are blocked pending explicit user approval.
+Closed on 2026-07-16. Implementation and private deployment are complete. The manual Studio/device matrix above remains available for user acceptance testing and does not block closure.
