@@ -659,6 +659,8 @@ section('9. Project Canvas Coordinate Authority');
   const studioSrc = readSrc('StudioApp.tsx');
   const panelSrc = readSrc('components/PropertyPanel.tsx');
   const geometrySrc = readSrc('lib/projectCanvasGeometry.ts');
+  const rasterGeometrySrc = readSrc('lib/projectRasterGeometry.ts');
+  const zpkSrc = readSrc('lib/zpkBuilder.ts');
   const v2Src = readSrc('lib/jsCodeGeneratorV2.ts');
   const v3Src = readSrc('lib/jsCodeGenerator.ts');
 
@@ -683,13 +685,13 @@ section('9. Project Canvas Coordinate Authority');
 
   if (
     geometrySrc.includes("element.type === 'TIME_POINTER'")
+    && geometrySrc.includes('pointerCenter:')
+    && geometrySrc.includes('element.bounds.width * sizeScale')
     && geometrySrc.includes('layoutStartX: undefined')
-    && !geometrySrc.includes('width: element.bounds.width *')
-    && !geometrySrc.includes('height: element.bounds.height *')
   ) {
-    ok('Spec 119: position-only helper excludes TIME_POINTER and preserves artwork size');
+    ok('Spec 120 supersedes Spec 119: all finished widget shells rearrange while TIME_POINTER local geometry stays protected');
   } else {
-    fail('Spec 119 position-only helper', 'Protected pointer guard or size-preservation contract is missing');
+    fail('Spec 120 rearrangement helper', 'Universal bounds scaling or TIME_POINTER project-center conversion is missing');
   }
 
   if (
@@ -706,6 +708,17 @@ section('9. Project Canvas Coordinate Authority');
     ok('Spec 119: V2/V3 background recognition uses project resolution');
   } else {
     fail('Spec 119 generator background parity', 'V2 or V3 still lacks project-resolution background recognition');
+  }
+
+  if (
+    rasterGeometrySrc.includes('projectRasterNormalizationTarget')
+    && zpkSrc.includes("'background.png'")
+    && zpkSrc.includes("'aod_background.png'")
+    && zpkSrc.includes('projectRasterNormalizationTarget(')
+  ) {
+    ok('Spec 120: MAIN/AOD package backgrounds are normalized to the authoritative project canvas');
+  } else {
+    fail('Spec 120 background export parity', 'Dedicated background dimension normalization is incomplete');
   }
 }
 

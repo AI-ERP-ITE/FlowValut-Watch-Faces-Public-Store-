@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WatchFaceConfig, WatchFaceElement } from '@/types';
 import { generateWatchFaceCode } from '@/lib/jsCodeGenerator';
 import { generateWatchFaceCodeV2 } from '@/lib/jsCodeGeneratorV2';
+import { rearrangeProjectPositions } from '@/lib/projectCanvasGeometry';
 
 function image(
   id: string,
@@ -90,5 +91,21 @@ describe.each([
 
     expect(source).toContain('center_x: px(233)');
     expect(source).toContain('center_y: px(233)');
+  });
+
+  it('emits an explicitly rearranged TIME_POINTER center exactly once', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const input = fixture(_label === 'V2' ? 'v2' : 'v3');
+    input.resolution = { width: 480, height: 480 };
+    const pointer = input.elements.find((element) => element.type === 'TIME_POINTER')!;
+    pointer.bounds = { x: 0, y: 0, width: 480, height: 480 };
+    pointer.center = { x: 240, y: 240 };
+    const rearranged = rearrangeProjectPositions(input, { width: 466, height: 466 });
+    const source = generate(rearranged);
+
+    expect(source).toContain('hour_centerX: px(233)');
+    expect(source).toContain('hour_centerY: px(233)');
+    expect(source).toContain('hour_posX: px(11)');
+    expect(source).toContain('hour_posY: px(118)');
   });
 });

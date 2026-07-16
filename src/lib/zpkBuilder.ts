@@ -1,5 +1,6 @@
 // ZPK File Builder for ZeppOS Watch Faces
 import JSZip from 'jszip';
+import { projectRasterNormalizationTarget } from '@/lib/projectRasterGeometry';
 import type { WatchFaceConfig } from '@/types';
 import { generateWatchFaceCode } from './jsCodeGenerator';
 import { FONT_STYLES } from '@/lib/fontLibrary';
@@ -42,6 +43,48 @@ function sanitizeAssetFilename(input: string): string {
   return safeExt ? `${safeBase}.${safeExt}` : safeBase;
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read background image'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function normalizeProjectRaster(
+  file: File,
+  targetWidth: number,
+  targetHeight: number,
+  outputName: string,
+): Promise<File> {
+  const dataUrl = await blobToDataUrl(file);
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Unable to decode ${outputName}`));
+    img.src = dataUrl;
+  });
+  const naturalWidth = image.naturalWidth || image.width;
+  const naturalHeight = image.naturalHeight || image.height;
+  const normalizationTarget = projectRasterNormalizationTarget(
+    { width: naturalWidth, height: naturalHeight },
+    { width: targetWidth, height: targetHeight },
+  );
+  if (!normalizationTarget) return file;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = normalizationTarget.width;
+  canvas.height = normalizationTarget.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error(`Unable to normalize ${outputName}: canvas context unavailable`);
+  ctx.drawImage(image, 0, 0, normalizationTarget.width, normalizationTarget.height);
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error(`Unable to encode ${outputName}`)), 'image/png');
+  });
+  return new File([blob], outputName, { type: 'image/png' });
+}
+
 function normalizeElementFiles(
   elementFiles: { src: string; file: File }[]
 ): {
@@ -72,9 +115,26 @@ function normalizeElementFiles(
 
 export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult> {
   console.log('[ZPK] Starting...');
-  const { config, backgroundFile, aodBackgroundFile } = options;
+  const { config } = options;
+  let backgroundFile = options.backgroundFile;
+  let aodBackgroundFile = options.aodBackgroundFile;
   
   try {
+    backgroundFile = await normalizeProjectRaster(
+      backgroundFile,
+      config.resolution.width,
+      config.resolution.height,
+      'background.png',
+    );
+    if (aodBackgroundFile) {
+      aodBackgroundFile = await normalizeProjectRaster(
+        aodBackgroundFile,
+        config.resolution.width,
+        config.resolution.height,
+        'aod_background.png',
+      );
+    }
+
     const normalizedFiles = normalizeElementFiles(options.elementFiles);
     const normalizedElementFiles = normalizedFiles.files;
     const srcMap = normalizedFiles.srcMap;

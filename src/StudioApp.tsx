@@ -101,6 +101,7 @@ interface PendingProjectLoad {
   fileName: string;
   restoreBackground: boolean;
   targetResolution: CanvasResolution;
+  targetWatchModel: string;
 }
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
@@ -3200,17 +3201,38 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     pending: PendingProjectLoad,
     choice: 'keep' | 'rearrange',
   ) => {
-    const chosenConfig = choice === 'rearrange'
-      ? rearrangeProjectPositions(pending.config, pending.targetResolution)
+    let chosenConfig = choice === 'rearrange'
+      ? rearrangeProjectPositions(pending.config, pending.targetResolution, pending.targetWatchModel)
       : structuredClone(pending.config);
+    let chosenBackgroundImage = pending.backgroundImage;
+
+    if (choice === 'rearrange' && pending.restoreBackground && pending.backgroundImage) {
+      chosenBackgroundImage = await resizeDataUrl(
+        pending.backgroundImage,
+        pending.targetResolution.width,
+        pending.targetResolution.height,
+      );
+      const updateBackgroundElement = (element: WatchFaceElement): WatchFaceElement => element.name === 'Background'
+        ? {
+            ...element,
+            bounds: { x: 0, y: 0, width: pending.targetResolution.width, height: pending.targetResolution.height },
+            src: chosenBackgroundImage ?? element.src,
+          }
+        : element;
+      chosenConfig = {
+        ...chosenConfig,
+        elements: chosenConfig.elements.map(updateBackgroundElement),
+        aodElements: chosenConfig.aodElements?.map(updateBackgroundElement) ?? chosenConfig.aodElements,
+      };
+    }
     setPendingProjectLoad(null);
     dispatch(actions.setWatchFaceConfig(chosenConfig));
     setAodElements(chosenConfig.aodElements && chosenConfig.aodElements.length > 0 ? chosenConfig.aodElements : null);
 
-    if (pending.restoreBackground && pending.backgroundImage) {
-      dispatch(actions.setBackgroundImage(pending.backgroundImage));
+    if (pending.restoreBackground && chosenBackgroundImage) {
+      dispatch(actions.setBackgroundImage(chosenBackgroundImage));
       try {
-        const response = await fetch(pending.backgroundImage);
+        const response = await fetch(chosenBackgroundImage);
         const blob = await response.blob();
         dispatch(actions.setBackgroundFile(new File([blob], 'background.png', { type: blob.type || 'image/png' })));
       } catch { /* non-critical: the project can still be edited */ }
@@ -3220,7 +3242,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     toast.success(`${pending.restoreBackground ? 'Project' : 'Widgets'} loaded: ${pending.fileName}`);
   }, [dispatch]);
 
-  const requestProjectLoad = useCallback(async (pending: Omit<PendingProjectLoad, 'targetResolution'>) => {
+  const requestProjectLoad = useCallback(async (pending: Omit<PendingProjectLoad, 'targetResolution' | 'targetWatchModel'>) => {
     const targetResolution = activeSpecGroup
       ? { width: _resolvedResolution.w, height: _resolvedResolution.h }
       : null;
@@ -3229,7 +3251,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       && isValidCanvasResolution(pending.config.resolution)
       && !canvasResolutionsMatch(pending.config.resolution, targetResolution)
     ) {
-      setPendingProjectLoad({ ...pending, targetResolution });
+      setPendingProjectLoad({ ...pending, targetResolution, targetWatchModel: watchModel });
       return;
     }
 
@@ -3238,8 +3260,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       targetResolution: isValidCanvasResolution(pending.config.resolution)
         ? pending.config.resolution
         : { width: activeCanvasW, height: activeCanvasH },
+      targetWatchModel: pending.config.watchModel,
     }, 'keep');
-  }, [activeCanvasH, activeCanvasW, activeSpecGroup, _resolvedResolution.h, _resolvedResolution.w, commitProjectLoad]);
+  }, [activeCanvasH, activeCanvasW, activeSpecGroup, _resolvedResolution.h, _resolvedResolution.w, commitProjectLoad, watchModel]);
 
   // Load a .fvwf project file from disk and restore watchface onto canvas
   const handleLoadProject = useCallback(() => {
