@@ -64,15 +64,8 @@ export function rearrangeElementPosition(
   const sizeScale = Math.min(scaleX, scaleY);
   const isBackground = element.name === 'Background';
   const shouldScaleLayoutMetrics = SAFE_LAYOUT_METRIC_TYPES.has(element.type);
-  // Legacy non-480 projects were sometimes edited on the old fixed 480 canvas.
-  // A full target-sized pointer shell is therefore already in target project space.
-  const pointerAlreadyUsesTargetCanvas = element.type === 'TIME_POINTER'
-    && isFullCanvasBounds(element, target);
   const shouldUseTargetCanvasBounds = isBackground
-    || (element.type === 'TIME_POINTER' && (
-      isFullCanvasBounds(element, source)
-      || pointerAlreadyUsesTargetCanvas
-    ));
+    || (element.type === 'TIME_POINTER' && isFullCanvasBounds(element, source));
 
   const nextWidth = shouldUseTargetCanvasBounds
     ? target.width
@@ -93,9 +86,7 @@ export function rearrangeElementPosition(
     : scaleCoordinate(anchorY, source.height, target.height) - nextHeight * yFraction;
 
   const sourceCenter = element.type === 'TIME_POINTER' && !element.center
-    ? pointerAlreadyUsesTargetCanvas
-      ? { x: target.width / 2, y: target.height / 2 }
-      : { x: source.width / 2, y: source.height / 2 }
+    ? { x: source.width / 2, y: source.height / 2 }
     : element.center;
 
   return {
@@ -110,24 +101,16 @@ export function rearrangeElementPosition(
     ...(sourceCenter
       ? {
           center: {
-            x: pointerAlreadyUsesTargetCanvas
-              ? sourceCenter.x
-              : scaleCoordinate(sourceCenter.x, source.width, target.width),
-            y: pointerAlreadyUsesTargetCanvas
-              ? sourceCenter.y
-              : scaleCoordinate(sourceCenter.y, source.height, target.height),
+            x: scaleCoordinate(sourceCenter.x, source.width, target.width),
+            y: scaleCoordinate(sourceCenter.y, source.height, target.height),
           },
         }
       : {}),
     ...(element.pointerCenter
       ? {
           pointerCenter: {
-            x: pointerAlreadyUsesTargetCanvas
-              ? element.pointerCenter.x
-              : scaleCoordinate(element.pointerCenter.x, source.width, target.width),
-            y: pointerAlreadyUsesTargetCanvas
-              ? element.pointerCenter.y
-              : scaleCoordinate(element.pointerCenter.y, source.height, target.height),
+            x: scaleCoordinate(element.pointerCenter.x, source.width, target.width),
+            y: scaleCoordinate(element.pointerCenter.y, source.height, target.height),
           },
         }
       : {}),

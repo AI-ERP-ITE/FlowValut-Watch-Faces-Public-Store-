@@ -95,28 +95,6 @@ describe('project canvas geometry', () => {
     expect(result.hourPos).toEqual({ x: 11, y: 118 });
   });
 
-  it('preserves a legacy pointer shell that already uses the target canvas', () => {
-    const pointer = element({
-      type: 'TIME_POINTER',
-      bounds: { x: 0, y: 0, width: 480, height: 480 },
-      center: { x: 240, y: 240 },
-      pointerCenter: { x: 238, y: 241 },
-      hourPos: { x: 11, y: 123 },
-      minutePos: { x: 8, y: 182 },
-    });
-    const result = rearrangeElementPosition(
-      pointer,
-      { width: 466, height: 466 },
-      { width: 480, height: 480 },
-    );
-
-    expect(result.bounds).toEqual({ x: 0, y: 0, width: 480, height: 480 });
-    expect(result.center).toEqual({ x: 240, y: 240 });
-    expect(result.pointerCenter).toEqual({ x: 238, y: 241 });
-    expect(result.hourPos).toEqual(pointer.hourPos);
-    expect(result.minutePos).toEqual(pointer.minutePos);
-  });
-
   it('scales every finished widget shell while limiting internal metric changes to safe types', () => {
     const text = rearrangeElementPosition(element({
       type: 'TEXT',
