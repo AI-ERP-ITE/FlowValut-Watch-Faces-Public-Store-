@@ -2,7 +2,11 @@
 
 ## Status
 
-Implementation in progress.
+**Complete — implemented, validated, privately deployed, and closed on 2026-07-16.**
+
+Implementation commit: `2a9c7fee`
+
+Private deployment commit: `17c51703` (`index-SUaR0KS2.js`)
 
 ## Problem
 
@@ -37,3 +41,7 @@ Normalize only PNG Hand Pack hubs from master space into device space while pres
 - Changing time-pointer center calculations or rearrangement behavior.
 - Changing HTML/SVG pointer rendering.
 - Changing Firebase authorization, storage paths, or Zepp generator contracts.
+
+## Closure
+
+All requirements are implemented. TypeScript/private production compilation passed, the repository verifier passed 52/52 checks, and the canonical private deployment pushed matching root, Studio, and Parametric entrypoints. Existing HTML/SVG hubs remain on render version 4; source-backed PNG hubs use render version 5 and migrate by rebaking the cover only.
