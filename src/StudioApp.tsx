@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -3350,7 +3351,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     if (gridWasOn) setShowGrid(false);
     // Temporarily force MAIN mode so preview always shows the main watchface (not AOD)
     const prevEditorMode = editorMode;
-    if (editorMode === 'AOD') setEditorMode('MAIN');
+    if (editorMode === 'AOD') {
+      flushSync(() => setEditorMode('MAIN'));
+    }
     // Temporarily hide flicker overlay so it doesn't bake into the preview
     const flickerWasOn = flickerOverlayEnabled;
     if (flickerWasOn) setFlickerOverlayEnabled(false);
@@ -3369,7 +3372,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         capturePointerParitySnapshotFromCanvas('composer-preview');
 
         if (aodElements) {
-          setEditorMode('AOD');
+          // Commit the mode change before waiting for InteractiveCanvas' RAF draw.
+          // Without flushSync, React can defer this update and the two captures can
+          // read the opposite mode from the shared canvas.
+          flushSync(() => setEditorMode('AOD'));
           await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
           aodPreviewDataUrl = canvasRef.current?.toDataURL('image/png') ?? previewDataUrl;
         } else {
@@ -3385,7 +3391,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
     // Restore grid, editor mode, and flicker overlay after capture
     if (gridWasOn) setShowGrid(true);
-    if (prevEditorMode === 'AOD') setEditorMode('AOD');
+    flushSync(() => setEditorMode(prevEditorMode));
     if (flickerWasOn) setFlickerOverlayEnabled(true);
 
     if (!state.watchFaceConfig) {
