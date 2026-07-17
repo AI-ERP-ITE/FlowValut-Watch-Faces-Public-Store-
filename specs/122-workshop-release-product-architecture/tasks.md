@@ -52,13 +52,13 @@
 
 ## Phase 5 — Metadata-only release repack
 
-- [ ] T050 Document V2/V3 nested package name locations with fixtures.
-- [ ] T051 Implement allowlisted metadata-only ZPK repacking.
-- [ ] T052 Implement SHA-256 structural/payload parity comparison.
-- [ ] T053 Store validation reports and immutable approved/released package links.
-- [ ] T054 Block release on embedded-name mismatch or unauthorized differences.
-- [ ] T055 Add V2/V3 positive, negative, and corruption regression tests.
-- [ ] T056 Deploy/verify release endpoints and obtain Phase 6 approval.
+- [x] T050 Document V2/V3 nested package name locations with fixtures.
+- [x] T051 Implement allowlisted metadata-only ZPK repacking.
+- [x] T052 Implement SHA-256 structural/payload parity comparison.
+- [x] T053 Store validation reports and immutable approved/released package links.
+- [x] T054 Block release on embedded-name mismatch or unauthorized differences.
+- [x] T055 Add V2/V3 positive, negative, and corruption regression tests.
+- [x] T056 Deploy/verify release endpoints and obtain Phase 6 approval.
 
 ## Phase 6 — Public storefront
 

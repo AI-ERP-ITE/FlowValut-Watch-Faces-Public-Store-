@@ -102,3 +102,16 @@ Spec 122 cannot be marked complete while any required migration, entitlement, de
 - Direct enablement of architecture-managed catalog records requires a CURRENT Technical Package.
 - `adminStoreHierarchy` and the updated `adminCatalogStatus` report `ACTIVE`, Node.js 20, `us-central1`.
 - Runtime commits: app `d2515a70`; Firebase root `7166a821`.
+
+## Phase 5 evidence — 2026-07-17
+
+- Focused Vitest suites: 3 files, 16 tests passed, including V2/V3 repack and corruption fixtures.
+- App TypeScript and Firebase Functions TypeScript passed.
+- Naming locations and the strict allowlist are documented in `zpk-name-locations.md`.
+- Release downloads the exact approved Workshop ZPK, verifies its recorded SHA-256, and creates a derivative without rerunning generation/rendering.
+- Only `appName` and `description` values in outer, device-side, and app-side manifests may differ.
+- All other outer/nested entries receive before/after SHA-256 comparison; missing manifests, corrupt ZIP/CRC data, insufficient name replacement, unexpected fields, and existing immutable release paths fail closed.
+- Approved and released ZPK paths remain distinct; the stored parity report links both hashes and the approved Workshop Build.
+- Successful verification makes the package CURRENT, supersedes an older current package for the same SKU/target, promotes the Workshop Build, and activates the SKU/Offer.
+- `adminReleasePackage` reports `ACTIVE`, Node.js 20, `us-central1`.
+- Runtime commits: app `3fbbe709`; Firebase root `80935444`.
