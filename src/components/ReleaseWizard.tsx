@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { fetchStoreHierarchy, submitReleaseClassification, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
+import { fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
 import { findNormalizedConflict, releaseWizardPreview, type ReleaseWizardDraft } from '@/lib/releaseWizard';
 
 const emptyDraft: ReleaseWizardDraft = {
@@ -29,7 +29,10 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
     setBusy(true);
     try {
       const result = await submitReleaseClassification({ ...draft, projectId, buildId, action });
-      toast.success(action === 'READY' ? `${result.canonicalName} saved as Ready.` : `${result.canonicalName} queued for verified release.`);
+      if (action === 'RELEASE') {
+        await releaseVerifiedPackage(result.packageId);
+        toast.success(`${result.canonicalName} released with verified ZPK parity.`);
+      } else toast.success(`${result.canonicalName} saved as Ready.`);
       setSnapshot(await fetchStoreHierarchy());
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Release classification failed'); }
     finally { setBusy(false); }
@@ -50,7 +53,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
       </div>
       {preview && <div className="rounded border border-[#30324a] p-2 text-xs"><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className="text-amber-300">{conflicts.length} normalized existing match(es) will be reused.</p></div>}
       <div className="flex gap-2"><Button disabled={busy || !preview} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
-      <p className="text-[10px] text-[#747c90]">Release remains VALIDATING until the Phase 5 repacker proves exact ZPK parity and canonical embedded naming.</p>
+      <p className="text-[10px] text-[#747c90]">Release derives from the approved test ZPK, rewrites only allowlisted name metadata, and fails unless every other payload hash is unchanged.</p>
     </div>
   );
 }
