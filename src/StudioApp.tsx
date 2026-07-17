@@ -86,6 +86,9 @@ import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/
 import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import { buildProjectFileConfig } from '@/lib/projectFileConfig';
+import { createProjectFileArtifact, createProjectFileBlob, parseProjectFileArtifact } from '@/lib/projectFileArtifact';
+import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob, fetchWorkshopProjectFile } from '@/lib/workshopApi';
+import { storeArchitectureFlags } from '@/lib/storeArchitecture';
 import {
   canvasResolutionsMatch,
   isValidCanvasResolution,
@@ -107,8 +110,7 @@ interface PendingProjectLoad {
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
 function downloadProjectFile(config: WatchFaceConfig, backgroundImage: string | null): void {
-  const json = JSON.stringify({ version: 1, backgroundImage, watchFaceConfig: config }, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
+  const blob = createProjectFileBlob(createProjectFileArtifact(config, backgroundImage));
   const url = URL.createObjectURL(blob);
   const date = new Date().toISOString().slice(0, 10);
   const safeName = (config.name || 'watchface').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -2711,6 +2713,10 @@ function StudioApp() {
   const [republishCatalog, setRepublishCatalog] = useState<Array<{ id: string; name: string }>>([]);
   const [republishTargetId, setRepublishTargetId] = useState('');
   const [republishMode, setRepublishMode] = useState<'KEEP_QR' | 'REGENERATE_ALL'>('REGENERATE_ALL');
+  const [workshopProjectId, setWorkshopProjectId] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('workshopProject'),
+  );
+  const workshopDeepLinkLoadedRef = useRef(false);
   const [latestUploadResult, setLatestUploadResult] = useState<StudioUploadResult | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
 const [watchModels, setWatchModels] = useState<Record<string, { name?: string; specGroup?: string }>>({});
@@ -3275,11 +3281,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       if (!file) return;
       try {
         const text = await file.text();
-        const parsed = JSON.parse(text);
-        // Support both wrapped format { version, backgroundImage, watchFaceConfig } and bare WatchFaceConfig
-        const config: WatchFaceConfig = parsed.watchFaceConfig ?? parsed;
-        const bgImage: string | null = parsed.backgroundImage ?? null;
-        if (!config || !config.elements) throw new Error('Invalid project file');
+        const parsed = parseProjectFileArtifact(text);
+        const config = parsed.watchFaceConfig;
+        const bgImage = parsed.backgroundImage;
         const requestedName = watchFaceName?.trim();
         const effectiveName = requestedName || config.name || file.name;
         const normalizedConfig = withNormalizedPointerEffects({
@@ -3299,6 +3303,34 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     input.click();
   }, [requestProjectLoad, watchFaceName]);
 
+  useEffect(() => {
+    if (!storeArchitectureFlags.workshop || workshopDeepLinkLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get('workshopProject');
+    const buildId = params.get('build');
+    if (!projectId || !buildId) return;
+    workshopDeepLinkLoadedRef.current = true;
+
+    void (async () => {
+      try {
+        const text = await fetchWorkshopProjectFile(projectId, buildId);
+        const artifact = parseProjectFileArtifact(text);
+        if (!window.confirm(`Open ${artifact.watchFaceConfig.name || buildId}? This replaces the current Studio canvas.`)) return;
+        await requestProjectLoad({
+          config: withNormalizedPointerEffects(artifact.watchFaceConfig),
+          backgroundImage: artifact.backgroundImage,
+          fileName: artifact.watchFaceConfig.name || buildId,
+          restoreBackground: true,
+        });
+        setWorkshopProjectId(projectId);
+        toast.success(`Workshop ${buildId} opened.`);
+      } catch (error) {
+        workshopDeepLinkLoadedRef.current = false;
+        toast.error(error instanceof Error ? error.message : 'Failed to open Workshop build');
+      }
+    })();
+  }, [requestProjectLoad]);
+
   // Load widgets-only from a .fvwf file — keeps current background image intact
   const handleLoadWidgetsOnly = useCallback(() => {
     const input = document.createElement('input');
@@ -3309,9 +3341,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       if (!file) return;
       try {
         const text = await file.text();
-        const parsed = JSON.parse(text);
-        const config: WatchFaceConfig = parsed.watchFaceConfig ?? parsed;
-        if (!config || !config.elements) throw new Error('Invalid project file');
+        const config = parseProjectFileArtifact(text).watchFaceConfig;
         // Patch Background element src to match current state.backgroundImage so canvas stays consistent
         const currentBg = state.backgroundImage;
         const patchedElements = config.elements.map((el: WatchFaceElement) =>
@@ -3409,6 +3439,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     console.log('[App] All checks passed, starting generation...');
     console.log('[App] Background file:', state.backgroundFile.name, 'size:', state.backgroundFile.size);
 
+    let workshopProjectBlob: Blob | null = null;
     // Save project file NOW — before any mutations to element src/assetFilename fields.
     // After export pipeline runs, el.src is mutated to filenames (not data: URLs) and the
     // saved JSON would be unloadable. Saving here captures the pristine config.
@@ -3420,7 +3451,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         aodSolidColor,
         aodBackgroundTransform,
       });
-      downloadProjectFile(withNormalizedPointerEffects(projectFileConfig), state.backgroundImage);
+      const normalizedProjectConfig = withNormalizedPointerEffects(projectFileConfig);
+      workshopProjectBlob = createProjectFileBlob(createProjectFileArtifact(normalizedProjectConfig, state.backgroundImage));
+      downloadProjectFile(normalizedProjectConfig, state.backgroundImage);
     } catch (e) {
       console.warn('[App] Project file download failed:', e);
     }
@@ -4197,6 +4230,39 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
       dispatch(actions.setZpkBlob(zpkResult.blob));
 
+      const derivedSpecGroup = Object.values(watchModels).find(
+        m => m.name === configForBuild.watchModel
+      )?.specGroup ?? null;
+
+      if (storeArchitectureFlags.workshop) {
+        if (!workshopProjectBlob) throw new Error('Workshop project snapshot was not created');
+        dispatch(actions.setLoadingMessage('Saving Workshop build...'));
+        let activeProjectId = workshopProjectId;
+        if (!activeProjectId) {
+          const project = await createWorkshopProject({
+            workingTitle: configForBuild.name,
+            tags: [],
+          });
+          activeProjectId = project.projectId;
+          setWorkshopProjectId(activeProjectId);
+        }
+        const build = await createWorkshopBuild({
+          projectId: activeProjectId,
+          workshopLabel: configForBuild.name || `Watch test ${new Date().toISOString().slice(0, 10)}`,
+          resolution: configForBuild.resolution,
+          specGroup: derivedSpecGroup ?? undefined,
+          fvwf: workshopProjectBlob,
+          zpk: zpkResult.blob,
+          mainPreview: previewDataUrl?.startsWith('data:') ? dataUrlToBlob(previewDataUrl) : undefined,
+          aodPreview: aodPreviewDataUrl?.startsWith('data:') ? dataUrlToBlob(aodPreviewDataUrl) : undefined,
+        });
+        dispatch(actions.setGithubUrl(''));
+        dispatch(actions.setQrCode(null));
+        dispatch(actions.setStep('success'));
+        toast.success(`Watch test saved as Build ${String(build.buildNumber).padStart(3, '0')}.`);
+        return;
+      }
+
       // Upload to Firebase storage through backend bridge.
       dispatch(actions.setLoadingMessage('Uploading to Firebase...'));
 
@@ -4219,9 +4285,6 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
       // Build source.json for safe future regeneration
       // Derive specGroup from watchModel so adminPatchSpecGroups batch can repair catalog entries.
-      const derivedSpecGroup = Object.values(watchModels).find(
-        m => m.name === configForBuild.watchModel
-      )?.specGroup ?? null;
       const sourceJson = buildSourceJson(withNormalizedPointerEffects(configForBuild), derivedSpecGroup);
 
       const uploadResult = await uploadStudioArtifactsToFirebase({
@@ -4289,7 +4352,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId]);
+  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId]);
 
   const handleGenerateClick = useCallback(() => {
     if (state.currentStep === 'generating') {
@@ -5254,7 +5317,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                 className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"
               >
                 <Sparkles className="h-5 w-5 mr-2" />
-                Generate ZPK & Upload
+                {storeArchitectureFlags.workshop ? 'Create Watch Test' : 'Generate ZPK & Upload'}
               </Button>
               <Button
                 onClick={runPointerParityVerification}
@@ -5343,7 +5406,12 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             )}
 
             {/* Publish flow */}
-            {publishedEntry ? (
+            {storeArchitectureFlags.workshop ? (
+              <div className="rounded-xl border border-cyan-800 bg-cyan-950/30 px-4 py-3">
+                <p className="text-cyan-300 text-sm font-medium">Workshop build saved</p>
+                <p className="text-zinc-400 text-xs mt-1">Review, reopen, and approve test builds from Admin. Store information is not required during testing.</p>
+              </div>
+            ) : publishedEntry ? (
               <div className="rounded-xl border border-green-700 bg-green-950/40 px-4 py-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-green-400 text-sm font-medium">Published to store ✓</p>

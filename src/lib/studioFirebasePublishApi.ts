@@ -9,7 +9,7 @@ const PUBLIC_BASE_URL =
   (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
   (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
 
-function requireAdminBaseUrl(): string {
+export function requireAdminBaseUrl(): string {
   if (!ADMIN_BASE_URL) {
     throw new Error('Backend bridge is required. Missing VITE_FIREBASE_FUNCTIONS_BASE_URL.');
   }
@@ -23,7 +23,7 @@ function requirePublicBaseUrl(): string {
   return PUBLIC_BASE_URL.replace(/\/$/, '');
 }
 
-async function adminFetch<T>(endpoint: string, init: RequestInit): Promise<T> {
+export async function adminFetch<T>(endpoint: string, init: RequestInit): Promise<T> {
   const token = await getFirebaseIdToken();
   const base = requireAdminBaseUrl();
 

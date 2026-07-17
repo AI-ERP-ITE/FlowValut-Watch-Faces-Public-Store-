@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Wrench, Database, Star, Trash2 } from 'lucide-react';
+import { Wrench, Database, Star, Trash2, FlaskConical, FolderOpen, Download, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPanel } from '@/components/AdminPanel';
 import {
@@ -17,6 +17,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { isFirebaseAuthConfigured } from '@/lib/firebaseAuthClient';
 import type { CatalogEntry, SpecGroup } from '@/context/CatalogContext';
+import { storeArchitectureFlags } from '@/lib/storeArchitecture';
+import {
+  approveWorkshopBuild,
+  fetchWorkshopProjects,
+  getWorkshopArtifactUrl,
+  type WorkshopProjectSummary,
+} from '@/lib/workshopApi';
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -40,8 +47,52 @@ export function AdminOpsPage() {
   const [updatingCatalogId, setUpdatingCatalogId] = useState<string | null>(null);
   const [deletingCatalogId, setDeletingCatalogId] = useState<string | null>(null);
   const [catalogFilter, setCatalogFilter] = useState<'ALL' | 'ENABLED' | 'OFFLINE'>('ALL');
+  const [workshopProjects, setWorkshopProjects] = useState<WorkshopProjectSummary[]>([]);
+  const [loadingWorkshop, setLoadingWorkshop] = useState(false);
+  const [workshopBusyId, setWorkshopBusyId] = useState<string | null>(null);
 
   const canRun = Boolean(backendMode);
+
+  async function loadWorkshop() {
+    if (!canRun) return;
+    setLoadingWorkshop(true);
+    try {
+      setWorkshopProjects(await fetchWorkshopProjects());
+      toast.success('Workshop projects loaded.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load Workshop');
+    } finally {
+      setLoadingWorkshop(false);
+    }
+  }
+
+  async function downloadWorkshopArtifact(projectId: string, buildId: string, kind: 'fvwf' | 'zpk') {
+    setWorkshopBusyId(buildId);
+    try {
+      const url = await getWorkshopArtifactUrl({ projectId, buildId, kind });
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to open Workshop artifact');
+    } finally {
+      setWorkshopBusyId(null);
+    }
+  }
+
+  async function approveBuild(projectId: string, buildId: string) {
+    setWorkshopBusyId(buildId);
+    try {
+      await approveWorkshopBuild(projectId, buildId);
+      setWorkshopProjects((projects) => projects.map((project) => ({
+        ...project,
+        builds: project.builds.map((build) => build.id === buildId ? { ...build, state: 'APPROVED' } : build),
+      })));
+      toast.success(`${buildId} approved.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to approve build');
+    } finally {
+      setWorkshopBusyId(null);
+    }
+  }
 
   async function loadCatalogData() {
     if (!canRun) return;
@@ -228,6 +279,64 @@ export function AdminOpsPage() {
             ? 'Firebase-backed admin mode active. All operations run through authenticated Firebase endpoints.'
             : 'Firebase Auth is not configured for this build.'}
         </div>
+
+        {storeArchitectureFlags.workshop && (
+          <div className="mt-6 rounded-xl border border-cyan-900/70 bg-[#0d1117] p-4 space-y-3">
+            <div className="flex items-center gap-2 text-[#dce3ee] text-sm font-medium">
+              <FlaskConical className="h-4 w-4 text-cyan-400" />
+              Workshop Projects
+            </div>
+            <p className="text-xs text-[#8f9aac]">
+              Exact editable FVWF snapshots paired with the exact ZPK installed for physical-watch testing. Store metadata is not required here.
+            </p>
+            <Button onClick={loadWorkshop} disabled={!canRun || loadingWorkshop} variant="outline" className="h-10 border-cyan-900 text-cyan-200 hover:bg-cyan-950/40">
+              <FolderOpen className="h-4 w-4 mr-2" />
+              {loadingWorkshop ? 'Loading Workshop...' : 'Load Workshop'}
+            </Button>
+            <div className="space-y-3">
+              {workshopProjects.map((project) => (
+                <div key={project.id} className="rounded-lg border border-[#2c3340] bg-[#10151c] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-[#e9edf5]">{project.workingTitle}</p>
+                      <p className="text-[10px] font-mono text-[#6b7a8d]">{project.id} · {project.buildCount} builds · {(project.storageBytes / 1024 / 1024).toFixed(1)} MB</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {project.builds.map((build) => {
+                      const busy = workshopBusyId === build.id;
+                      return (
+                        <div key={build.id} className="flex flex-wrap items-center gap-2 rounded border border-[#252d38] px-3 py-2 text-xs">
+                          <div className="min-w-[180px] flex-1">
+                            <p className="text-[#e9edf5]">Build {String(build.buildNumber).padStart(3, '0')} · {build.workshopLabel}</p>
+                            <p className="text-[10px] text-[#738095]">{build.state} · {build.resolution.width}×{build.resolution.height} · {(build.storageBytes / 1024 / 1024).toFixed(1)} MB</p>
+                          </div>
+                          <a
+                            href={`${import.meta.env.BASE_URL}studio?workshopProject=${encodeURIComponent(project.id)}&build=${encodeURIComponent(build.id)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded border border-cyan-900 px-2 py-1 text-cyan-300 hover:bg-cyan-950/40"
+                          >
+                            Open in Studio
+                          </a>
+                          <Button onClick={() => downloadWorkshopArtifact(project.id, build.id, 'fvwf')} disabled={busy} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">
+                            <Download className="h-3.5 w-3.5 mr-1" /> FVWF
+                          </Button>
+                          <Button onClick={() => downloadWorkshopArtifact(project.id, build.id, 'zpk')} disabled={busy} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">
+                            <Download className="h-3.5 w-3.5 mr-1" /> Test ZPK
+                          </Button>
+                          <Button onClick={() => approveBuild(project.id, build.id)} disabled={busy || build.state === 'APPROVED'} variant="outline" className="h-8 border-emerald-900 text-emerald-300">
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">
           <div className="flex items-center gap-2 text-[#dce3ee] text-sm font-medium">
