@@ -8,16 +8,16 @@
 - [x] T004 Capture metadata-only repack and byte-parity requirements.
 - [x] T005 Capture storefront, Offer, entitlement, compatibility, and migration requirements.
 - [x] T006 Create traceability, data-model, lifecycle, tests, validation, migration, and deployment documents.
-- [ ] T007 Receive approval for Phase 1 runtime implementation.
+- [x] T007 Receive approval for Phase 1 runtime implementation.
 
 ## Phase 1 — Contracts and foundations
 
-- [ ] T010 Add shared domain types and runtime validation.
-- [ ] T011 Add collection/storage path constants and canonical ID/code builders.
-- [ ] T012 Add compatibility vocabulary for Devices versus Design Models.
-- [ ] T013 Add feature flags and legacy adapters with no production behavior change.
-- [ ] T014 Add focused type/validator/identifier tests.
-- [ ] T015 Commit Phase 1 separately and obtain Phase 2 approval.
+- [x] T010 Add shared domain types and runtime validation.
+- [x] T011 Add collection/storage path constants and canonical ID/code builders.
+- [x] T012 Add compatibility vocabulary for Devices versus Design Models.
+- [x] T013 Add feature flags and legacy adapters with no production behavior change.
+- [x] T014 Add focused type/validator/identifier tests.
+- [x] T015 Commit Phase 1 separately and obtain Phase 2 approval.
 
 ## Phase 2 — Workshop persistence
 
@@ -100,4 +100,3 @@
 - [ ] T096 Verify live public/private routes, hashes, assets, catalog, auth, checkout, and legacy compatibility.
 - [ ] T097 Record origin/public commits and deployed bundle hashes.
 - [ ] T098 Close Spec 122 only after every required live gate passes.
-
