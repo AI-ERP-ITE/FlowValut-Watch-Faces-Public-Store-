@@ -62,13 +62,13 @@
 
 ## Phase 6 — Public storefront
 
-- [ ] T060 Add Design Model storefront read model/API.
-- [ ] T061 Add Collection, Design Model, and Device routes.
-- [ ] T062 Add legacy face/model route resolution.
-- [ ] T063 Update cards to represent one Design Model.
-- [ ] T064 Add Variant/Edition/Offer selection and MAIN/AOD media behavior.
-- [ ] T065 Add compatibility and finished-timepiece messaging.
-- [ ] T066 Add public route/read-model/accessibility tests and obtain Phase 7 approval.
+- [x] T060 Add Design Model storefront read model/API.
+- [x] T061 Add Collection, Design Model, and Device routes.
+- [x] T062 Add legacy face/model route resolution.
+- [x] T063 Update cards to represent one Design Model.
+- [x] T064 Add Variant/Edition/Offer selection and MAIN/AOD media behavior.
+- [x] T065 Add compatibility and finished-timepiece messaging.
+- [x] T066 Add public route/read-model/accessibility tests and obtain Phase 7 approval.
 
 ## Phase 7 — Offers and fulfillment
 

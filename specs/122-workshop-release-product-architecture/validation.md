@@ -115,3 +115,16 @@ Spec 122 cannot be marked complete while any required migration, entitlement, de
 - Successful verification makes the package CURRENT, supersedes an older current package for the same SKU/target, promotes the Workshop Build, and activates the SKU/Offer.
 - `adminReleasePackage` reports `ACTIVE`, Node.js 20, `us-central1`.
 - Runtime commits: app `3fbbe709`; Firebase root `80935444`.
+
+## Phase 6 evidence — 2026-07-17
+
+- Focused Vitest suites: 2 files, 12 tests passed.
+- App TypeScript and Firebase Functions TypeScript passed.
+- Feature-flagged public provider exposes one card/page per Design Model with nested SKU Variant/Edition choices.
+- Collection, Design Model, and Device compatibility routes are registered; legacy face IDs resolve through mappings and fall back to the legacy product page when unmapped.
+- MAIN/AOD selection uses released package media; buttons expose `aria-pressed` and meaningful preview alternative text.
+- Offers and device compatibility resolve from the selected SKU, while device targets remain technical information rather than duplicated artistic products.
+- Homepage reports Unique Design Models and Sellable SKUs separately and uses finished-timepiece wording.
+- `publicStoreHierarchy` and `publicReleaseMedia` report `ACTIVE`, Node.js 20, `us-central1`.
+- Live `publicStoreHierarchy` smoke test returned HTTP 200 with the expected response shape. Counts are zero until the first Phase 5 release or Phase 8 migration creates live hierarchy records.
+- Runtime commits: app `19e14794`; Firebase root `cd8ad028`.
