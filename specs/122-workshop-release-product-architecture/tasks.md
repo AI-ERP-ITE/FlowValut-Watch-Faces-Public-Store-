@@ -42,13 +42,13 @@
 
 ## Phase 4 — Hierarchy and release wizard
 
-- [ ] T040 Add Design DNA, Collection, Design Model, Variant, Edition, SKU, Technical Variant, Revision, and Offer persistence.
-- [ ] T041 Add normalized duplicate/conflict checks.
-- [ ] T042 Add canonical customer-name and internal-code generation.
-- [ ] T043 Build one shared guided release wizard for Studio and Admin.
-- [ ] T044 Prevent direct enabling of incomplete builds.
-- [ ] T045 Support Save as Ready and Release to Store.
-- [ ] T046 Add hierarchy/wizard tests and obtain Phase 5 approval.
+- [x] T040 Add Design DNA, Collection, Design Model, Variant, Edition, SKU, Technical Variant, Revision, and Offer persistence.
+- [x] T041 Add normalized duplicate/conflict checks.
+- [x] T042 Add canonical customer-name and internal-code generation.
+- [x] T043 Build one shared guided release wizard for Studio and Admin.
+- [x] T044 Prevent direct enabling of incomplete builds.
+- [x] T045 Support Save as Ready and Release to Store.
+- [x] T046 Add hierarchy/wizard tests and obtain Phase 5 approval.
 
 ## Phase 5 — Metadata-only release repack
 

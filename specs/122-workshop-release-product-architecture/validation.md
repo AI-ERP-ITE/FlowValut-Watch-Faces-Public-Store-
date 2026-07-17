@@ -90,3 +90,15 @@ Spec 122 cannot be marked complete while any required migration, entitlement, de
 - Storage maintenance is dry-run only and reports managed bytes plus historical-path orphan candidates.
 - All six targeted lifecycle endpoints report `ACTIVE`, Node.js 20, `us-central1`.
 - Runtime commits: app `4c350add`; Firebase root `44729339`.
+
+## Phase 4 evidence — 2026-07-17
+
+- Focused Vitest suites: 5 files, 19 tests passed.
+- App TypeScript and Firebase Functions TypeScript passed.
+- Shared Release Wizard is mounted from both Studio and Admin.
+- Server persists Design DNA, Collection, Design Model, embedded Variant/Edition SKU snapshots, Technical Target, revisioned Technical Package, and Offer.
+- Server performs normalized hierarchy conflict checks and generates canonical customer names/internal codes.
+- Save as Ready creates a READY package; Release to Store creates a VALIDATING release request that cannot become live before Phase 5 parity verification.
+- Direct enablement of architecture-managed catalog records requires a CURRENT Technical Package.
+- `adminStoreHierarchy` and the updated `adminCatalogStatus` report `ACTIVE`, Node.js 20, `us-central1`.
+- Runtime commits: app `d2515a70`; Firebase root `7166a821`.
