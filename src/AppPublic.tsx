@@ -17,6 +17,12 @@ import { CopyrightPage } from '@/components/storefront/legal/CopyrightPage';
 import { SupportPage } from '@/components/storefront/legal/SupportPage';
 import { CookiesPage } from '@/components/storefront/legal/CookiesPage';
 import { LegalIndexPage } from '@/components/storefront/legal/LegalIndexPage';
+import { StoreReadModelProvider } from '@/context/StoreReadModelContext';
+import { storeArchitectureFlags } from '@/lib/storeArchitecture';
+import { DesignModelHomePage } from '@/components/storefront/DesignModelHomePage';
+import { CollectionPage } from '@/components/storefront/CollectionPage';
+import { DesignModelPage, LegacyFaceResolver } from '@/components/storefront/DesignModelPage';
+import { DeviceCompatibilityPage } from '@/components/storefront/DeviceCompatibilityPage';
 
 export default function AppPublic() {
   return (
@@ -26,14 +32,18 @@ export default function AppPublic() {
       <Route
         element={
           <CatalogProvider>
-            <StorefrontLayout />
+            <StoreReadModelProvider><StorefrontLayout /></StoreReadModelProvider>
           </CatalogProvider>
         }
       >
-        <Route index element={<HomePage />} />
+        <Route index element={storeArchitectureFlags.storefrontReadModel ? <DesignModelHomePage /> : <HomePage />} />
         <Route path="model/:slug" element={<ModelPage />} />
+        <Route path="collection/:slug" element={<CollectionPage />} />
+        <Route path="design/:slug" element={<DesignModelPage />} />
+        <Route path="device/:slug" element={<DeviceCompatibilityPage />} />
         <Route path="category/:slug" element={<CategoryPage />} />
-        <Route path="face/:id" element={<ProductPage />} />
+        <Route path="face/:id" element={storeArchitectureFlags.storefrontReadModel ? <LegacyFaceResolver /> : <ProductPage />} />
+        <Route path="legacy-face/:id" element={<ProductPage />} />
         <Route path="buy/:id" element={<BuyPage />} />
         <Route path="success/:id" element={<SuccessPage />} />
         <Route path="search" element={<SearchPage />} />
