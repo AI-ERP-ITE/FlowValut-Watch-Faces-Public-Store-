@@ -128,3 +128,17 @@ Spec 122 cannot be marked complete while any required migration, entitlement, de
 - `publicStoreHierarchy` and `publicReleaseMedia` report `ACTIVE`, Node.js 20, `us-central1`.
 - Live `publicStoreHierarchy` smoke test returned HTTP 200 with the expected response shape. Counts are zero until the first Phase 5 release or Phase 8 migration creates live hierarchy records.
 - Runtime commits: app `19e14794`; Firebase root `cd8ad028`.
+
+## Phase 7 evidence — 2026-07-17
+
+- Firebase Functions TypeScript and 5 focused pricing/fulfillment tests passed from the clean deployment snapshot.
+- App TypeScript and Vite production build passed; the Offer checkout UI remains behind `VITE_STORE_OFFER_CHECKOUT_ENABLED`.
+- Checkout loads the ACTIVE Offer and LIVE included SKUs server-side and records immutable price, Offer, SKU-entitlement, and selected-device snapshots.
+- Paid confirmation creates idempotent per-SKU entitlements; zero-price Offers receive the same snapshots and entitlements without a payment round trip.
+- Fulfillment maps the selected Device to its Technical Target and requires exactly one CURRENT released package for every entitled SKU.
+- BUNDLE Offers return every included SKU package, preserving Complete Color Collection semantics and failing closed for missing or ambiguous current revisions.
+- Legacy `createOrderOrCheckout`, `download`, `downloadByToken`, order parsing, and `zpk/<legacy-id>.zpk` resolution remain unchanged.
+- Targeted deployment created `createOfferCheckout` and `fulfillEntitlement` and updated `paddleWebhook`; both new endpoints appear in the active Node.js 20 `us-central1` function inventory.
+- Live negative smoke tests returned HTTP 400 for missing Offer ID and missing entitlement token, confirming request validation without creating an order.
+- Runtime commits: app `43abb0b6`; Firebase root `3523d6fe`.
+- Public/private Pages were intentionally not deployed; storefront activation remains feature-flagged and final Pages deployment remains gated by Phase 9.

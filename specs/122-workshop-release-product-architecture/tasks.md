@@ -72,13 +72,13 @@
 
 ## Phase 7 — Offers and fulfillment
 
-- [ ] T070 Add server-authoritative Offer checkout.
-- [ ] T071 Add immutable order and SKU-entitlement snapshots.
-- [ ] T072 Add Device-to-current-Technical-Package fulfillment resolution.
-- [ ] T073 Add Complete Color Collection fulfillment.
-- [ ] T074 Preserve legacy order/download compatibility.
-- [ ] T075 Add pricing, entitlement, revision, and deletion-protection tests.
-- [ ] T076 Deploy/verify purchase endpoints and obtain Phase 8 approval.
+- [x] T070 Add server-authoritative Offer checkout.
+- [x] T071 Add immutable order and SKU-entitlement snapshots.
+- [x] T072 Add Device-to-current-Technical-Package fulfillment resolution.
+- [x] T073 Add Complete Color Collection fulfillment.
+- [x] T074 Preserve legacy order/download compatibility.
+- [x] T075 Add pricing, entitlement, revision, and deletion-protection tests.
+- [x] T076 Deploy/verify purchase endpoints and obtain Phase 8 approval.
 
 ## Phase 8 — Migration
 
