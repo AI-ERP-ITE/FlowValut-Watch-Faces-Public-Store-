@@ -21,14 +21,14 @@
 
 ## Phase 2 — Workshop persistence
 
-- [ ] T020 Reuse/export exact `.fvwf` serialization as an in-memory artifact.
-- [ ] T021 Add authenticated Workshop project/build endpoints and binary upload flow.
-- [ ] T022 Save exact FVWF, test ZPK, MAIN/AOD previews, metadata, and parent build.
-- [ ] T023 Add Workshop Project creation and numbered immutable builds.
-- [ ] T024 Rename the test action to Create Watch Test without requiring store fields.
-- [ ] T025 Add Open in Studio, Download FVWF, Download Test ZPK, notes, and approval.
-- [ ] T026 Add Workshop persistence/import regression tests.
-- [ ] T027 Deploy/verify targeted Workshop endpoints and obtain Phase 3 approval.
+- [x] T020 Reuse/export exact `.fvwf` serialization as an in-memory artifact.
+- [x] T021 Add authenticated Workshop project/build endpoints and binary upload flow.
+- [x] T022 Save exact FVWF, test ZPK, MAIN/AOD previews, metadata, and parent build.
+- [x] T023 Add Workshop Project creation and numbered immutable builds.
+- [x] T024 Rename the test action to Create Watch Test without requiring store fields.
+- [x] T025 Add Open in Studio, Download FVWF, Download Test ZPK, notes, and approval.
+- [x] T026 Add Workshop persistence/import regression tests.
+- [x] T027 Deploy/verify targeted Workshop endpoints and obtain Phase 3 approval.
 
 ## Phase 3 — Lifecycle and cleanup
 

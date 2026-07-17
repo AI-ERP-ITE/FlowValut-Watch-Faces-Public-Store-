@@ -69,3 +69,13 @@ npm run build
 
 Spec 122 cannot be marked complete while any required migration, entitlement, deletion-safety, ZPK-parity, security, deployment, or live-compatibility gate remains unresolved.
 
+## Phase 2 evidence — 2026-07-17
+
+- Focused Vitest suites: 3 files, 12 tests passed.
+- App TypeScript: `npx tsc --noEmit` passed.
+- Firebase Functions TypeScript: `npm run build` passed.
+- Private Vite production build with the Workshop flag enabled passed.
+- Targeted Firebase deployment created the six Workshop endpoints only.
+- `functions:list --project zeppfaceloader-b0b106e9` reports all six endpoints `ACTIVE`, Node.js 20, `us-central1`.
+- Runtime commits: app `6dcfa975`; Firebase root `0fd0dfe5`.
+- Public/private Pages were intentionally not deployed in this phase; final Pages deployment remains gated by the later rollout phase.
