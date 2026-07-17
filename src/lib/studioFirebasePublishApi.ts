@@ -235,11 +235,32 @@ export async function setCatalogStatusInFirebase(input: {
 
 export async function deleteZpkEntryInFirebase(input: {
   watchfaceId: string;
+  confirmation: string;
 }): Promise<{ ok: boolean; watchfaceId: string }> {
   return adminFetch<{ ok: boolean; watchfaceId: string }>('adminCatalogDelete', {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+export async function setCatalogLifecycleInFirebase(input: {
+  watchfaceId: string;
+  action: 'TRASH' | 'RESTORE';
+}): Promise<{ ok: boolean; watchfaceId: string; status: 'OFFLINE' | 'TRASHED' }> {
+  return adminFetch('adminCatalogLifecycle', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export interface StorageMaintenanceReport {
+  mode: 'DRY_RUN';
+  totalBytes: number;
+  referencedObjects: number;
+  managedObjects: number;
+  orphanBytes: number;
+  orphanCandidates: Array<{ path: string; bytes: number }>;
+}
+
+export async function fetchStorageMaintenanceReport(): Promise<StorageMaintenanceReport> {
+  return adminFetch<StorageMaintenanceReport>('adminStorageMaintenance', { method: 'GET' });
 }
 
 export async function fetchParametricLibraryFromFirebase(): Promise<Array<Record<string, unknown>>> {

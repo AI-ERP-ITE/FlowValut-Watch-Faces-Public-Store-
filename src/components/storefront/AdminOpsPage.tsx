@@ -12,6 +12,9 @@ import {
   patchCatalogSpecGroupsInFirebase,
   setCatalogStatusInFirebase,
   deleteZpkEntryInFirebase,
+  fetchStorageMaintenanceReport,
+  setCatalogLifecycleInFirebase,
+  type StorageMaintenanceReport,
   writeStorefrontConfigToFirebase,
 } from '@/lib/studioFirebasePublishApi';
 import { Button } from '@/components/ui/button';
@@ -23,7 +26,9 @@ import {
   fetchWorkshopProjects,
   getWorkshopArtifactUrl,
   type WorkshopProjectSummary,
+  setWorkshopBuildLifecycle,
 } from '@/lib/workshopApi';
+import { canRestoreCatalog, canTrashCatalog, formatStorageBytes, permanentDeleteConfirmation, type CatalogLifecycleStatus } from '@/lib/catalogLifecycle';
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -46,7 +51,9 @@ export function AdminOpsPage() {
   const [loadingAdminCatalog, setLoadingAdminCatalog] = useState(false);
   const [updatingCatalogId, setUpdatingCatalogId] = useState<string | null>(null);
   const [deletingCatalogId, setDeletingCatalogId] = useState<string | null>(null);
-  const [catalogFilter, setCatalogFilter] = useState<'ALL' | 'ENABLED' | 'OFFLINE'>('ALL');
+  const [catalogFilter, setCatalogFilter] = useState<'ALL' | CatalogLifecycleStatus>('ALL');
+  const [maintenanceReport, setMaintenanceReport] = useState<StorageMaintenanceReport | null>(null);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(false);
   const [workshopProjects, setWorkshopProjects] = useState<WorkshopProjectSummary[]>([]);
   const [loadingWorkshop, setLoadingWorkshop] = useState(false);
   const [workshopBusyId, setWorkshopBusyId] = useState<string | null>(null);
@@ -89,6 +96,19 @@ export function AdminOpsPage() {
       toast.success(`${buildId} approved.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to approve build');
+    } finally {
+      setWorkshopBusyId(null);
+    }
+  }
+
+  async function changeWorkshopLifecycle(projectId: string, buildId: string, action: 'TRASH' | 'RESTORE') {
+    setWorkshopBusyId(buildId);
+    try {
+      const result = await setWorkshopBuildLifecycle(projectId, buildId, action);
+      setWorkshopProjects((projects) => projects.map((project) => ({ ...project, builds: project.builds.map((build) => build.id === buildId ? { ...build, state: result.state } : build) })));
+      toast.success(`${buildId} ${action === 'TRASH' ? 'moved to Trash' : 'restored'}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Workshop lifecycle update failed');
     } finally {
       setWorkshopBusyId(null);
     }
@@ -218,23 +238,49 @@ export function AdminOpsPage() {
     }
   }
 
-  async function deleteZpkEntry(watchfaceId: string, currentStatus: 'ENABLED' | 'OFFLINE') {
+  async function changeCatalogLifecycle(watchfaceId: string, action: 'TRASH' | 'RESTORE') {
+    setDeletingCatalogId(watchfaceId);
+    try {
+      const result = await setCatalogLifecycleInFirebase({ watchfaceId, action });
+      setAdminCatalog((prev) => prev.map((entry) => entry.id === watchfaceId ? { ...entry, storeStatus: result.status, published: false } : entry));
+      toast.success(`${watchfaceId} ${action === 'TRASH' ? 'moved to Trash' : 'restored Offline'}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Lifecycle update failed');
+    } finally {
+      setDeletingCatalogId(null);
+    }
+  }
+
+  async function deleteZpkEntry(watchfaceId: string, currentStatus: CatalogLifecycleStatus) {
     if (!canRun) return;
-    if (currentStatus !== 'OFFLINE') {
-      toast.error('Set the watchface to Offline before deleting.');
+    if (currentStatus !== 'TRASHED') {
+      toast.error('Move the watchface to Trash before deleting permanently.');
       return;
     }
-    if (!window.confirm(`Delete "${watchfaceId}" permanently? This cannot be undone.`)) return;
+    const required = permanentDeleteConfirmation(watchfaceId);
+    if (window.prompt(`Permanent deletion cannot be undone. Type: ${required}`) !== required) return;
 
     setDeletingCatalogId(watchfaceId);
     try {
-      await deleteZpkEntryInFirebase({ watchfaceId });
+      await deleteZpkEntryInFirebase({ watchfaceId, confirmation: required });
       setAdminCatalog((prev) => prev.filter((entry) => entry.id !== watchfaceId));
       toast.success(`${watchfaceId} deleted.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to delete entry');
     } finally {
       setDeletingCatalogId(null);
+    }
+  }
+
+  async function runStorageMaintenance() {
+    setLoadingMaintenance(true);
+    try {
+      setMaintenanceReport(await fetchStorageMaintenanceReport());
+      toast.success('Storage dry-run completed. Nothing was deleted.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Storage scan failed');
+    } finally {
+      setLoadingMaintenance(false);
     }
   }
 
@@ -328,6 +374,11 @@ export function AdminOpsPage() {
                           <Button onClick={() => approveBuild(project.id, build.id)} disabled={busy || build.state === 'APPROVED'} variant="outline" className="h-8 border-emerald-900 text-emerald-300">
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
                           </Button>
+                          {build.state === 'TRASHED' ? (
+                            <Button onClick={() => changeWorkshopLifecycle(project.id, build.id, 'RESTORE')} disabled={busy} variant="outline" className="h-8 border-amber-800 text-amber-300">Restore</Button>
+                          ) : (
+                            <Button onClick={() => changeWorkshopLifecycle(project.id, build.id, 'TRASH')} disabled={busy || build.state === 'PROMOTED'} variant="outline" className="h-8 border-red-900 text-red-400">Trash</Button>
+                          )}
                         </div>
                       );
                     })}
@@ -437,12 +488,13 @@ export function AdminOpsPage() {
 
             <select
               value={catalogFilter}
-              onChange={(e) => setCatalogFilter(e.target.value as 'ALL' | 'ENABLED' | 'OFFLINE')}
+              onChange={(e) => setCatalogFilter(e.target.value as 'ALL' | CatalogLifecycleStatus)}
               className="rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
             >
               <option value="ALL">All statuses</option>
               <option value="ENABLED">Enabled only</option>
               <option value="OFFLINE">Offline only</option>
+              <option value="TRASHED">Trash only</option>
             </select>
           </div>
 
@@ -479,14 +531,14 @@ export function AdminOpsPage() {
                           <div className="text-[10px] text-[#6b7a8d] font-mono">{entry.id}</div>
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`rounded px-2 py-0.5 ${status === 'ENABLED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                          <span className={`rounded px-2 py-0.5 ${status === 'ENABLED' ? 'bg-emerald-500/20 text-emerald-300' : status === 'TRASHED' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>
                             {status}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right space-x-2">
                           <Button
                             onClick={() => setCatalogStatus(entry.id, 'ENABLED')}
-                            disabled={!canRun || rowBusy || status === 'ENABLED'}
+                            disabled={!canRun || rowBusy || status === 'ENABLED' || status === 'TRASHED'}
                             variant="outline"
                             className="h-8 border-[#345045] text-[#ccf2de] hover:bg-[#20382f]"
                           >
@@ -494,21 +546,26 @@ export function AdminOpsPage() {
                           </Button>
                           <Button
                             onClick={() => setCatalogStatus(entry.id, 'OFFLINE')}
-                            disabled={!canRun || rowBusy || status === 'OFFLINE'}
+                            disabled={!canRun || rowBusy || status === 'OFFLINE' || status === 'TRASHED'}
                             variant="outline"
                             className="h-8 border-[#5a4631] text-[#f5dfc2] hover:bg-[#3a2c1f]"
                           >
                             Set Offline
                           </Button>
+                          {status === 'TRASHED' ? (
+                            <Button onClick={() => changeCatalogLifecycle(entry.id, 'RESTORE')} disabled={!canRun || rowBusy} variant="outline" className="h-8 border-amber-800 text-amber-300">Restore</Button>
+                          ) : (
+                            <Button onClick={() => changeCatalogLifecycle(entry.id, 'TRASH')} disabled={!canRun || rowBusy || !canTrashCatalog(status)} variant="outline" className="h-8 border-red-900 text-red-300">Trash</Button>
+                          )}
                           <Button
                             onClick={() => deleteZpkEntry(entry.id, status)}
-                            disabled={!canRun || rowBusy || status !== 'OFFLINE'}
+                            disabled={!canRun || rowBusy || !canRestoreCatalog(status)}
                             variant="outline"
-                            title={status !== 'OFFLINE' ? 'Set to Offline before deleting' : 'Delete permanently'}
+                            title={status !== 'TRASHED' ? 'Move to Trash before permanent deletion' : 'Delete permanently'}
                             className="h-8 border-red-900 text-red-400 hover:bg-red-950 disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-1" />
-                            Delete
+                            Delete Permanently
                           </Button>
                         </td>
                       </tr>
@@ -519,6 +576,19 @@ export function AdminOpsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#2f3642] bg-[#11151b] p-6 space-y-3">
+        <h2 className="text-lg font-semibold text-[#e9edf5]">Storage Maintenance</h2>
+        <p className="text-sm text-[#9ba6b8]">Dry-run scan across current and historical managed paths. It reports possible orphans and never deletes automatically.</p>
+        <Button onClick={runStorageMaintenance} disabled={!canRun || loadingMaintenance} variant="outline" className="border-[#3b4d68] text-[#ecf2ff]">{loadingMaintenance ? 'Scanning...' : 'Scan Storage Usage'}</Button>
+        {maintenanceReport && (
+          <div className="text-xs text-[#aeb9c9] space-y-1">
+            <p>{maintenanceReport.managedObjects} managed objects · {formatStorageBytes(maintenanceReport.totalBytes)}</p>
+            <p>{maintenanceReport.orphanCandidates.length} possible orphans · {formatStorageBytes(maintenanceReport.orphanBytes)}</p>
+            <div className="max-h-36 overflow-auto font-mono text-[10px] text-[#738095]">{maintenanceReport.orphanCandidates.map((item) => <div key={item.path}>{item.path} · {formatStorageBytes(item.bytes)}</div>)}</div>
+          </div>
+        )}
       </div>
 
       {canRun && (

@@ -150,3 +150,9 @@ export async function approveWorkshopBuild(projectId: string, buildId: string): 
   });
 }
 
+export async function setWorkshopBuildLifecycle(projectId: string, buildId: string, action: 'TRASH' | 'RESTORE'): Promise<{ state: WorkshopBuildSummary['state'] }> {
+  return adminFetch('adminWorkshopBuildLifecycle', {
+    method: 'POST',
+    body: JSON.stringify({ projectId, buildId, action }),
+  });
+}

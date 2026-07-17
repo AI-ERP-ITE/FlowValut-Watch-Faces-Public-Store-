@@ -21,7 +21,7 @@ export interface CatalogEntry {
   qrPath: string;
   sourcePath?: string;
   published?: boolean;
-  storeStatus?: 'ENABLED' | 'OFFLINE';
+  storeStatus?: 'ENABLED' | 'OFFLINE' | 'TRASHED';
 }
 
 export interface ModelEntry {
