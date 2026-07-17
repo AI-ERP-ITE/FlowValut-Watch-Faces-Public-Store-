@@ -7,6 +7,7 @@ import { CategoryPage } from '@/components/storefront/CategoryPage';
 import { ProductPage } from '@/components/storefront/ProductPage';
 import { SearchPage } from '@/components/storefront/SearchPage';
 import { BuyPage } from '@/components/storefront/BuyPage';
+import { OfferBuyPage } from '@/components/storefront/OfferBuyPage';
 import { SuccessPage } from '@/components/storefront/SuccessPage';
 import { TermsPage } from '@/components/storefront/legal/TermsPage';
 import { PrivacyPage } from '@/components/storefront/legal/PrivacyPage';
@@ -44,7 +45,7 @@ export default function AppPublic() {
         <Route path="category/:slug" element={<CategoryPage />} />
         <Route path="face/:id" element={storeArchitectureFlags.storefrontReadModel ? <LegacyFaceResolver /> : <ProductPage />} />
         <Route path="legacy-face/:id" element={<ProductPage />} />
-        <Route path="buy/:id" element={<BuyPage />} />
+        <Route path="buy/:id" element={storeArchitectureFlags.offerCheckout ? <OfferBuyPage /> : <BuyPage />} />
         <Route path="success/:id" element={<SuccessPage />} />
         <Route path="search" element={<SearchPage />} />
 

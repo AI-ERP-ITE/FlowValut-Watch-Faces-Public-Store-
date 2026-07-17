@@ -2,7 +2,7 @@ export interface PublicCollection { id: string; name: string; slug: string; desc
 export interface PublicDesignModel { id: string; collectionId: string; name: string; slug: string; description?: string; designStory?: string; categories: string[]; tags: string[] }
 export interface PublicSku { id: string; productModelId: string; canonicalName: string; variant: { id: string; name: string; code: string; swatch?: string; material?: string }; edition?: { id: string; name: string; code: string } | null }
 export interface PublicTechnicalPackage { id: string; skuId: string; technicalTargetId: string; revision: string; releasedZpkPath?: string; canonicalName: string; mainPreviewPath?: string | null; aodPreviewPath?: string | null }
-export interface PublicOffer { id: string; name: string; includedSkuIds: string[]; regularPrice: number; campaignPrice?: number | null; currency: 'USD' }
+export interface PublicOffer { id: string; type: 'SKU' | 'BUNDLE'; name: string; includedSkuIds: string[]; regularPrice: number; campaignPrice?: number | null; currency: 'USD' }
 export interface PublicTechnicalTarget { id: string; name?: string; specGroup?: string; resolution?: string; shape?: string }
 export interface PublicDevice { id: string; name: string; brand: string; technicalTargetId: string }
 export interface StoreReadModel { collections: PublicCollection[]; designModels: PublicDesignModel[]; skus: PublicSku[]; technicalPackages: PublicTechnicalPackage[]; offers: PublicOffer[]; technicalTargets: PublicTechnicalTarget[]; devices: PublicDevice[]; legacyMappings: Array<{ legacyWatchfaceId: string; productModelId: string; skuId: string }>; metrics: { uniqueDesignModels: number; sellableSkus: number } }

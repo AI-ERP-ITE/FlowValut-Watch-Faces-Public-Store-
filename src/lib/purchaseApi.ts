@@ -31,6 +31,17 @@ export interface DownloadResponse {
   signedUrl: string;
 }
 
+export interface OfferCheckoutResponse {
+  type: 'free' | 'paid'; provider: 'paddle'; orderId: string; token?: string | null;
+  paddleTransactionId?: string; checkoutUrl?: string | null; regenerationKey: string;
+  offerSnapshot: { offerId: string; name: string; type: 'SKU' | 'BUNDLE'; includedSkuIds: string[]; chargedPrice: number; currency: 'USD' };
+}
+
+export interface EntitlementFulfillmentResponse {
+  orderId: string; offerId: string; deviceId: string; technicalTargetId: string; completeColorCollection: boolean;
+  packages: Array<{ packageId: string; skuId: string; revision: string; canonicalName: string; signedUrl: string }>;
+}
+
 function requirePurchaseBaseUrl(): string {
   if (!PURCHASE_BASE_URL) {
     throw new Error('Purchase backend is not configured. Missing VITE_PURCHASE_FUNCTIONS_BASE_URL.');
@@ -101,6 +112,22 @@ export async function createPaddleCheckout(watchfaceId: string, email?: string):
   }
 
   throw new Error('Invalid checkout response from backend');
+}
+
+export async function createOfferCheckout(offerId: string, deviceId: string, email?: string): Promise<OfferCheckoutResponse> {
+  const response = await fetch(`${requirePurchaseBaseUrl()}/createOfferCheckout`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offerId, deviceId, ...(email ? { email } : {}) }) });
+  const payload = await response.json().catch(() => null) as OfferCheckoutResponse | { error?: string } | null;
+  if (!response.ok) throw new Error(payload && 'error' in payload && payload.error ? payload.error : `Offer checkout failed (${response.status})`);
+  if (!payload || !('type' in payload) || !('offerSnapshot' in payload)) throw new Error('Invalid Offer checkout response');
+  return payload;
+}
+
+export async function fulfillEntitlement(token: string, deviceId: string): Promise<EntitlementFulfillmentResponse> {
+  const response = await fetch(`${requirePurchaseBaseUrl()}/fulfillEntitlement`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, deviceId }) });
+  const payload = await response.json().catch(() => null) as EntitlementFulfillmentResponse | { error?: string } | null;
+  if (!response.ok) throw new Error(payload && 'error' in payload && payload.error ? payload.error : `Fulfillment failed (${response.status})`);
+  if (!payload || !('packages' in payload) || !Array.isArray(payload.packages)) throw new Error('Invalid fulfillment response');
+  return payload;
 }
 
 export async function getOrderStatus(orderId: string): Promise<OrderStatusResponse> {
