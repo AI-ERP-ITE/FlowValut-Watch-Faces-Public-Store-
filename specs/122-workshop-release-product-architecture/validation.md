@@ -79,3 +79,14 @@ Spec 122 cannot be marked complete while any required migration, entitlement, de
 - `functions:list --project zeppfaceloader-b0b106e9` reports all six endpoints `ACTIVE`, Node.js 20, `us-central1`.
 - Runtime commits: app `6dcfa975`; Firebase root `0fd0dfe5`.
 - Public/private Pages were intentionally not deployed in this phase; final Pages deployment remains gated by the later rollout phase.
+
+## Phase 3 evidence — 2026-07-17
+
+- Focused Vitest suites: 4 files, 16 tests passed.
+- App TypeScript: `npx tsc --noEmit` passed.
+- Firebase Functions TypeScript: `npm run build` passed.
+- Take Offline remains a visibility-only mutation; Trash and Restore are separate audited transitions.
+- Permanent deletion requires `DELETE <watchface-id>`, rejects order references, and retains Firestore on unexpected Storage failures.
+- Storage maintenance is dry-run only and reports managed bytes plus historical-path orphan candidates.
+- All six targeted lifecycle endpoints report `ACTIVE`, Node.js 20, `us-central1`.
+- Runtime commits: app `4c350add`; Firebase root `44729339`.

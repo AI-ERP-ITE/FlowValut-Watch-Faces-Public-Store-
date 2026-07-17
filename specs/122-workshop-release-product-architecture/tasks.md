@@ -32,13 +32,13 @@
 
 ## Phase 3 — Lifecycle and cleanup
 
-- [ ] T030 Preserve Take Offline as non-destructive store visibility.
-- [ ] T031 Add Trash and Restore metadata/state transitions.
-- [ ] T032 Make hard deletion fail closed on unexpected Storage errors.
-- [ ] T033 Add reference guards, typed confirmation, and deletion audit.
-- [ ] T034 Add historical-path orphan scan and storage-usage summaries.
-- [ ] T035 Add lifecycle, authorization, and partial-failure regression tests.
-- [ ] T036 Deploy/verify cleanup endpoints and obtain Phase 4 approval.
+- [x] T030 Preserve Take Offline as non-destructive store visibility.
+- [x] T031 Add Trash and Restore metadata/state transitions.
+- [x] T032 Make hard deletion fail closed on unexpected Storage errors.
+- [x] T033 Add reference guards, typed confirmation, and deletion audit.
+- [x] T034 Add historical-path orphan scan and storage-usage summaries.
+- [x] T035 Add lifecycle, authorization, and partial-failure regression tests.
+- [x] T036 Deploy/verify cleanup endpoints and obtain Phase 4 approval.
 
 ## Phase 4 — Hierarchy and release wizard
 
