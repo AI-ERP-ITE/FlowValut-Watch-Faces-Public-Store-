@@ -89,6 +89,7 @@ import { buildProjectFileConfig } from '@/lib/projectFileConfig';
 import { createProjectFileArtifact, createProjectFileBlob, parseProjectFileArtifact } from '@/lib/projectFileArtifact';
 import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob, fetchWorkshopProjectFile } from '@/lib/workshopApi';
 import { storeArchitectureFlags } from '@/lib/storeArchitecture';
+import { ReleaseWizard } from '@/components/ReleaseWizard';
 import {
   canvasResolutionsMatch,
   isValidCanvasResolution,
@@ -2716,6 +2717,9 @@ function StudioApp() {
   const [workshopProjectId, setWorkshopProjectId] = useState<string | null>(
     () => new URLSearchParams(window.location.search).get('workshopProject'),
   );
+  const [workshopBuildId, setWorkshopBuildId] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('build'),
+  );
   const workshopDeepLinkLoadedRef = useRef(false);
   const [latestUploadResult, setLatestUploadResult] = useState<StudioUploadResult | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
@@ -3323,6 +3327,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
           restoreBackground: true,
         });
         setWorkshopProjectId(projectId);
+        setWorkshopBuildId(buildId);
         toast.success(`Workshop ${buildId} opened.`);
       } catch (error) {
         workshopDeepLinkLoadedRef.current = false;
@@ -4256,6 +4261,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
           mainPreview: previewDataUrl?.startsWith('data:') ? dataUrlToBlob(previewDataUrl) : undefined,
           aodPreview: aodPreviewDataUrl?.startsWith('data:') ? dataUrlToBlob(aodPreviewDataUrl) : undefined,
         });
+        setWorkshopBuildId(build.buildId);
         dispatch(actions.setGithubUrl(''));
         dispatch(actions.setQrCode(null));
         dispatch(actions.setStep('success'));
@@ -5407,9 +5413,12 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
             {/* Publish flow */}
             {storeArchitectureFlags.workshop ? (
-              <div className="rounded-xl border border-cyan-800 bg-cyan-950/30 px-4 py-3">
-                <p className="text-cyan-300 text-sm font-medium">Workshop build saved</p>
-                <p className="text-zinc-400 text-xs mt-1">Review, reopen, and approve test builds from Admin. Store information is not required during testing.</p>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-cyan-800 bg-cyan-950/30 px-4 py-3">
+                  <p className="text-cyan-300 text-sm font-medium">Workshop build saved</p>
+                  <p className="text-zinc-400 text-xs mt-1">Review and approve physical-watch test builds before permanent store classification.</p>
+                </div>
+                {storeArchitectureFlags.productHierarchy && workshopProjectId && workshopBuildId && <ReleaseWizard projectId={workshopProjectId} buildId={workshopBuildId} />}
               </div>
             ) : publishedEntry ? (
               <div className="rounded-xl border border-green-700 bg-green-950/40 px-4 py-3 flex items-center justify-between gap-3">

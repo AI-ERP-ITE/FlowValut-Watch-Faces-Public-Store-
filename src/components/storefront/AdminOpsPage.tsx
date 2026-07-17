@@ -29,6 +29,7 @@ import {
   setWorkshopBuildLifecycle,
 } from '@/lib/workshopApi';
 import { canRestoreCatalog, canTrashCatalog, formatStorageBytes, permanentDeleteConfirmation, type CatalogLifecycleStatus } from '@/lib/catalogLifecycle';
+import { ReleaseWizard } from '@/components/ReleaseWizard';
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -57,6 +58,7 @@ export function AdminOpsPage() {
   const [workshopProjects, setWorkshopProjects] = useState<WorkshopProjectSummary[]>([]);
   const [loadingWorkshop, setLoadingWorkshop] = useState(false);
   const [workshopBusyId, setWorkshopBusyId] = useState<string | null>(null);
+  const [releaseBuild, setReleaseBuild] = useState<{ projectId: string; buildId: string; target?: string } | null>(null);
 
   const canRun = Boolean(backendMode);
 
@@ -379,10 +381,12 @@ export function AdminOpsPage() {
                           ) : (
                             <Button onClick={() => changeWorkshopLifecycle(project.id, build.id, 'TRASH')} disabled={busy || build.state === 'PROMOTED'} variant="outline" className="h-8 border-red-900 text-red-400">Trash</Button>
                           )}
+                          <Button onClick={() => setReleaseBuild({ projectId: project.id, buildId: build.id, target: build.specGroup })} disabled={busy || build.state !== 'APPROVED'} variant="outline" className="h-8 border-violet-900 text-violet-300">Prepare Release</Button>
                         </div>
                       );
                     })}
                   </div>
+                  {releaseBuild?.projectId === project.id && <div className="mt-3"><ReleaseWizard projectId={releaseBuild.projectId} buildId={releaseBuild.buildId} defaultTarget={releaseBuild.target} /></div>}
                 </div>
               ))}
             </div>
