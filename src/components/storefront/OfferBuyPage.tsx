@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
-import { compatibleDevices, skuOffer, skuPackages } from '@/lib/storeReadModel';
+import { compatibleDevices, resolveLegacySku, skuOffer, skuPackages } from '@/lib/storeReadModel';
 import { createOfferCheckout, fulfillEntitlement, getOrderStatus } from '@/lib/purchaseApi';
 
 export function OfferBuyPage() {
   const { id } = useParams<{ id: string }>(); const { data, loading, error } = useStoreReadModel();
-  const sku = data?.skus.find((item) => item.id === id); const offer = data && sku ? skuOffer(data, sku.id) : null;
+  const sku = data?.skus.find((item) => item.id === id) ?? (data && id ? resolveLegacySku(data, id) : null); const offer = data && sku ? skuOffer(data, sku.id) : null;
   const devices = data && sku ? compatibleDevices(data, sku.id) : []; const [deviceId, setDeviceId] = useState(''); const [email, setEmail] = useState('');
   const [agreed, setAgreed] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<Array<{ canonicalName: string; signedUrl: string }>>([]);

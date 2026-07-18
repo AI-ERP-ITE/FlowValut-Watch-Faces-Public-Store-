@@ -30,6 +30,7 @@ import {
 } from '@/lib/workshopApi';
 import { canRestoreCatalog, canTrashCatalog, formatStorageBytes, permanentDeleteConfirmation, type CatalogLifecycleStatus } from '@/lib/catalogLifecycle';
 import { ReleaseWizard } from '@/components/ReleaseWizard';
+import { applyLegacyMigration, dryRunLegacyMigration, fetchLegacyClassificationQueue, type LegacyClassificationEntry, type LegacyMigrationReport } from '@/lib/legacyMigrationApi';
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -59,6 +60,9 @@ export function AdminOpsPage() {
   const [loadingWorkshop, setLoadingWorkshop] = useState(false);
   const [workshopBusyId, setWorkshopBusyId] = useState<string | null>(null);
   const [releaseBuild, setReleaseBuild] = useState<{ projectId: string; buildId: string; target?: string } | null>(null);
+  const [migrationReport, setMigrationReport] = useState<LegacyMigrationReport | null>(null);
+  const [migrationQueue, setMigrationQueue] = useState<LegacyClassificationEntry[]>([]);
+  const [migrationBusy, setMigrationBusy] = useState(false);
 
   const canRun = Boolean(backendMode);
 
@@ -284,6 +288,30 @@ export function AdminOpsPage() {
     } finally {
       setLoadingMaintenance(false);
     }
+  }
+
+  async function runMigrationDryRun() {
+    setMigrationBusy(true);
+    try { setMigrationReport(await dryRunLegacyMigration()); toast.success('Legacy migration dry-run saved. No catalog records changed.'); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Migration dry-run failed'); }
+    finally { setMigrationBusy(false); }
+  }
+
+  async function applyMigration() {
+    if (!migrationReport) return;
+    const confirmation = window.prompt(`This creates additive temporary hierarchy records. Legacy records, orders, tokens, and files remain unchanged. Type: ${migrationReport.requiredConfirmation}`);
+    if (confirmation !== migrationReport.requiredConfirmation) return;
+    setMigrationBusy(true);
+    try { const result = await applyLegacyMigration(migrationReport.reportId, confirmation); toast.success(`Backfilled ${result.migrated} one-to-one temporary products.`); setMigrationQueue(await fetchLegacyClassificationQueue()); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Migration apply failed'); }
+    finally { setMigrationBusy(false); }
+  }
+
+  async function loadMigrationQueue() {
+    setMigrationBusy(true);
+    try { setMigrationQueue(await fetchLegacyClassificationQueue()); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Could not load classification queue'); }
+    finally { setMigrationBusy(false); }
   }
 
   const filteredAdminCatalog = adminCatalog.filter((entry) => {
@@ -581,6 +609,14 @@ export function AdminOpsPage() {
           )}
         </div>
       </div>
+
+      {storeArchitectureFlags.productHierarchy && <div className="rounded-2xl border border-violet-900/70 bg-[#11151b] p-6 space-y-3">
+        <h2 className="text-lg font-semibold text-[#e9edf5]">Legacy Migration</h2>
+        <p className="text-sm text-[#9ba6b8]">Creates one temporary Design Model and SKU per legacy face. It never guesses colors, editions, or artistic families, and never modifies legacy orders or binaries.</p>
+        <div className="flex flex-wrap gap-2"><Button onClick={runMigrationDryRun} disabled={!canRun || migrationBusy} variant="outline">Run Dry-Run</Button><Button onClick={loadMigrationQueue} disabled={!canRun || migrationBusy} variant="outline">Load Classification Queue</Button>{migrationReport && <Button onClick={applyMigration} disabled={migrationBusy || migrationReport.storage.missingZpkIds.length > 0} className="bg-violet-700 text-white">Apply Saved Plan</Button>}</div>
+        {migrationReport && <div className="rounded-lg border border-[#303744] p-3 text-xs text-[#aeb9c9] space-y-1"><p>{migrationReport.legacyCount} legacy records · {migrationReport.enabledCount} visible · {migrationReport.offlineOrTrashedCount} retained offline</p><p>{migrationReport.orderCount} orders · {migrationReport.tokenCount} tokens · {migrationReport.mappedOrderProductCount} mapped legacy products</p><p>{formatStorageBytes(migrationReport.storage.managedBytes)} managed · {migrationReport.storage.orphanObjectCount} unexplained objects · {migrationReport.storage.missingZpkIds.length} missing ZPK files</p><p className="font-mono text-[10px] text-[#738095]">Plan {migrationReport.planHash}</p>{migrationReport.storage.missingZpkIds.length > 0 && <p className="text-red-300">Apply blocked: missing ZPKs for {migrationReport.storage.missingZpkIds.join(', ')}</p>}</div>}
+        {migrationQueue.length > 0 && <div className="max-h-56 overflow-auto rounded-lg border border-[#303744] text-xs">{migrationQueue.map((entry) => <div key={entry.id} className="border-b border-[#252d38] p-3"><p className="text-white">{entry.legacyWatchfaceId} · {entry.status}</p><p className="text-[10px] text-[#738095]">Needs: {entry.requiredFields.join(', ')}</p>{entry.warnings.length > 0 && <p className="text-amber-300">{entry.warnings.join(', ')}</p>}</div>)}</div>}
+      </div>}
 
       <div className="rounded-2xl border border-[#2f3642] bg-[#11151b] p-6 space-y-3">
         <h2 className="text-lg font-semibold text-[#e9edf5]">Storage Maintenance</h2>

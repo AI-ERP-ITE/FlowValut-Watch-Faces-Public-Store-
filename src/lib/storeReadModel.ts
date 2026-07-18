@@ -18,3 +18,7 @@ export function resolveLegacyDesignModel(model: StoreReadModel, legacyId: string
   const mapping = model.legacyMappings.find((item) => item.legacyWatchfaceId === legacyId);
   return mapping ? model.designModels.find((item) => item.id === mapping.productModelId) ?? null : null;
 }
+export function resolveLegacySku(model: StoreReadModel, legacyId: string) {
+  const mapping = model.legacyMappings.find((item) => item.legacyWatchfaceId === legacyId);
+  return mapping ? model.skus.find((item) => item.id === mapping.skuId) ?? null : null;
+}
