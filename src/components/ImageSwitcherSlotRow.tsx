@@ -113,7 +113,7 @@ export default function ImageSwitcherSlotRow({ slot, policyType, isFixed, onUpda
       )}
 
       {/* Min / Max (ranges) */}
-      {policyType !== 'FIXED_CODES' && (
+      {policyType !== 'FIXED_CODES' && policyType !== 'LUNAR_CYCLE' && (
         <>
           <td className="py-1 px-1 w-16">
             <Input

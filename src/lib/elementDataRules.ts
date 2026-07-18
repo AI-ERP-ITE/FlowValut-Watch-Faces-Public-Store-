@@ -138,6 +138,11 @@ export const ELEMENT_TO_DATA: Record<RuleElementKey, readonly string[]> = {
     'PAI_WEEKLY',
     'FAT_BURN',
     'HEART',
+    'STRESS',
+    'SPO2',
+    'HUMIDITY',
+    'UVI',
+    'AQI',
     'WEATHER_CURRENT',
     'WEATHER_STATUS',
     'MOON',
@@ -161,13 +166,28 @@ export const DATA_TO_ELEMENT: Record<string, RuleElementKey[]> = Object.entries(
 );
 
 const DATA_ALIASES: Record<string, string> = {
+  CALORIE: 'CAL',
+  CALORIES: 'CAL',
   DIST: 'DISTANCE',
   PAI_DAILY: 'PAI',
 };
 
 export function normalizeDataAlias(dataType: string | undefined): string | undefined {
-  if (!dataType) return undefined;
-  return DATA_ALIASES[dataType] ?? dataType;
+  const normalized = dataType?.trim().toUpperCase();
+  if (!normalized) return undefined;
+  return DATA_ALIASES[normalized] ?? normalized;
+}
+
+/** The single creator/editor/runtime authority for supported IMG_LEVEL bindings. */
+export const IMAGE_SWITCHER_DATA_TYPES = ELEMENT_TO_DATA.IMAGE_SWITCHER;
+
+export function imageSwitcherDataTypesMatch(
+  left: string | undefined,
+  right: string | undefined,
+): boolean {
+  const normalizedLeft = normalizeDataAlias(left);
+  const normalizedRight = normalizeDataAlias(right);
+  return !!normalizedLeft && normalizedLeft === normalizedRight;
 }
 
 export function toRuleElementKey(type: WatchFaceElement['type'], subtype?: string): RuleElementKey | null {
@@ -235,13 +255,15 @@ export function getTextImgPrefixForDataType(dataType: string | undefined): strin
 export const IMAGE_SWITCHER_MIN_NON_WEATHER_FRAMES = 2;
 export const IMAGE_SWITCHER_WEATHER_FRAME_COUNT = 29;
 export const IMAGE_SWITCHER_LEGACY_DEFAULT_FRAMES = 10;
+export const IMAGE_SWITCHER_MOON_FRAME_COUNTS = [7, 13, 30] as const;
+export const IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT = 7;
 
 import type { PolicyType } from '@/types/imageSwitcher';
 
 export const IMAGE_SWITCHER_POLICY: Record<string, PolicyType> = {
   WEATHER_CURRENT: 'FIXED_CODES',
   WEATHER_STATUS:  'FIXED_CODES',
-  MOON:            'FIXED_CODES',
+  MOON:            'LUNAR_CYCLE',
   BATTERY:         'PERCENT_RANGES',
   HEART:           'DYNAMIC_RANGES',
   STEP:            'ABSOLUTE_RANGES',
@@ -261,14 +283,13 @@ export const IMAGE_SWITCHER_POLICY: Record<string, PolicyType> = {
 export const IMAGE_SWITCHER_FIXED_SLOT_COUNTS: Record<string, number> = {
   WEATHER_CURRENT: 29,
   WEATHER_STATUS:  29,
-  MOON:            8,
 };
 
 export interface ImageSwitcherCountResolution {
   expectedCount: number | null;
   minCount: number;
   strictFixed: boolean;
-  source: 'weather-fixed' | 'user-defined' | 'legacy-default' | 'unsupported';
+  source: 'weather-fixed' | 'moon-cycle' | 'user-defined' | 'legacy-default' | 'unsupported';
 }
 
 export function resolveImageSwitcherFrameCount(
@@ -296,6 +317,18 @@ export function resolveImageSwitcherFrameCount(
       minCount: IMAGE_SWITCHER_WEATHER_FRAME_COUNT,
       strictFixed: true,
       source: 'weather-fixed',
+    };
+  }
+
+  if (normalized === 'MOON') {
+    const moonCount = IMAGE_SWITCHER_MOON_FRAME_COUNTS.includes(
+      explicitCount as (typeof IMAGE_SWITCHER_MOON_FRAME_COUNTS)[number],
+    ) ? explicitCount! : IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT;
+    return {
+      expectedCount: moonCount,
+      minCount: IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT,
+      strictFixed: true,
+      source: 'moon-cycle',
     };
   }
 

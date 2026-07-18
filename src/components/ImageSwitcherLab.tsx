@@ -19,7 +19,11 @@ import {
 } from '@/lib/imageSwitcherResolver';
 import {
   IMAGE_SWITCHER_POLICY,
+  IMAGE_SWITCHER_DATA_TYPES,
+  IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT,
+  IMAGE_SWITCHER_MOON_FRAME_COUNTS,
   getDataTypeLabel,
+  normalizeDataAlias,
 } from '@/lib/elementDataRules';
 import { pushSwitcherDefinition, deleteSwitcherFromCloud } from '@/lib/imageSwitcherSync';
 import { renderHtmlToDataUrl } from '@/lib/customIconStore';
@@ -30,18 +34,13 @@ import { cn } from '@/lib/utils';
 
 // ── Supported data types for Image Switcher ───────────────────────────────────
 
-const SWITCHER_DATA_TYPES = [
-  'BATTERY', 'HEART', 'WEATHER_CURRENT', 'WEATHER_STATUS',
-  'STEP', 'CAL', 'DISTANCE', 'STAND', 'PAI', 'PAI_WEEKLY',
-  'FAT_BURN', 'STRESS', 'SPO2', 'AQI', 'UVI', 'HUMIDITY',
-];
-
 function policyLabel(policy: string): string {
   const map: Record<string, string> = {
     FIXED_CODES: 'Fixed Codes',
     PERCENT_RANGES: 'Percent Ranges (0–100%)',
     DYNAMIC_RANGES: 'Dynamic Zones (Heart Rate)',
     ABSOLUTE_RANGES: 'Absolute Ranges',
+    LUNAR_CYCLE: 'Lunar Cycle',
   };
   return map[policy] ?? policy;
 }
@@ -102,7 +101,8 @@ export default function ImageSwitcherLab() {
   }, [dataType]);
 
   const policyType = IMAGE_SWITCHER_POLICY[dataType] ?? 'ABSOLUTE_RANGES';
-  const isFixed = policyType === 'FIXED_CODES';
+  const isMoon = policyType === 'LUNAR_CYCLE';
+  const isFixed = policyType === 'FIXED_CODES' || isMoon;
   const isHeart = policyType === 'DYNAMIC_RANGES';
 
   // Slot manipulation
@@ -120,6 +120,13 @@ export default function ImageSwitcherLab() {
       min: last ? (last.max ?? 0) + 1 : 0,
       max: last ? (last.max ?? 0) + 10 : 10,
     }]);
+  };
+
+  const setMoonResolution = (count: number) => {
+    const hasPopulatedSlots = slots.some(slot => slot.dataUrl || slot.baked || (slot.sourceHtml ?? '').trim());
+    if (hasPopulatedSlots && !window.confirm('Changing Moon resolution will replace the current slots and images. Continue?')) return;
+    setSlots(buildDefaultSlots('MOON', undefined, count));
+    setErrors([]);
   };
 
   // Auto-suggest heart zones
@@ -149,7 +156,7 @@ export default function ImageSwitcherLab() {
     const def: ImageSwitcherDefinition = {
       id: editingId ?? makeId(),
       name: name.trim(),
-      dataType,
+      dataType: normalizeDataAlias(dataType) ?? dataType,
       policyType,
       slotCount: slots.length,
       ranges: slots,
@@ -307,7 +314,7 @@ export default function ImageSwitcherLab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SWITCHER_DATA_TYPES.map((dt) => (
+                {IMAGE_SWITCHER_DATA_TYPES.map((dt) => (
                   <SelectItem key={dt} value={dt}>{getDataTypeLabel(dt)}</SelectItem>
                 ))}
               </SelectContent>
@@ -319,6 +326,32 @@ export default function ImageSwitcherLab() {
         <p className="text-[10px] text-white/35">
           Policy: <span className="text-white/55">{policyLabel(policyType)}</span>
         </p>
+
+        {isMoon && (
+          <div className="rounded border border-white/8 bg-black/20 p-2 space-y-1.5">
+            <p className="text-[10px] text-white/50 font-medium">Moon Resolution</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {IMAGE_SWITCHER_MOON_FRAME_COUNTS.map(count => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setMoonResolution(count)}
+                  className={cn(
+                    'rounded border px-2 py-1 text-[10px] transition-colors',
+                    slots.length === count
+                      ? 'border-cyan-500/60 bg-cyan-500/15 text-cyan-300'
+                      : 'border-white/15 bg-white/5 text-white/55 hover:bg-white/10',
+                  )}
+                >
+                  {count} phases
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-white/35">
+              Ordered chronologically through the lunar cycle. New sets default to {IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT} phases.
+            </p>
+          </div>
+        )}
 
         {/* Heart profile inputs */}
         {isHeart && (
@@ -385,12 +418,13 @@ export default function ImageSwitcherLab() {
               <tr className="border-b border-white/8 bg-white/3">
                 <th className="py-1.5 px-2 text-[9px] text-white/35 w-8">#</th>
                 <th className="py-1.5 px-1.5 text-[9px] text-white/35">Label</th>
-                {isFixed
+                {policyType === 'FIXED_CODES'
                   ? <th className="py-1.5 px-1.5 text-[9px] text-white/35 w-12">Code</th>
-                  : <>
+                  : policyType !== 'LUNAR_CYCLE' ? <>
                       <th className="py-1.5 px-1 text-[9px] text-white/35 w-16">Min</th>
                       <th className="py-1.5 px-1 text-[9px] text-white/35 w-16">Max</th>
                     </>
+                  : null
                 }
                 <th className="py-1.5 px-1.5 text-[9px] text-white/35">Image</th>
                 <th className="w-7" />

@@ -20,6 +20,7 @@ import {
   getImageSwitcherExpectedImageCount,
   resolveImageSwitcherFrameCount,
   normalizeDataTypeForElement,
+  imageSwitcherDataTypesMatch,
 } from '@/lib/elementDataRules';
 import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { renderHtmlToDataUrl, renderSvgToDataUrl } from '@/lib/customIconStore';
@@ -197,6 +198,10 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
   const expectedImageCount = element?.type === 'IMG_LEVEL'
     ? getImageSwitcherExpectedImageCount(element.dataType, imageSwitcherExplicitCount)
     : null;
+  const compatibleSwitcherDefinitions = useMemo(() => {
+    if (element?.type !== 'IMG_LEVEL' || !element.dataType) return switcherDefinitions;
+    return switcherDefinitions.filter(def => imageSwitcherDataTypesMatch(def.dataType, element.dataType));
+  }, [element?.dataType, element?.type, switcherDefinitions]);
   const switcherDetection = useMemo(
     () => extractFramesFromMarkup(switcherMarkup),
     [switcherMarkup],
@@ -1065,7 +1070,16 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
       {/* DataType — shown only when current element accepts data bindings */}
       {allowedDataTypes.length > 0 && (
         <Section label="Data Type">
-          <Select value={element.dataType ?? '__none__'} onValueChange={v => update({ dataType: v === '__none__' ? undefined : v })}>
+          <Select value={element.dataType ?? '__none__'} onValueChange={v => {
+            const nextDataType = v === '__none__' ? undefined : v;
+            const linkedDefinition = switcherDefinitions.find(def => def.id === element.imageSwitcherDefinitionId);
+            update({
+              dataType: nextDataType,
+              imageSwitcherDefinitionId: linkedDefinition && imageSwitcherDataTypesMatch(linkedDefinition.dataType, nextDataType)
+                ? element.imageSwitcherDefinitionId
+                : undefined,
+            });
+          }}>
             <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
               <SelectValue placeholder="— none —" />
             </SelectTrigger>
@@ -1122,15 +1136,23 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
             </p>
             <Select
               value={element.imageSwitcherDefinitionId ?? '__none__'}
-              onValueChange={(v) => update({ imageSwitcherDefinitionId: v === '__none__' ? undefined : v })}
+              onValueChange={(v) => {
+                const definition = switcherDefinitions.find(def => def.id === v);
+                update({
+                  imageSwitcherDefinitionId: v === '__none__' ? undefined : v,
+                  ...(definition ? { imageSwitcherFrameCount: definition.slotCount } : {}),
+                });
+              }}
             >
               <SelectTrigger className="h-7 text-xs bg-zinc-800 border-white/10 text-white">
                 <SelectValue placeholder="— none (manual images) —" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">— none (manual images) —</SelectItem>
-                {switcherDefinitions.map((def) => (
-                  <SelectItem key={def.id} value={def.id}>{def.name}</SelectItem>
+                {compatibleSwitcherDefinitions.map((def) => (
+                  <SelectItem key={def.id} value={def.id}>
+                    {def.name}{imageSwitcherDataTypesMatch(def.dataType, 'MOON') ? ` (${def.slotCount} phases)` : ''}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -10,7 +10,11 @@ import type {
   UserProfile,
   HeartZone,
 } from '@/types/imageSwitcher';
-import { IMAGE_SWITCHER_FIXED_SLOT_COUNTS } from '@/lib/elementDataRules';
+import {
+  IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT,
+  IMAGE_SWITCHER_FIXED_SLOT_COUNTS,
+  IMAGE_SWITCHER_MOON_FRAME_COUNTS,
+} from '@/lib/elementDataRules';
 
 // ── Heart-rate zones (Karvonen method) ────────────────────────────────────────
 
@@ -112,13 +116,10 @@ function buildWeatherSlots(count: number): RangeSlot[] {
   }));
 }
 
-function buildMoonSlots(): RangeSlot[] {
-  const labels = ['New', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
-    'Full', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'];
-  return Array.from({ length: 8 }, (_, i) => ({
+function buildMoonSlots(count: number): RangeSlot[] {
+  return Array.from({ length: count }, (_, i) => ({
     slotIndex: i,
-    label: labels[i],
-    code: i,
+    label: count === 30 ? `Lunar Day ${i + 1}` : `Phase ${i + 1} of ${count}`,
   }));
 }
 
@@ -172,13 +173,16 @@ function buildAbsoluteSlots(dataType: string): RangeSlot[] {
  * Build sensible default RangeSlots for a given dataType + optional profile.
  * Used when user creates a new ImageSwitcherDefinition.
  */
-export function buildDefaultSlots(dataType: string, profile?: UserProfile): RangeSlot[] {
+export function buildDefaultSlots(dataType: string, profile?: UserProfile, slotCount?: number): RangeSlot[] {
   const fixedCount = IMAGE_SWITCHER_FIXED_SLOT_COUNTS[dataType];
   if (dataType === 'WEATHER_CURRENT' || dataType === 'WEATHER_STATUS') {
     return buildWeatherSlots(fixedCount ?? 29);
   }
   if (dataType === 'MOON') {
-    return buildMoonSlots();
+    const moonCount = IMAGE_SWITCHER_MOON_FRAME_COUNTS.includes(
+      slotCount as (typeof IMAGE_SWITCHER_MOON_FRAME_COUNTS)[number],
+    ) ? slotCount! : IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT;
+    return buildMoonSlots(moonCount);
   }
   if (dataType === 'BATTERY') {
     return buildBatterySlots();
@@ -213,7 +217,29 @@ export function validateDefinition(def: ImageSwitcherDefinition): string[] {
     return errors;
   }
 
-  if (policyType === 'FIXED_CODES') {
+  if (def.dataType === 'MOON' && policyType !== 'LUNAR_CYCLE') {
+    errors.push('Moon definitions must use the Lunar Cycle policy.');
+  }
+
+  if (policyType === 'LUNAR_CYCLE') {
+    if (def.dataType !== 'MOON') {
+      errors.push('Lunar Cycle policy can only be used with Moon.');
+    }
+    if (!IMAGE_SWITCHER_MOON_FRAME_COUNTS.includes(
+      def.slotCount as (typeof IMAGE_SWITCHER_MOON_FRAME_COUNTS)[number],
+    )) {
+      errors.push('Moon sets must contain exactly 7, 13, or 30 images.');
+    }
+    if (ranges.length !== def.slotCount) {
+      errors.push(`Expected exactly ${def.slotCount} Moon slots, got ${ranges.length}.`);
+    }
+    ranges.forEach((slot, index) => {
+      if (slot.slotIndex !== index) errors.push(`Moon slot ${index + 1} is out of sequence.`);
+      if (slot.code !== undefined || slot.min !== undefined || slot.max !== undefined) {
+        errors.push(`Moon slot ${index + 1} must not define a code or numeric range.`);
+      }
+    });
+  } else if (policyType === 'FIXED_CODES') {
     const fixedCount = IMAGE_SWITCHER_FIXED_SLOT_COUNTS[def.dataType];
     if (fixedCount !== undefined && ranges.length !== fixedCount) {
       errors.push(`Expected exactly ${fixedCount} slots for ${def.dataType}, got ${ranges.length}.`);

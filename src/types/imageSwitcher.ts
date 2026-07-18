@@ -6,10 +6,11 @@
 // ── Policy types ──────────────────────────────────────────────────────────────
 
 export type PolicyType =
-  | 'FIXED_CODES'       // weather (29 codes), moon (8 codes) — exact integer code → slot
+  | 'FIXED_CODES'       // weather (29 codes) — exact integer code → slot
   | 'PERCENT_RANGES'    // battery — 0–100% ordered stops
   | 'DYNAMIC_RANGES'    // heart — profile-derived heart-rate zones
-  | 'ABSOLUTE_RANGES';  // steps/AQI/UV/stress — fixed numeric min..max bands
+  | 'ABSOLUTE_RANGES'   // steps/AQI/UV/stress — fixed numeric min..max bands
+  | 'LUNAR_CYCLE';      // moon — ordered 7/13/30-frame lunar-cycle progress
 
 // ── Storage references ────────────────────────────────────────────────────────
 
