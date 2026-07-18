@@ -30,7 +30,7 @@ import {
 } from '@/lib/workshopApi';
 import { canRestoreCatalog, canTrashCatalog, formatStorageBytes, permanentDeleteConfirmation, type CatalogLifecycleStatus } from '@/lib/catalogLifecycle';
 import { ReleaseWizard } from '@/components/ReleaseWizard';
-import { applyLegacyMigration, dryRunLegacyMigration, fetchLegacyClassificationQueue, type LegacyClassificationEntry, type LegacyMigrationReport } from '@/lib/legacyMigrationApi';
+import { applyLegacyMigration, auditLegacyZpkPage, dryRunLegacyMigration, fetchLegacyClassificationQueue, type LegacyClassificationEntry, type LegacyMigrationReport, type LegacyZpkAuditEntry } from '@/lib/legacyMigrationApi';
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -63,6 +63,8 @@ export function AdminOpsPage() {
   const [migrationReport, setMigrationReport] = useState<LegacyMigrationReport | null>(null);
   const [migrationQueue, setMigrationQueue] = useState<LegacyClassificationEntry[]>([]);
   const [migrationBusy, setMigrationBusy] = useState(false);
+  const [zpkAudit, setZpkAudit] = useState<LegacyZpkAuditEntry[]>([]);
+  const [zpkAuditCursor, setZpkAuditCursor] = useState<string | null | undefined>(undefined);
 
   const canRun = Boolean(backendMode);
 
@@ -311,6 +313,17 @@ export function AdminOpsPage() {
     setMigrationBusy(true);
     try { setMigrationQueue(await fetchLegacyClassificationQueue()); }
     catch (error) { toast.error(error instanceof Error ? error.message : 'Could not load classification queue'); }
+    finally { setMigrationBusy(false); }
+  }
+
+  async function runZpkAudit(reset = false) {
+    setMigrationBusy(true);
+    try {
+      const page = await auditLegacyZpkPage(reset ? undefined : zpkAuditCursor ?? undefined);
+      setZpkAudit((current) => reset ? page.results : [...current, ...page.results]);
+      setZpkAuditCursor(page.nextCursor);
+      toast.success(`Audited ${page.results.length} ZPK files without changes.`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'ZPK audit failed'); }
     finally { setMigrationBusy(false); }
   }
 
@@ -614,6 +627,8 @@ export function AdminOpsPage() {
         <h2 className="text-lg font-semibold text-[#e9edf5]">Legacy Migration</h2>
         <p className="text-sm text-[#9ba6b8]">Creates one temporary Design Model and SKU per legacy face. It never guesses colors, editions, or artistic families, and never modifies legacy orders or binaries.</p>
         <div className="flex flex-wrap gap-2"><Button onClick={runMigrationDryRun} disabled={!canRun || migrationBusy} variant="outline">Run Dry-Run</Button><Button onClick={loadMigrationQueue} disabled={!canRun || migrationBusy} variant="outline">Load Classification Queue</Button>{migrationReport && <Button onClick={applyMigration} disabled={migrationBusy || migrationReport.storage.missingZpkIds.length > 0} className="bg-violet-700 text-white">Apply Saved Plan</Button>}</div>
+        <div className="flex flex-wrap gap-2"><Button onClick={() => runZpkAudit(true)} disabled={!canRun || migrationBusy} variant="outline">Start Read-Only ZPK Audit</Button>{zpkAudit.length > 0 && zpkAuditCursor && <Button onClick={() => runZpkAudit(false)} disabled={migrationBusy} variant="outline">Audit Next 5</Button>}</div>
+        {zpkAudit.length > 0 && <div className="max-h-72 overflow-auto rounded-lg border border-[#303744] text-xs">{zpkAudit.map((entry) => <div key={entry.id} className="border-b border-[#252d38] p-3"><p className="text-white">{entry.id} · {entry.verdict}</p><p className="font-mono text-[10px] text-[#738095]">{entry.specGroup} · {entry.outerConfigVersion ?? '?'} / {entry.deviceConfigVersion ?? '?'}</p>{entry.reason && <p className="break-all text-amber-300">{entry.reason}</p>}</div>)}</div>}
         {migrationReport && <div className="rounded-lg border border-[#303744] p-3 text-xs text-[#aeb9c9] space-y-1">
           <p>{migrationReport.legacyCount} legacy records · {migrationReport.enabledCount} visible · {migrationReport.offlineOrTrashedCount} retained offline</p>
           <p>{migrationReport.orderCount} orders · {migrationReport.tokenCount} tokens · {migrationReport.mappedOrderProductCount} mapped legacy products</p>
