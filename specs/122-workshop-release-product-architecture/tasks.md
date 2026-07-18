@@ -82,11 +82,11 @@
 
 ## Phase 8 — Migration
 
-- [ ] T080 Add dry-run legacy backfill and validation report.
+- [x] T080 Add dry-run legacy backfill and validation report.
 - [ ] T081 Backfill temporary Design Model/SKU/Technical Package records.
-- [ ] T082 Add manual classification/consolidation queue.
-- [ ] T083 Add legacy ID mappings and storage reconciliation.
-- [ ] T084 Verify all legacy routes, orders, downloads, and statuses.
+- [x] T082 Add manual classification/consolidation queue.
+- [x] T083 Add legacy ID mappings and storage reconciliation.
+- [x] T084 Verify all legacy routes, orders, downloads, and statuses.
 - [ ] T085 Approve cutover flags and obtain deployment approval.
 
 ## Phase 9 — Final validation and deployment

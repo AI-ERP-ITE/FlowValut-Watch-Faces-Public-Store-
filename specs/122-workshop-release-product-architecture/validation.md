@@ -142,3 +142,18 @@ Spec 122 cannot be marked complete while any required migration, entitlement, de
 - Live negative smoke tests returned HTTP 400 for missing Offer ID and missing entitlement token, confirming request validation without creating an order.
 - Runtime commits: app `43abb0b6`; Firebase root `3523d6fe`.
 - Public/private Pages were intentionally not deployed; storefront activation remains feature-flagged and final Pages deployment remains gated by Phase 9.
+
+## Phase 8 implementation evidence — 2026-07-18
+
+- Firebase Functions TypeScript and 9 focused migration/fulfillment tests passed from both the working tree and clean deployment snapshot.
+- Storefront compatibility suites passed: 2 files, 13 tests.
+- Explicit `build:public` and Firebase-preflighted `build:private` completed successfully.
+- Migration planning is deterministic and mechanical: every legacy watchface receives one temporary Design Model, one default SKU, one Technical Package, one compatibility Offer, and one manual-classification queue entry. No artistic grouping is inferred.
+- Dry-run inventory reports catalog visibility, orders, tokens, managed Storage bytes, missing ZPKs, unexplained objects, unknown order product IDs, conflicts, and a SHA-256 plan hash without changing catalog records.
+- Apply requires the exact saved report, unchanged source-plan hash, single use, typed `BACKFILL <count>` confirmation, and zero missing legacy ZPKs.
+- Apply is additive and does not update or delete legacy watchfaces, orders, download tokens, or Storage objects.
+- Legacy `/face/:id` and `/buy/:id` resolve through `legacyMappings`; historical `orders.productId`, legacy token status, and legacy download resolution remain unchanged.
+- `adminLegacyMigration` was deployed alone to `zeppfaceloader-b0b106e9` and appears in the function inventory as Node.js 20, `us-central1`, 1024 MB.
+- Live unauthenticated GET returned HTTP 401 `Missing bearer token`, confirming the migration/report/queue surface is admin-only.
+- Runtime commits: app `034f00f0`; Firebase root `84b5bf27`.
+- Production dry-run/backfill remains pending an authenticated Admin session; cutover flags remain disabled and Pages were not deployed.
