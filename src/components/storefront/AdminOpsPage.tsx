@@ -614,7 +614,21 @@ export function AdminOpsPage() {
         <h2 className="text-lg font-semibold text-[#e9edf5]">Legacy Migration</h2>
         <p className="text-sm text-[#9ba6b8]">Creates one temporary Design Model and SKU per legacy face. It never guesses colors, editions, or artistic families, and never modifies legacy orders or binaries.</p>
         <div className="flex flex-wrap gap-2"><Button onClick={runMigrationDryRun} disabled={!canRun || migrationBusy} variant="outline">Run Dry-Run</Button><Button onClick={loadMigrationQueue} disabled={!canRun || migrationBusy} variant="outline">Load Classification Queue</Button>{migrationReport && <Button onClick={applyMigration} disabled={migrationBusy || migrationReport.storage.missingZpkIds.length > 0} className="bg-violet-700 text-white">Apply Saved Plan</Button>}</div>
-        {migrationReport && <div className="rounded-lg border border-[#303744] p-3 text-xs text-[#aeb9c9] space-y-1"><p>{migrationReport.legacyCount} legacy records · {migrationReport.enabledCount} visible · {migrationReport.offlineOrTrashedCount} retained offline</p><p>{migrationReport.orderCount} orders · {migrationReport.tokenCount} tokens · {migrationReport.mappedOrderProductCount} mapped legacy products</p><p>{formatStorageBytes(migrationReport.storage.managedBytes)} managed · {migrationReport.storage.orphanObjectCount} unexplained objects · {migrationReport.storage.missingZpkIds.length} missing ZPK files</p><p className="font-mono text-[10px] text-[#738095]">Plan {migrationReport.planHash}</p>{migrationReport.storage.missingZpkIds.length > 0 && <p className="text-red-300">Apply blocked: missing ZPKs for {migrationReport.storage.missingZpkIds.join(', ')}</p>}</div>}
+        {migrationReport && <div className="rounded-lg border border-[#303744] p-3 text-xs text-[#aeb9c9] space-y-1">
+          <p>{migrationReport.legacyCount} legacy records · {migrationReport.enabledCount} visible · {migrationReport.offlineOrTrashedCount} retained offline</p>
+          <p>{migrationReport.orderCount} orders · {migrationReport.tokenCount} tokens · {migrationReport.mappedOrderProductCount} mapped legacy products</p>
+          <p>{formatStorageBytes(migrationReport.storage.managedBytes)} managed · {migrationReport.storage.orphanObjectCount} unexplained objects · {migrationReport.storage.missingZpkIds.length} missing ZPK files</p>
+          <p className="font-mono text-[10px] text-[#738095]">Plan {migrationReport.planHash}</p>
+          {migrationReport.unknownOrderProductIds.length > 0 && <div className="rounded border border-amber-900/70 bg-amber-950/20 p-2 text-amber-200">
+            <p className="font-semibold">Historical order product IDs requiring compatibility review</p>
+            <p className="mt-1 break-all font-mono text-[10px]">{migrationReport.unknownOrderProductIds.join(', ')}</p>
+          </div>}
+          {migrationReport.conflicts.length > 0 && <div className="rounded border border-red-900/70 bg-red-950/20 p-2 text-red-200">
+            <p className="font-semibold">Migration conflicts</p>
+            {migrationReport.conflicts.map((conflict) => <p key={`${conflict.legacyWatchfaceId}:${conflict.reason}`} className="break-all font-mono text-[10px]">{conflict.legacyWatchfaceId}: {conflict.reason}</p>)}
+          </div>}
+          {migrationReport.storage.missingZpkIds.length > 0 && <p className="text-red-300">Apply blocked: missing ZPKs for {migrationReport.storage.missingZpkIds.join(', ')}</p>}
+        </div>}
         {migrationQueue.length > 0 && <div className="max-h-56 overflow-auto rounded-lg border border-[#303744] text-xs">{migrationQueue.map((entry) => <div key={entry.id} className="border-b border-[#252d38] p-3"><p className="text-white">{entry.legacyWatchfaceId} · {entry.status}</p><p className="text-[10px] text-[#738095]">Needs: {entry.requiredFields.join(', ')}</p>{entry.warnings.length > 0 && <p className="text-amber-300">{entry.warnings.join(', ')}</p>}</div>)}</div>}
       </div>}
 
