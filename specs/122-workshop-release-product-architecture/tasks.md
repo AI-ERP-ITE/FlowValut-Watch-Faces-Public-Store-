@@ -83,7 +83,7 @@
 ## Phase 8 — Migration
 
 - [x] T080 Add dry-run legacy backfill and validation report.
-- [ ] T081 Backfill temporary Design Model/SKU/Technical Package records.
+- [x] T081 Backfill temporary Design Model/SKU/Technical Package records.
 - [x] T082 Add manual classification/consolidation queue.
 - [x] T083 Add legacy ID mappings and storage reconciliation.
 - [x] T084 Verify all legacy routes, orders, downloads, and statuses.
@@ -100,3 +100,22 @@
 - [ ] T096 Verify live public/private routes, hashes, assets, catalog, auth, checkout, and legacy compatibility.
 - [ ] T097 Record origin/public commits and deployed bundle hashes.
 - [ ] T098 Close Spec 122 only after every required live gate passes.
+
+## Post-audit hardening (local only; deployment requires explicit approval)
+
+- [x] T099 Audit the mixed private bundle and confirm Workshop endpoints/components are not duplicated.
+- [x] T100 Make private Workshop feature enablement reproducible in the tracked private-build command.
+- [x] T101 Preserve parent-build lineage and detach manually loaded local projects from prior Workshop identity.
+- [x] T102 Abort incomplete binary reservations and fail closed when cleanup cannot be verified.
+- [x] T103 Add guarded Workshop permanent deletion with Trash, typed confirmation, reference checks, and object-level failure reporting.
+- [x] T104 Correct release-object maintenance accounting from `released/` to `releases/` and include Technical Package references.
+- [x] T105 Replace free-text classification with ordered select-or-create hierarchy controls and detected Technical Variant confirmation.
+- [x] T106 Enforce parent-scoped IDs, Collection model-number uniqueness, and same-model Complete Color Collection membership.
+- [x] T107 Make Save-as-Ready, interrupted validation, immutable artifact writes, and completed release retries resumable/idempotent.
+- [x] T108 Restore existing classification into the wizard and prevent one approved build from receiving multiple classifications.
+- [x] T109 Hide premature Studio release controls, constrain Admin actions by lifecycle state, and collapse legacy tools away from normal operations.
+- [x] T110 Add Workshop project title/folder/notes editing and mandatory Trash reasons.
+- [x] T111 Pass focused frontend tests (24/24), Functions tests (16/16), Functions compile, and private production build.
+- [x] T112 Baseline the separate rendering/effects failures: the same 11 tests failed before and after hardening, while passing tests increased from 203 to 205.
+- [x] T114 Preserve a successfully generated local ZPK when Workshop persistence is unreachable and show an explicit Workshop-save failure state.
+- [ ] T113 Review the final isolated diff and receive explicit deployment approval.

@@ -1,59 +1,147 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
-import { findNormalizedConflict, releaseWizardPreview, type ReleaseWizardDraft } from '@/lib/releaseWizard';
+import { fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchyOption, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
+import { findNormalizedConflict, nextRevision, releaseWizardPreview, type ReleaseWizardDraft } from '@/lib/releaseWizard';
 
+const NEW = '__new__';
 const emptyDraft: ReleaseWizardDraft = {
   designDnaName: '', designDnaCode: '', collectionName: '', collectionCode: '', modelName: '', modelNumber: 1,
-  variantName: '', variantCode: '', editionName: '', editionCode: '', technicalTargetId: '', revision: 'v1.0', regularPrice: 8, campaignPrice: 4,
+  variantName: '', variantCode: '', editionName: '', editionCode: '', technicalTargetId: '', revision: 'v1.0',
+  regularPrice: 8, campaignPrice: 4, offerType: 'SKU', bundleSkuIds: [],
 };
+
+function optionLabel(option: HierarchyOption) {
+  return option.code ? `${option.name} · ${option.code}` : option.name;
+}
+
+function TextField({ label, value, disabled, onChange }: { label: string; value: string | number; disabled?: boolean; onChange: (value: string) => void }) {
+  return <label className="text-[10px] text-[#9ba6b8]">{label}<input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-60" /></label>;
+}
 
 export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { projectId: string; buildId: string; defaultTarget?: string }) {
   const [draft, setDraft] = useState<ReleaseWizardDraft>({ ...emptyDraft, technicalTargetId: defaultTarget });
   const [snapshot, setSnapshot] = useState<HierarchySnapshot | null>(null);
   const [busy, setBusy] = useState(false);
-  const preview = useMemo(() => {
-    try { return releaseWizardPreview(draft); } catch { return null; }
-  }, [draft]);
+  const [dnaId, setDnaId] = useState(NEW);
+  const [collectionId, setCollectionId] = useState(NEW);
+  const [modelId, setModelId] = useState(NEW);
+  const [skuId, setSkuId] = useState(NEW);
+
+  const collections = useMemo(() => snapshot?.collections.filter((item) => dnaId !== NEW && item.parentId === dnaId) ?? [], [dnaId, snapshot]);
+  const models = useMemo(() => snapshot?.productModels.filter((item) => collectionId !== NEW && item.parentId === collectionId) ?? [], [collectionId, snapshot]);
+  const skus = useMemo(() => snapshot?.skus.filter((item) => modelId !== NEW && item.productModelId === modelId) ?? [], [modelId, snapshot]);
+  const preview = useMemo(() => { try { return releaseWizardPreview(draft); } catch { return null; } }, [draft]);
   const conflicts = snapshot ? [
-    findNormalizedConflict(draft.designDnaName, snapshot.designDnas),
-    findNormalizedConflict(draft.collectionName, snapshot.collections),
-    findNormalizedConflict(draft.modelName, snapshot.productModels),
+    dnaId === NEW ? findNormalizedConflict(draft.designDnaName, snapshot.designDnas) : null,
+    collectionId === NEW ? findNormalizedConflict(draft.collectionName, snapshot.collections) : null,
+    modelId === NEW ? findNormalizedConflict(draft.modelName, snapshot.productModels) : null,
   ].filter(Boolean) : [];
 
-  useEffect(() => { void fetchStoreHierarchy().then(setSnapshot).catch(() => undefined); }, []);
-  function field<K extends keyof ReleaseWizardDraft>(key: K, value: ReleaseWizardDraft[K]) { setDraft((current) => ({ ...current, [key]: value })); }
+  useEffect(() => {
+    void fetchStoreHierarchy().then((result) => {
+      setSnapshot(result);
+      const existingPackage = result.technicalPackages.find((item) => item.approvedWorkshopProjectId === projectId && item.approvedWorkshopBuildId === buildId);
+      if (existingPackage) {
+        const sku = result.skus.find((item) => item.id === existingPackage.skuId);
+        const model = result.productModels.find((item) => item.id === sku?.productModelId);
+        const collection = result.collections.find((item) => item.id === model?.parentId);
+        const dna = result.designDnas.find((item) => item.id === collection?.parentId);
+        if (sku && model && collection && dna) {
+          setDnaId(dna.id); setCollectionId(collection.id); setModelId(model.id); setSkuId(sku.id);
+          setDraft((current) => ({ ...current, designDnaName: dna.name, designDnaCode: dna.code ?? '', collectionName: collection.name, collectionCode: collection.code ?? '', modelName: model.name, modelNumber: model.modelNumber ?? 1, variantName: sku.variantName, variantCode: sku.variantCode, editionName: sku.editionName ?? '', editionCode: sku.editionCode ?? '', technicalTargetId: existingPackage.technicalTargetId, revision: existingPackage.revision }));
+          return;
+        }
+      }
+      const detected = result.technicalTargets.find((target) => target.id === defaultTarget || target.name === defaultTarget);
+      setDraft((current) => ({ ...current, technicalTargetId: detected?.id || defaultTarget }));
+    }).catch((error) => toast.error(error instanceof Error ? error.message : 'Failed to load store hierarchy'));
+  }, [buildId, defaultTarget, projectId]);
+
+  useEffect(() => {
+    if (!snapshot || !draft.technicalTargetId) return;
+    const existingForBuild = snapshot.technicalPackages.find((item) => item.approvedWorkshopProjectId === projectId && item.approvedWorkshopBuildId === buildId);
+    if (existingForBuild) {
+      setDraft((current) => ({ ...current, revision: existingForBuild.revision }));
+      return;
+    }
+    const revisions = snapshot.technicalPackages
+      .filter((item) => skuId !== NEW && item.skuId === skuId && item.technicalTargetId === draft.technicalTargetId && ['CURRENT', 'SUPERSEDED'].includes(item.state))
+      .map((item) => item.revision);
+    setDraft((current) => ({ ...current, revision: nextRevision(revisions) }));
+  }, [buildId, draft.technicalTargetId, projectId, skuId, snapshot]);
+
+  function patch(values: Partial<ReleaseWizardDraft>) { setDraft((current) => ({ ...current, ...values })); }
+  function selectDna(id: string) {
+    setDnaId(id); setCollectionId(NEW); setModelId(NEW); setSkuId(NEW);
+    const item = snapshot?.designDnas.find((candidate) => candidate.id === id);
+    patch({ designDnaName: item?.name ?? '', designDnaCode: item?.code ?? '', collectionName: '', collectionCode: '', modelName: '', modelNumber: 1, variantName: '', variantCode: '', editionName: '', editionCode: '' });
+  }
+  function selectCollection(id: string) {
+    setCollectionId(id); setModelId(NEW); setSkuId(NEW);
+    const item = snapshot?.collections.find((candidate) => candidate.id === id);
+    const nextNumber = Math.max(0, ...(snapshot?.productModels.filter((model) => model.parentId === id).map((model) => model.modelNumber ?? 0) ?? [])) + 1;
+    patch({ collectionName: item?.name ?? '', collectionCode: item?.code ?? '', modelName: '', modelNumber: nextNumber || 1, variantName: '', variantCode: '', editionName: '', editionCode: '' });
+  }
+  function selectModel(id: string) {
+    setModelId(id); setSkuId(NEW);
+    const item = snapshot?.productModels.find((candidate) => candidate.id === id);
+    patch({ modelName: item?.name ?? '', modelNumber: item?.modelNumber ?? 1, variantName: '', variantCode: '', editionName: '', editionCode: '' });
+  }
+  function selectSku(id: string) {
+    setSkuId(id);
+    const item = snapshot?.skus.find((candidate) => candidate.id === id);
+    patch({ variantName: item?.variantName ?? '', variantCode: item?.variantCode ?? '', editionName: item?.editionName ?? '', editionCode: item?.editionCode ?? '' });
+  }
+
   async function submit(action: 'READY' | 'RELEASE') {
-    if (!preview) return toast.error('Complete all canonical identity fields.');
+    if (!preview || !draft.technicalTargetId) return toast.error('Complete every required identity selection.');
     setBusy(true);
     try {
       const result = await submitReleaseClassification({ ...draft, projectId, buildId, action });
-      if (action === 'RELEASE') {
+      if (action === 'RELEASE' && result.packageState !== 'CURRENT') {
         await releaseVerifiedPackage(result.packageId);
         toast.success(`${result.canonicalName} released with verified ZPK parity.`);
-      } else toast.success(`${result.canonicalName} saved as Ready.`);
+      } else if (action === 'RELEASE') toast.success(`${result.canonicalName} is already released.`);
+      else toast.success(`${result.canonicalName} saved as Ready.`);
       setSnapshot(await fetchStoreHierarchy());
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Release classification failed'); }
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Release operation failed'); }
     finally { setBusy(false); }
   }
-  const textFields: Array<[keyof ReleaseWizardDraft, string]> = [
-    ['designDnaName', 'Design DNA'], ['designDnaCode', 'DNA code'], ['collectionName', 'Collection'], ['collectionCode', 'Collection code'],
-    ['modelName', 'Design Model'], ['variantName', 'Color / Material Variant'], ['variantCode', 'Variant code'], ['editionName', 'Widget Edition (optional)'],
-    ['editionCode', 'Edition code (optional)'], ['technicalTargetId', 'Detected Technical Target'], ['revision', 'Revision'],
-  ];
+
   return (
-    <div className="rounded-xl border border-violet-900/70 bg-[#10101a] p-4 space-y-3">
-      <div><h3 className="text-sm font-semibold text-violet-200">Guided Store Release</h3><p className="text-xs text-[#9097aa]">Classification becomes permanent product identity. Existing normalized matches are reused automatically.</p></div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {textFields.map(([key, label]) => <label key={key} className="text-[10px] text-[#9ba6b8]">{label}<input value={String(draft[key] ?? '')} onChange={(event) => field(key, event.target.value as never)} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white" /></label>)}
-        <label className="text-[10px] text-[#9ba6b8]">Model number<input type="number" min={1} value={draft.modelNumber} onChange={(event) => field('modelNumber', Number(event.target.value))} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white" /></label>
-        <label className="text-[10px] text-[#9ba6b8]">Regular price USD<input type="number" min={0} step="0.01" value={draft.regularPrice} onChange={(event) => field('regularPrice', Number(event.target.value))} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white" /></label>
-        <label className="text-[10px] text-[#9ba6b8]">Campaign price USD<input type="number" min={0} step="0.01" value={draft.campaignPrice ?? ''} onChange={(event) => field('campaignPrice', event.target.value ? Number(event.target.value) : undefined)} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white" /></label>
-      </div>
-      {preview && <div className="rounded border border-[#30324a] p-2 text-xs"><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className="text-amber-300">{conflicts.length} normalized existing match(es) will be reused.</p></div>}
-      <div className="flex gap-2"><Button disabled={busy || !preview} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
-      <p className="text-[10px] text-[#747c90]">Release derives from the approved test ZPK, rewrites only allowlisted name metadata, and fails unless every other payload hash is unchanged.</p>
+    <div className="rounded-xl border border-violet-900/70 bg-[#10101a] p-4 space-y-4">
+      <div><h3 className="text-sm font-semibold text-violet-200">Guided Store Release</h3><p className="text-xs text-[#9097aa]">Choose an existing identity or explicitly create a new one. Permanent artistic classification is never guessed.</p></div>
+      {!snapshot && <p className="text-xs text-[#9097aa]">Loading controlled hierarchy…</p>}
+      {snapshot && <>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-[10px] text-[#9ba6b8]">1. Design DNA<select value={dnaId} onChange={(event) => selectDna(event.target.value)} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white"><option value={NEW}>Create new…</option>{snapshot.designDnas.map((item) => <option key={item.id} value={item.id}>{optionLabel(item)}</option>)}</select></label>
+          <label className="text-[10px] text-[#9ba6b8]">2. Collection<select value={collectionId} onChange={(event) => selectCollection(event.target.value)} disabled={!draft.designDnaName} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-50"><option value={NEW}>Create new…</option>{collections.map((item) => <option key={item.id} value={item.id}>{optionLabel(item)}</option>)}</select></label>
+          <label className="text-[10px] text-[#9ba6b8]">3. Design Model<select value={modelId} onChange={(event) => selectModel(event.target.value)} disabled={!draft.collectionName} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-50"><option value={NEW}>Create new…</option>{models.map((item) => <option key={item.id} value={item.id}>{optionLabel(item)}</option>)}</select></label>
+          <label className="text-[10px] text-[#9ba6b8]">4. Variant / Edition<select value={skuId} onChange={(event) => selectSku(event.target.value)} disabled={!draft.modelName} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-50"><option value={NEW}>Create new SKU…</option>{skus.map((item) => <option key={item.id} value={item.id}>{item.variantName}{item.editionName ? ` · ${item.editionName}` : ''}</option>)}</select></label>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <TextField label="Design DNA name" value={draft.designDnaName} disabled={dnaId !== NEW} onChange={(value) => patch({ designDnaName: value })} />
+          <TextField label="DNA code" value={draft.designDnaCode} disabled={dnaId !== NEW} onChange={(value) => patch({ designDnaCode: value })} />
+          <TextField label="Collection name" value={draft.collectionName} disabled={collectionId !== NEW} onChange={(value) => patch({ collectionName: value })} />
+          <TextField label="Collection code" value={draft.collectionCode} disabled={collectionId !== NEW} onChange={(value) => patch({ collectionCode: value })} />
+          <TextField label="Design Model" value={draft.modelName} disabled={modelId !== NEW} onChange={(value) => patch({ modelName: value })} />
+          <TextField label="Model number" value={draft.modelNumber} disabled={modelId !== NEW} onChange={(value) => patch({ modelNumber: Number(value) })} />
+          <TextField label="Color / Material Variant" value={draft.variantName} disabled={skuId !== NEW} onChange={(value) => patch({ variantName: value })} />
+          <TextField label="Variant code" value={draft.variantCode} disabled={skuId !== NEW} onChange={(value) => patch({ variantCode: value })} />
+          <TextField label="Widget Edition (optional)" value={draft.editionName ?? ''} disabled={skuId !== NEW} onChange={(value) => patch({ editionName: value })} />
+          <TextField label="Edition code (optional)" value={draft.editionCode ?? ''} disabled={skuId !== NEW} onChange={(value) => patch({ editionCode: value })} />
+          <TextField label="Detected Technical Variant" value={draft.technicalTargetId || 'Not detected'} disabled onChange={() => undefined} />
+          <TextField label="Next revision" value={draft.revision} onChange={(value) => patch({ revision: value })} />
+          <TextField label="Regular price USD" value={draft.regularPrice} onChange={(value) => patch({ regularPrice: Number(value) })} />
+          <TextField label="Campaign price USD" value={draft.campaignPrice ?? ''} onChange={(value) => patch({ campaignPrice: value ? Number(value) : undefined })} />
+        </div>
+        <label className="block text-[10px] text-[#9ba6b8]">Offer<select value={draft.offerType ?? 'SKU'} onChange={(event) => patch({ offerType: event.target.value as 'SKU' | 'BUNDLE' })} className="mt-1 w-full max-w-sm rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white"><option value="SKU">Individual watchface</option><option value="BUNDLE">Complete Color Collection</option></select></label>
+        {draft.offerType === 'BUNDLE' && <div className="rounded border border-[#30324a] p-3 text-xs text-[#9ba6b8]"><p className="mb-2">Include existing SKUs in this Complete Color Collection:</p><div className="grid gap-2 sm:grid-cols-2">{snapshot.skus.filter((item) => item.productModelId === modelId && item.id !== skuId).map((item) => <label key={item.id} className="flex gap-2"><input type="checkbox" checked={draft.bundleSkuIds?.includes(item.id) ?? false} onChange={(event) => patch({ bundleSkuIds: event.target.checked ? [...(draft.bundleSkuIds ?? []), item.id] : (draft.bundleSkuIds ?? []).filter((id) => id !== item.id) })} />{item.name}</label>)}</div></div>}
+      </>}
+      {preview && <div className="rounded border border-[#30324a] p-2 text-xs"><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className={conflicts.length ? 'text-red-300' : 'text-emerald-300'}>{conflicts.length ? `${conflicts.length} unresolved normalized conflict(s).` : 'No unresolved normalized conflicts.'}</p></div>}
+      <div className="flex gap-2"><Button disabled={busy || !preview || conflicts.length > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || conflicts.length > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
+      <p className="text-[10px] text-[#747c90]">Release reuses the approved physical-test ZPK and rewrites only allowlisted name metadata. Failed or interrupted releases can be resumed safely.</p>
     </div>
   );
 }

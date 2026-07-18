@@ -79,3 +79,16 @@
 - `functions:list` contains every expected endpoint.
 - Public/private route exposure, hashed assets, catalog, and live compatibility URLs pass.
 
+## Post-audit hardening regressions
+
+- Failed FVWF/ZPK upload aborts its reserved build and cleans every uploaded object before surfacing failure.
+- Opening Build N and creating another test records Build N as `parentBuildId`.
+- Loading a local `.fvwf` clears any prior Workshop project/build identity.
+- Only `TESTING` builds can be approved; only `APPROVED` builds can open release classification.
+- Trash requires a reason; permanent deletion requires Trash plus `DELETE <project>/<build>` and rejects release references.
+- Storage maintenance recognizes `releases/` and counts approved/released/parity paths as referenced.
+- Existing DNA/Collection/Model/SKU choices constrain downstream dropdowns; technical target is detected, not freely typed.
+- Model numbers are unique inside a Collection and bundle SKUs belong to one Design Model.
+- `READY` packages can resume as `VALIDATING`; `VALIDATING` retries resume; `CURRENT` retries return the existing result.
+- Existing immutable release objects are reused only when their hashes and parity identity match exactly.
+- Reopening a classified build restores its hierarchy and revision instead of creating a duplicate package.

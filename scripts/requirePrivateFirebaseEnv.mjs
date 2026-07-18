@@ -1,3 +1,7 @@
+import { loadEnv } from 'vite';
+
+const privateEnv = loadEnv('private', process.cwd(), '');
+
 const REQUIRED_ENV_VARS = [
   'VITE_FIREBASE_API_KEY',
   'VITE_FIREBASE_AUTH_DOMAIN',
@@ -6,7 +10,7 @@ const REQUIRED_ENV_VARS = [
 ];
 
 const missing = REQUIRED_ENV_VARS.filter((key) => {
-  const value = process.env[key];
+  const value = process.env[key] || privateEnv[key];
   return typeof value !== 'string' || value.trim().length === 0;
 });
 

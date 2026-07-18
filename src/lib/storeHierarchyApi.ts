@@ -1,15 +1,17 @@
 import { adminFetch } from './studioFirebasePublishApi';
 import type { ReleaseWizardDraft } from './releaseWizard';
 
-export interface HierarchyOption { id: string; name: string; code?: string; parentId?: string }
-export interface HierarchySnapshot { designDnas: HierarchyOption[]; collections: HierarchyOption[]; productModels: HierarchyOption[]; technicalTargets: HierarchyOption[]; offers: HierarchyOption[] }
+export interface HierarchyOption { id: string; name: string; code?: string; parentId?: string; modelNumber?: number }
+export interface SkuHierarchyOption extends HierarchyOption { productModelId: string; variantName: string; variantCode: string; editionName?: string; editionCode?: string }
+export interface TechnicalPackageOption { id: string; skuId: string; technicalTargetId: string; revision: string; state: string; approvedWorkshopProjectId?: string; approvedWorkshopBuildId?: string }
+export interface HierarchySnapshot { designDnas: HierarchyOption[]; collections: HierarchyOption[]; productModels: HierarchyOption[]; skus: SkuHierarchyOption[]; technicalTargets: HierarchyOption[]; technicalPackages: TechnicalPackageOption[]; offers: HierarchyOption[] }
 
 export async function fetchStoreHierarchy(): Promise<HierarchySnapshot> {
   return adminFetch<HierarchySnapshot>('adminStoreHierarchy', { method: 'GET' });
 }
 
 export async function submitReleaseClassification(input: ReleaseWizardDraft & { projectId: string; buildId: string; action: 'READY' | 'RELEASE' }) {
-  return adminFetch<{ packageId: string; canonicalName: string; internalCode: string; packageState: 'READY' | 'VALIDATING'; conflicts: string[] }>('adminStoreHierarchy', { method: 'POST', body: JSON.stringify(input) });
+  return adminFetch<{ packageId: string; canonicalName: string; internalCode: string; packageState: 'READY' | 'VALIDATING' | 'CURRENT'; conflicts: string[]; resumed?: boolean }>('adminStoreHierarchy', { method: 'POST', body: JSON.stringify(input) });
 }
 
 export async function releaseVerifiedPackage(packageId: string) {

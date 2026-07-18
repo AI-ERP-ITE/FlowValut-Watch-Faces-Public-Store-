@@ -8,17 +8,21 @@ export interface ReleaseWizardDraft {
   editionName?: string; editionCode?: string;
   technicalTargetId: string; revision: string;
   regularPrice: number; campaignPrice?: number;
+  offerType?: 'SKU' | 'BUNDLE'; bundleSkuIds?: string[];
 }
 
 export function releaseWizardPreview(draft: ReleaseWizardDraft) {
+  const designDnaId = canonicalSlug(draft.designDnaName);
+  const collectionId = canonicalSlug(`${designDnaId}-${draft.collectionName}`);
+  const modelId = canonicalSlug(`${collectionId}-${draft.modelName}`);
   return {
     canonicalName: buildCanonicalCustomerName({ modelName: draft.modelName, variantName: draft.variantName, editionName: draft.editionName }),
     internalCode: buildInternalProductCode({ collectionCode: draft.collectionCode, modelNumber: draft.modelNumber, variantCode: draft.variantCode, editionCode: draft.editionCode, technicalTargetCode: draft.technicalTargetId, revision: draft.revision }),
     ids: {
-      designDnaId: canonicalSlug(draft.designDnaName),
-      collectionId: canonicalSlug(draft.collectionName),
-      modelId: canonicalSlug(`${draft.collectionName}-${draft.modelName}`),
-      skuId: canonicalSlug(`${draft.collectionName}-${draft.modelName}-${draft.variantName}-${draft.editionName ?? ''}`),
+      designDnaId,
+      collectionId,
+      modelId,
+      skuId: canonicalSlug(`${modelId}-${draft.variantName}-${draft.editionName ?? ''}`),
     },
   };
 }

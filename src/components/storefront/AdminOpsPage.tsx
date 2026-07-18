@@ -25,8 +25,10 @@ import {
   approveWorkshopBuild,
   fetchWorkshopProjects,
   getWorkshopArtifactUrl,
+  permanentlyDeleteWorkshopBuild,
   type WorkshopProjectSummary,
   setWorkshopBuildLifecycle,
+  updateWorkshopProject,
 } from '@/lib/workshopApi';
 import { canRestoreCatalog, canTrashCatalog, formatStorageBytes, permanentDeleteConfirmation, type CatalogLifecycleStatus } from '@/lib/catalogLifecycle';
 import { ReleaseWizard } from '@/components/ReleaseWizard';
@@ -81,6 +83,20 @@ export function AdminOpsPage() {
     }
   }
 
+  async function editWorkshopProject(project: WorkshopProjectSummary) {
+    const workingTitle = window.prompt('Workshop working title', project.workingTitle)?.trim();
+    if (!workingTitle) return;
+    const folder = window.prompt('Optional folder / group', project.folder ?? '')?.trim() ?? '';
+    const notes = window.prompt('Optional project notes', project.notes ?? '') ?? '';
+    setWorkshopBusyId(project.id);
+    try {
+      await updateWorkshopProject({ projectId: project.id, workingTitle, folder, notes, tags: project.tags ?? [] });
+      setWorkshopProjects((projects) => projects.map((item) => item.id === project.id ? { ...item, workingTitle, folder, notes } : item));
+      toast.success('Workshop project details updated.');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Failed to update Workshop project'); }
+    finally { setWorkshopBusyId(null); }
+  }
+
   async function downloadWorkshopArtifact(projectId: string, buildId: string, kind: 'fvwf' | 'zpk') {
     setWorkshopBusyId(buildId);
     try {
@@ -110,13 +126,34 @@ export function AdminOpsPage() {
   }
 
   async function changeWorkshopLifecycle(projectId: string, buildId: string, action: 'TRASH' | 'RESTORE') {
+    const reason = action === 'TRASH' ? window.prompt('Why is this test build being moved to Trash?')?.trim() : undefined;
+    if (action === 'TRASH' && !reason) return;
     setWorkshopBusyId(buildId);
     try {
-      const result = await setWorkshopBuildLifecycle(projectId, buildId, action);
+      const result = await setWorkshopBuildLifecycle(projectId, buildId, action, reason);
       setWorkshopProjects((projects) => projects.map((project) => ({ ...project, builds: project.builds.map((build) => build.id === buildId ? { ...build, state: result.state } : build) })));
       toast.success(`${buildId} ${action === 'TRASH' ? 'moved to Trash' : 'restored'}.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Workshop lifecycle update failed');
+    } finally {
+      setWorkshopBusyId(null);
+    }
+  }
+
+  async function deleteWorkshopBuildPermanently(projectId: string, buildId: string) {
+    const confirmation = `DELETE ${projectId}/${buildId}`;
+    if (window.prompt(`Permanent deletion removes the private FVWF, Test ZPK, and previews. Type: ${confirmation}`) !== confirmation) return;
+    setWorkshopBusyId(buildId);
+    try {
+      await permanentlyDeleteWorkshopBuild(projectId, buildId, confirmation);
+      setWorkshopProjects((projects) => projects.map((project) => ({
+        ...project,
+        builds: project.builds.filter((build) => build.id !== buildId),
+      })));
+      if (releaseBuild?.projectId === projectId && releaseBuild.buildId === buildId) setReleaseBuild(null);
+      toast.success(`${buildId} permanently deleted.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Workshop permanent deletion failed');
     } finally {
       setWorkshopBusyId(null);
     }
@@ -390,6 +427,7 @@ export function AdminOpsPage() {
                       <p className="text-sm font-medium text-[#e9edf5]">{project.workingTitle}</p>
                       <p className="text-[10px] font-mono text-[#6b7a8d]">{project.id} · {project.buildCount} builds · {(project.storageBytes / 1024 / 1024).toFixed(1)} MB</p>
                     </div>
+                    <Button onClick={() => editWorkshopProject(project)} disabled={workshopBusyId === project.id} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">Edit Project</Button>
                   </div>
                   <div className="mt-3 space-y-2">
                     {project.builds.map((build) => {
@@ -414,11 +452,14 @@ export function AdminOpsPage() {
                           <Button onClick={() => downloadWorkshopArtifact(project.id, build.id, 'zpk')} disabled={busy} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">
                             <Download className="h-3.5 w-3.5 mr-1" /> Test ZPK
                           </Button>
-                          <Button onClick={() => approveBuild(project.id, build.id)} disabled={busy || build.state === 'APPROVED'} variant="outline" className="h-8 border-emerald-900 text-emerald-300">
+                          <Button onClick={() => approveBuild(project.id, build.id)} disabled={busy || build.state !== 'TESTING'} variant="outline" className="h-8 border-emerald-900 text-emerald-300">
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
                           </Button>
                           {build.state === 'TRASHED' ? (
-                            <Button onClick={() => changeWorkshopLifecycle(project.id, build.id, 'RESTORE')} disabled={busy} variant="outline" className="h-8 border-amber-800 text-amber-300">Restore</Button>
+                            <>
+                              <Button onClick={() => changeWorkshopLifecycle(project.id, build.id, 'RESTORE')} disabled={busy} variant="outline" className="h-8 border-amber-800 text-amber-300">Restore</Button>
+                              <Button onClick={() => deleteWorkshopBuildPermanently(project.id, build.id)} disabled={busy} variant="outline" className="h-8 border-red-900 text-red-400">Delete Permanently</Button>
+                            </>
                           ) : (
                             <Button onClick={() => changeWorkshopLifecycle(project.id, build.id, 'TRASH')} disabled={busy || build.state === 'PROMOTED'} variant="outline" className="h-8 border-red-900 text-red-400">Trash</Button>
                           )}
@@ -623,8 +664,9 @@ export function AdminOpsPage() {
         </div>
       </div>
 
-      {storeArchitectureFlags.productHierarchy && <div className="rounded-2xl border border-violet-900/70 bg-[#11151b] p-6 space-y-3">
-        <h2 className="text-lg font-semibold text-[#e9edf5]">Legacy Migration</h2>
+      {storeArchitectureFlags.productHierarchy && <details className="rounded-2xl border border-[#343946] bg-[#0d1117] p-6 space-y-3">
+        <summary className="cursor-pointer text-sm font-semibold text-[#9ba6b8]">Legacy tools — one-time recovery and diagnostics only</summary>
+        <h2 className="pt-3 text-lg font-semibold text-[#e9edf5]">Legacy Migration</h2>
         <p className="text-sm text-[#9ba6b8]">Creates one temporary Design Model and SKU per legacy face. It never guesses colors, editions, or artistic families, and never modifies legacy orders or binaries.</p>
         <div className="flex flex-wrap gap-2"><Button onClick={runMigrationDryRun} disabled={!canRun || migrationBusy} variant="outline">Run Dry-Run</Button><Button onClick={loadMigrationQueue} disabled={!canRun || migrationBusy} variant="outline">Load Classification Queue</Button>{migrationReport && <Button onClick={applyMigration} disabled={migrationBusy || migrationReport.storage.missingZpkIds.length > 0} className="bg-violet-700 text-white">Apply Saved Plan</Button>}</div>
         <div className="flex flex-wrap gap-2"><Button onClick={() => runZpkAudit(true)} disabled={!canRun || migrationBusy} variant="outline">Start Read-Only ZPK Audit</Button>{zpkAudit.length > 0 && zpkAuditCursor && <Button onClick={() => runZpkAudit(false)} disabled={migrationBusy} variant="outline">Audit Next 5</Button>}</div>
@@ -645,7 +687,7 @@ export function AdminOpsPage() {
           {migrationReport.storage.missingZpkIds.length > 0 && <p className="text-red-300">Apply blocked: missing ZPKs for {migrationReport.storage.missingZpkIds.join(', ')}</p>}
         </div>}
         {migrationQueue.length > 0 && <div className="max-h-56 overflow-auto rounded-lg border border-[#303744] text-xs">{migrationQueue.map((entry) => <div key={entry.id} className="border-b border-[#252d38] p-3"><p className="text-white">{entry.legacyWatchfaceId} · {entry.status}</p><p className="text-[10px] text-[#738095]">Needs: {entry.requiredFields.join(', ')}</p>{entry.warnings.length > 0 && <p className="text-amber-300">{entry.warnings.join(', ')}</p>}</div>)}</div>}
-      </div>}
+      </details>}
 
       <div className="rounded-2xl border border-[#2f3642] bg-[#11151b] p-6 space-y-3">
         <h2 className="text-lg font-semibold text-[#e9edf5]">Storage Maintenance</h2>

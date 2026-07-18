@@ -21,6 +21,9 @@ export interface WorkshopProjectSummary {
   createdAt: string | null;
   updatedAt: string | null;
   builds: WorkshopBuildSummary[];
+  folder?: string;
+  notes?: string;
+  tags?: string[];
 }
 
 interface UploadTarget {
@@ -73,6 +76,10 @@ export async function createWorkshopProject(input: {
   });
 }
 
+export async function updateWorkshopProject(input: { projectId: string; workingTitle: string; folder?: string; notes?: string; tags?: string[] }): Promise<void> {
+  await adminFetch('workshopUpdateProject', { method: 'POST', body: JSON.stringify(input) });
+}
+
 export async function createWorkshopBuild(input: {
   projectId: string;
   workshopLabel: string;
@@ -100,23 +107,34 @@ export async function createWorkshopBuild(input: {
       hasAodPreview: Boolean(input.aodPreview),
     }),
   });
+  try {
+    await Promise.all([
+      uploadSignedArtifact(session.uploads.fvwf, input.fvwf),
+      uploadSignedArtifact(session.uploads.zpk, input.zpk),
+      ...(input.mainPreview && session.uploads.mainPreview
+        ? [uploadSignedArtifact(session.uploads.mainPreview, input.mainPreview)]
+        : []),
+      ...(input.aodPreview && session.uploads.aodPreview
+        ? [uploadSignedArtifact(session.uploads.aodPreview, input.aodPreview)]
+        : []),
+    ]);
 
-  await Promise.all([
-    uploadSignedArtifact(session.uploads.fvwf, input.fvwf),
-    uploadSignedArtifact(session.uploads.zpk, input.zpk),
-    ...(input.mainPreview && session.uploads.mainPreview
-      ? [uploadSignedArtifact(session.uploads.mainPreview, input.mainPreview)]
-      : []),
-    ...(input.aodPreview && session.uploads.aodPreview
-      ? [uploadSignedArtifact(session.uploads.aodPreview, input.aodPreview)]
-      : []),
-  ]);
-
-  const finalized = await adminFetch<{ storageBytes: number }>('workshopFinalizeBuild', {
-    method: 'POST',
-    body: JSON.stringify({ projectId: session.projectId, buildId: session.buildId }),
-  });
-  return { ...session, storageBytes: finalized.storageBytes };
+    const finalized = await adminFetch<{ storageBytes: number }>('workshopFinalizeBuild', {
+      method: 'POST',
+      body: JSON.stringify({ projectId: session.projectId, buildId: session.buildId }),
+    });
+    return { ...session, storageBytes: finalized.storageBytes };
+  } catch (error) {
+    try {
+      await adminFetch('workshopAbortBuild', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: session.projectId, buildId: session.buildId }),
+      });
+    } catch (abortError) {
+      console.error('Workshop reservation cleanup failed', abortError);
+    }
+    throw error;
+  }
 }
 
 export async function fetchWorkshopProjects(): Promise<WorkshopProjectSummary[]> {
@@ -150,9 +168,16 @@ export async function approveWorkshopBuild(projectId: string, buildId: string): 
   });
 }
 
-export async function setWorkshopBuildLifecycle(projectId: string, buildId: string, action: 'TRASH' | 'RESTORE'): Promise<{ state: WorkshopBuildSummary['state'] }> {
+export async function setWorkshopBuildLifecycle(projectId: string, buildId: string, action: 'TRASH' | 'RESTORE', reason?: string): Promise<{ state: WorkshopBuildSummary['state'] }> {
   return adminFetch('adminWorkshopBuildLifecycle', {
     method: 'POST',
-    body: JSON.stringify({ projectId, buildId, action }),
+    body: JSON.stringify({ projectId, buildId, action, reason }),
+  });
+}
+
+export async function permanentlyDeleteWorkshopBuild(projectId: string, buildId: string, confirmation: string): Promise<void> {
+  await adminFetch('adminWorkshopBuildPermanentDelete', {
+    method: 'POST',
+    body: JSON.stringify({ projectId, buildId, confirmation }),
   });
 }
