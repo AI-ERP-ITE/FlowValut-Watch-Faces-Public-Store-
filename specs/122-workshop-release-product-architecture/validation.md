@@ -156,4 +156,7 @@ Spec 122 cannot be marked complete while any required migration, entitlement, de
 - `adminLegacyMigration` was deployed alone to `zeppfaceloader-b0b106e9` and appears in the function inventory as Node.js 20, `us-central1`, 1024 MB.
 - Live unauthenticated GET returned HTTP 401 `Missing bearer token`, confirming the migration/report/queue surface is admin-only.
 - Runtime commits: app `034f00f0`; Firebase root `84b5bf27`.
-- Production dry-run/backfill remains pending an authenticated Admin session; cutover flags remain disabled and Pages were not deployed.
+- Authenticated production dry-run reported 200 legacy records (1 visible, 199 retained offline), 9 orders, 9 tokens, 573.5 MB managed Storage, 257 unexplained objects, and zero missing ZPK files. Plan hash: `3bbcb243d9e10715f7e03adc691ad03c846fdc858a4f2a698a8440afcf1cd19b`.
+- The first apply attempt made no writes because mixed-case Firestore report IDs were incorrectly normalized to lowercase. The endpoint now validates report IDs without changing case; all 9 backend tests passed and `adminLegacyMigration` version 2 deployed successfully on 2026-07-18.
+- The fresh saved plan applied successfully: the Admin classification queue contains the temporary one-to-one records in `PENDING` state, including explicit `UNKNOWN_TECHNICAL_TARGET` warnings where source technical identity is unknown.
+- The 257 unexplained Storage objects remain untouched. Public cutover flags remain disabled pending investigation of the 9 historical orders, whose `productId` values did not directly match current legacy watchface document IDs (`mappedOrderProductCount: 0`).
