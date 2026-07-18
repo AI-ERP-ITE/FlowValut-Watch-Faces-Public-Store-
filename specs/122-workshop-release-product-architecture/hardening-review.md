@@ -1,6 +1,6 @@
 # Spec 122 Post-Audit Hardening Review
 
-**Status:** Isolated candidate built and validated; not deployed  
+**Status:** Private candidate deployed and live-verified  
 **Deployment rule:** Build the eventual candidate from an isolated clean checkout and deploy only after explicit user approval.
 
 ## Spec 122-owned changes
@@ -38,6 +38,18 @@ These files are preserved in the shared working tree but are not automatically a
 
 ## Deployment blockers
 
-1. Receive explicit user approval for the isolated candidate.
-2. Deploy the candidate Functions before the private UI so Workshop requests cannot target missing endpoints.
-3. Verify the live Functions list, CORS behavior, Studio ZPK/Workshop save, Admin project listing, and deployed bundle hash.
+No deployment blocker remains for the approved private candidate. A user-authenticated Studio ZPK → Workshop Build smoke test remains the final hands-on acceptance step.
+
+## Deployment record — 2026-07-18
+
+- Firebase project: `zeppfaceloader-b0b106e9`
+- Functions deployment: 52 deployed, 0 errors
+- Functions source hash: `8cf208b7abbd6562a0df303d6345d645fa507914`
+- Required Workshop endpoints: active in `us-central1`
+- Private origin commit: `c5536bade6054207520700012f4e009cfc8ce8f9`
+- Private bundle: `index-CBlBrWUl.js`
+- Live root, Studio, and Parametric routes: HTTP 200 with identical bundle hash
+- Workshop GET and authenticated POST preflights: HTTP 204 with expected CORS methods and headers
+- Deployed bundle contains the local-ZPK preservation fallback
+
+Operational follow-up: upgrade the deprecated Node.js 20 runtime and Firebase Functions SDK in a separate compatibility-tested change. The dependency audit also reports known vulnerabilities that should be reviewed separately rather than auto-fixed during this deployment.

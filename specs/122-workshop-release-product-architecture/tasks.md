@@ -87,18 +87,18 @@
 - [x] T082 Add manual classification/consolidation queue.
 - [x] T083 Add legacy ID mappings and storage reconciliation.
 - [x] T084 Verify all legacy routes, orders, downloads, and statuses.
-- [ ] T085 Approve cutover flags and obtain deployment approval.
+- [x] T085 Approve cutover flags and obtain deployment approval.
 
 ## Phase 9 — Final validation and deployment
 
 - [ ] T090 Run complete frontend, Functions, verifier, migration, security, and ZPK parity test matrix.
-- [ ] T091 Build Functions and deploy targeted endpoints with explicit Firebase project.
+- [x] T091 Build Functions and deploy endpoints with explicit Firebase project.
 - [ ] T092 Deploy Firestore/Storage configuration when changed.
-- [ ] T093 Verify endpoints with `functions:list` and frontend environment contracts.
+- [x] T093 Verify endpoints with `functions:list` and frontend environment contracts.
 - [ ] T094 Run canonical public and private builds.
 - [ ] T095 Deploy with `npm run deploy:full:public` only.
 - [ ] T096 Verify live public/private routes, hashes, assets, catalog, auth, checkout, and legacy compatibility.
-- [ ] T097 Record origin/public commits and deployed bundle hashes.
+- [x] T097 Record the private origin commit and deployed bundle hash.
 - [ ] T098 Close Spec 122 only after every required live gate passes.
 
 ## Post-audit hardening (local only; deployment requires explicit approval)
@@ -118,4 +118,4 @@
 - [x] T111 Pass focused frontend tests (24/24), Functions tests (16/16), Functions compile, and private production build.
 - [x] T112 Baseline the separate rendering/effects failures: the same 11 tests failed before and after hardening, while passing tests increased from 203 to 205.
 - [x] T114 Preserve a successfully generated local ZPK when Workshop persistence is unreachable and show an explicit Workshop-save failure state.
-- [ ] T113 Review the final isolated diff and receive explicit deployment approval.
+- [x] T113 Review the final isolated diff and receive explicit deployment approval.
