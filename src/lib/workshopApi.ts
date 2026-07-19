@@ -1,4 +1,5 @@
 import { adminFetch } from '@/lib/studioFirebasePublishApi';
+import { generateQRCode } from '@/lib/qrGenerator';
 
 export interface WorkshopBuildSummary {
   id: string;
@@ -38,18 +39,25 @@ interface BuildSession {
   uploads: {
     fvwf: UploadTarget;
     zpk: UploadTarget;
+    qr: UploadTarget;
     mainPreview?: UploadTarget;
     aodPreview?: UploadTarget;
   };
+  installUrl: string;
 }
 
-async function uploadSignedArtifact(target: UploadTarget, blob: Blob): Promise<void> {
-  const response = await fetch(target.url, {
-    method: 'PUT',
-    headers: { 'Content-Type': target.contentType },
-    body: blob,
-  });
-  if (!response.ok) throw new Error(`Workshop artifact upload failed (${response.status})`);
+async function uploadSignedArtifact(kind: string, target: UploadTarget, blob: Blob): Promise<void> {
+  try {
+    const response = await fetch(target.url, {
+      method: 'PUT',
+      headers: { 'Content-Type': target.contentType },
+      body: blob,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'network error';
+    throw new Error(`Workshop ${kind} upload failed: ${detail}`);
+  }
 }
 
 export function dataUrlToBlob(dataUrl: string): Blob {
@@ -92,7 +100,7 @@ export async function createWorkshopBuild(input: {
   zpk: Blob;
   mainPreview?: Blob;
   aodPreview?: Blob;
-}): Promise<{ projectId: string; buildId: string; buildNumber: number; storageBytes: number }> {
+}): Promise<{ projectId: string; buildId: string; buildNumber: number; storageBytes: number; installUrl: string; qrDataUrl: string }> {
   const session = await adminFetch<BuildSession>('workshopCreateBuildSession', {
     method: 'POST',
     body: JSON.stringify({
@@ -108,14 +116,17 @@ export async function createWorkshopBuild(input: {
     }),
   });
   try {
+    const qrDataUrl = await generateQRCode(session.installUrl);
+    const qr = dataUrlToBlob(qrDataUrl);
     await Promise.all([
-      uploadSignedArtifact(session.uploads.fvwf, input.fvwf),
-      uploadSignedArtifact(session.uploads.zpk, input.zpk),
+      uploadSignedArtifact('FVWF', session.uploads.fvwf, input.fvwf),
+      uploadSignedArtifact('ZPK', session.uploads.zpk, input.zpk),
+      uploadSignedArtifact('QR', session.uploads.qr, qr),
       ...(input.mainPreview && session.uploads.mainPreview
-        ? [uploadSignedArtifact(session.uploads.mainPreview, input.mainPreview)]
+        ? [uploadSignedArtifact('main preview', session.uploads.mainPreview, input.mainPreview)]
         : []),
       ...(input.aodPreview && session.uploads.aodPreview
-        ? [uploadSignedArtifact(session.uploads.aodPreview, input.aodPreview)]
+        ? [uploadSignedArtifact('AOD preview', session.uploads.aodPreview, input.aodPreview)]
         : []),
     ]);
 
@@ -123,7 +134,7 @@ export async function createWorkshopBuild(input: {
       method: 'POST',
       body: JSON.stringify({ projectId: session.projectId, buildId: session.buildId }),
     });
-    return { ...session, storageBytes: finalized.storageBytes };
+    return { ...session, storageBytes: finalized.storageBytes, qrDataUrl };
   } catch (error) {
     try {
       await adminFetch('workshopAbortBuild', {
@@ -145,7 +156,7 @@ export async function fetchWorkshopProjects(): Promise<WorkshopProjectSummary[]>
 export async function getWorkshopArtifactUrl(input: {
   projectId: string;
   buildId: string;
-  kind: 'fvwf' | 'zpk' | 'mainPreview' | 'aodPreview';
+  kind: 'fvwf' | 'zpk' | 'qr' | 'mainPreview' | 'aodPreview';
 }): Promise<string> {
   const result = await adminFetch<{ url: string }>('workshopArtifactAccess', {
     method: 'POST',

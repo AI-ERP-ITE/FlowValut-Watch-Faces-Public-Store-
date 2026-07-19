@@ -118,4 +118,7 @@
 - [x] T111 Pass focused frontend tests (24/24), Functions tests (16/16), Functions compile, and private production build.
 - [x] T112 Baseline the separate rendering/effects failures: the same 11 tests failed before and after hardening, while passing tests increased from 203 to 205.
 - [x] T114 Preserve a successfully generated local ZPK when Workshop persistence is unreachable and show an explicit Workshop-save failure state.
+- [x] T115 Preserve the established ZPK/QR artifact generation and move its output to the exact immutable Workshop Build path without store publication.
+- [x] T116 Retain the exact generated FVWF/ZPK pair for an in-session Workshop retry without rebuilding.
+- [x] T117 Report artifact-specific upload failures and expose an explicit zero-build Project state in Admin.
 - [x] T113 Review the final isolated diff and receive explicit deployment approval.

@@ -17,9 +17,9 @@ describe('workshopApi artifact conversion', () => {
     expect(Array.from(new Uint8Array(await blob.arrayBuffer()))).toEqual([1, 2, 3]);
   });
 
-  it('passes parent lineage and finalizes only after both required artifacts upload', async () => {
+  it('passes parent lineage and finalizes only after FVWF, ZPK, and QR upload', async () => {
     adminFetchMock
-      .mockResolvedValueOnce({ projectId: 'project-1', buildId: 'build-0002', buildNumber: 2, uploads: { fvwf: { url: 'https://upload/fvwf', contentType: 'application/json' }, zpk: { url: 'https://upload/zpk', contentType: 'application/octet-stream' } } })
+      .mockResolvedValueOnce({ projectId: 'project-1', buildId: 'build-0002', buildNumber: 2, installUrl: 'https://functions/workshopTestZpk?projectId=project-1&buildId=build-0002', uploads: { fvwf: { url: 'https://upload/fvwf', contentType: 'application/json' }, zpk: { url: 'https://upload/zpk', contentType: 'application/octet-stream' }, qr: { url: 'https://upload/qr', contentType: 'image/png' } } })
       .mockResolvedValueOnce({ storageBytes: 12 });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
@@ -28,17 +28,20 @@ describe('workshopApi artifact conversion', () => {
     expect(JSON.parse(adminFetchMock.mock.calls[0][1].body)).toMatchObject({ parentBuildId: 'build-0001' });
     expect(adminFetchMock.mock.calls[1][0]).toBe('workshopFinalizeBuild');
     expect(result.storageBytes).toBe(12);
+    expect(result.installUrl).toContain('workshopTestZpk');
+    expect(result.qrDataUrl).toMatch(/^data:image\/png;base64,/);
   });
 
   it('aborts the reserved build when an artifact upload fails', async () => {
     adminFetchMock
-      .mockResolvedValueOnce({ projectId: 'project-1', buildId: 'build-0003', buildNumber: 3, uploads: { fvwf: { url: 'https://upload/fvwf', contentType: 'application/json' }, zpk: { url: 'https://upload/zpk', contentType: 'application/octet-stream' } } })
+      .mockResolvedValueOnce({ projectId: 'project-1', buildId: 'build-0003', buildNumber: 3, installUrl: 'https://functions/workshopTestZpk?projectId=project-1&buildId=build-0003', uploads: { fvwf: { url: 'https://upload/fvwf', contentType: 'application/json' }, zpk: { url: 'https://upload/zpk', contentType: 'application/octet-stream' }, qr: { url: 'https://upload/qr', contentType: 'image/png' } } })
       .mockResolvedValueOnce({ ok: true });
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({ ok: false, status: 500 }));
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: true }));
 
-    await expect(createWorkshopBuild({ projectId: 'project-1', workshopLabel: 'Broken', resolution: { width: 480, height: 480 }, fvwf: new Blob(['{}']), zpk: new Blob(['zpk']) })).rejects.toThrow('Workshop artifact upload failed');
+    await expect(createWorkshopBuild({ projectId: 'project-1', workshopLabel: 'Broken', resolution: { width: 480, height: 480 }, fvwf: new Blob(['{}']), zpk: new Blob(['zpk']) })).rejects.toThrow('Workshop ZPK upload failed: HTTP 500');
     expect(adminFetchMock.mock.calls[1][0]).toBe('workshopAbortBuild');
     expect(JSON.parse(adminFetchMock.mock.calls[1][1].body)).toEqual({ projectId: 'project-1', buildId: 'build-0003' });
   });

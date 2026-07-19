@@ -9,6 +9,9 @@
 - Verify the saved `.fvwf` corresponds to the exact paired ZPK build state.
 - Open a historical build in a new Studio tab and create the next linked build.
 - Reject unauthorized FVWF/ZPK fetches and uploads.
+- Generate and store the established Zepp direct-install QR beside the exact finalized Workshop Test ZPK, using a stable Workshop ZPK path without publishing the build.
+- Preserve the already-generated FVWF/ZPK pair after a Workshop upload failure and retry those same artifacts without rebuilding.
+- Show an explicit empty-project state instead of silently hiding approval/release controls when no build finalized.
 
 ## Naming and release wizard
 

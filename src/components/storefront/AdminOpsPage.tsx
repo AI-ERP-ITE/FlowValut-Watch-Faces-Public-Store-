@@ -62,6 +62,7 @@ export function AdminOpsPage() {
   const [loadingWorkshop, setLoadingWorkshop] = useState(false);
   const [workshopBusyId, setWorkshopBusyId] = useState<string | null>(null);
   const [releaseBuild, setReleaseBuild] = useState<{ projectId: string; buildId: string; target?: string } | null>(null);
+  const [workshopQr, setWorkshopQr] = useState<{ projectId: string; buildId: string; dataUrl: string } | null>(null);
   const [migrationReport, setMigrationReport] = useState<LegacyMigrationReport | null>(null);
   const [migrationQueue, setMigrationQueue] = useState<LegacyClassificationEntry[]>([]);
   const [migrationBusy, setMigrationBusy] = useState(false);
@@ -104,6 +105,19 @@ export function AdminOpsPage() {
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to open Workshop artifact');
+    } finally {
+      setWorkshopBusyId(null);
+    }
+  }
+
+  async function showWorkshopInstallQr(projectId: string, buildId: string) {
+    setWorkshopBusyId(buildId);
+    try {
+      const qrUrl = await getWorkshopArtifactUrl({ projectId, buildId, kind: 'qr' });
+      setWorkshopQr({ projectId, buildId, dataUrl: qrUrl });
+      toast.success('Installation QR loaded for this exact Test ZPK.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to generate Workshop installation QR');
     } finally {
       setWorkshopBusyId(null);
     }
@@ -430,6 +444,12 @@ export function AdminOpsPage() {
                     <Button onClick={() => editWorkshopProject(project)} disabled={workshopBusyId === project.id} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">Edit Project</Button>
                   </div>
                   <div className="mt-3 space-y-2">
+                    {project.builds.length === 0 && (
+                      <div className="rounded border border-amber-900/70 bg-amber-950/20 p-3 text-xs text-amber-200">
+                        <p className="font-medium">No completed Watch Test exists in this project.</p>
+                        <p className="mt-1 text-[10px] text-[#a99b82]">A previous upload may have stopped before its FVWF/ZPK pair was finalized. Return to Studio and retry the saved artifacts; approval and release become available only after a complete build appears here.</p>
+                      </div>
+                    )}
                     {project.builds.map((build) => {
                       const busy = workshopBusyId === build.id;
                       return (
@@ -452,6 +472,9 @@ export function AdminOpsPage() {
                           <Button onClick={() => downloadWorkshopArtifact(project.id, build.id, 'zpk')} disabled={busy} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">
                             <Download className="h-3.5 w-3.5 mr-1" /> Test ZPK
                           </Button>
+                          <Button onClick={() => showWorkshopInstallQr(project.id, build.id)} disabled={busy} variant="outline" className="h-8 border-cyan-800 text-cyan-300">
+                            Install QR
+                          </Button>
                           <Button onClick={() => approveBuild(project.id, build.id)} disabled={busy || build.state !== 'TESTING'} variant="outline" className="h-8 border-emerald-900 text-emerald-300">
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
                           </Button>
@@ -467,6 +490,13 @@ export function AdminOpsPage() {
                         </div>
                       );
                     })}
+                    {workshopQr?.projectId === project.id && (
+                      <div className="rounded-lg border border-cyan-800 bg-cyan-950/20 p-3 text-center">
+                        <p className="mb-2 text-xs font-medium text-cyan-200">Direct installation QR · {workshopQr.buildId}</p>
+                        <img src={workshopQr.dataUrl} alt="Zepp direct Test ZPK installation QR" className="mx-auto h-52 w-52 rounded bg-white p-2" />
+                        <p className="mt-2 text-[10px] text-[#8f9aac]">This is the QR generated with the build. It installs the exact saved Test ZPK and does not publish it to the store.</p>
+                      </div>
+                    )}
                   </div>
                   {releaseBuild?.projectId === project.id && <div className="mt-3"><ReleaseWizard projectId={releaseBuild.projectId} buildId={releaseBuild.buildId} defaultTarget={releaseBuild.target} /></div>}
                 </div>

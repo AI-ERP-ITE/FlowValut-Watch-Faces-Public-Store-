@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, RefreshCw, Sparkles, Wand2, Settings, Eye, EyeOff, Grid3X3, Undo2, Redo2, Plus, FlaskConical, AlertTriangle, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,7 @@ import type { HandStyleKey } from '@/lib/handStyles';
 import { generateWeatherSet } from '@/lib/weatherIconSets';
 
 import { buildSourceJson } from '@/lib/sourceJsonGenerator';
+import { captureStorePreviews } from '@/lib/storePreviewCapture';
 import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 import { PublishForm } from '@/components/PublishForm';
 import { AdminPanel } from '@/components/AdminPanel';
@@ -106,6 +106,18 @@ interface PendingProjectLoad {
   restoreBackground: boolean;
   targetResolution: CanvasResolution;
   targetWatchModel: string;
+}
+
+interface PendingWorkshopSave {
+  projectId: string | null;
+  workshopLabel: string;
+  resolution: { width: number; height: number };
+  specGroup?: string;
+  parentBuildId?: string;
+  fvwf: Blob;
+  zpk: Blob;
+  mainPreview?: Blob;
+  aodPreview?: Blob;
 }
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
@@ -2044,9 +2056,9 @@ function StudioApp() {
 
   // Canvas-only override: inject custom switcher slot dataUrls into el.images[] for preview.
   // This does NOT mutate stored state — it's a derived render-only view.
-  const canvasElements = useMemo(() => {
-    if (switcherDefinitions.length === 0) return activeElements;
-    return activeElements.map(el => {
+  const resolveCanvasElements = useCallback((elements: WatchFaceElement[]) => {
+    if (switcherDefinitions.length === 0) return elements;
+    return elements.map(el => {
       if (el.type !== 'IMG_LEVEL' || !el.imageSwitcherDefinitionId) return el;
       const def = switcherDefinitions.find(d => d.id === el.imageSwitcherDefinitionId);
       if (!def) return el;
@@ -2055,7 +2067,19 @@ function StudioApp() {
       if (dataUrls.length === 0) return el;
       return { ...el, images: dataUrls };
     });
-  }, [activeElements, switcherDefinitions]);
+  }, [switcherDefinitions]);
+  const canvasElements = useMemo(
+    () => resolveCanvasElements(activeElements),
+    [activeElements, resolveCanvasElements],
+  );
+  const mainCaptureElements = useMemo(
+    () => resolveCanvasElements(state.watchFaceConfig?.elements ?? []),
+    [resolveCanvasElements, state.watchFaceConfig],
+  );
+  const aodCaptureElements = useMemo(
+    () => resolveCanvasElements(aodElements ?? []),
+    [aodElements, resolveCanvasElements],
+  );
   const activeResolutionW = state.watchFaceConfig?.resolution?.width ?? 480;
   const activeResolutionH = state.watchFaceConfig?.resolution?.height ?? activeResolutionW;
   const activeResolution = activeResolutionW;
@@ -2070,6 +2094,13 @@ function StudioApp() {
     if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
     return state.backgroundImage;
   }, [editorMode, aodElements, state.backgroundImage, aodBackgroundMode, aodSolidBackgroundImage, aodBackgroundImage]);
+  const aodCaptureBackgroundImage = useMemo(() => {
+    if (!aodElements) return state.backgroundImage;
+    if (aodBackgroundMode === 'NONE_BLACK') return null;
+    if (aodBackgroundMode === 'SOLID_COLOR') return aodSolidBackgroundImage;
+    if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') return aodBackgroundImage;
+    return state.backgroundImage;
+  }, [aodBackgroundImage, aodBackgroundMode, aodElements, aodSolidBackgroundImage, state.backgroundImage]);
   const activeBackgroundTransform = useMemo(
     () => (editorMode === 'AOD' && aodElements ? aodBackgroundTransform : mainBackgroundTransform),
     [aodBackgroundTransform, aodElements, editorMode, mainBackgroundTransform],
@@ -2274,6 +2305,8 @@ function StudioApp() {
     [addElType, addElSubtype]
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mainPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const aodPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const pointerParitySnapshotsRef = useRef<Partial<Record<PointerParityStage, ImageData>>>({});
   const pointerParityMissingAssetsRef = useRef<string[]>([]);
   const [pointerParityResult, setPointerParityResult] = useState<PointerParityResult | null>(null);
@@ -2720,6 +2753,8 @@ function StudioApp() {
     () => new URLSearchParams(window.location.search).get('build'),
   );
   const [workshopSaveError, setWorkshopSaveError] = useState<string | null>(null);
+  const [pendingWorkshopSave, setPendingWorkshopSave] = useState<PendingWorkshopSave | null>(null);
+  const [retryingWorkshopSave, setRetryingWorkshopSave] = useState(false);
   const workshopDeepLinkLoadedRef = useRef(false);
   const [latestUploadResult, setLatestUploadResult] = useState<StudioUploadResult | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
@@ -3387,11 +3422,6 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     // Temporarily hide grid so it doesn't appear in the preview screenshot
     const gridWasOn = showGrid;
     if (gridWasOn) setShowGrid(false);
-    // Temporarily force MAIN mode so preview always shows the main watchface (not AOD)
-    const prevEditorMode = editorMode;
-    if (editorMode === 'AOD') {
-      flushSync(() => setEditorMode('MAIN'));
-    }
     // Temporarily hide flicker overlay so it doesn't bake into the preview
     const flickerWasOn = flickerOverlayEnabled;
     if (flickerWasOn) setFlickerOverlayEnabled(false);
@@ -3402,24 +3432,18 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     let previewDataUrl: string | null = null;
     let aodPreviewDataUrl: string | null = null;
     try {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        previewDataUrl = canvas.toDataURL('image/png');
-        setPreviewImageUrl(previewDataUrl);
-        console.log('[App] Canvas screenshot captured, size:', previewDataUrl.length);
-        capturePointerParitySnapshotFromCanvas('composer-preview');
-
-        if (aodElements) {
-          // Commit the mode change before waiting for InteractiveCanvas' RAF draw.
-          // Without flushSync, React can defer this update and the two captures can
-          // read the opposite mode from the shared canvas.
-          flushSync(() => setEditorMode('AOD'));
-          await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-          aodPreviewDataUrl = canvasRef.current?.toDataURL('image/png') ?? previewDataUrl;
-        } else {
-          aodPreviewDataUrl = previewDataUrl;
-        }
-      }
+      const mainCanvas = mainPreviewCanvasRef.current;
+      if (!mainCanvas) throw new Error('Main preview canvas unavailable');
+      const captures = await captureStorePreviews({
+        mainCanvas,
+        aodCanvas: aodPreviewCanvasRef.current,
+        hasExplicitAod: !!aodElements,
+      });
+      previewDataUrl = captures.main;
+      aodPreviewDataUrl = captures.aod;
+      setPreviewImageUrl(previewDataUrl);
+      console.log('[App] Isolated Main/AOD previews captured');
+      capturePointerParitySnapshotFromCanvas('composer-preview');
     } catch (e) {
       console.warn('[App] Canvas capture failed (tainted?), falling back to backgroundImage', e);
       previewDataUrl = state.backgroundImage;
@@ -3427,9 +3451,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       if (previewDataUrl) setPreviewImageUrl(previewDataUrl);
     }
 
-    // Restore grid, editor mode, and flicker overlay after capture
+    // Restore grid and flicker overlay after capture
     if (gridWasOn) setShowGrid(true);
-    flushSync(() => setEditorMode(prevEditorMode));
     if (flickerWasOn) setFlickerOverlayEnabled(true);
 
     if (!state.watchFaceConfig) {
@@ -4243,6 +4266,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       )?.specGroup ?? null;
 
       if (storeArchitectureFlags.workshop) {
+        let pendingSave: PendingWorkshopSave | null = null;
         try {
           if (!workshopProjectBlob) throw new Error('Workshop project snapshot was not created');
           dispatch(actions.setLoadingMessage('Saving Workshop build...'));
@@ -4255,7 +4279,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             activeProjectId = project.projectId;
             setWorkshopProjectId(activeProjectId);
           }
-          const build = await createWorkshopBuild({
+          pendingSave = {
             projectId: activeProjectId,
             workshopLabel: configForBuild.name || `Watch test ${new Date().toISOString().slice(0, 10)}`,
             resolution: configForBuild.resolution,
@@ -4265,8 +4289,14 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             zpk: zpkResult.blob,
             mainPreview: previewDataUrl?.startsWith('data:') ? dataUrlToBlob(previewDataUrl) : undefined,
             aodPreview: aodPreviewDataUrl?.startsWith('data:') ? dataUrlToBlob(aodPreviewDataUrl) : undefined,
-          });
+          };
+          const build = await createWorkshopBuild({ ...pendingSave, projectId: activeProjectId });
           setWorkshopBuildId(build.buildId);
+          setPendingWorkshopSave(null);
+          setWorkshopSaveError(null);
+          dispatch(actions.setGithubUrl(build.installUrl));
+          dispatch(actions.setQrCode(build.qrDataUrl));
+          pendingSave = null;
           toast.success(`Watch test saved as Build ${String(build.buildNumber).padStart(3, '0')}.`);
         } catch (error) {
           const rawMessage = error instanceof Error ? error.message : 'Unknown Workshop save error';
@@ -4274,11 +4304,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             ? 'Workshop backend could not be reached. The local ZPK is safe and ready to download.'
             : `Workshop save failed: ${rawMessage}`;
           console.error('[App] Workshop save failed after local ZPK generation:', error);
+          if (pendingSave) setPendingWorkshopSave(pendingSave);
           setWorkshopSaveError(message);
           toast.error(message);
         }
-        dispatch(actions.setGithubUrl(''));
-        dispatch(actions.setQrCode(null));
         dispatch(actions.setStep('success'));
         return;
       }
@@ -4373,6 +4402,32 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       dispatch(actions.setLoading(false));
     }
   }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId, workshopBuildId]);
+
+  const retryWorkshopSave = useCallback(async () => {
+    if (!pendingWorkshopSave || retryingWorkshopSave) return;
+    setRetryingWorkshopSave(true);
+    try {
+      let activeProjectId = pendingWorkshopSave.projectId;
+      if (!activeProjectId) {
+        const project = await createWorkshopProject({ workingTitle: pendingWorkshopSave.workshopLabel, tags: [] });
+        activeProjectId = project.projectId;
+        setWorkshopProjectId(activeProjectId);
+      }
+      const build = await createWorkshopBuild({ ...pendingWorkshopSave, projectId: activeProjectId });
+      setWorkshopBuildId(build.buildId);
+      setPendingWorkshopSave(null);
+      setWorkshopSaveError(null);
+      dispatch(actions.setGithubUrl(build.installUrl));
+      dispatch(actions.setQrCode(build.qrDataUrl));
+      toast.success(`Workshop Build ${String(build.buildNumber).padStart(3, '0')} saved. Installation QR is ready.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Workshop retry error';
+      setWorkshopSaveError(`Workshop retry failed: ${message}`);
+      toast.error(`Workshop retry failed: ${message}`);
+    } finally {
+      setRetryingWorkshopSave(false);
+    }
+  }, [dispatch, pendingWorkshopSave, retryingWorkshopSave]);
 
   const handleGenerateClick = useCallback(() => {
     if (state.currentStep === 'generating') {
@@ -5048,6 +5103,51 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                       canvasShape={activeShape}
                       canvasCornerRadius={activeCornerRadius}
                     />
+                    <div
+                      aria-hidden="true"
+                      className="fixed left-[-10000px] top-0 h-px w-px overflow-hidden opacity-0 pointer-events-none"
+                    >
+                      <InteractiveCanvas
+                        ref={mainPreviewCanvasRef}
+                        backgroundImage={state.backgroundImage ?? undefined}
+                        backgroundTransform={mainBackgroundTransform}
+                        elements={mainCaptureElements}
+                        elementImages={state.elementImages}
+                        selectedElementId={null}
+                        extraSelectedIds={[]}
+                        showGrid={false}
+                        calibrationEnabled={calibrationEnabled}
+                        calibrationMode={calibrationMode}
+                        flickerAnalysisEnabled={false}
+                        flickerOverlayEnabled={false}
+                        customHandStyles={customHandStyles}
+                        canvasW={activeCanvasW}
+                        canvasH={activeCanvasH}
+                        canvasShape={activeShape}
+                        canvasCornerRadius={activeCornerRadius}
+                      />
+                      {aodElements && (
+                        <InteractiveCanvas
+                          ref={aodPreviewCanvasRef}
+                          backgroundImage={aodCaptureBackgroundImage ?? undefined}
+                          backgroundTransform={aodBackgroundTransform}
+                          elements={aodCaptureElements}
+                          elementImages={state.elementImages}
+                          selectedElementId={null}
+                          extraSelectedIds={[]}
+                          showGrid={false}
+                          calibrationEnabled={calibrationEnabled}
+                          calibrationMode={calibrationMode}
+                          flickerAnalysisEnabled={false}
+                          flickerOverlayEnabled={false}
+                          customHandStyles={customHandStyles}
+                          canvasW={activeCanvasW}
+                          canvasH={activeCanvasH}
+                          canvasShape={activeShape}
+                          canvasCornerRadius={activeCornerRadius}
+                        />
+                      )}
+                    </div>
                   </div>
                   <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(280px,340px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
                     <div className="space-y-4 xl:min-h-0 xl:pr-2">
@@ -5404,8 +5504,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
             {state.zpkBlob && (!state.qrCodeDataUrl || !state.githubUrl) && (
               <div className="rounded-xl border border-amber-700 bg-amber-950/30 p-4 space-y-3">
-                <p className="text-amber-300 text-sm font-medium">ZPK created locally. Upload did not complete.</p>
-                <p className="text-zinc-400 text-xs">You can still download and use the generated ZPK file.</p>
+                <p className="text-amber-300 text-sm font-medium">{workshopSaveError ? 'ZPK created locally. Workshop save did not complete.' : 'ZPK created locally. Installation QR is unavailable.'}</p>
+                <p className="text-zinc-400 text-xs">The exact generated ZPK is safe. Download it below or retry saving the same artifacts without rebuilding.</p>
                 <Button
                   onClick={() => {
                     const blobUrl = URL.createObjectURL(state.zpkBlob!);
@@ -5592,6 +5692,16 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                 <Button onClick={() => void commitProjectLoad(pendingProjectLoad, 'rearrange')}>
                   Rearrange positions
                 </Button>
+                {storeArchitectureFlags.workshop && pendingWorkshopSave && (
+                  <Button
+                    onClick={retryWorkshopSave}
+                    disabled={retryingWorkshopSave}
+                    className="w-full h-10 bg-cyan-600 hover:bg-cyan-500 text-white text-sm"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${retryingWorkshopSave ? 'animate-spin' : ''}`} />
+                    {retryingWorkshopSave ? 'Retrying Workshop Save...' : 'Retry Workshop Save & Generate QR'}
+                  </Button>
+                )}
               </div>
             </div>
           )}
