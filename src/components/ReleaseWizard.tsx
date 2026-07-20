@@ -15,8 +15,8 @@ function optionLabel(option: HierarchyOption) {
   return option.code ? `${option.name} · ${option.code}` : option.name;
 }
 
-function TextField({ label, value, disabled, onChange }: { label: string; value: string | number; disabled?: boolean; onChange: (value: string) => void }) {
-  return <label className="text-[10px] text-[#9ba6b8]">{label}<input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-60" /></label>;
+function TextField({ label, value, disabled, onChange, error }: { label: string; value: string | number; disabled?: boolean; onChange: (value: string) => void; error?: boolean }) {
+  return <label className={`text-[10px] ${error ? 'text-red-400' : 'text-[#9ba6b8]'}`}>{label}<input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={`mt-1 w-full rounded border ${error ? 'border-red-500/50 bg-red-950/20 text-red-100' : 'border-[#34354b] bg-[#0c0d14] text-white'} px-2 py-2 text-xs disabled:opacity-60`} /></label>;
 }
 
 export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { projectId: string; buildId: string; defaultTarget?: string }) {
@@ -32,11 +32,15 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
   const models = useMemo(() => snapshot?.productModels.filter((item) => collectionId !== NEW && item.parentId === collectionId) ?? [], [collectionId, snapshot]);
   const skus = useMemo(() => snapshot?.skus.filter((item) => modelId !== NEW && item.productModelId === modelId) ?? [], [modelId, snapshot]);
   const preview = useMemo(() => { try { return releaseWizardPreview(draft); } catch { return null; } }, [draft]);
-  const conflicts = snapshot ? [
-    dnaId === NEW ? findNormalizedConflict(draft.designDnaName, snapshot.designDnas) : null,
-    collectionId === NEW ? findNormalizedConflict(draft.collectionName, snapshot.collections) : null,
-    modelId === NEW ? findNormalizedConflict(draft.modelName, snapshot.productModels) : null,
-  ].filter(Boolean) : [];
+  const conflicts = useMemo(() => {
+    if (!snapshot) return { dna: null, collection: null, model: null };
+    return {
+      dna: dnaId === NEW ? findNormalizedConflict(draft.designDnaName, snapshot.designDnas) : null,
+      collection: collectionId === NEW ? findNormalizedConflict(draft.collectionName, snapshot.collections) : null,
+      model: modelId === NEW ? findNormalizedConflict(draft.modelName, snapshot.productModels) : null,
+    };
+  }, [dnaId, collectionId, modelId, draft.designDnaName, draft.collectionName, draft.modelName, snapshot]);
+  const activeConflictsCount = Object.values(conflicts).filter(Boolean).length;
 
   useEffect(() => {
     void fetchStoreHierarchy().then((result) => {
@@ -130,11 +134,11 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
           <label className="text-[10px] text-[#9ba6b8]">4. Variant / Edition<select value={skuId} onChange={(event) => selectSku(event.target.value)} disabled={!draft.modelName} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-50"><option value={NEW}>Create new SKU…</option>{skus.map((item) => <option key={item.id} value={item.id}>{item.variantName}{item.editionName ? ` · ${item.editionName}` : ''}</option>)}</select></label>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <TextField label="Design DNA name" value={draft.designDnaName} disabled={dnaId !== NEW} onChange={(value) => patch({ designDnaName: value })} />
+          <TextField label="Design DNA name" value={draft.designDnaName} disabled={dnaId !== NEW} onChange={(value) => patch({ designDnaName: value })} error={!!conflicts.dna} />
           <TextField label="DNA code" value={draft.designDnaCode} disabled={dnaId !== NEW} onChange={(value) => patch({ designDnaCode: value })} />
-          <TextField label="Collection name" value={draft.collectionName} disabled={collectionId !== NEW} onChange={(value) => patch({ collectionName: value })} />
+          <TextField label="Collection name" value={draft.collectionName} disabled={collectionId !== NEW} onChange={(value) => patch({ collectionName: value })} error={!!conflicts.collection} />
           <TextField label="Collection code" value={draft.collectionCode} disabled={collectionId !== NEW} onChange={(value) => patch({ collectionCode: value })} />
-          <TextField label="Design Model" value={draft.modelName} disabled={modelId !== NEW} onChange={(value) => patch({ modelName: value })} />
+          <TextField label="Design Model" value={draft.modelName} disabled={modelId !== NEW} onChange={(value) => patch({ modelName: value })} error={!!conflicts.model} />
           <TextField label="Model number" value={draft.modelNumber} disabled={modelId !== NEW} onChange={(value) => patch({ modelNumber: Number(value) })} />
           <TextField label="Color / Material Variant" value={draft.variantName} disabled={skuId !== NEW} onChange={(value) => patch({ variantName: value })} />
           <TextField label="Variant code" value={draft.variantCode} disabled={skuId !== NEW} onChange={(value) => patch({ variantCode: value })} />
@@ -148,8 +152,8 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
         <label className="block text-[10px] text-[#9ba6b8]">Offer<select value={draft.offerType ?? 'SKU'} onChange={(event) => patch({ offerType: event.target.value as 'SKU' | 'BUNDLE' })} className="mt-1 w-full max-w-sm rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white"><option value="SKU">Individual watchface</option><option value="BUNDLE">Complete Color Collection</option></select></label>
         {draft.offerType === 'BUNDLE' && <div className="rounded border border-[#30324a] p-3 text-xs text-[#9ba6b8]"><p className="mb-2">Include existing SKUs in this Complete Color Collection:</p><div className="grid gap-2 sm:grid-cols-2">{snapshot.skus.filter((item) => item.productModelId === modelId && item.id !== skuId).map((item) => <label key={item.id} className="flex gap-2"><input type="checkbox" checked={draft.bundleSkuIds?.includes(item.id) ?? false} onChange={(event) => patch({ bundleSkuIds: event.target.checked ? [...(draft.bundleSkuIds ?? []), item.id] : (draft.bundleSkuIds ?? []).filter((id) => id !== item.id) })} />{item.name}</label>)}</div></div>}
       </>}
-      {preview && <div className="rounded border border-[#30324a] p-2 text-xs"><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className={conflicts.length ? 'text-red-300' : 'text-emerald-300'}>{conflicts.length ? `${conflicts.length} unresolved normalized conflict(s).` : 'No unresolved normalized conflicts.'}</p></div>}
-      <div className="flex gap-2"><Button disabled={busy || !preview || conflicts.length > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || conflicts.length > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
+      {preview && <div className={`rounded border ${activeConflictsCount ? 'border-red-900/50 bg-red-950/20' : 'border-[#30324a]'} p-2 text-xs`}><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className={activeConflictsCount ? 'text-red-300 font-medium' : 'text-emerald-300'}>{activeConflictsCount ? `${activeConflictsCount} conflict(s): A name you entered is already in use elsewhere. Please enter a globally unique name or select the existing one from the dropdown.` : 'No unresolved normalized conflicts.'}</p></div>}
+      <div className="flex gap-2"><Button disabled={busy || !preview || activeConflictsCount > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || activeConflictsCount > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
       <p className="text-[10px] text-[#747c90]">Release reuses the approved physical-test ZPK and rewrites only allowlisted name metadata. Failed or interrupted releases can be resumed safely.</p>
     </div>
   );
