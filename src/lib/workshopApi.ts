@@ -132,14 +132,14 @@ export async function createWorkshopBuild(input: {
 
     const finalized = await adminFetch<{ storageBytes: number }>('workshopFinalizeBuild', {
       method: 'POST',
-      body: JSON.stringify({ projectId: session.projectId, buildId: session.buildId }),
+      body: JSON.stringify({ projectId: input.projectId, buildId: session.buildId }),
     });
-    return { ...session, storageBytes: finalized.storageBytes, qrDataUrl };
+    return { ...session, projectId: input.projectId, storageBytes: finalized.storageBytes, qrDataUrl };
   } catch (error) {
     try {
       await adminFetch('workshopAbortBuild', {
         method: 'POST',
-        body: JSON.stringify({ projectId: session.projectId, buildId: session.buildId }),
+        body: JSON.stringify({ projectId: input.projectId, buildId: session.buildId }),
       });
     } catch (abortError) {
       console.error('Workshop reservation cleanup failed', abortError);
