@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench, Database, Star, Trash2, FlaskConical, FolderOpen, Download, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -33,6 +33,26 @@ import {
 import { canRestoreCatalog, canTrashCatalog, formatStorageBytes, permanentDeleteConfirmation, type CatalogLifecycleStatus } from '@/lib/catalogLifecycle';
 import { ReleaseWizard } from '@/components/ReleaseWizard';
 import { applyLegacyMigration, auditLegacyZpkPage, dryRunLegacyMigration, fetchLegacyClassificationQueue, type LegacyClassificationEntry, type LegacyMigrationReport, type LegacyZpkAuditEntry } from '@/lib/legacyMigrationApi';
+
+function WorkshopPreviewImage({ projectId, buildId, kind, fallbackLabel }: { projectId: string; buildId: string; kind: 'mainPreview' | 'aodPreview'; fallbackLabel: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getWorkshopArtifactUrl({ projectId, buildId, kind }).then((url) => {
+      if (active) setSrc(url);
+    }).catch(() => {
+      if (active) setError(true);
+    });
+    return () => { active = false; };
+  }, [projectId, buildId, kind]);
+
+  if (error || !src) {
+    return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-[#1c2331] text-[9px] text-[#485b73]">{fallbackLabel}</div>;
+  }
+  return <img src={src} alt={fallbackLabel} className="h-12 w-12 shrink-0 rounded object-cover border border-[#2c3340]" />;
+}
 
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
@@ -454,6 +474,8 @@ export function AdminOpsPage() {
                       const busy = workshopBusyId === build.id;
                       return (
                         <div key={build.id} className="flex flex-wrap items-center gap-2 rounded border border-[#252d38] px-3 py-2 text-xs">
+                          <WorkshopPreviewImage projectId={project.id} buildId={build.id} kind="mainPreview" fallbackLabel="MAIN" />
+                          <WorkshopPreviewImage projectId={project.id} buildId={build.id} kind="aodPreview" fallbackLabel="AOD" />
                           <div className="min-w-[180px] flex-1">
                             <p className="text-[#e9edf5]">Build {String(build.buildNumber).padStart(3, '0')} · {build.workshopLabel}</p>
                             <p className="text-[10px] text-[#738095]">{build.state} · {build.resolution.width}×{build.resolution.height} · {(build.storageBytes / 1024 / 1024).toFixed(1)} MB</p>

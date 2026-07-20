@@ -104,7 +104,16 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
         toast.success(`${result.canonicalName} released with verified ZPK parity.`);
       } else if (action === 'RELEASE') toast.success(`${result.canonicalName} is already released.`);
       else toast.success(`${result.canonicalName} saved as Ready.`);
-      setSnapshot(await fetchStoreHierarchy());
+      const newSnapshot = await fetchStoreHierarchy();
+      setSnapshot(newSnapshot);
+      const newDnaId = dnaId === NEW ? newSnapshot.designDnas.find((d) => d.name === draft.designDnaName)?.id ?? NEW : dnaId;
+      const newCollectionId = collectionId === NEW ? newSnapshot.collections.find((c) => c.name === draft.collectionName && c.parentId === newDnaId)?.id ?? NEW : collectionId;
+      const newModelId = modelId === NEW ? newSnapshot.productModels.find((m) => m.name === draft.modelName && m.parentId === newCollectionId)?.id ?? NEW : modelId;
+      const newSkuId = skuId === NEW ? newSnapshot.skus.find((s) => s.variantName === draft.variantName && s.productModelId === newModelId && (s.editionName || '') === (draft.editionName || ''))?.id ?? NEW : skuId;
+      setDnaId(newDnaId);
+      setCollectionId(newCollectionId);
+      setModelId(newModelId);
+      setSkuId(newSkuId);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Release operation failed'); }
     finally { setBusy(false); }
   }
