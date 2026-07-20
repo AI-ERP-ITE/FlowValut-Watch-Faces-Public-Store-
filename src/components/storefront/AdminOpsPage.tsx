@@ -104,6 +104,10 @@ export function AdminOpsPage() {
     }
   }
 
+  useEffect(() => {
+    if (canRun) loadWorkshop();
+  }, [canRun]);
+
   async function editWorkshopProject(project: WorkshopProjectSummary) {
     const workingTitle = window.prompt('Workshop working title', project.workingTitle)?.trim();
     if (!workingTitle) return;

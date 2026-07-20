@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:public": "cross-env VITE_BUILD_TARGET=public tsc -b && vite build --mode public",
-    "build:private": "cross-env VITE_BUILD_TARGET=private VITE_STORE_WORKSHOP_ENABLED=true VITE_STORE_PRODUCT_HIERARCHY_ENABLED=true VITE_STORE_RELEASE_REPACK_ENABLED=true node scripts/requirePrivateFirebaseEnv.mjs && cross-env VITE_BUILD_TARGET=private VITE_STORE_WORKSHOP_ENABLED=true VITE_STORE_PRODUCT_HIERARCHY_ENABLED=true VITE_STORE_RELEASE_REPACK_ENABLED=true tsc -b && cross-env VITE_STORE_WORKSHOP_ENABLED=true VITE_STORE_PRODUCT_HIERARCHY_ENABLED=true VITE_STORE_RELEASE_REPACK_ENABLED=true vite build --mode private",
+    "build:public": "cross-env VITE_BUILD_TARGET=public VITE_STORE_READ_MODEL_ENABLED=true VITE_STORE_OFFER_CHECKOUT_ENABLED=true tsc -b && cross-env VITE_STORE_READ_MODEL_ENABLED=true VITE_STORE_OFFER_CHECKOUT_ENABLED=true vite build --mode public",
+    "build:private": "cross-env VITE_BUILD_TARGET=private VITE_STORE_WORKSHOP_ENABLED=true VITE_STORE_PRODUCT_HIERARCHY_ENABLED=true VITE_STORE_RELEASE_REPACK_ENABLED=true VITE_STORE_READ_MODEL_ENABLED=true VITE_STORE_OFFER_CHECKOUT_ENABLED=true node scripts/requirePrivateFirebaseEnv.mjs && cross-env VITE_BUILD_TARGET=private VITE_STORE_WORKSHOP_ENABLED=true VITE_STORE_PRODUCT_HIERARCHY_ENABLED=true VITE_STORE_RELEASE_REPACK_ENABLED=true VITE_STORE_READ_MODEL_ENABLED=true VITE_STORE_OFFER_CHECKOUT_ENABLED=true tsc -b && cross-env VITE_STORE_WORKSHOP_ENABLED=true VITE_STORE_PRODUCT_HIERARCHY_ENABLED=true VITE_STORE_RELEASE_REPACK_ENABLED=true VITE_STORE_READ_MODEL_ENABLED=true VITE_STORE_OFFER_CHECKOUT_ENABLED=true vite build --mode private",
     "deploy:docs": "node scripts/deployDistToDocs.mjs --mirror-root",
     "deploy:docs:public": "npm run build:public && node scripts/deployDistToDocs.mjs --target=public --mirror-root",
     "deploy:docs:private": "npm run build:private && node scripts/deployDistToDocs.mjs --target=private --mirror-root",
