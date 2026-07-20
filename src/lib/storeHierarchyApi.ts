@@ -2,7 +2,7 @@ import { adminFetch } from './studioFirebasePublishApi';
 import type { ReleaseWizardDraft } from './releaseWizard';
 
 export interface HierarchyOption { id: string; name: string; code?: string; parentId?: string; modelNumber?: number }
-export interface SkuHierarchyOption extends HierarchyOption { productModelId: string; variantName: string; variantCode: string; editionName?: string; editionCode?: string }
+export interface SkuHierarchyOption extends HierarchyOption { productModelId: string; variantName: string; variantCode: string; editionName?: string; editionCode?: string; state?: string }
 export interface TechnicalPackageOption { id: string; skuId: string; technicalTargetId: string; revision: string; state: string; approvedWorkshopProjectId?: string; approvedWorkshopBuildId?: string }
 export interface HierarchySnapshot { designDnas: HierarchyOption[]; collections: HierarchyOption[]; productModels: HierarchyOption[]; skus: SkuHierarchyOption[]; technicalTargets: HierarchyOption[]; technicalPackages: TechnicalPackageOption[]; offers: HierarchyOption[] }
 

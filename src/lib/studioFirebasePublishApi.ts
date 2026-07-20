@@ -250,6 +250,13 @@ export async function setCatalogLifecycleInFirebase(input: {
   return adminFetch('adminCatalogLifecycle', { method: 'POST', body: JSON.stringify(input) });
 }
 
+export async function setSkuLifecycleInFirebase(input: {
+  skuId: string;
+  action: 'LIVE' | 'OFFLINE' | 'TRASH' | 'RESTORE';
+}): Promise<{ ok: boolean; skuId: string; state: string }> {
+  return adminFetch('adminSkuLifecycle', { method: 'POST', body: JSON.stringify(input) });
+}
+
 export interface StorageMaintenanceReport {
   mode: 'DRY_RUN';
   totalBytes: number;

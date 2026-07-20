@@ -1,6 +1,28 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { SearchBar } from './SearchBar';
 import { CookieConsentBanner } from './legal/CookieConsentBanner';
+import { useStoreReadModel } from '@/context/StoreReadModelContext';
+
+function DeviceFilter() {
+  const { data, globalDeviceId, setGlobalDeviceId } = useStoreReadModel();
+  if (!data || data.devices.length === 0) return null;
+
+  return (
+    <select
+      value={globalDeviceId}
+      onChange={(e) => setGlobalDeviceId(e.target.value)}
+      className="max-w-[150px] md:max-w-[200px] truncate rounded-full border border-[#3a4452] bg-[#141820]/80 px-3 py-1.5 text-xs text-[#aeb5c1] outline-none focus:border-[#d5b987]"
+      aria-label="Filter by watch device"
+    >
+      <option value="">All Watches</option>
+      {data.devices.map((device) => (
+        <option key={device.id} value={device.id}>
+          {device.brand} {device.name}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export function StorefrontLayout() {
   const location = useLocation();
@@ -35,8 +57,9 @@ export function StorefrontLayout() {
             <NavLink to="/category/funny" label="Funny" currentPath={location.pathname} />
           </nav>
 
-          {/* Right: search only (Studio removed from public nav) */}
+          {/* Right: device filter and search */}
           <div className="flex items-center gap-3">
+            <DeviceFilter />
             <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#3a4452] bg-[#141820]/80">
               <span className="w-1.5 h-1.5 rounded-full bg-[#d5b987]" />
               <span className="font-mono text-[11px] uppercase tracking-wide text-[#aeb5c1]">Premium Store</span>

@@ -1,25 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Wrench, Database, Star, Trash2, FlaskConical, FolderOpen, Download, CheckCircle2 } from 'lucide-react';
+import { Wrench, Database, Star, FlaskConical, FolderOpen, Download, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPanel } from '@/components/AdminPanel';
 import {
-  fetchAdminCatalogFromFirebase,
   fetchCatalogFromFirebase,
   fetchPublicConfig,
   fetchStorefrontConfigFromFirebase,
   adminUpdateConfigInFirebase,
   patchCatalogSpecGroupsInFirebase,
-  setCatalogStatusInFirebase,
-  deleteZpkEntryInFirebase,
   fetchStorageMaintenanceReport,
-  setCatalogLifecycleInFirebase,
+  setSkuLifecycleInFirebase,
   type StorageMaintenanceReport,
   writeStorefrontConfigToFirebase,
 } from '@/lib/studioFirebasePublishApi';
+import { fetchStoreHierarchy, type SkuHierarchyOption } from '@/lib/storeHierarchyApi';
 import { Button } from '@/components/ui/button';
 import { isFirebaseAuthConfigured } from '@/lib/firebaseAuthClient';
-import type { CatalogEntry, SpecGroup } from '@/context/CatalogContext';
+import type { SpecGroup } from '@/context/CatalogContext';
 import { storeArchitectureFlags } from '@/lib/storeArchitecture';
 import {
   approveWorkshopBuild,
@@ -30,7 +28,7 @@ import {
   setWorkshopBuildLifecycle,
   updateWorkshopProject,
 } from '@/lib/workshopApi';
-import { canRestoreCatalog, canTrashCatalog, formatStorageBytes, permanentDeleteConfirmation, type CatalogLifecycleStatus } from '@/lib/catalogLifecycle';
+import { formatStorageBytes } from '@/lib/catalogLifecycle';
 import { ReleaseWizard } from '@/components/ReleaseWizard';
 import { applyLegacyMigration, auditLegacyZpkPage, dryRunLegacyMigration, fetchLegacyClassificationQueue, type LegacyClassificationEntry, type LegacyMigrationReport, type LegacyZpkAuditEntry } from '@/lib/legacyMigrationApi';
 
@@ -57,25 +55,16 @@ function WorkshopPreviewImage({ projectId, buildId, kind, fallbackLabel }: { pro
 export function AdminOpsPage() {
   const backendMode = isFirebaseAuthConfigured();
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
-  const functionsBase = (
-    (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined) ||
-    (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined) || ''
-  ).replace(/\/$/, '');
-  function previewUrl(id: string) {
-    return functionsBase ? `${functionsBase}/publicAsset?kind=preview&id=${encodeURIComponent(id)}` : '';
-  }
-
   const [patching, setPatching] = useState(false);
   const [uploadingConfig, setUploadingConfig] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [catalogOptions, setCatalogOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [featuredFaceId, setFeaturedFaceId] = useState<string>('');
   const [savingFeatured, setSavingFeatured] = useState(false);
-  const [adminCatalog, setAdminCatalog] = useState<CatalogEntry[]>([]);
-  const [loadingAdminCatalog, setLoadingAdminCatalog] = useState(false);
-  const [updatingCatalogId, setUpdatingCatalogId] = useState<string | null>(null);
-  const [deletingCatalogId, setDeletingCatalogId] = useState<string | null>(null);
-  const [catalogFilter, setCatalogFilter] = useState<'ALL' | CatalogLifecycleStatus>('ALL');
+  const [adminSkus, setAdminSkus] = useState<SkuHierarchyOption[]>([]);
+  const [loadingAdminSkus, setLoadingAdminSkus] = useState(false);
+  const [updatingSkuId, setUpdatingSkuId] = useState<string | null>(null);
+  const [skuFilter, setSkuFilter] = useState<'ALL' | 'READY' | 'LIVE' | 'OFFLINE' | 'TRASHED'>('ALL');
   const [maintenanceReport, setMaintenanceReport] = useState<StorageMaintenanceReport | null>(null);
   const [loadingMaintenance, setLoadingMaintenance] = useState(false);
   const [workshopProjects, setWorkshopProjects] = useState<WorkshopProjectSummary[]>([]);
@@ -283,77 +272,67 @@ export function AdminOpsPage() {
     } finally {
       setUploadingConfig(false);
     }
-  }
-
-  async function loadAdminCatalog() {
+  }  async function loadAdminSkus() {
     if (!canRun) return;
 
-    setLoadingAdminCatalog(true);
+    setLoadingAdminSkus(true);
     try {
-      const entries = await fetchAdminCatalogFromFirebase();
-      setAdminCatalog(entries);
-      toast.success('Admin catalog loaded.');
+      const snapshot = await fetchStoreHierarchy();
+      setAdminSkus(snapshot.skus);
+      toast.success('Admin SKU catalog loaded.');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load admin catalog');
+      toast.error(error instanceof Error ? error.message : 'Failed to load admin SKU catalog');
     } finally {
-      setLoadingAdminCatalog(false);
+      setLoadingAdminSkus(false);
     }
   }
 
-  async function setCatalogStatus(watchfaceId: string, status: 'ENABLED' | 'OFFLINE') {
+  async function setSkuLifecycle(skuId: string, action: 'LIVE' | 'OFFLINE') {
     if (!canRun) return;
 
-    setUpdatingCatalogId(watchfaceId);
+    setUpdatingSkuId(skuId);
     try {
-      await setCatalogStatusInFirebase({ watchfaceId, status });
-      setAdminCatalog((prev) =>
+      const result = await setSkuLifecycleInFirebase({ skuId, action });
+      setAdminSkus((prev) =>
         prev.map((entry) =>
-          entry.id === watchfaceId
-            ? { ...entry, storeStatus: status, published: status === 'ENABLED' }
+          entry.id === skuId
+            ? { ...entry, state: result.state }
             : entry
         )
       );
-      toast.success(`${watchfaceId} set to ${status}.`);
+      toast.success(`${skuId} set to ${result.state}.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update catalog status');
+      toast.error(error instanceof Error ? error.message : 'Failed to update SKU status');
     } finally {
-      setUpdatingCatalogId(null);
+      setUpdatingSkuId(null);
     }
   }
 
-  async function changeCatalogLifecycle(watchfaceId: string, action: 'TRASH' | 'RESTORE') {
-    setDeletingCatalogId(watchfaceId);
-    try {
-      const result = await setCatalogLifecycleInFirebase({ watchfaceId, action });
-      setAdminCatalog((prev) => prev.map((entry) => entry.id === watchfaceId ? { ...entry, storeStatus: result.status, published: false } : entry));
-      toast.success(`${watchfaceId} ${action === 'TRASH' ? 'moved to Trash' : 'restored Offline'}.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Lifecycle update failed');
-    } finally {
-      setDeletingCatalogId(null);
-    }
-  }
-
-  async function deleteZpkEntry(watchfaceId: string, currentStatus: CatalogLifecycleStatus) {
+  async function changeSkuLifecycle(skuId: string, action: 'TRASH' | 'RESTORE') {
     if (!canRun) return;
-    if (currentStatus !== 'TRASHED') {
-      toast.error('Move the watchface to Trash before deleting permanently.');
-      return;
-    }
-    const required = permanentDeleteConfirmation(watchfaceId);
-    if (window.prompt(`Permanent deletion cannot be undone. Type: ${required}`) !== required) return;
 
-    setDeletingCatalogId(watchfaceId);
+    setUpdatingSkuId(skuId);
     try {
-      await deleteZpkEntryInFirebase({ watchfaceId, confirmation: required });
-      setAdminCatalog((prev) => prev.filter((entry) => entry.id !== watchfaceId));
-      toast.success(`${watchfaceId} deleted.`);
+      const result = await setSkuLifecycleInFirebase({ skuId, action });
+      setAdminSkus((prev) =>
+        prev.map((entry) =>
+          entry.id === skuId
+            ? { ...entry, state: result.state }
+            : entry
+        )
+      );
+      toast.success(`${skuId} is now ${result.state}.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete entry');
+      toast.error(error instanceof Error ? error.message : 'Failed to change lifecycle state');
     } finally {
-      setDeletingCatalogId(null);
+      setUpdatingSkuId(null);
     }
   }
+
+  const filteredAdminSkus = adminSkus.filter((entry) => {
+    if (skuFilter === 'ALL') return true;
+    return (entry.state || 'READY') === skuFilter;
+  });
 
   async function runStorageMaintenance() {
     setLoadingMaintenance(true);
@@ -402,11 +381,6 @@ export function AdminOpsPage() {
     finally { setMigrationBusy(false); }
   }
 
-  const filteredAdminCatalog = adminCatalog.filter((entry) => {
-    const status = entry.storeStatus ?? (entry.published === false ? 'OFFLINE' : 'ENABLED');
-    if (catalogFilter === 'ALL') return true;
-    return status === catalogFilter;
-  });
 
   return (
     <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
@@ -612,82 +586,71 @@ export function AdminOpsPage() {
         <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">
           <div className="flex items-center gap-2 text-[#dce3ee] text-sm font-medium">
             <Database className="h-4 w-4 text-[#d2b37a]" />
-            Catalog Lifecycle (Soft Delete)
+            Store Hierarchy SKU Lifecycle
           </div>
           <p className="text-xs text-[#8f9aac]">
-            Set watchfaces offline to remove from store without deleting database/storage records. Restore anytime by enabling again.
+            Set SKUs offline to hide them from the store. Restore anytime by enabling again.
           </p>
 
           <div className="flex flex-wrap gap-2">
             <Button
-              onClick={loadAdminCatalog}
-              disabled={!canRun || loadingAdminCatalog}
+              onClick={loadAdminSkus}
+              disabled={!canRun || loadingAdminSkus}
               variant="outline"
               className="h-10 border-[#3b4d68] text-[#ecf2ff] hover:bg-[#263448]"
             >
-              {loadingAdminCatalog ? 'Loading Admin Catalog...' : 'Load Full Catalog'}
+              {loadingAdminSkus ? 'Loading SKUs...' : 'Load All SKUs'}
             </Button>
 
             <select
-              value={catalogFilter}
-              onChange={(e) => setCatalogFilter(e.target.value as 'ALL' | CatalogLifecycleStatus)}
+              value={skuFilter}
+              onChange={(e) => setSkuFilter(e.target.value as any)}
               className="rounded-lg border border-[#343d4b] bg-[#0d1015] px-3 py-2 text-sm text-[#e8edf6] focus:outline-none focus:border-[#9f8557]"
             >
               <option value="ALL">All statuses</option>
-              <option value="ENABLED">Enabled only</option>
+              <option value="READY">Ready only</option>
+              <option value="LIVE">Live only</option>
               <option value="OFFLINE">Offline only</option>
               <option value="TRASHED">Trash only</option>
             </select>
           </div>
 
-          {filteredAdminCatalog.length > 0 && (
+          {filteredAdminSkus.length > 0 && (
             <div className="max-h-72 overflow-auto rounded-lg border border-[#2c3340]">
               <table className="w-full text-xs">
                 <thead className="bg-[#161d27] text-[#9ba6b8]">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">Preview</th>
                     <th className="px-3 py-2 text-left font-medium">Name</th>
                     <th className="px-3 py-2 text-left font-medium">Status</th>
                     <th className="px-3 py-2 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAdminCatalog.map((entry) => {
-                    const status = entry.storeStatus ?? (entry.published === false ? 'OFFLINE' : 'ENABLED');
-                    const rowBusy = updatingCatalogId === entry.id || deletingCatalogId === entry.id;
+                  {filteredAdminSkus.map((entry) => {
+                    const status = (entry.state || 'READY').toUpperCase();
+                    const rowBusy = updatingSkuId === entry.id;
                     return (
                       <tr key={entry.id} className="border-t border-[#202632] text-[#e9edf5]">
-                        <td className="px-3 py-2">
-                          {previewUrl(entry.id) ? (
-                            <img
-                              src={previewUrl(entry.id)}
-                              alt={entry.name}
-                              className="h-12 w-12 rounded object-cover bg-[#1a2030]"
-                            />
-                          ) : (
-                            <div className="h-12 w-12 rounded bg-[#1a2030]" />
-                          )}
-                        </td>
                         <td className="px-3 py-2">
                           <div className="font-medium">{entry.name}</div>
                           <div className="text-[10px] text-[#6b7a8d] font-mono">{entry.id}</div>
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`rounded px-2 py-0.5 ${status === 'ENABLED' ? 'bg-emerald-500/20 text-emerald-300' : status === 'TRASHED' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                          <span className={`rounded px-2 py-0.5 ${status === 'LIVE' ? 'bg-emerald-500/20 text-emerald-300' : status === 'TRASHED' ? 'bg-red-500/20 text-red-300' : status === 'READY' ? 'bg-blue-500/20 text-blue-300' : 'bg-amber-500/20 text-amber-300'}`}>
                             {status}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right space-x-2">
                           <Button
-                            onClick={() => setCatalogStatus(entry.id, 'ENABLED')}
-                            disabled={!canRun || rowBusy || status === 'ENABLED' || status === 'TRASHED'}
+                            onClick={() => setSkuLifecycle(entry.id, 'LIVE')}
+                            disabled={!canRun || rowBusy || status === 'LIVE' || status === 'TRASHED'}
                             variant="outline"
                             className="h-8 border-[#345045] text-[#ccf2de] hover:bg-[#20382f]"
                           >
-                            Enable
+                            Set Live
                           </Button>
                           <Button
-                            onClick={() => setCatalogStatus(entry.id, 'OFFLINE')}
+                            onClick={() => setSkuLifecycle(entry.id, 'OFFLINE')}
                             disabled={!canRun || rowBusy || status === 'OFFLINE' || status === 'TRASHED'}
                             variant="outline"
                             className="h-8 border-[#5a4631] text-[#f5dfc2] hover:bg-[#3a2c1f]"
@@ -695,20 +658,10 @@ export function AdminOpsPage() {
                             Set Offline
                           </Button>
                           {status === 'TRASHED' ? (
-                            <Button onClick={() => changeCatalogLifecycle(entry.id, 'RESTORE')} disabled={!canRun || rowBusy} variant="outline" className="h-8 border-amber-800 text-amber-300">Restore</Button>
+                            <Button onClick={() => changeSkuLifecycle(entry.id, 'RESTORE')} disabled={!canRun || rowBusy} variant="outline" className="h-8 border-amber-800 text-amber-300">Restore</Button>
                           ) : (
-                            <Button onClick={() => changeCatalogLifecycle(entry.id, 'TRASH')} disabled={!canRun || rowBusy || !canTrashCatalog(status)} variant="outline" className="h-8 border-red-900 text-red-300">Trash</Button>
+                            <Button onClick={() => changeSkuLifecycle(entry.id, 'TRASH')} disabled={!canRun || rowBusy || status === 'LIVE'} variant="outline" className="h-8 border-red-900 text-red-300">Trash</Button>
                           )}
-                          <Button
-                            onClick={() => deleteZpkEntry(entry.id, status)}
-                            disabled={!canRun || rowBusy || !canRestoreCatalog(status)}
-                            variant="outline"
-                            title={status !== 'TRASHED' ? 'Move to Trash before permanent deletion' : 'Delete permanently'}
-                            className="h-8 border-red-900 text-red-400 hover:bg-red-950 disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-1" />
-                            Delete Permanently
-                          </Button>
                         </td>
                       </tr>
                     );
