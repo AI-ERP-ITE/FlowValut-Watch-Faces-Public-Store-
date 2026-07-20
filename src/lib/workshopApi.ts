@@ -134,6 +134,15 @@ export async function createWorkshopBuild(input: {
       method: 'POST',
       body: JSON.stringify({ projectId: input.projectId, buildId: session.buildId }),
     });
+
+    try {
+      const bc = new BroadcastChannel('workshop_events');
+      bc.postMessage({ type: 'WORKSHOP_BUILD_CREATED', projectId: input.projectId, buildId: session.buildId });
+      bc.close();
+    } catch (bcError) {
+      console.warn('BroadcastChannel failed', bcError);
+    }
+
     return { ...session, projectId: input.projectId, storageBytes: finalized.storageBytes, qrDataUrl };
   } catch (error) {
     try {

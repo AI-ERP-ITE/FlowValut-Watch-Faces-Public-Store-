@@ -95,8 +95,17 @@ export function AdminOpsPage() {
 
   useEffect(() => {
     if (canRun) loadWorkshop();
-  }, [canRun]);
 
+    const bc = new BroadcastChannel('workshop_events');
+    bc.onmessage = (event) => {
+      if (event.data?.type === 'WORKSHOP_BUILD_CREATED') {
+        if (canRun) {
+          fetchWorkshopProjects().then(setWorkshopProjects).catch(console.error);
+        }
+      }
+    };
+    return () => bc.close();
+  }, [canRun]);
   async function editWorkshopProject(project: WorkshopProjectSummary) {
     const workingTitle = window.prompt('Workshop working title', project.workingTitle)?.trim();
     if (!workingTitle) return;
