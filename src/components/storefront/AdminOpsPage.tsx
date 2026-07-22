@@ -24,7 +24,7 @@ import {
   fetchWorkshopProjects,
   getWorkshopArtifactUrl,
   permanentlyDeleteWorkshopBuild,
-  cleanEmptyWorkshopProjects,
+  deleteWorkshopProject,
   type WorkshopProjectSummary,
   setWorkshopBuildLifecycle,
   updateWorkshopProject,
@@ -198,19 +198,15 @@ export function AdminOpsPage() {
     }
   }
 
-  async function handleCleanEmptyProjects() {
-    if (!window.confirm("Are you sure you want to permanently delete all empty workshop projects?")) return;
+  async function handleDeleteProject(projectId: string) {
+    if (!window.confirm("Are you sure you want to permanently delete this project and ALL its builds? This action cannot be undone.")) return;
     setLoadingCatalog(true);
     try {
-      const result = await cleanEmptyWorkshopProjects();
-      if (result.deletedCount > 0) {
-        toast.success(`Deleted ${result.deletedCount} empty projects successfully.`);
-        setWorkshopProjects(prev => prev.filter(p => !result.deletedIds.includes(p.id)));
-      } else {
-        toast.info("No empty projects found.");
-      }
+      await deleteWorkshopProject(projectId);
+      toast.success(`Project ${projectId} deleted successfully.`);
+      setWorkshopProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (e) {
-      toast.error("Failed to delete empty projects: " + (e instanceof Error ? e.message : String(e)));
+      toast.error("Failed to delete project: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setLoadingCatalog(false);
     }
@@ -462,12 +458,6 @@ export function AdminOpsPage() {
                 <FolderOpen className="h-4 w-4 mr-2" />
                 {loadingWorkshop ? 'Loading Workshop...' : 'Load Workshop'}
               </Button>
-              {workshopProjects.length > 0 && (
-                <Button onClick={handleCleanEmptyProjects} disabled={!canRun || loadingCatalog} variant="outline" className="h-10 border-red-900 text-red-400 hover:bg-red-950/40">
-                  <Wrench className="h-4 w-4 mr-2" />
-                  Clean Empty Projects
-                </Button>
-              )}
             </div>
             <div className="space-y-3">
               {workshopProjects.map((project) => (
@@ -477,7 +467,18 @@ export function AdminOpsPage() {
                       <p className="text-sm font-medium text-[#e9edf5]">{project.workingTitle}</p>
                       <p className="text-[10px] font-mono text-[#6b7a8d]">{project.id} · {project.buildCount} builds · {(project.storageBytes / 1024 / 1024).toFixed(1)} MB</p>
                     </div>
-                    <Button onClick={() => editWorkshopProject(project)} disabled={workshopBusyId === project.id} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">Edit Project</Button>
+                    <div className="flex gap-2">
+                      <Button onClick={() => editWorkshopProject(project)} disabled={workshopBusyId === project.id} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">Edit Project</Button>
+                      <Button 
+                        onClick={() => handleDeleteProject(project.id)} 
+                        disabled={workshopBusyId === project.id || project.builds.some(b => b.state === 'APPROVED')} 
+                        variant="outline" 
+                        className="h-8 border-red-900/50 text-red-400 hover:bg-red-950/30"
+                        title={project.builds.some(b => b.state === 'APPROVED') ? "Cannot delete project with approved builds" : "Delete Project"}
+                      >
+                        Delete Project
+                      </Button>
+                    </div>
                   </div>
                   <div className="mt-3 space-y-2">
                     {project.builds.length === 0 && (
