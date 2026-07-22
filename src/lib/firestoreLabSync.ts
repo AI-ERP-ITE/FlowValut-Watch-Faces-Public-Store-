@@ -222,23 +222,20 @@ async function pushIcon(uid: string, record: CustomIconRecord): Promise<void> {
   const sourcePath = `users/${uid}/labAssets/icons/${record.key}/source.${sourceExt}`;
   const bakedPath  = `users/${uid}/labAssets/icons/${record.key}/baked_${record.width}x${record.height}.png`;
 
-  // Read existing doc to check hash and grab existing URLs
   let existingHash: string | null = null;
   let bakedVersion = 0;
   let existingSourceURL = '';
   let existingDownloadURL = '';
   try {
-    const snap = await getDocs(labCol(uid, 'icons'));
-    snap.forEach(d => {
-      if (decodeURIComponent(d.id) === record.key) {
-        const data = d.data() as Partial<IconStorageMeta>;
-        existingHash       = data.sourceHash ?? null;
-        bakedVersion       = data.bakedVersion ?? 0;
-        existingSourceURL  = data.sourceURL ?? '';
-        existingDownloadURL = data.downloadURL ?? '';
-      }
-    });
-  } catch { /* ignore — treat as first upload */ }
+    const docSnap = await getDoc(labDocRef(uid, 'icons', record.key));
+    if (docSnap.exists()) {
+      const data = docSnap.data() as Partial<IconStorageMeta>;
+      existingHash       = data.sourceHash ?? null;
+      bakedVersion       = data.bakedVersion ?? 0;
+      existingSourceURL  = data.sourceURL ?? '';
+      existingDownloadURL = data.downloadURL ?? '';
+    }
+  } catch { /* ignore */ }
 
   const needsRebake = existingHash !== newHash;
   let sourceURL  = existingSourceURL;
@@ -789,14 +786,12 @@ async function pushFont(uid: string, record: CustomFontRecord): Promise<void> {
   let existingHash: string | null = null;
   let existingDownloadURL = '';
   try {
-    const snap = await getDocs(labCol(uid, 'fonts'));
-    snap.forEach(d => {
-      if (decodeURIComponent(d.id) === record.name) {
-        const data = d.data() as Partial<FontStorageMeta>;
-        existingHash        = data.fileHash ?? null;
-        existingDownloadURL = data.downloadURL ?? '';
-      }
-    });
+    const docSnap = await getDoc(labDocRef(uid, 'fonts', record.name));
+    if (docSnap.exists()) {
+      const data = docSnap.data() as Partial<FontStorageMeta>;
+      existingHash        = data.fileHash ?? null;
+      existingDownloadURL = data.downloadURL ?? '';
+    }
   } catch { /* ignore */ }
 
   let downloadURL = existingDownloadURL;

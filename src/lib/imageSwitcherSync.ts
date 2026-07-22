@@ -181,13 +181,11 @@ export async function pushSwitcherDefinition(def: ImageSwitcherDefinition): Prom
 
   try {
     // Read existing meta from Firestore to compare hashes
-    const existingSnap = await getDocs(switcherCol(uid));
+    const existingSnap = await getDoc(switcherDocRef(uid, def.id));
     let existingSlotMetas: SlotMeta[] = [];
-    existingSnap.forEach(d => {
-      if (d.id === def.id) {
-        existingSlotMetas = (d.data() as SwitcherMeta).slots ?? [];
-      }
-    });
+    if (existingSnap.exists()) {
+      existingSlotMetas = (existingSnap.data() as SwitcherMeta).slots ?? [];
+    }
     const existingByIndex = new Map<number, SlotMeta>(
       existingSlotMetas.map(s => [s.slotIndex, s]),
     );

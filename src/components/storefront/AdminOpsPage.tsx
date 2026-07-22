@@ -178,7 +178,13 @@ export function AdminOpsPage() {
 
   async function deleteWorkshopBuildPermanently(projectId: string, buildId: string) {
     const confirmation = `DELETE ${projectId}/${buildId}`;
-    if (window.prompt(`Permanent deletion removes the private FVWF, Test ZPK, and previews. Type: ${confirmation}`) !== confirmation) return;
+    const userInput = window.prompt(`Permanent deletion removes the private FVWF, Test ZPK, and previews.\n\nType exactly:\n${confirmation}`);
+    if (userInput !== confirmation) {
+      if (userInput !== null) {
+        toast.error(`Confirmation mismatch. You typed: "${userInput}". Expected: "${confirmation}".`);
+      }
+      return;
+    }
     setWorkshopBusyId(buildId);
     try {
       await permanentlyDeleteWorkshopBuild(projectId, buildId, confirmation);
@@ -436,10 +442,12 @@ export function AdminOpsPage() {
             <p className="text-xs text-[#8f9aac]">
               Exact editable FVWF snapshots paired with the exact ZPK installed for physical-watch testing. Store metadata is not required here.
             </p>
-            <Button onClick={loadWorkshop} disabled={!canRun || loadingWorkshop} variant="outline" className="h-10 border-cyan-900 text-cyan-200 hover:bg-cyan-950/40">
-              <FolderOpen className="h-4 w-4 mr-2" />
-              {loadingWorkshop ? 'Loading Workshop...' : 'Load Workshop'}
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={loadWorkshop} disabled={!canRun || loadingWorkshop} variant="outline" className="h-10 border-cyan-900 text-cyan-200 hover:bg-cyan-950/40">
+                <FolderOpen className="h-4 w-4 mr-2" />
+                {loadingWorkshop ? 'Loading Workshop...' : 'Load Workshop'}
+              </Button>
+            </div>
             <div className="space-y-3">
               {workshopProjects.map((project) => (
                 <div key={project.id} className="rounded-lg border border-[#2c3340] bg-[#10151c] p-3">
