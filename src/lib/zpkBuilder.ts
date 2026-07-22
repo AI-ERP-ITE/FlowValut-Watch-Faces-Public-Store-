@@ -149,49 +149,66 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
     
     // Elements may have data URLs (from preview rendering) instead of filenames.
     // Prefer assetFilename (set by pipeline), fall back to name-based guessing.
-    const fixElementSources = (input: WatchFaceConfig['elements']) => input.map(el => {
-      let next = { ...el };
-      if (el.src && el.src.startsWith('data:')) {
-        // Prefer the deterministic assetFilename set during pipeline
-        const candidate = remapSrc(el.assetFilename);
-        if (candidate && assetFilenames.has(candidate)) {
-          next = { ...next, src: candidate };
+    const fixElementSources = async (input: WatchFaceConfig['elements']) => {
+      return Promise.all(input.map(async el => {
+        let next = { ...el };
+        if (el.src && el.src.startsWith('data:')) {
+          // Prefer the deterministic assetFilename set during pipeline
+          const candidate = remapSrc(el.assetFilename);
+          if (candidate && assetFilenames.has(candidate)) {
+            next = { ...next, src: candidate };
+          } else {
+            // Legacy fallback: substring matching
+            const name = el.name.toLowerCase();
+            for (const filename of assetFilenames) {
+              const fn = filename.toLowerCase();
+              if (name.includes('battery') && fn.includes('batt')) { next = { ...next, src: filename }; break; }
+              if (name.includes('heart') && fn.includes('heart')) { next = { ...next, src: filename }; break; }
+              if (name.includes('steps') && fn.includes('step')) { next = { ...next, src: filename }; break; }
+              if (name.includes('arc') && fn.includes('arc')) { next = { ...next, src: filename }; break; }
+              if (name.includes('background') && fn.includes('background')) { next = { ...next, src: filename }; break; }
+            }
+            if (!next.src || next.src.startsWith('data:')) {
+              if (next.src && next.src.startsWith('data:')) {
+                try {
+                  const res = await fetch(next.src);
+                  const blob = await res.blob();
+                  const newFilename = `static_img_${el.id.slice(0,6)}.png`;
+                  const newFile = new File([blob], newFilename, { type: 'image/png' });
+                  normalizedElementFiles.push({ src: newFilename, file: newFile });
+                  assetFilenames.add(newFilename);
+                  next.src = newFilename;
+                  console.log(`[ZPK] Extracted base64 image for ${el.name} to ${newFilename}`);
+                } catch (e) {
+                  console.error('[ZPK] Failed to extract base64 for element:', el.name, e);
+                }
+              } else {
+                console.warn('[ZPK] Could not restore filename for element:', el.name);
+              }
+            }
+          }
         } else {
-          // Legacy fallback: substring matching
-          const name = el.name.toLowerCase();
-          for (const filename of assetFilenames) {
-            const fn = filename.toLowerCase();
-            if (name.includes('battery') && fn.includes('batt')) { next = { ...next, src: filename }; break; }
-            if (name.includes('heart') && fn.includes('heart')) { next = { ...next, src: filename }; break; }
-            if (name.includes('steps') && fn.includes('step')) { next = { ...next, src: filename }; break; }
-            if (name.includes('arc') && fn.includes('arc')) { next = { ...next, src: filename }; break; }
-            if (name.includes('background') && fn.includes('background')) { next = { ...next, src: filename }; break; }
-          }
-          if (!next.src || next.src.startsWith('data:')) {
-            console.warn('[ZPK] Could not restore filename for element:', el.name);
-          }
+          next = {
+            ...next,
+            src: remapSrc(next.src),
+          };
         }
-      } else {
-        next = {
-          ...next,
-          src: remapSrc(next.src),
-        };
-      }
 
-      return {
-        ...next,
-        assetFilename: remapSrc(next.assetFilename),
-        hourHandSrc: remapSrc(next.hourHandSrc),
-        minuteHandSrc: remapSrc(next.minuteHandSrc),
-        secondHandSrc: remapSrc(next.secondHandSrc),
-        coverSrc: remapSrc(next.coverSrc),
-        pressSrc: remapSrc(next.pressSrc),
-        normalSrc: remapSrc(next.normalSrc),
-        images: Array.isArray(next.images) ? next.images.map((v) => remapSrc(v) ?? v) : next.images,
-      };
-    });
-    const fixedElements = fixElementSources(config.elements);
-    const fixedAodElements = config.aodElements ? fixElementSources(config.aodElements) : config.aodElements;
+        return {
+          ...next,
+          assetFilename: remapSrc(next.assetFilename),
+          hourHandSrc: remapSrc(next.hourHandSrc),
+          minuteHandSrc: remapSrc(next.minuteHandSrc),
+          secondHandSrc: remapSrc(next.secondHandSrc),
+          coverSrc: remapSrc(next.coverSrc),
+          pressSrc: remapSrc(next.pressSrc),
+          normalSrc: remapSrc(next.normalSrc),
+          images: Array.isArray(next.images) ? next.images.map((v) => remapSrc(v) ?? v) : next.images,
+        };
+      }));
+    };
+    const fixedElements = await fixElementSources(config.elements);
+    const fixedAodElements = config.aodElements ? await fixElementSources(config.aodElements) : config.aodElements;
     
     const fixedConfig = { ...config, elements: fixedElements, aodElements: fixedAodElements };
     

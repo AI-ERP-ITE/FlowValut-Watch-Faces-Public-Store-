@@ -104,7 +104,7 @@ export function ElementList({
     
     // Update zIndex sequentially based on array order
     newElements.forEach((el, idx) => {
-      el.zIndex = newElements.length - idx;
+      el.zIndex = idx;
     });
 
     onReorder(newElements);
@@ -137,8 +137,9 @@ export function ElementList({
         Elements ({elements.length})
       </h4>
       
-      <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-        {elements.map((element, index) => {
+      <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 flex flex-col">
+        {[...elements].reverse().map((element, reversedIndex) => {
+          const index = elements.length - 1 - reversedIndex;
           const warning = elementWarnings?.[element.id];
           const hasWarning = !!warning?.hasFlickerRisk;
           const warningColorClass = warning?.severity === 'high' ? 'text-red-400' : 'text-amber-400';
