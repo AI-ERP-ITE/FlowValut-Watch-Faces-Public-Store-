@@ -257,7 +257,8 @@ export async function setSkuLifecycleInFirebase(input: {
   let state: string = input.action;
   if (input.action === 'TRASH') state = 'TRASHED';
   if (input.action === 'RESTORE') state = 'OFFLINE';
-  return adminFetch('adminSkuLifecycle', { method: 'POST', body: JSON.stringify({ skuId: input.skuId, state }) });
+  const result = await adminFetch<{ ok: boolean }>('adminSkuLifecycle', { method: 'POST', body: JSON.stringify({ skuId: input.skuId, state }) });
+  return { ...result, skuId: input.skuId, state };
 }
 
 export interface StorageMaintenanceReport {
