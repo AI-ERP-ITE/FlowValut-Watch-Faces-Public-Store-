@@ -201,3 +201,9 @@ export async function permanentlyDeleteWorkshopBuild(projectId: string, buildId:
     body: JSON.stringify({ projectId, buildId, confirmation }),
   });
 }
+
+export async function cleanEmptyWorkshopProjects(): Promise<{ deletedCount: number, deletedIds: string[] }> {
+  return adminFetch('adminWorkshopProjectCleanEmpty', {
+    method: 'POST',
+  });
+}

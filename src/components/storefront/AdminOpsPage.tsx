@@ -24,6 +24,7 @@ import {
   fetchWorkshopProjects,
   getWorkshopArtifactUrl,
   permanentlyDeleteWorkshopBuild,
+  cleanEmptyWorkshopProjects,
   type WorkshopProjectSummary,
   setWorkshopBuildLifecycle,
   updateWorkshopProject,
@@ -178,11 +179,7 @@ export function AdminOpsPage() {
 
   async function deleteWorkshopBuildPermanently(projectId: string, buildId: string) {
     const confirmation = `DELETE ${projectId}/${buildId}`;
-    const userInput = window.prompt(`Permanent deletion removes the private FVWF, Test ZPK, and previews.\n\nType exactly:\n${confirmation}`);
-    if (userInput !== confirmation) {
-      if (userInput !== null) {
-        toast.error(`Confirmation mismatch. You typed: "${userInput}". Expected: "${confirmation}".`);
-      }
+    if (!window.confirm(`Permanent deletion removes the private FVWF, Test ZPK, and previews.\n\nAre you sure you want to permanently delete:\n${projectId}/${buildId}?`)) {
       return;
     }
     setWorkshopBusyId(buildId);
@@ -198,6 +195,24 @@ export function AdminOpsPage() {
       toast.error(error instanceof Error ? error.message : 'Workshop permanent deletion failed');
     } finally {
       setWorkshopBusyId(null);
+    }
+  }
+
+  async function handleCleanEmptyProjects() {
+    if (!window.confirm("Are you sure you want to permanently delete all empty workshop projects?")) return;
+    setLoadingCatalog(true);
+    try {
+      const result = await cleanEmptyWorkshopProjects();
+      if (result.deletedCount > 0) {
+        toast.success(`Deleted ${result.deletedCount} empty projects successfully.`);
+        setWorkshopProjects(prev => prev.filter(p => !result.deletedIds.includes(p.id)));
+      } else {
+        toast.info("No empty projects found.");
+      }
+    } catch (e) {
+      toast.error("Failed to delete empty projects: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setLoadingCatalog(false);
     }
   }
 
@@ -447,6 +462,12 @@ export function AdminOpsPage() {
                 <FolderOpen className="h-4 w-4 mr-2" />
                 {loadingWorkshop ? 'Loading Workshop...' : 'Load Workshop'}
               </Button>
+              {workshopProjects.length > 0 && (
+                <Button onClick={handleCleanEmptyProjects} disabled={!canRun || loadingCatalog} variant="outline" className="h-10 border-red-900 text-red-400 hover:bg-red-950/40">
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Clean Empty Projects
+                </Button>
+              )}
             </div>
             <div className="space-y-3">
               {workshopProjects.map((project) => (
