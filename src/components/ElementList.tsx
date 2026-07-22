@@ -138,8 +138,7 @@ export function ElementList({
       </h4>
       
       <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 flex flex-col">
-        {[...elements].reverse().map((element, reversedIndex) => {
-          const index = elements.length - 1 - reversedIndex;
+        {elements.map((element, index) => {
           const warning = elementWarnings?.[element.id];
           const hasWarning = !!warning?.hasFlickerRisk;
           const warningColorClass = warning?.severity === 'high' ? 'text-red-400' : 'text-amber-400';
