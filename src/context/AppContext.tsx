@@ -54,6 +54,7 @@ type Action =
   | { type: 'COMMIT_DRAG'; payload: WatchFaceElement[] }
   | { type: 'ADD_ELEMENT'; payload: WatchFaceElement }
   | { type: 'DELETE_ELEMENT'; payload: string }
+  | { type: 'REORDER_ELEMENTS'; payload: WatchFaceElement[] }
   | { type: 'UNDO' }
   | { type: 'REDO' }
   | { type: 'RESET' };
@@ -158,6 +159,32 @@ function appReducer(state: AppState, action: Action): AppState {
           }
         }
       }
+
+      if (action.payload.changes.zIndex !== undefined) {
+        const targetId = action.payload.id;
+        const requestedZIndex = action.payload.changes.zIndex;
+        const targetElementIndex = updatedElements.findIndex(el => el.id === targetId);
+        
+        if (targetElementIndex !== -1) {
+          const targetElement = updatedElements[targetElementIndex];
+          let groupElements = [targetElement];
+          
+          if (targetElement.gaugePairId) {
+            groupElements = updatedElements.filter(el => el.gaugePairId === targetElement.gaugePairId);
+          }
+
+          const groupIds = new Set(groupElements.map(el => el.id));
+          updatedElements = updatedElements.filter(el => !groupIds.has(el.id));
+          
+          const relativeTargetIndex = groupElements.findIndex(el => el.id === targetId);
+          const targetInsertionPoint = Math.max(0, Math.min(requestedZIndex, updatedElements.length + groupElements.length - 1));
+          const groupInsertionPoint = Math.max(0, Math.min(targetInsertionPoint - relativeTargetIndex, updatedElements.length));
+          
+          updatedElements.splice(groupInsertionPoint, 0, ...groupElements);
+          updatedElements = updatedElements.map((el, i) => ({ ...el, zIndex: i }));
+        }
+      }
+
       return {
         ...state,
         watchFaceConfig: { ...state.watchFaceConfig, elements: updatedElements },
@@ -168,9 +195,35 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'UPDATE_ELEMENT_ISOLATED': {
       if (!state.watchFaceConfig) return state;
       const isolatedUndoStack = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
-      const isolatedElements = state.watchFaceConfig.elements.map((el) =>
+      let isolatedElements = state.watchFaceConfig.elements.map((el) =>
         el.id === action.payload.id ? bumpElementVersion({ ...el, ...action.payload.changes }) : el
       );
+
+      if (action.payload.changes.zIndex !== undefined) {
+        const targetId = action.payload.id;
+        const requestedZIndex = action.payload.changes.zIndex;
+        const targetElementIndex = isolatedElements.findIndex(el => el.id === targetId);
+        
+        if (targetElementIndex !== -1) {
+          const targetElement = isolatedElements[targetElementIndex];
+          let groupElements = [targetElement];
+          
+          if (targetElement.gaugePairId) {
+            groupElements = isolatedElements.filter(el => el.gaugePairId === targetElement.gaugePairId);
+          }
+
+          const groupIds = new Set(groupElements.map(el => el.id));
+          isolatedElements = isolatedElements.filter(el => !groupIds.has(el.id));
+          
+          const relativeTargetIndex = groupElements.findIndex(el => el.id === targetId);
+          const targetInsertionPoint = Math.max(0, Math.min(requestedZIndex, isolatedElements.length + groupElements.length - 1));
+          const groupInsertionPoint = Math.max(0, Math.min(targetInsertionPoint - relativeTargetIndex, isolatedElements.length));
+          
+          isolatedElements.splice(groupInsertionPoint, 0, ...groupElements);
+          isolatedElements = isolatedElements.map((el, i) => ({ ...el, zIndex: i }));
+        }
+      }
+
       return {
         ...state,
         watchFaceConfig: { ...state.watchFaceConfig, elements: isolatedElements },
@@ -182,10 +235,16 @@ function appReducer(state: AppState, action: Action): AppState {
       if (!state.watchFaceConfig) return state;
       const newUndoStack2 = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
       const changeMap = new Map(action.payload.map(p => [p.id, p.changes]));
-      const batchUpdated = state.watchFaceConfig.elements.map(el => {
+      let batchUpdated = state.watchFaceConfig.elements.map(el => {
         const changes = changeMap.get(el.id);
         return changes ? bumpElementVersion({ ...el, ...changes }) : el;
       });
+
+      if (action.payload.some(p => p.changes.zIndex !== undefined)) {
+        batchUpdated.sort((a, b) => a.zIndex - b.zIndex);
+        batchUpdated = batchUpdated.map((el, i) => ({ ...el, zIndex: i }));
+      }
+
       return {
         ...state,
         watchFaceConfig: { ...state.watchFaceConfig, elements: batchUpdated },
@@ -195,23 +254,65 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'UPDATE_ELEMENT_SILENT': {
       if (!state.watchFaceConfig) return state;
-      const silentUpdated = state.watchFaceConfig.elements.map(el =>
+      let silentUpdated = state.watchFaceConfig.elements.map(el =>
         el.id === action.payload.id ? bumpElementVersion({ ...el, ...action.payload.changes }) : el
       );
+
+      if (action.payload.changes.zIndex !== undefined) {
+        const targetId = action.payload.id;
+        const requestedZIndex = action.payload.changes.zIndex;
+        const targetElementIndex = silentUpdated.findIndex(el => el.id === targetId);
+        
+        if (targetElementIndex !== -1) {
+          const targetElement = silentUpdated[targetElementIndex];
+          let groupElements = [targetElement];
+          
+          if (targetElement.gaugePairId) {
+            groupElements = silentUpdated.filter(el => el.gaugePairId === targetElement.gaugePairId);
+          }
+
+          const groupIds = new Set(groupElements.map(el => el.id));
+          silentUpdated = silentUpdated.filter(el => !groupIds.has(el.id));
+          
+          const relativeTargetIndex = groupElements.findIndex(el => el.id === targetId);
+          const targetInsertionPoint = Math.max(0, Math.min(requestedZIndex, silentUpdated.length + groupElements.length - 1));
+          const groupInsertionPoint = Math.max(0, Math.min(targetInsertionPoint - relativeTargetIndex, silentUpdated.length));
+          
+          silentUpdated.splice(groupInsertionPoint, 0, ...groupElements);
+          silentUpdated = silentUpdated.map((el, i) => ({ ...el, zIndex: i }));
+        }
+      }
+
       return { ...state, watchFaceConfig: { ...state.watchFaceConfig, elements: silentUpdated } };
     }
     case 'UPDATE_ELEMENTS_BATCH_SILENT': {
       if (!state.watchFaceConfig) return state;
       const silentChangeMap = new Map(action.payload.map(p => [p.id, p.changes]));
-      const silentBatchUpdated = state.watchFaceConfig.elements.map(el => {
+      let silentBatchUpdated = state.watchFaceConfig.elements.map(el => {
         const changes = silentChangeMap.get(el.id);
         return changes ? bumpElementVersion({ ...el, ...changes }) : el;
       });
+
+      if (action.payload.some(p => p.changes.zIndex !== undefined)) {
+        silentBatchUpdated.sort((a, b) => a.zIndex - b.zIndex);
+        silentBatchUpdated = silentBatchUpdated.map((el, i) => ({ ...el, zIndex: i }));
+      }
+
       return { ...state, watchFaceConfig: { ...state.watchFaceConfig, elements: silentBatchUpdated } };
     }
     case 'COMMIT_DRAG': {
       const newUndoForDrag = [...state.undoStack, action.payload].slice(-30);
       return { ...state, undoStack: newUndoForDrag, redoStack: [] };
+    }
+    case 'REORDER_ELEMENTS': {
+      if (!state.watchFaceConfig) return state;
+      const newUndoForReorder = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
+      return {
+        ...state,
+        watchFaceConfig: { ...state.watchFaceConfig, elements: action.payload },
+        undoStack: newUndoForReorder,
+        redoStack: [],
+      };
     }
     case 'UNDO': {
       if (state.undoStack.length === 0 || !state.watchFaceConfig) return state;
@@ -294,6 +395,7 @@ export const actions = {
   updateElementsBatch: (updates: Array<{ id: string; changes: Partial<WatchFaceElement> }>) => ({ type: 'UPDATE_ELEMENTS_BATCH' as const, payload: updates }),
   addElement: (element: WatchFaceElement) => ({ type: 'ADD_ELEMENT' as const, payload: element }),
   deleteElement: (id: string) => ({ type: 'DELETE_ELEMENT' as const, payload: id }),
+  reorderElements: (elements: WatchFaceElement[]) => ({ type: 'REORDER_ELEMENTS' as const, payload: elements }),
   undo: () => ({ type: 'UNDO' as const }),
   redo: () => ({ type: 'REDO' as const }),
   reset: () => ({ type: 'RESET' as const }),

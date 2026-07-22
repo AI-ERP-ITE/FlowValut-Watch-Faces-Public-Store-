@@ -1939,6 +1939,41 @@ function drawArc(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
   ctx.lineCap = 'round';
   ctx.stroke();
 
+  if (el.tickCount && el.tickCount > 0) {
+    const tickWidth = el.tickWidth ?? 2;
+    const tickLength = el.tickLength ?? 10;
+    const tickColor = el.tickColor ? parseZeppColor(el.tickColor) : '#FFFFFF';
+    const showEnds = !(el.hideStartEndTicks ?? false);
+    const count = el.tickCount;
+
+    ctx.strokeStyle = tickColor;
+    ctx.lineWidth = tickWidth;
+    ctx.lineCap = 'butt';
+
+    const totalDeg = endDeg - startDeg;
+    const steps = count > 1 ? count - 1 : 1;
+    
+    ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      if (!showEnds && count > 1 && (i === 0 || i === count - 1)) continue;
+      
+      const fraction = count > 1 ? i / steps : 0.5;
+      const angleRad = degToRad(startDeg - 90 + (totalDeg * fraction));
+      
+      const innerR = radius - tickLength / 2;
+      const outerR = radius + tickLength / 2;
+      
+      const x1 = cx + innerR * Math.cos(angleRad);
+      const y1 = cy + innerR * Math.sin(angleRad);
+      const x2 = cx + outerR * Math.cos(angleRad);
+      const y2 = cy + outerR * Math.sin(angleRad);
+      
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    }
+    ctx.stroke();
+  }
+
   if (el.dataType) {
     const midDeg = (startDeg + endDeg) / 2 - 90;
     const labelR = radius + 16;

@@ -2125,6 +2125,8 @@ function StudioApp() {
     setAodElements(nextElements);
   }, [aodElements, dispatch, editorMode, state.watchFaceConfig]);
 
+
+
   const updateMainBackgroundTransform = useCallback((patch: Partial<BackgroundTransform>) => {
     setMainBackgroundTransform((prev) => {
       const next = normalizeBackgroundTransform({ ...prev, ...patch });
@@ -2161,6 +2163,15 @@ function StudioApp() {
     updateMainBackgroundTransform(patch);
   }, [aodElements, editorMode, updateAodBackgroundTransform, updateMainBackgroundTransform]);
 
+
+  const handleReorderElements = useCallback((newElements: WatchFaceElement[]) => {
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'REORDER_ELEMENTS', payload: newElements });
+    } else {
+      setAodElements(newElements);
+    }
+  }, [dispatch, editorMode]);
+
   const updateActiveElement = useCallback((id: string, changes: Partial<WatchFaceElement>) => {
     if (!state.watchFaceConfig) return;
     if (editorMode === 'MAIN') {
@@ -2187,6 +2198,10 @@ function StudioApp() {
       return updated;
     });
   }, [dispatch, editorMode, state.watchFaceConfig]);
+
+  const handleRenameElement = useCallback((id: string, newName: string) => {
+    updateActiveElement(id, { displayName: newName });
+  }, [updateActiveElement]);
 
   /** Selected-element-only update used by frame fitting; never resizes linked decorative frames. */
   const updateActiveElementIsolated = useCallback((id: string, changes: Partial<WatchFaceElement>) => {
@@ -3250,6 +3265,18 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     let chosenConfig = choice === 'rearrange'
       ? rearrangeProjectPositions(pending.config, pending.targetResolution, pending.targetWatchModel)
       : structuredClone(pending.config);
+
+    // Sanitize and strictly sequentialize zIndex order on load to guarantee parity
+    if (chosenConfig.elements) {
+      chosenConfig.elements = chosenConfig.elements
+        .sort((a, b) => a.zIndex - b.zIndex)
+        .map((el, i) => ({ ...el, zIndex: i }));
+    }
+    if (chosenConfig.aodElements) {
+      chosenConfig.aodElements = chosenConfig.aodElements
+        .sort((a, b) => a.zIndex - b.zIndex)
+        .map((el, i) => ({ ...el, zIndex: i }));
+    }
     let chosenBackgroundImage = pending.backgroundImage;
 
     if (choice === 'rearrange' && pending.restoreBackground && pending.backgroundImage) {
@@ -5179,14 +5206,49 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                     <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] xl:overflow-y-auto 2xl:max-h-[calc(100vh-15rem)]">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
-                        <button
-                          onClick={() => setShowAddElement(true)}
-                          className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/50 rounded px-2 py-1 transition-colors"
-                          title="Add a new element"
-                        >
-                          <Plus className="h-3 w-3" />
-                          Add
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/50 rounded px-2 py-1 transition-colors cursor-pointer" title="Add a static image">
+                            <Plus className="h-3 w-3" />
+                            Add Image
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = (ev) => {
+                                  const dataUrl = ev.target?.result as string;
+                                  const img = new window.Image();
+                                  img.onload = () => {
+                                    addActiveElement({
+                                      id: generateId(),
+                                      type: 'IMG',
+                                      name: file.name,
+                                      displayName: 'Image',
+                                      bounds: { x: 0, y: 0, width: img.width, height: img.height },
+                                      visible: true,
+                                      zIndex: activeElements.length,
+                                      src: dataUrl
+                                    });
+                                  };
+                                  img.src = dataUrl;
+                                };
+                                reader.readAsDataURL(file);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          <button
+                            onClick={() => setShowAddElement(true)}
+                            className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/50 rounded px-2 py-1 transition-colors"
+                            title="Add a new element"
+                          >
+                            <Plus className="h-3 w-3" />
+                            Add
+                          </button>
+                        </div>
                       </div>
                       <ElementList
                         elements={activeElements}
@@ -5196,6 +5258,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                         onSelectElement={handleSelectElement}
                         extraSelectedIds={extraSelectedIds}
                         onMultiToggle={handleMultiToggle}
+                        onReorder={handleReorderElements}
+                        onRenameElement={handleRenameElement}
                         onDeleteElement={(id) => {
                           deleteActiveElement(id);
                           if (selectedElementId === id) { setSelectedElementId(null); setExtraSelectedIds([]); }

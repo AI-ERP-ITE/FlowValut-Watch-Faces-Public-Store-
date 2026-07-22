@@ -1213,6 +1213,33 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
               <NumField label="End°" value={element.endAngle ?? 345} onChange={v => update({ endAngle: v })} />
             </FieldRow>
           </Section>
+          <Section label="Arc Ticks">
+            <FieldRow>
+              <NumField label="Count" value={element.tickCount ?? 0} onChange={v => update({ tickCount: Math.max(0, v) })} />
+              <NumField label="Width" value={element.tickWidth ?? 2} onChange={v => update({ tickWidth: clamp(v, 1, 20) })} />
+            </FieldRow>
+            <FieldRow>
+              <NumField label="Length" value={element.tickLength ?? 10} onChange={v => update({ tickLength: clamp(v, 1, 50) })} />
+              <div className="flex flex-col gap-1 w-full">
+                <span className="text-[10px] text-white/40 px-1 truncate">Color</span>
+                <input
+                  type="color"
+                  value={element.tickColor ?? '#FFFFFF'}
+                  onChange={e => update({ tickColor: e.target.value })}
+                  className="h-[22px] w-full rounded border-0 bg-transparent p-0 cursor-pointer"
+                />
+              </div>
+            </FieldRow>
+            <div className="mt-2 flex items-center justify-between px-1">
+              <span className="text-[10px] text-white/40">Show Start/End Ticks</span>
+              <input
+                type="checkbox"
+                checked={!(element.hideStartEndTicks ?? false)}
+                onChange={e => update({ hideStartEndTicks: !e.target.checked })}
+                className="w-3.5 h-3.5 rounded border-white/20 bg-black/20 text-cyan-500 cursor-pointer"
+              />
+            </div>
+          </Section>
         </>
       )}
 
