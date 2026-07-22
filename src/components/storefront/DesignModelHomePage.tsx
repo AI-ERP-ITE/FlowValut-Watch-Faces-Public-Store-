@@ -37,13 +37,31 @@ export function DesignModelHomePage() {
 
   const featuredData = useMemo(() => {
     if (!data || !featuredFaceId) return null;
-    const sku = resolveLegacySku(data, featuredFaceId);
-    if (!sku) return null;
-    const model = data.designModels.find(m => m.id === sku.productModelId);
-    if (!model) return null;
-    const pkgs = skuPackages(data, sku.id);
-    const pkg = pkgs.find(p => p.mainPreviewPath) || pkgs[0];
-    return { model, sku, pkg };
+
+    // Try as a legacy SKU ID first
+    const legacySku = resolveLegacySku(data, featuredFaceId);
+    if (legacySku) {
+      const model = data.designModels.find(m => m.id === legacySku.productModelId);
+      if (model) {
+        const pkgs = skuPackages(data, legacySku.id);
+        const pkg = pkgs.find(p => p.mainPreviewPath) || pkgs[0];
+        return { model, sku: legacySku, pkg };
+      }
+    }
+
+    // Then try as a direct DesignModel ID or Slug
+    const directModel = data.designModels.find(m => m.id === featuredFaceId || m.slug === featuredFaceId);
+    if (directModel) {
+      const modelSkus = data.skus.filter(s => s.productModelId === directModel.id);
+      const skuToUse = modelSkus[0];
+      if (skuToUse) {
+        const pkgs = skuPackages(data, skuToUse.id);
+        const pkg = pkgs.find(p => p.mainPreviewPath) || pkgs[0];
+        return { model: directModel, sku: skuToUse, pkg };
+      }
+    }
+
+    return null;
   }, [data, featuredFaceId]);
 
   if (loading) return <Status text="Loading the collection…" />; if (error || !data) return <Status text={error ?? 'Store unavailable'} />;
@@ -83,11 +101,12 @@ export function DesignModelHomePage() {
               <span className="rounded border border-[#343b48] px-3 py-2 text-[#e8d2a8]">{data.metrics.sellableSkus} Sellable SKUs</span>
             </div>
           </div>
-          <div className="hidden lg:flex items-center justify-center">
-            <div className="store-hero-watch">
-              <div className="store-hero-watch-inner">
-                {imageSrc && featuredData ? (
-                  <Link to={`/model/${featuredData.model.slug || featuredData.model.id}`}>
+          {featuredData && (
+            <div className="flex items-center justify-center lg:justify-end mt-10 lg:mt-0">
+              <div className="store-hero-watch">
+                <div className="store-hero-watch-inner">
+                  {imageSrc ? (
+                    <Link to={`/model/${featuredData.model.slug || featuredData.model.id}`}>
                     <img
                       src={imageSrc}
                       alt={`${featuredData.model.name} preview`}
@@ -116,6 +135,7 @@ export function DesignModelHomePage() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </section>
       <section className="mx-auto max-w-6xl px-4 py-10">
