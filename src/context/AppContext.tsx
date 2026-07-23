@@ -53,6 +53,7 @@ type Action =
   /** Commit drag: push a pre-captured snapshot onto the undo stack (call once at drag start). */
   | { type: 'COMMIT_DRAG'; payload: WatchFaceElement[] }
   | { type: 'ADD_ELEMENT'; payload: WatchFaceElement }
+  | { type: 'ADD_ELEMENTS_BATCH'; payload: WatchFaceElement[] }
   | { type: 'DELETE_ELEMENT'; payload: string }
   | { type: 'REORDER_ELEMENTS'; payload: WatchFaceElement[] }
   | { type: 'UNDO' }
@@ -114,6 +115,17 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         watchFaceConfig: { ...state.watchFaceConfig, elements: [...state.watchFaceConfig.elements, withVersion] },
         undoStack: newUndoForAdd,
+        redoStack: [],
+      };
+    }
+    case 'ADD_ELEMENTS_BATCH': {
+      if (!state.watchFaceConfig) return state;
+      const newUndoForAddBatch = [...state.undoStack, structuredClone(state.watchFaceConfig.elements)].slice(-30);
+      const withVersions = action.payload.map(el => ({ ...el, version: el.version ?? 1 }));
+      return {
+        ...state,
+        watchFaceConfig: { ...state.watchFaceConfig, elements: [...state.watchFaceConfig.elements, ...withVersions] },
+        undoStack: newUndoForAddBatch,
         redoStack: [],
       };
     }
@@ -425,6 +437,7 @@ export const actions = {
   updateElement: (id: string, changes: Partial<WatchFaceElement>) => ({ type: 'UPDATE_ELEMENT' as const, payload: { id, changes } }),
   updateElementsBatch: (updates: Array<{ id: string; changes: Partial<WatchFaceElement> }>) => ({ type: 'UPDATE_ELEMENTS_BATCH' as const, payload: updates }),
   addElement: (element: WatchFaceElement) => ({ type: 'ADD_ELEMENT' as const, payload: element }),
+  addElementBatch: (elements: WatchFaceElement[]) => ({ type: 'ADD_ELEMENTS_BATCH' as const, payload: elements }),
   deleteElement: (id: string) => ({ type: 'DELETE_ELEMENT' as const, payload: id }),
   reorderElements: (elements: WatchFaceElement[]) => ({ type: 'REORDER_ELEMENTS' as const, payload: elements }),
   undo: () => ({ type: 'UNDO' as const }),

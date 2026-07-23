@@ -2823,6 +2823,259 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       });
   }, []);
 
+  const duplicateElements = useCallback((ids: string[]) => {
+    if (!state.watchFaceConfig) return;
+    const currentElements = editorMode === 'MAIN' ? state.watchFaceConfig.elements : (aodElements ?? []);
+    const elementsToDuplicate = currentElements.filter(el => ids.includes(el.id));
+    if (elementsToDuplicate.length === 0) return;
+
+    const idMap = new Map<string, string>();
+    const maxZ = currentElements.reduce((m, e) => Math.max(m, e.zIndex), 0);
+
+    const duplicated = elementsToDuplicate.map((el, index) => {
+      const newId = generateId();
+      idMap.set(el.id, newId);
+      
+      const copy: WatchFaceElement = {
+        ...el,
+        id: newId,
+        zIndex: maxZ + 1 + index,
+        name: el.name.endsWith(' Copy') ? el.name : `${el.name} Copy`,
+      };
+
+      if (copy.bounds) {
+        copy.bounds = {
+          ...copy.bounds,
+          x: copy.bounds.x + 10,
+          y: copy.bounds.y + 10,
+        };
+      }
+      if (copy.center) {
+        copy.center = {
+          ...copy.center,
+          x: copy.center.x + 10,
+          y: copy.center.y + 10,
+        };
+      }
+      return copy;
+    });
+
+    const finalDuplicated = duplicated.map(el => {
+      const updated = { ...el };
+      if (el.frameElementId && idMap.has(el.frameElementId)) {
+        updated.frameElementId = idMap.get(el.frameElementId);
+      }
+      if (el.engraveFrame && idMap.has(el.engraveFrame.frameOf)) {
+        updated.engraveFrame = {
+          ...el.engraveFrame,
+          frameOf: idMap.get(el.engraveFrame.frameOf)!,
+        };
+      }
+      return updated;
+    });
+
+    if (editorMode === 'MAIN') {
+      dispatch({ type: 'ADD_ELEMENTS_BATCH', payload: finalDuplicated });
+    } else {
+      setAodElements(prev => [...(prev ?? []), ...finalDuplicated]);
+    }
+
+    const primaryCopy = finalDuplicated[0];
+    const extraCopies = finalDuplicated.slice(1).map(el => el.id);
+    setSelectedElementId(primaryCopy.id);
+    setExtraSelectedIds(extraCopies);
+    toast.success(`Duplicated ${finalDuplicated.length} element(s)`);
+  }, [state.watchFaceConfig, editorMode, aodElements, dispatch]);
+
+  const handleDuplicateSelected = useCallback(() => {
+    const selection = [selectedElementId, ...extraSelectedIds].filter((sid): sid is string => !!sid);
+    duplicateElements(selection);
+  }, [selectedElementId, extraSelectedIds, duplicateElements]);
+
+  const handleDuplicateElement = useCallback((id: string) => {
+    const selection = [selectedElementId, ...extraSelectedIds].filter((sid): sid is string => !!sid);
+    if (selection.includes(id)) {
+      duplicateElements(selection);
+    } else {
+      duplicateElements([id]);
+    }
+  }, [selectedElementId, extraSelectedIds, duplicateElements]);
+
+  const handleFlipSelected = useCallback(async (axis: 'h' | 'v', mode: 'local' | 'canvas') => {
+    if (!state.watchFaceConfig) return;
+    const selectedIds = [selectedElementId, ...extraSelectedIds].filter((id): id is string => !!id);
+    if (selectedIds.length === 0) return;
+
+    const currentElements = editorMode === 'MAIN' ? state.watchFaceConfig.elements : (aodElements ?? []);
+    const elementsToFlip = currentElements.filter(el => selectedIds.includes(el.id));
+
+    const canvasW = activeCanvasW;
+    const canvasH = activeCanvasH;
+
+    const updates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
+    const newElementImages = [...state.elementImages];
+
+    const getFlippedImageName = (originalName: string, suffix: string) => {
+      if (originalName.startsWith(`flipped_${suffix}_`)) {
+        return originalName.substring(`flipped_${suffix}_`.length);
+      }
+      return `flipped_${suffix}_${originalName}`;
+    };
+
+    const flipImageHelper = async (imgName: string, suffix: string, dir: 'h' | 'v') => {
+      const existing = newElementImages.find(img => img.name === imgName);
+      if (!existing) return imgName;
+
+      const flippedName = getFlippedImageName(imgName, suffix);
+      if (newElementImages.some(img => img.name === flippedName)) {
+        return flippedName;
+      }
+
+      try {
+        const flippedDataUrl = await new Promise<string>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(existing.dataUrl); return; }
+            ctx.translate(dir === 'h' ? img.width : 0, dir === 'v' ? img.height : 0);
+            ctx.scale(dir === 'h' ? -1 : 1, dir === 'v' ? -1 : 1);
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL());
+          };
+          img.onerror = () => resolve(existing.dataUrl);
+          img.src = existing.dataUrl;
+        });
+
+        newElementImages.push({
+          name: flippedName,
+          dataUrl: flippedDataUrl,
+          bounds: { ...existing.bounds },
+          type: existing.type,
+        });
+        return flippedName;
+      } catch (err) {
+        console.error('Failed to flip image:', err);
+        return imgName;
+      }
+    };
+
+    const suffix = axis === 'h' ? 'h' : 'v';
+    const dir = axis === 'h' ? 'h' : 'v';
+
+    for (const el of elementsToFlip) {
+      const elChanges: Partial<WatchFaceElement> = {};
+
+      if (mode === 'canvas') {
+        if (axis === 'h') {
+          if (el.bounds) {
+            elChanges.bounds = {
+              ...el.bounds,
+              x: canvasW - el.bounds.x - el.bounds.width,
+            };
+          }
+          if (el.center) {
+            elChanges.center = {
+              ...el.center,
+              x: canvasW - el.center.x,
+            };
+          }
+        } else {
+          if (el.bounds) {
+            elChanges.bounds = {
+              ...el.bounds,
+              y: canvasH - el.bounds.y - el.bounds.height,
+            };
+          }
+          if (el.center) {
+            elChanges.center = {
+              ...el.center,
+              y: canvasH - el.center.y,
+            };
+          }
+        }
+      }
+
+      if (axis === 'h') {
+        if (el.startAngle != null && el.endAngle != null) {
+          elChanges.startAngle = -el.endAngle;
+          elChanges.endAngle = -el.startAngle;
+        }
+      } else {
+        if (el.startAngle != null && el.endAngle != null) {
+          elChanges.startAngle = 180 - el.endAngle;
+          elChanges.endAngle = 180 - el.startAngle;
+        }
+      }
+
+      // Skip image asset flipping for text and digits
+      const isTextOrDigits = ['TEXT', 'TEXT_IMG', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK'].includes(el.type);
+      if (!isTextOrDigits) {
+        if (el.src) elChanges.src = await flipImageHelper(el.src, suffix, dir);
+        if (el.pressSrc) elChanges.pressSrc = await flipImageHelper(el.pressSrc, suffix, dir);
+        if (el.normalSrc) elChanges.normalSrc = await flipImageHelper(el.normalSrc, suffix, dir);
+        if (el.hourHandSrc) elChanges.hourHandSrc = await flipImageHelper(el.hourHandSrc, suffix, dir);
+        if (el.minuteHandSrc) elChanges.minuteHandSrc = await flipImageHelper(el.minuteHandSrc, suffix, dir);
+        if (el.secondHandSrc) elChanges.secondHandSrc = await flipImageHelper(el.secondHandSrc, suffix, dir);
+        if (el.coverSrc) elChanges.coverSrc = await flipImageHelper(el.coverSrc, suffix, dir);
+        if (el.images && el.images.length > 0) {
+          const flippedImages = [];
+          for (const img of el.images) {
+            flippedImages.push(await flipImageHelper(img, suffix, dir));
+          }
+          elChanges.images = flippedImages;
+        }
+      }
+
+      updates.push({ id: el.id, changes: elChanges });
+    }
+
+    dispatch(actions.setElementImages(newElementImages));
+    if (editorMode === 'MAIN') {
+      dispatch(actions.updateElementsBatch(updates));
+    } else {
+      setAodElements(prev => {
+        const elements = prev ?? [];
+        return elements.map(el => {
+          const update = updates.find(u => u.id === el.id);
+          return update ? { ...el, ...update.changes } : el;
+        });
+      });
+    }
+
+    toast.success(`Flipped ${elementsToFlip.length} element(s) ${axis === 'h' ? 'horizontally' : 'vertically'}`);
+  }, [selectedElementId, extraSelectedIds, editorMode, aodElements, activeCanvasW, activeCanvasH, state.elementImages, dispatch]);
+
+  // Keyboard shortcuts (undo, redo, duplicate)
+  const handleDuplicateSelectedRef = useRef(handleDuplicateSelected);
+  handleDuplicateSelectedRef.current = handleDuplicateSelected;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        handleDuplicateSelectedRef.current();
+      }
+
+      if (editorMode === 'AOD') return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        dispatchRef({ type: 'UNDO' });
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        dispatchRef({ type: 'REDO' });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dispatchRef, editorMode]);
+
   const openCropTool = (file: File, target: CropTarget = 'MAIN') => {
     setCropTarget(target);
     setCropFile(file);
@@ -5221,6 +5474,10 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                         onRemoveSiblingElements={(ids) => {
                           ids.forEach(id => deleteActiveElement(id));
                         }}
+                        extraSelectedIds={extraSelectedIds}
+                        onDuplicateSelected={handleDuplicateSelected}
+                        onFlipHorizontal={(mode) => handleFlipSelected('h', mode)}
+                        onFlipVertical={(mode) => handleFlipSelected('v', mode)}
                       />
                     </div>
                     <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] xl:overflow-y-auto 2xl:max-h-[calc(100vh-15rem)]">
@@ -5285,6 +5542,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
                           if (selectedElementId === id) { setSelectedElementId(null); setExtraSelectedIds([]); }
                           else setExtraSelectedIds(prev => prev.filter(x => x !== id));
                         }}
+                        onDuplicateElement={handleDuplicateElement}
                       />
                     </div>
                   </div>

@@ -153,6 +153,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
   const dragSnapshotsRef = useRef<Map<string, WatchFaceElement>>(new Map());
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const dragSnapshotRef = useRef<WatchFaceElement | null>(null);
+  const dragDirectionRef = useRef<'h' | 'v' | null>(null); // locks axis on shift-drag
   const resizeHandleRef = useRef<string | null>(null); // 'TL','TC','TR','ML','MR','BL','BC','BR'
   const selectedElementIdRef = useRef(selectedElementId);
   selectedElementIdRef.current = selectedElementId;
@@ -383,6 +384,26 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     }
     isDraggingRef.current = true;
 
+    let constrainedDx = dx;
+    let constrainedDy = dy;
+
+    if (e.shiftKey) {
+      if (!dragDirectionRef.current) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          dragDirectionRef.current = 'h';
+        } else if (Math.abs(dy) > Math.abs(dx)) {
+          dragDirectionRef.current = 'v';
+        }
+      }
+      if (dragDirectionRef.current === 'h') {
+        constrainedDy = 0;
+      } else if (dragDirectionRef.current === 'v') {
+        constrainedDx = 0;
+      }
+    } else {
+      dragDirectionRef.current = null;
+    }
+
     const snap = dragSnapshotRef.current;
 
     // Resize mode
@@ -485,16 +506,16 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
 
     // Drag mode
     const newBounds = {
-      x: Math.max(0, Math.min(csW - snap.bounds.width, snap.bounds.x + dx)),
-      y: Math.max(0, Math.min(csH - snap.bounds.height, snap.bounds.y + dy)),
+      x: Math.max(0, Math.min(csW - snap.bounds.width, snap.bounds.x + constrainedDx)),
+      y: Math.max(0, Math.min(csH - snap.bounds.height, snap.bounds.y + constrainedDy)),
       width: snap.bounds.width,
       height: snap.bounds.height,
     };
     const changes: Partial<WatchFaceElement> = { bounds: newBounds };
     if (snap.center) {
       changes.center = {
-        x: Math.max(0, Math.min(csW, snap.center.x + dx)),
-        y: Math.max(0, Math.min(csH, snap.center.y + dy)),
+        x: Math.max(0, Math.min(csW, snap.center.x + constrainedDx)),
+        y: Math.max(0, Math.min(csH, snap.center.y + constrainedDy)),
       };
     } else if (snap.type === 'ARC_PROGRESS') {
       // ARC_PROGRESS without center stored: derive from new bounds midpoint so canvas and device stay in sync
@@ -510,16 +531,16 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const batchUpdates: Array<{ id: string; changes: Partial<WatchFaceElement> }> = [];
       for (const [xid, xsnap] of dragSnapshotsRef.current) {
         const xBounds = {
-          x: Math.max(0, Math.min(csW - xsnap.bounds.width, xsnap.bounds.x + dx)),
-          y: Math.max(0, Math.min(csH - xsnap.bounds.height, xsnap.bounds.y + dy)),
+          x: Math.max(0, Math.min(csW - xsnap.bounds.width, xsnap.bounds.x + constrainedDx)),
+          y: Math.max(0, Math.min(csH - xsnap.bounds.height, xsnap.bounds.y + constrainedDy)),
           width: xsnap.bounds.width,
           height: xsnap.bounds.height,
         };
         const xChanges: Partial<WatchFaceElement> = { bounds: xBounds };
         if (xsnap.center) {
           xChanges.center = {
-            x: Math.max(0, Math.min(csW, xsnap.center.x + dx)),
-            y: Math.max(0, Math.min(csH, xsnap.center.y + dy)),
+            x: Math.max(0, Math.min(csW, xsnap.center.x + constrainedDx)),
+            y: Math.max(0, Math.min(csH, xsnap.center.y + constrainedDy)),
           };
         }
         batchUpdates.push({ id: xid, changes: xChanges });
@@ -532,6 +553,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
     dragStartRef.current = null;
     dragSnapshotRef.current = null;
     dragSnapshotsRef.current.clear();
+    dragDirectionRef.current = null;
     resizeHandleRef.current = null;
     dragStartFiredRef.current = false;
     setTimeout(() => { isDraggingRef.current = false; }, 0);

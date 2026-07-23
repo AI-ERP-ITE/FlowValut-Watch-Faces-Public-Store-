@@ -1,3 +1,4 @@
+import { Copy, FlipHorizontal, FlipVertical } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -53,6 +54,10 @@ export interface PropertyPanelProps {
   onAddSiblingElement?: (partialEl: Omit<WatchFaceElement, 'id'>) => void;
   /** Called before re-building gauge siblings to remove stale ones (prevents duplicates). */
   onRemoveSiblingElements?: (ids: string[]) => void;
+  extraSelectedIds?: string[];
+  onDuplicateSelected?: () => void;
+  onFlipHorizontal?: (mode: 'local' | 'canvas') => void;
+  onFlipVertical?: (mode: 'local' | 'canvas') => void;
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
@@ -161,7 +166,7 @@ function resolveSectionTab(label: string): PanelTab | null {
   return null;
 }
 
-export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, onUpdateElement, onUpdateElementIsolated, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements }: PropertyPanelProps) {
+export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, onUpdateElement, onUpdateElementIsolated, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements, onDuplicateSelected, onFlipHorizontal, onFlipVertical }: PropertyPanelProps) {
   const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
   const [iconSearch, setIconSearch] = useState('');
   const [fontSearch, setFontSearch] = useState('');
@@ -841,6 +846,59 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
             Paste Style
           </button>
         )}
+      </div>
+
+      {/* Transforms & Alignment */}
+      <div className="border-t border-white/5 pt-3 mt-1 space-y-2">
+        <span className="text-[10px] font-semibold text-white/45 uppercase tracking-wider block">Transforms</span>
+        <div className="flex flex-col gap-1.5">
+          <button
+            onClick={onDuplicateSelected}
+            className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+            title="Duplicate selected element(s)"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Duplicate
+          </button>
+          
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => onFlipHorizontal?.('canvas')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Mirror horizontally relative to canvas center"
+            >
+              <FlipHorizontal className="h-3.5 w-3.5" />
+              Mirror H (Canvas)
+            </button>
+            <button
+              onClick={() => onFlipVertical?.('canvas')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Mirror vertically relative to canvas center"
+            >
+              <FlipVertical className="h-3.5 w-3.5" />
+              Mirror V (Canvas)
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => onFlipHorizontal?.('local')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Flip selected element(s) horizontally in place"
+            >
+              <FlipHorizontal className="h-3.5 w-3.5 opacity-50" />
+              Flip H (Local)
+            </button>
+            <button
+              onClick={() => onFlipVertical?.('local')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Flip selected element(s) vertically in place"
+            >
+              <FlipVertical className="h-3.5 w-3.5 opacity-50" />
+              Flip V (Local)
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-white/10 bg-black/20 p-1 md:grid-cols-5">

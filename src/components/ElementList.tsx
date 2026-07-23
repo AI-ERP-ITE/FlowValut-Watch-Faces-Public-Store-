@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { WatchFaceElement } from '@/types';
-import { AlertTriangle, Eye, EyeOff, GripVertical, Trash2, Edit2, Check, X } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, GripVertical, Trash2, Edit2, Check, X, Copy } from 'lucide-react';
 
 interface ElementWarningInfo {
   hasFlickerRisk: boolean;
@@ -16,6 +16,7 @@ interface ElementListProps {
   onReorder?: (elements: WatchFaceElement[]) => void;
   onRenameElement?: (id: string, newName: string) => void;
   onDeleteElement?: (id: string) => void;
+  onDuplicateElement?: (id: string) => void;
   selectedElementId?: string | null;
   onSelectElement?: (id: string) => void;
   /** IDs of elements that are part of the current group selection (gauge siblings). */
@@ -32,6 +33,7 @@ export function ElementList({
   onReorder,
   onRenameElement,
   onDeleteElement,
+  onDuplicateElement,
   selectedElementId,
   onSelectElement,
   extraSelectedIds,
@@ -295,6 +297,17 @@ export function ElementList({
                 ) : (
                   <EyeOff className="h-4 w-4" />
                 )}
+              </button>
+            )}
+
+            {/* Duplicate button */}
+            {onDuplicateElement && !isEditing && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }}
+                className="p-1.5 rounded-md text-zinc-600 hover:text-cyan-400 hover:bg-cyan-400/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                title="Duplicate element"
+              >
+                <Copy className="h-3.5 w-3.5" />
               </button>
             )}
 
