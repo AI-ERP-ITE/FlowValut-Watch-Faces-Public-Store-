@@ -142,7 +142,7 @@ function generateAppJson(config: WatchFaceConfig): string {
     defaultLanguage: 'en-US',
     debug: false,
     targets: {
-      [platformMeta.targetKey]: {
+      default: {
         module: {
           watchface: {
             path: 'watchface/index',
@@ -154,6 +154,15 @@ function generateAppJson(config: WatchFaceConfig): string {
         },
         platforms: platformMeta.platforms,
         designWidth: config.resolution.width,
+      },
+    },
+    module: {
+      watchface: {
+        path: 'watchface/index',
+        main: 1,
+        editable: 0,
+        lockscreen: 0,
+        hightCost: 0,
       },
     },
     packageInfo: {
@@ -204,14 +213,14 @@ function getPlatformMeta(config: WatchFaceConfig): {
     compatibleModels.length > 0
       ? compatibleModels.flatMap((entry) =>
           entry.deviceSources.map((source) => ({
-            name: entry.name,
+            name: config.watchModel,
             st,
             sr,
             deviceSource: source,
           }))
         )
       : [{
-          name: 'Compatible Device',
+          name: config.watchModel || 'Compatible Device',
           st,
           sr,
           deviceSource: 8519936, // generic fallback
@@ -232,9 +241,12 @@ function getModelEntry(watchModel: string): {
   deviceSources: number[];
 } | undefined {
   if (!watchModel) return undefined;
+  const target = watchModel.trim().toLowerCase();
   return getModelEntries().find((model) => (
-    model.key.toLowerCase() === watchModel.trim().toLowerCase()
-    || model.name.toLowerCase() === watchModel.trim().toLowerCase()
+    model.key.toLowerCase() === target
+    || model.name.toLowerCase() === target
+    || model.name.toLowerCase().includes(target)
+    || target.includes(model.name.toLowerCase())
   ));
 }
 
