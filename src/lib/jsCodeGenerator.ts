@@ -859,6 +859,19 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
     ? `\n                    type: hmUI.data_type.${element.dataType},`
     : '';
 
+  let ticksCode = '';
+  if (element.tickCount && element.tickCount > 0) {
+    const ticksFilename = `ticks_${element.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+    ticksCode = `
+                // ${element.name} - Ticks Overlay (Image Layer)
+                let widget_${widgetIndex}_ticks = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(0),
+                    y: px(0),
+                    src: '${ticksFilename}',
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+  }
+
   return `
                 // ${element.name} - Faint full-range background (setProperty forces level:100 on firmware)
                 const faintArc_${widgetIndex} = hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
@@ -883,7 +896,7 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
                     color: ${colorValue},
                     line_width: px(${lineWidth}),${typeParam}
                     show_level: hmUI.show_level.${showLevel}
-                });`;
+                });${ticksCode}`;
 }
 
 // ============================================================

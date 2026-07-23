@@ -2584,7 +2584,7 @@ function FieldRow({ children }: { children: React.ReactNode }) {
 function NumField({ label, value, onChange, disabled, step }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean; step?: string }) {
   return (
     <div className="flex items-center gap-1 flex-1">
-      <span className="text-[10px] text-white/40 w-4 shrink-0">{label}</span>
+      <span className="text-[10px] text-white/40 w-9 shrink-0 text-right pr-1">{label}</span>
       <Input
         type="number"
         value={step ? value : Math.round(value)}

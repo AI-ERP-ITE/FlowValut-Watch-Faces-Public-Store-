@@ -2843,20 +2843,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         name: el.name.endsWith(' Copy') ? el.name : `${el.name} Copy`,
       };
 
-      if (copy.bounds) {
-        copy.bounds = {
-          ...copy.bounds,
-          x: copy.bounds.x + 10,
-          y: copy.bounds.y + 10,
-        };
-      }
-      if (copy.center) {
-        copy.center = {
-          ...copy.center,
-          x: copy.center.x + 10,
-          y: copy.center.y + 10,
-        };
-      }
+      // Duplicate elements in-place with no offset for faster mirroring
       return copy;
     });
 
@@ -3860,19 +3847,36 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       }
       const allElementImages = [...state.elementImages, ...switcherSlotImages];
 
+      // 1. Generate transparent ticks PNGs for ARC_PROGRESS widgets
+      const tickFiles: Array<{ src: string; file: File }> = [];
+      for (const el of allExportElements) {
+        if (el.type === 'ARC_PROGRESS' && el.tickCount && el.tickCount > 0) {
+          const ticksDataUrl = generateArcTicksPng(el, activeCanvasW, activeCanvasH);
+          if (ticksDataUrl) {
+            const ticksName = `ticks_${el.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+            const { mimeType, bytes } = decodeDataUrlToBytes(ticksDataUrl, `Ticks image ${ticksName}`);
+            const blob = new Blob([bytes], { type: mimeType });
+            tickFiles.push({
+              src: ticksName,
+              file: new File([blob], ticksName, { type: mimeType }),
+            });
+          }
+        }
+      }
+
       // Convert elementImages from dataUrl to File objects
-      const elementFiles = allElementImages.map((img) => {
-        console.log('[App] Converting element image to file:', img.name);
-        
-        const { mimeType, bytes } = decodeDataUrlToBytes(img.dataUrl, `Element image ${img.name}`);
-        const blob = new Blob([bytes], { type: mimeType });
-        
-        console.log('[App] Converted', img.name, 'size:', blob.size);
-        return {
-          src: img.name,
-          file: new File([blob], img.name, { type: mimeType }),
-        };
-      });
+      const elementFiles = [
+        ...allElementImages.map((img) => {
+          console.log('[App] Converting element image to file:', img.name);
+          const { mimeType, bytes } = decodeDataUrlToBytes(img.dataUrl, `Element image ${img.name}`);
+          const blob = new Blob([bytes], { type: mimeType });
+          return {
+            src: img.name,
+            file: new File([blob], img.name, { type: mimeType }),
+          };
+        }),
+        ...tickFiles
+      ];
       
       console.log('[App] Element files prepared:', { count: elementFiles.length, files: elementFiles.map(f => f.src) });
       
@@ -6086,6 +6090,61 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       </Dialog>
     </div>
   );
+}
+
+function generateArcTicksPng(el: WatchFaceElement, canvasW: number, canvasH: number): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const cx = el.center?.x ?? (el.bounds.x + el.bounds.width / 2);
+  const cy = el.center?.y ?? (el.bounds.y + el.bounds.height / 2);
+  const radius = el.radius ?? 100;
+  const startDeg = el.startAngle ?? 135;
+  const endDeg = el.endAngle ?? 345;
+  const tickWidth = el.tickWidth ?? 2;
+  const tickLength = el.tickLength ?? 10;
+  
+  const tickColorRaw = el.tickColor || '#FFFFFF';
+  const tickColor = (tickColorRaw.startsWith('0x') || tickColorRaw.startsWith('0X')) 
+    ? '#' + tickColorRaw.slice(2).padStart(6, '0') 
+    : tickColorRaw;
+    
+  const showEnds = !(el.hideStartEndTicks ?? false);
+  const count = el.tickCount ?? 0;
+
+  if (count <= 0) return '';
+
+  ctx.strokeStyle = tickColor;
+  ctx.lineWidth = tickWidth;
+  ctx.lineCap = 'butt';
+
+  const totalDeg = endDeg - startDeg;
+  const steps = count > 1 ? count - 1 : 1;
+
+  ctx.beginPath();
+  for (let i = 0; i < count; i++) {
+    if (!showEnds && count > 1 && (i === 0 || i === count - 1)) continue;
+    
+    const fraction = count > 1 ? i / steps : 0.5;
+    const angleRad = (startDeg - 90 + (totalDeg * fraction)) * (Math.PI / 180);
+    
+    const innerR = radius - tickLength / 2;
+    const outerR = radius + tickLength / 2;
+    
+    const x1 = cx + innerR * Math.cos(angleRad);
+    const y1 = cy + innerR * Math.sin(angleRad);
+    const x2 = cx + outerR * Math.cos(angleRad);
+    const y2 = cy + outerR * Math.sin(angleRad);
+    
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+  }
+  ctx.stroke();
+
+  return canvas.toDataURL();
 }
 
 export default StudioApp;
