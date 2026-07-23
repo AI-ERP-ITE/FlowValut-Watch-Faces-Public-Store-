@@ -51,10 +51,8 @@ function _shadowImgWidgetV3(element: WatchFaceElement, label: string): string {
                 });`;
 }
 
-// Device models using V3 format — fallback list used only when configVersion is not set on the config.
-// Spec 110: configVersion is now injected by StudioApp from specGroups.supportedConfigVersions,
-// so this list is only hit for configs saved before spec 110.
-const V3_DEVICE_MODELS = [
+// Device models using V3 format (GTR 4, GTS 4, newer Zepp OS models)
+export const V3_DEVICE_MODELS = [
   'GTR 4',
   'GTS 4',
   'Active 2 Round',
@@ -65,21 +63,14 @@ const V3_DEVICE_MODELS = [
 export function generateWatchFaceCode(config: WatchFaceConfig): GeneratedCode {
   console.log('[JSGen] Starting code generation for:', config.name, 'Model:', config.watchModel);
 
-  // Spec 110: prefer explicit configVersion from specGroups lookup (set by StudioApp at export time).
-  // Fall back to legacy hardcoded model-name lists for configs saved before this change.
-  const version = config.configVersion
-    ?? (V3_DEVICE_MODELS.includes(config.watchModel) ? 'v3' : 'v2');
-
-  if (version === 'v3') {
-    console.log('[JSGen] Using V3 generator for model:', config.watchModel);
-    return generateWatchFaceCodeV3(config);
-  }
-  console.log('[JSGen] Using V2 generator (legacy format) for model:', config.watchModel);
+  // Per user instruction: force all models to use V2 generator (legacy format)
+  // as V3 generation has unverified schema issues.
+  console.log('[JSGen] Forcing V2 generator (legacy format) for all models');
   return generateWatchFaceCodeV2(config);
 }
 
 // V3 Generator (for newer devices)
-function generateWatchFaceCodeV3(config: WatchFaceConfig): GeneratedCode {
+export function generateWatchFaceCodeV3(config: WatchFaceConfig): GeneratedCode {
   console.log('[JSGenV3] Starting v3 code generation for:', config.name);
   try {
     const appJson = generateAppJson(config);

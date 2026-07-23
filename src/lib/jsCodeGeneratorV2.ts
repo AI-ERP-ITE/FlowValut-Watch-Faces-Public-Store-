@@ -130,7 +130,7 @@ function generateAppJsonV2(config: WatchFaceConfig): string {
       },
     },
     platforms: deviceSources.map((source) => ({
-      name: 'Amazfit Balance',  // EXACT name from reference
+      name: config.watchModel || 'Amazfit Balance',
       deviceSource: source,
     })),
     designWidth: config.resolution.width,
