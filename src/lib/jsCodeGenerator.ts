@@ -174,6 +174,7 @@ function getPlatformMeta(config: WatchFaceConfig): {
   platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }>;
 } {
   const model = getModelEntry(config.watchModel);
+  const allModels = getModelEntries();
   const fallbackShape: 'r' | 's' = config.resolution.width === config.resolution.height ? 'r' : 's';
   const fallbackResTag = fallbackShape === 'r'
     ? `w${config.resolution.width}`
@@ -195,16 +196,20 @@ function getPlatformMeta(config: WatchFaceConfig): {
     }
   }
 
-  // ONLY use the specific model selected, do not inherit all models in the spec group
-  // This prevents the Zepp app installer from crashing due to a massive platforms array
+  const compatibleModels = model?.specGroup
+    ? allModels.filter((entry) => entry.specGroup === model.specGroup)
+    : (model ? [model] : []);
+
   const platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }> =
-    model && model.deviceSources.length > 0
-      ? model.deviceSources.map((source) => ({
-          name: model.name,
-          st,
-          sr,
-          deviceSource: source,
-        }))
+    compatibleModels.length > 0
+      ? compatibleModels.flatMap((entry) =>
+          entry.deviceSources.map((source) => ({
+            name: entry.name,
+            st,
+            sr,
+            deviceSource: source,
+          }))
+        )
       : [{
           name: 'Compatible Device',
           st,
@@ -227,12 +232,9 @@ function getModelEntry(watchModel: string): {
   deviceSources: number[];
 } | undefined {
   if (!watchModel) return undefined;
-  const target = watchModel.trim().toLowerCase();
   return getModelEntries().find((model) => (
-    model.key.toLowerCase() === target
-    || model.name.toLowerCase() === target
-    || model.name.toLowerCase().includes(target)
-    || target.includes(model.name.toLowerCase())
+    model.key.toLowerCase() === watchModel.trim().toLowerCase()
+    || model.name.toLowerCase() === watchModel.trim().toLowerCase()
   ));
 }
 
