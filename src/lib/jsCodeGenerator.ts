@@ -1,36 +1,42 @@
-// JavaScript Code Generator for ZeppOS Watch Faces
-// Supports both V2 (legacy/Balance 2) and V3 (newer models) formats
-// Routes based on device model selection
+// V2 Code Generator for ZeppOS Watch Faces (Balance 2 & Legacy Devices)
+// Generates v2 manifest structure with flat organization
+// Compatible with Amazfit Balance 2, Balance, Active Max (older Zepp OS)
 
 import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import modelsData from '../../models.json';
-import { generateWatchFaceCodeV2 } from './jsCodeGeneratorV2';
 import { FONT_STYLES } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
+import { getCenteredTimeStartX } from '@/lib/timeDigitGeometry';
 import { getCenteredNumericDayStartX, isCompleteDayImageMode } from '@/lib/dateImageMode';
 import { isProjectBackgroundElement } from '@/lib/projectCanvasGeometry';
 
-function _safeAssetIdV3(id?: string): string {
+function _safeAssetId(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-function _monthAssetPrefixV3(element: WatchFaceElement): string {
-  return `month_${_safeAssetIdV3(element.id)}`;
+function _monthAssetPrefix(element: WatchFaceElement): string {
+  return `month_${_safeAssetId(element.id)}`;
 }
 
-function _weekAssetPrefixV3(element: WatchFaceElement): string {
-  return `week_${_safeAssetIdV3(element.id)}`;
+function _weekAssetPrefix(element: WatchFaceElement): string {
+  return `week_${_safeAssetId(element.id)}`;
 }
 
-/** Compute shadow-bake padding (mirrors V2 helper). */
+/** Compute extra canvas padding required to contain a drop shadow (mirrors StudioApp helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
   return dropShadowPaddingForBake(ds);
 }
 
-function _shadowImgWidgetV3(element: WatchFaceElement, label: string): string {
+/** Emit an IMG widget that references a pre-baked shadow PNG with padded bounds. */
+function _shadowImgWidget(
+  element: WatchFaceElement,
+  widgetIndex: number,
+  showLevel: string,
+  label: string,
+): string {
   const ds = element.dropShadow!;
   const pad = _shadowPad(ds);
   const safeName = element.name.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -41,66 +47,45 @@ function _shadowImgWidgetV3(element: WatchFaceElement, label: string): string {
   const h = (element.bounds.height || 50) + pad * 2;
   return `
                 // ${element.name} - ${label} (shadow-baked IMG)
-                hmUI.createWidget(hmUI.widget.IMG, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG, {
                     x: px(${x}),
                     y: px(${y}),
                     w: px(${w}),
                     h: px(${h}),
-            src: '${filename}',
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                  src: '${filename}',
+                    alpha: 255,
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// Device models using V3 format (GTR 4, GTS 4, newer Zepp OS models)
-export const V3_DEVICE_MODELS = [
-  'GTR 4',
-  'GTS 4',
-  'Active 2 Round',
-  'Active 2 Square',
-  'Active',
-];
-
 export function generateWatchFaceCode(config: WatchFaceConfig): GeneratedCode {
-  console.log('[JSGen] Starting code generation for:', config.name, 'Model:', config.watchModel);
-
-  // Per user instruction: force all models to use V2 generator (legacy format)
-  // as V3 generation has unverified schema issues.
-  console.log('[JSGen] Forcing V2 generator (legacy format) for all models');
-  return generateWatchFaceCodeV2(config);
-}
-
-// V3 Generator (for newer devices)
-export function generateWatchFaceCodeV3(config: WatchFaceConfig): GeneratedCode {
-  console.log('[JSGenV3] Starting v3 code generation for:', config.name);
+  console.log('[JSGen] Starting v2 code generation for:', config.name);
   try {
     const appJson = generateAppJson(config);
-    console.log('[JSGenV3] app.json generated, length:', appJson.length);
+    console.log('[JSGen] app.json v2 generated, length:', appJson.length);
     
     const appJs = generateAppJs(config);
-    console.log('[JSGenV3] app.js generated, length:', appJs.length);
+    console.log('[JSGen] app.js v2 generated, length:', appJs.length);
     
     const watchfaceIndexJs = generateWatchfaceIndexJs(config);
-    console.log('[JSGenV3] watchface/index.js generated, length:', watchfaceIndexJs.length);
+    console.log('[JSGen] watchface/index.js v2 generated, length:', watchfaceIndexJs.length);
     
     return { appJson, appJs, watchfaceIndexJs };
   } catch (error) {
-    console.error('[JSGenV3] Error generating code:', error);
+    console.error('[JSGen] Error generating code:', error);
     throw error;
   }
 }
 
-// Generate app.json - Matching working ZPK structure exactly (v3 with proper targets structure)
+// Generate app.json - V2 format (EXACTLY matching reference structure)
 function generateAppJson(config: WatchFaceConfig): string {
   const appId = generateAppId();
-  
-  // Resolve platform metadata from model catalog with resolution fallback
-  const platformMeta = getPlatformMeta(config);
-  
-  // Increment version code based on timestamp (ensures each build has higher code)
+  const deviceSources = getDeviceSources(config.watchModel);
   const versionCode = Math.floor(Date.now() / 1000);
   
-  const json = {
-    configVersion: 'v3',
+  // Build JSON as plain object with exact structure from reference
+  const json: any = {
+    configVersion: 'v2',
     app: {
       appIdType: 0,
       appId: appId,
@@ -108,48 +93,50 @@ function generateAppJson(config: WatchFaceConfig): string {
       appType: 'watchface',
       version: {
         code: versionCode,
-        name: '1.0.0',
+        name: '1.0.1',
       },
-      vender: 'AI-WatchFace-Creator',
-      description: `Custom watch face - ${config.name}`,
+      vender: 'zepp',
+      description: '',
       icon: 'anteprima.png',
       cover: ['anteprima.png'],
+      extraInfo: {
+        madeBy: 1,
+        fromZoom: false,
+      },
     },
-    permissions: [],
+    permissions: ['gps'],
     runtime: {
       apiVersion: {
-          minVersion: '3.0.0',
-          compatible: '3.0.0',
-          target: '3.0.0',
+        compatible: '1.0.0',
+        target: '1.0.1',
+        minVersion: '1.0.0',
       },
-        type: 'js',
     },
     i18n: {
-      'en-US': {
+      enUS: {
         icon: 'anteprima.png',
         appName: config.name,
       },
     },
     defaultLanguage: 'en-US',
     debug: false,
-    targets: {
-      [platformMeta.targetKey]: {
-        module: {
-          watchface: {
-            path: 'watchface/index',
-            main: 1,
-            editable: 0,
-            lockscreen: 0,
-            hightCost: 0,
-          },
-        },
-        platforms: platformMeta.platforms,
-        designWidth: config.resolution.width,
+    module: {
+      watchface: {
+        path: 'watchface/index',
+        main: 1,
+        editable: 0,
+        lockscreen: 1,
+        hightCost: 0,
       },
     },
+    platforms: deviceSources.map((source) => ({
+      name: config.watchModel || 'Amazfit Balance',
+      deviceSource: source,
+    })),
+    designWidth: config.resolution.width,
     packageInfo: {
       mode: 'production',
-      timeStamp: Math.floor(Date.now() / 1000),
+      timeStamp: versionCode,
       expiredTime: 172800,
       zpm: '2.8.2',
     },
@@ -158,93 +145,16 @@ function generateAppJson(config: WatchFaceConfig): string {
   return JSON.stringify(json, null, 2);
 }
 
-function getPlatformMeta(config: WatchFaceConfig): {
-  targetKey: string;
-  st: 'r' | 's';
-  sr: string;
-  platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }>;
-} {
-  const model = getModelEntry(config.watchModel);
-  const fallbackShape: 'r' | 's' = config.resolution.width === config.resolution.height ? 'r' : 's';
-  const fallbackResTag = fallbackShape === 'r'
-    ? `w${config.resolution.width}`
-    : `w${config.resolution.width}h${config.resolution.height}`;
-
-  let st: 'r' | 's' = fallbackShape;
-  let sr = fallbackResTag;
-  const specGroup = model?.specGroup?.toLowerCase();
-
-  if (specGroup) {
-    if (specGroup.includes('round')) {
-      st = 'r';
-      const m = specGroup.match(/^(\d+)-round$/);
-      if (m) sr = `w${m[1]}`;
-    } else if (specGroup.includes('square')) {
-      st = 's';
-      const m = specGroup.match(/^(\d+)x(\d+)-square$/);
-      if (m) sr = `w${m[1]}h${m[2]}`;
-    }
-  }
-
-  const platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }> =
-    model && model.deviceSources.length > 0
-      ? model.deviceSources.map((source) => ({
-          name: model.name,
-          st,
-          sr,
-          deviceSource: source,
-        }))
-      : [{
-          name: config.watchModel || 'Compatible Device',
-          st,
-          sr,
-          deviceSource: 8519936, // generic fallback
-        }];
-
-  return {
-    targetKey: model?.key ?? 'default',
-    st,
-    sr,
-    platforms,
-  };
+// Get device sources for v2 by matching watchModel name against models.json
+function getDeviceSources(watchModel: string): number[] {
+  const models = modelsData as Record<string, { name: string; deviceSources: number[] }>;
+  const entry = Object.values(models).find(
+    (m) => m.name === watchModel || m.name.toLowerCase() === watchModel.toLowerCase()
+  );
+  return entry?.deviceSources ?? [8519936, 8519937, 8519939];
 }
 
-function getModelEntry(watchModel: string): {
-  key: string;
-  name: string;
-  specGroup?: string;
-  deviceSources: number[];
-} | undefined {
-  if (!watchModel) return undefined;
-  const target = watchModel.trim().toLowerCase();
-  return getModelEntries().find((model) => (
-    model.key.toLowerCase() === target
-    || model.name.toLowerCase() === target
-    || model.name.toLowerCase().includes(target)
-    || target.includes(model.name.toLowerCase())
-  ));
-}
-
-function getModelEntries(): Array<{
-  key: string;
-  name: string;
-  specGroup?: string;
-  deviceSources: number[];
-}> {
-  const models = modelsData as Record<string, {
-    name: string;
-    specGroup?: string;
-    deviceSources: number[];
-  }>;
-  return Object.entries(models).map(([key, model]) => ({
-    key,
-    name: model.name,
-    specGroup: model.specGroup,
-    deviceSources: model.deviceSources,
-  }));
-}
-
-// Generate app.js - Matching working ZPK structure (comes from Brushed_Steel_Petroleum)
+// Generate app.js - V2 format (EXACT copy of working reference app.js)
 function generateAppJs(config: WatchFaceConfig): string {
   return `try {
     (() => {
@@ -296,58 +206,164 @@ function generateAppJs(config: WatchFaceConfig): string {
         }
         let globalNS = getGlobal();
         if (typeof setTimeout === 'undefined' && isHmTimerDefined()) {
-            globalNS.setTimeout = timer.setTimeout;
+            globalNS.clearTimeout = function clearTimeout(timerRef) {
+                timerRef && timer.stopTimer(timerRef);
+            };
+            globalNS.setTimeout = function setTimeout2(func, ns) {
+                const timer1 = timer.createTimer(ns || 1, Number.MAX_SAFE_INTEGER, function () {
+                    globalNS.clearTimeout(timer1);
+                    func && func();
+                }, {});
+                return timer1;
+            };
+            globalNS.clearImmediate = function clearImmediate(timerRef) {
+                timerRef && timer.stopTimer(timerRef);
+            };
+            globalNS.setImmediate = function setImmediate(func) {
+                const timer1 = timer.createTimer(1, Number.MAX_SAFE_INTEGER, function () {
+                    globalNS.clearImmediate(timer1);
+                    func && func();
+                }, {});
+                return timer1;
+            };
+            globalNS.clearInterval = function clearInterval(timerRef) {
+                timerRef && timer.stopTimer(timerRef);
+            };
+            globalNS.setInterval = function setInterval(func, ms) {
+                const timer1 = timer.createTimer(1, ms, function () {
+                    func && func();
+                }, {});
+                return timer1;
+            };
         }
-        if (typeof setInterval === 'undefined' && isHmTimerDefined()) {
-            globalNS.setInterval = timer.setInterval;
-        }
-        if (typeof clearTimeout === 'undefined' && isHmTimerDefined()) {
-            globalNS.clearTimeout = timer.clearTimeout;
-        }
-        if (typeof clearInterval === 'undefined' && isHmTimerDefined()) {
-            globalNS.clearInterval = timer.clearInterval;
-        }
-        let __$$module$$__ = __$$app$$__.current;
+        __$$app$$__.app = DeviceRuntimeCore.App({
+            globalData: {},
+            onCreate(options) {
+            },
+            onDestroy(options) {
+            },
+            onError(error) {
+            },
+            onPageNotFound(obj) {
+            },
+            onUnhandledRejection(obj) {
+            }
+        });
+        ;
     })();
 } catch (e) {
-    console.log(e);
+    console.log('Mini Program Error', e);
+    e && e.stack && e.stack.split(/\\n/).forEach(i => console.log('error stack', i));
+    ;
 }`;
 }
 
-// Generate watchface/index.js - Matching working ZPK structure with proper lifecycle
+// Generate watchface/index.js - V2 format with IMG_TIME, IMG_DATE, IMG_WEEK, and AOD mode
 function generateWatchfaceIndexJs(config: WatchFaceConfig): string {
-  const visibleElements = config.elements.filter((el) => el.visible);
-  
-  // Pre-process layers: sort correctly by zIndex for rendering.
-  // Decorative engraveFrames must render immediately after their target element.
-  const zById = new Map(visibleElements.map(el => [el.id, el.zIndex]));
-  const elements = [...visibleElements].sort((a, b) => {
-    const az = (a.engraveFrame && a.engraveFrame.linked !== false)
-      ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) + 0.5
-      : a.zIndex;
-    const bz = (b.engraveFrame && b.engraveFrame.linked !== false)
-      ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) + 0.5
-      : b.zIndex;
-    return az - bz;
-  });
+  const sortVisible = (inputElements: WatchFaceElement[]) => {
+    const visibleElements = inputElements.filter((el) => el.visible);
+    const zById = new Map(visibleElements.map(el => [el.id, el.zIndex]));
+    return [...visibleElements].sort((a, b) => {
+      const az = a.engraveFrame
+        ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) + 0.5
+        : a.zIndex;
+      const bz = b.engraveFrame
+        ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) + 0.5
+        : b.zIndex;
+      return az - bz;
+    });
+  };
 
-  /* const aodElements = config.aodElements
-    ? [...config.aodElements].filter((e) => e.visible).sort((a, b) => a.zIndex - b.zIndex)
-    : []; */
+  const elements = sortVisible(config.elements);
+  const aodElements = config.aodElements && config.aodElements.length > 0
+    ? sortVisible(config.aodElements)
+    : elements;
+
+  const aodSourceLabel = config.aodElements && config.aodElements.length > 0
+    ? 'dedicated AOD layout'
+    : 'main layout fallback';
   
-  let widgetsCode = '';
+  console.log('[JSGen] Total main elements in config:', config.elements.length);
+  console.log('[JSGen] Visible main elements after filter:', elements.length);
+  console.log('[JSGen] AOD source:', aodSourceLabel, '| visible AOD elements:', aodElements.length);
   
+  const backgroundSrc = 'background.png';
+  const aodBackgroundMode = config.aodBackgroundMode ?? 'USE_MAIN_BACKGROUND';
+  const shouldEmitAodBackground = aodBackgroundMode !== 'NONE_BLACK';
+  const resolvedAodBackgroundSrc =
+    aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' || aodBackgroundMode === 'SOLID_COLOR'
+      ? (config.aodBackgroundSrc || 'aod_background.png')
+      : backgroundSrc;
+  
+  // Generate NORMAL mode widgets
+  let normalWidgetsCode = '';
+  let normalWidgetCounter = 2;
+  // Find time elements by type (supports split hours/minutes or legacy single element)
+  const hoursElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'hours')
+    ?? elements.find(e => e.type === 'IMG_TIME' && !e.subtype);
+  const minutesElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'minutes');
+  const secondsElement = elements.find(e => e.type === 'IMG_TIME' && e.subtype === 'seconds');
+  const hasTimeWidget = !!(hoursElement || minutesElement || secondsElement);
+  const dateElements = elements.filter(e => e.type === 'IMG_DATE' && e.subtype !== 'month');
+  if (dateElements.length === 0) {
+    const fallback = elements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
+    if (fallback) dateElements.push(fallback);
+  }
+  const monthElements = elements.filter(e => e.type === 'IMG_DATE' && e.subtype === 'month');
+  if (monthElements.length === 0) {
+    const fallback = elements.find(e => e.name.toLowerCase().includes('month'));
+    if (fallback) monthElements.push(fallback);
+  }
+  const weekElements = elements.filter(e => e.type === 'IMG_WEEK');
+  if (weekElements.length === 0) {
+    const fallback = elements.find(e => e.name.toLowerCase().includes('week'));
+    if (fallback) weekElements.push(fallback);
+  }
+  
+  // Add IMG_TIME widget if time element exists
+  if (hasTimeWidget) {
+    normalWidgetsCode += generateIMGTimeWidget(hoursElement, minutesElement, secondsElement, normalWidgetCounter++, 'ONLY_NORMAL');
+  }
+  
+  // Add IMG_DATE widget if date element exists
+  for (const dateElement of dateElements) {
+    normalWidgetsCode += generateIMGDateWidget(dateElement, normalWidgetCounter++, 'ONLY_NORMAL');
+  }
+
+  // Add IMG_DATE (month) widget if month element exists
+  for (const monthElement of monthElements) {
+    normalWidgetsCode += generateIMGMonthWidget(monthElement, normalWidgetCounter++, 'ONLY_NORMAL');
+  }
+  
+  // Add IMG_WEEK widget if week element exists
+  for (const weekElement of weekElements) {
+    normalWidgetsCode += generateIMGWeekWidget(weekElement, normalWidgetCounter++, 'ONLY_NORMAL');
+  }
+  
+  // Add other static elements for NORMAL mode
   for (const element of elements) {
-    let code = generateWidgetCode(element, config.resolution);
-    // Skip types that can't have a sensible static tap rect (see V2 generator for rationale)
-    const NO_OVERLAY_V3 = new Set(['BUTTON','TIME_POINTER','DATE_POINTER','ARC_PROGRESS','IMG_TIME','IMG_DATE','IMG_WEEK']);
-    if (code && element.clickAction && !NO_OVERLAY_V3.has(element.type)) {
-      // Spec 009 T014: IMG_CLICK overlay — data_type binds OS to launch the system app
-      const bx = element.bounds.x;
-      const by = element.bounds.y;
-      const bw = element.bounds.width || 100;
-      const bh = element.bounds.height || 100;
-      code += `
+    if (element.type === 'IMG_TIME' || element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') {
+      continue; // Skip, already handled above
+    }
+    if (element.name.toLowerCase().includes('month')) {
+      continue; // Skip month, handled above
+    }
+    const code = generateWidgetCode(element, normalWidgetCounter, false, config.resolution);
+    if (code) {
+      let finalCode = code;
+      // Skip types that can't have a sensible static tap rect:
+      //  - BUTTON has its own click_func
+      //  - TIME_POINTER / DATE_POINTER rotate (hands sweep outside bounds)
+      //  - ARC_PROGRESS visible arc circle wouldn't match a rect overlay
+      //  - IMG_TIME / IMG_DATE / IMG_WEEK are dispatched as multi-sub-element widgets
+      const NO_OVERLAY = new Set(['BUTTON','TIME_POINTER','DATE_POINTER','ARC_PROGRESS','IMG_TIME','IMG_DATE','IMG_WEEK']);
+      if (element.clickAction && !NO_OVERLAY.has(element.type)) {
+        // Spec 009 T014: IMG_CLICK overlay — data_type binds OS to launch the system app
+        const bx = element.bounds.x;
+        const by = element.bounds.y;
+        const bw = element.bounds.width || 100;
+        const bh = element.bounds.height || 100;
+        finalCode += `
                 // ${element.name} - App shortcut IMG_CLICK overlay
                 hmUI.createWidget(hmUI.widget.IMG_CLICK, {
                     x: px(${bx}), y: px(${by}),
@@ -355,13 +371,75 @@ function generateWatchfaceIndexJs(config: WatchFaceConfig): string {
                     type: hmUI.data_type.${element.clickAction},
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });`;
+      }
+      normalWidgetsCode += finalCode;
+      normalWidgetCounter++;
     }
-    widgetsCode += code;
-    console.log('[JSGen] Widget code for', element.name, ':\n', code);
   }
   
-  const finalCode = `// Zepp OS Watchface generated by AI WatchFace Creator
-// Fixed structure: v3 manifest, complete TIME_POINTER, proper data binding, AOD support
+  // Generate AOD mode widgets (complete duplicate for always-on display)
+  let aodWidgetsCode = '';
+  let aodWidgetCounter = 100;
+  
+  const aodHoursElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'hours')
+    ?? aodElements.find(e => e.type === 'IMG_TIME' && !e.subtype);
+  const aodMinutesElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'minutes');
+  const aodSecondsElement = aodElements.find(e => e.type === 'IMG_TIME' && e.subtype === 'seconds');
+  const hasAodTimeWidget = !!(aodHoursElement || aodMinutesElement || aodSecondsElement);
+  const aodDateElements = aodElements.filter(e => e.type === 'IMG_DATE' && e.subtype !== 'month');
+  if (aodDateElements.length === 0) {
+    const fallback = aodElements.find(e => e.name.toLowerCase().includes('date') && !e.name.toLowerCase().includes('month'));
+    if (fallback) aodDateElements.push(fallback);
+  }
+  const aodMonthElements = aodElements.filter(e => e.type === 'IMG_DATE' && e.subtype === 'month');
+  if (aodMonthElements.length === 0) {
+    const fallback = aodElements.find(e => e.name.toLowerCase().includes('month'));
+    if (fallback) aodMonthElements.push(fallback);
+  }
+  const aodWeekElements = aodElements.filter(e => e.type === 'IMG_WEEK');
+  if (aodWeekElements.length === 0) {
+    const fallback = aodElements.find(e => e.name.toLowerCase().includes('week'));
+    if (fallback) aodWeekElements.push(fallback);
+  }
+
+  if (hasAodTimeWidget) {
+    aodWidgetsCode += generateIMGTimeWidget(aodHoursElement, aodMinutesElement, aodSecondsElement, aodWidgetCounter++, 'ONLY_AOD');
+  }
+  
+  for (const aodDateElement of aodDateElements) {
+    aodWidgetsCode += generateIMGDateWidget(aodDateElement, aodWidgetCounter++, 'ONLY_AOD');
+  }
+
+  for (const aodMonthElement of aodMonthElements) {
+    aodWidgetsCode += generateIMGMonthWidget(aodMonthElement, aodWidgetCounter++, 'ONLY_AOD');
+  }
+  
+  for (const aodWeekElement of aodWeekElements) {
+    aodWidgetsCode += generateIMGWeekWidget(aodWeekElement, aodWidgetCounter++, 'ONLY_AOD');
+  }
+  
+  // Add other static elements for AOD mode
+  for (const element of aodElements) {
+    if (element.type === 'IMG_TIME' || element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') {
+      continue;
+    }
+    if (element.name.toLowerCase().includes('month')) {
+      continue;
+    }
+    // Skip BUTTON in AOD mode - no touch interaction on AOD screen
+    if (element.type === 'BUTTON') {
+      continue;
+    }
+    const code = generateWidgetCode(element, aodWidgetCounter, true, config.resolution);
+    if (code) {
+      aodWidgetsCode += code;
+      aodWidgetCounter++;
+    }
+  }
+  
+  const finalCode = `// Zepp OS Watchface generated by AI WatchFace Creator (V2 Format)
+// V2 Manifest: Full A OD support with dynamic widgets
+// Compatible with Amazfit Balance 2, Balance, Active Max
 try {
     (() => {
         const __$$app$$__ = __$$hmAppManager$$__.currentApp;
@@ -375,167 +453,204 @@ try {
         const h = new DeviceRuntimeCore.WidgetFactory(new DeviceRuntimeCore.HmDomApi(__$$app$$__, __$$module$$__));
         const {px} = __$$app$$__.__globals__;
         const logger = Logger.getLogger('WatchFaceEditor');
+        
+        // Sensor for weather and system info
+        let weatherSensor = null;
         __$$module$$__.module = DeviceRuntimeCore.WatchFace({
             init_view() {
-                // Background image - Fill entire screen with proper asset path
-                hmUI.createWidget(hmUI.widget.IMG, {
+                // Initialize sensors
+                try {
+                    weatherSensor = hmSensor.createSensor(hmSensor.id.WEATHER);
+                } catch (e) {
+                    logger.log('Weather sensor init failed:', e);
+                }
+                
+                // ========== NORMAL MODE BACKGROUND ==========
+                let widget_1 = hmUI.createWidget(hmUI.widget.IMG, {
                     x: px(0),
                     y: px(0),
                     w: px(${config.resolution.width}),
                     h: px(${config.resolution.height}),
-                    src: 'background.png',
+                    src: '${backgroundSrc}',
                     alpha: 255,
                     show_level: hmUI.show_level.ONLY_NORMAL
                 });
                 
-                // Widgets
-${widgetsCode}
+                // ========== NORMAL MODE WIDGETS ==========
+${normalWidgetsCode}
                 
-                // Widget delegate for lifecycle management
+        ${shouldEmitAodBackground ? `                // ========== AOD MODE BACKGROUND ==========
+                let widget_aod_bg = hmUI.createWidget(hmUI.widget.IMG, {
+                  x: px(0),
+                  y: px(0),
+                  w: px(${config.resolution.width}),
+                  h: px(${config.resolution.height}),
+                  src: '${resolvedAodBackgroundSrc}',
+                  alpha: 255,
+                  show_level: hmUI.show_level.ONLY_AOD
+                });` : '                // ========== AOD MODE BACKGROUND =========='}
+                
+                // ========== AOD MODE WIDGETS ==========
+${aodWidgetsCode}
+
+                // Widget delegate for lifecycle management (matches working reference)
                 const widgetDelegate = hmUI.createWidget(hmUI.widget.WIDGET_DELEGATE, {
                     resume_call() {
-                        logger.log('watchface resumed');
+                        console.log('resume_call()');
+                        let tipoSchermo = hmSetting.getScreenType();
+                        if (tipoSchermo === hmSetting.screen_type.WATCHFACE) {
+                            // NORMAL MODE updates
+                        } else if (tipoSchermo === hmSetting.screen_type.AOD) {
+                            // AOD MODE updates
+                        }
                     },
                     pause_call() {
-                        logger.log('watchface paused');
+                        console.log('pause_call()');
                     }
                 });
             },
             onInit() {
-                logger.log('Watchface initialized');
+                logger.log('index page.js on init invoke');
             },
             build() {
                 this.init_view();
-                logger.log('Watchface built and displayed');
+                logger.log('index page.js on ready invoke');
             },
             onDestroy() {
-                logger.log('Watchface destroyed, cleaning up');
+                logger.log('index page.js on destroy invoke');
             }
         });
+        ;
     })();
 } catch (e) {
-    console.log('Watchface Error', e);
+    console.log('Mini Program Error', e);
     e && e.stack && e.stack.split(/\\n/).forEach(i => console.log('error stack', i));
+    ;
 }`;
   
-  console.log('[JSGen] Complete watchface/index.js:\n', finalCode);
   return finalCode;
 }
 
-// Generate widget code for each element (V3)
-function generateWidgetCode(element: WatchFaceElement, resolution = { width: 480, height: 480 }): string {
-  // Skip minute/second hands - they're combined with hour hand in TIME_POINTER
-  if (element.type === 'TIME_POINTER' && element.subtype && element.subtype !== 'hour') {
-    return '';
-  }
+// Generate IMG_TIME widget with separate hour, minute and optional second elements
+// hoursEl defines hour position/size; minutesEl defines minute position (or derived from hoursEl)
+function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl: WatchFaceElement | undefined, secondsEl: WatchFaceElement | undefined, widgetIndex: number, showLevel: string): string {
+  const refEl = hoursEl ?? minutesEl ?? secondsEl;
+  if (!refEl) return '';
 
-  // Skip background element - already handled
-  if (isProjectBackgroundElement(element, resolution)) {
-    return '';
-  }
+  const resolveDigits = (el: WatchFaceElement | undefined): string[] => {
+    const arr = el?.fontArray ?? el?.images;
+    if (Array.isArray(arr) && arr.length > 0) return arr;
+    return Array.from({ length: 10 }, (_, i) => `time_digit_${i}.png`);
+  };
 
-  switch (element.type) {
-    case 'TIME_POINTER':
-      return generateTimePointerWidgetV3(element);
-    case 'GAUGE_POINTER':
-      return generateGaugePointerWidgetV3(element);
-    case 'ARC_PROGRESS':
-      return generateArcProgressWidgetV3(element);
-    case 'TEXT_IMG':
-      return generateTextImgWidgetV3(element);
-    case 'IMG_DATE':
-      return generateImgDateWidgetV3(element);
-    case 'IMG_WEEK':
-      return generateImgWeekWidgetV3(element);
-    case 'TEXT':
-      return generateTextWidgetV3(element);
-    case 'BUTTON':
-      return generateButtonWidgetV3(element);
-    case 'IMG_STATUS':
-      return generateImgStatusWidgetV3(element);
-    case 'CIRCLE':
-      if (element.dropShadow) return _shadowImgWidgetV3(element, 'Circle');
-      return generateCircleWidgetV3(element);
-    case 'IMG_LEVEL':
-      return generateImgLevelWidgetV3(element);
-    case 'FILL_RECT': {
-      if (element.engraveFrame) {
-        const safeName = element.name.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const filename = `frame_${safeName}.png`;
-        return `
-                // ${element.name} - Engrave Frame (pre-rendered IMG)
-                hmUI.createWidget(hmUI.widget.IMG, {
-                    x: px(${element.bounds.x}),
-                    y: px(${element.bounds.y}),
-                    w: px(${element.bounds.width}),
-                    h: px(${element.bounds.height}),
-                      src: '${filename}',
-                    show_level: hmUI.show_level.ONLY_NORMAL
+  const centeredStart = (el: WatchFaceElement | undefined, fallbackX: number): number => {
+    if (!el?.timeDigitCellWidth) return fallbackX;
+    return getCenteredTimeStartX(el.bounds, el.timeDigitCellWidth);
+  };
+
+  // Studio owns a centered two-digit frame. Zepp IMG_TIME consumes a left
+  // origin, so export derives that origin from the generated tabular pair.
+  const hx = centeredStart(hoursEl, hoursEl ? hoursEl.bounds.x : refEl.bounds.x);
+  const hy = hoursEl ? hoursEl.bounds.y : refEl.bounds.y;
+  const hW = hoursEl ? hoursEl.bounds.width : Math.floor(refEl.bounds.width * 2 / 5);
+  const digitW = Math.floor(hW / 2);
+
+  const mxFallback = minutesEl ? minutesEl.bounds.x : (hx + hW + Math.max(4, digitW));
+  const mx = centeredStart(minutesEl, mxFallback);
+  const my = minutesEl ? minutesEl.bounds.y : hy;
+
+  // Second position: from secondsEl if present
+  const hasSeconds = !!secondsEl;
+  const sx = centeredStart(secondsEl, secondsEl ? secondsEl.bounds.x : 0);
+  const sy = secondsEl ? secondsEl.bounds.y : 0;
+
+  const hourDigits = resolveDigits(hoursEl ?? refEl);
+  const minuteDigits = resolveDigits(minutesEl ?? hoursEl ?? refEl);
+  const secondDigits = resolveDigits(secondsEl ?? minutesEl ?? hoursEl ?? refEl);
+  const hourArrayStr = `[${hourDigits.map((d) => `'${d}'`).join(', ')}]`;
+  const minuteArrayStr = `[${minuteDigits.map((d) => `'${d}'`).join(', ')}]`;
+  const secondArrayStr = `[${secondDigits.map((d) => `'${d}'`).join(', ')}]`;
+  
+  const secondParams = hasSeconds ? `
+                    second_zero: 1,
+                    second_startX: px(${sx}),
+                    second_startY: px(${sy}),
+                    second_array: ${secondArrayStr},
+                    second_space: 0,
+                    second_align: hmUI.align.LEFT,` : '';
+
+  return `
+                // IMG_TIME Widget (Hours @ ${hx},${hy} | Minutes @ ${mx},${my}${hasSeconds ? ` | Seconds @ ${sx},${sy}` : ''})
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_TIME, {
+                    hour_zero: 1,
+                    hour_startX: px(${hx}),
+                    hour_startY: px(${hy}),
+                  hour_array: ${hourArrayStr},
+                    hour_space: 0,
+                    hour_align: hmUI.align.LEFT,
+                    minute_zero: 1,
+                    minute_startX: px(${mx}),
+                    minute_startY: px(${my}),
+                  minute_array: ${minuteArrayStr},
+                    minute_space: 0,
+                    minute_align: hmUI.align.LEFT,
+                    minute_follow: 0,${secondParams}
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
-      }
-      if (element.dropShadow) return _shadowImgWidgetV3(element, 'Fill Rect');
-      return generateFillRectWidgetV3(element);
-    }
-    case 'STROKE_RECT':
-      if (element.dropShadow) return _shadowImgWidgetV3(element, 'Stroke Rect');
-      return generateStrokeRectWidgetV3(element);
-    case 'IMG_ANIM':
-      return generateImgAnimWidgetV3(element);
-    case 'IMG_PROGRESS':
-      return generateImgProgressWidgetV3(element);
-    case 'DATE_POINTER':
-      return generateDatePointerWidgetV3(element, resolution);
-    case 'IMG_CLICK':
-      return generateImgClickWidgetV3(element);
-    case 'IMG':
-    default:
-      break;
-  }
-
-  // Handle IMG elements (static images / icons)
-  if (element.type === 'IMG' || !element.type) {
-    if (element.dropShadow) return _shadowImgWidgetV3(element, 'IMG');
-
-    const w = element.bounds.width || 50;
-    const h = element.bounds.height || 50;
-    const imgSrc = element.iconKey
-      ? `icon_${element.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`
-      : (element.src || 'placeholder.png');
-    return `
-                // ${element.name}
-                hmUI.createWidget(hmUI.widget.IMG, {
-                    x: px(${element.bounds.x}),
-                    y: px(${element.bounds.y}),
-                    w: px(${w}),
-                    h: px(${h}),
-                      src: '${imgSrc}',
-                    alpha: 255,
-                    show_level: hmUI.show_level.ONLY_NORMAL
-                });`;
-  }
-
-  return '';
 }
 
-function generateImgDateWidgetV3(element: WatchFaceElement): string {
+// Generate IMG_DATE widget with day arrays
+function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const completeMode = isCompleteDayImageMode(element);
   const x = completeMode
-    ? (element.bounds.x ?? 92)
+    ? element.bounds.x
     : getCenteredNumericDayStartX(element.bounds, element.dayDigitCellWidth, element.hSpace);
-  const y = element.bounds.y ?? 198;
+  const y = element.bounds.y || 198;
+  const hSpace = Math.max(0, Math.floor(Number(element.hSpace) || 0));
 
-  if (element.subtype === 'month') {
-    const explicitMonthArray = Array.isArray(element.images) && element.images.length >= 12
-      ? element.images.slice(0, 12)
-      : null;
-    const prefix = _monthAssetPrefixV3(element);
-    const monthArray = explicitMonthArray
-      ? explicitMonthArray.map((img) => `'${img}'`)
-      : Array.from({ length: 12 }, (_, i) => `'${prefix}_${i}.png'`);
-    const monthArrayStr = `[${monthArray.join(', ')}]`;
-    return `
+  const raw = element.fontArray ?? element.images;
+  const expectedCount = completeMode ? 31 : 10;
+  const dayImages = Array.isArray(raw) && raw.length >= expectedCount
+    ? raw.slice(0, expectedCount)
+    : completeMode
+      ? Array.from({ length: 31 }, (_, i) => `date_day_${_safeAssetId(element.id)}_${String(i + 1).padStart(2, '0')}.png`)
+      : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
+  const imageArrayStr = `[${dayImages.map((d) => `'${d}'`).join(', ')}]`;
+  
+  return `
+                // ${element.name} - IMG_DATE Widget
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_DATE, {
+                    day_startX: px(${x}),
+                    day_startY: px(${y}),
+                    day_sc_array: ${imageArrayStr},
+                    day_tc_array: ${imageArrayStr},
+                    day_en_array: ${imageArrayStr},
+                    day_zero: ${completeMode ? 0 : 1},
+                    day_space: ${completeMode ? 0 : hSpace},
+                    day_align: hmUI.align.LEFT,
+                    day_is_character: ${completeMode},
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+}
+
+// Generate IMG_DATE (month) widget with month arrays (12 images)
+// Pattern from working Brushed Steel reference: month_startX/Y, month_sc/tc/en_array, month_is_character
+function generateIMGMonthWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  const x = element.bounds.x || 105;
+  const y = element.bounds.y || 198;
+  const alignH = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
+  const explicitMonthArray = Array.isArray(element.images) && element.images.length >= 12
+    ? element.images.slice(0, 12)
+    : null;
+  const prefix = _monthAssetPrefix(element);
+  const monthArray = explicitMonthArray
+    ? explicitMonthArray.map((img) => `'${img}'`)
+    : Array.from({ length: 12 }, (_, i) => `'${prefix}_${i}.png'`);
+  const monthArrayStr = `[${monthArray.join(', ')}]`;
+  
+  return `
                 // ${element.name} - IMG_DATE Month Widget
-                hmUI.createWidget(hmUI.widget.IMG_DATE, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_DATE, {
                     month_startX: px(${x}),
                     month_startY: px(${y}),
                     month_sc_array: ${monthArrayStr},
@@ -544,158 +659,185 @@ function generateImgDateWidgetV3(element: WatchFaceElement): string {
                     month_zero: 0,
                     month_space: 0,
                     month_is_character: true,
-                    month_align: hmUI.align.LEFT,
-                    show_level: hmUI.show_level.ONLY_NORMAL
-                });`;
-  }
-
-  const raw = element.fontArray ?? element.images;
-  const expectedCount = completeMode ? 31 : 10;
-  const dayImages = Array.isArray(raw) && raw.length >= expectedCount
-    ? raw.slice(0, expectedCount)
-    : completeMode
-      ? Array.from({ length: 31 }, (_, i) => `date_day_${_safeAssetIdV3(element.id)}_${String(i + 1).padStart(2, '0')}.png`)
-      : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
-  const dayArray = dayImages.map((d) => `'${d}'`);
-  const dayArrayStr = `[${dayArray.join(', ')}]`;
-  return `
-                // ${element.name} - IMG_DATE Widget
-                hmUI.createWidget(hmUI.widget.IMG_DATE, {
-                    day_startX: px(${x}),
-                    day_startY: px(${y}),
-                    day_sc_array: ${dayArrayStr},
-                    day_tc_array: ${dayArrayStr},
-                    day_en_array: ${dayArrayStr},
-                    day_zero: ${completeMode ? 0 : 1},
-                    day_space: ${completeMode ? 0 : Math.max(0, Math.floor(Number(element.hSpace) || 0))},
-                    day_align: hmUI.align.LEFT,
-                    day_is_character: ${completeMode},
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    month_align: hmUI.align.${alignH},
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-function generateImgWeekWidgetV3(element: WatchFaceElement): string {
-  const x = element.bounds.x ?? 33;
-  const y = element.bounds.y ?? 198;
+// Generate IMG_WEEK widget with weekday arrays
+function generateIMGWeekWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  const x = element.bounds.x || 33;
+  const y = element.bounds.y || 198;
   const explicitWeekArray = Array.isArray(element.images) && element.images.length >= 7
     ? element.images.slice(0, 7)
     : null;
-  const prefix = _weekAssetPrefixV3(element);
+  const prefix = _weekAssetPrefix(element);
   const weekArray = explicitWeekArray
     ? explicitWeekArray.map((img) => `'${img}'`)
     : Array.from({ length: 7 }, (_, i) => `'${prefix}_${i}.png'`);
   const weekArrayStr = `[${weekArray.join(', ')}]`;
+  
   return `
                 // ${element.name} - IMG_WEEK Widget
-                hmUI.createWidget(hmUI.widget.IMG_WEEK, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_WEEK, {
                     x: px(${x}),
                     y: px(${y}),
                     week_en: ${weekArrayStr},
                     week_sc: ${weekArrayStr},
                     week_tc: ${weekArrayStr},
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// TIME_POINTER - Analog clock hands (hour/minute/second in ONE widget)
-function generateTimePointerWidgetV3(element: WatchFaceElement): string {
-  const toAssetPath = (src?: string): string | undefined => {
-    if (!src) return undefined;
-    const clean = src.replace(/^assets\//, '').trim();
-    if (!clean) return undefined;
-    // Match the proven working watchface runtime convention: hand paths resolve by filename.
-    return clean;
-  };
-
-  const centerX = element.pointerCenter?.x ?? element.center?.x ?? (element.bounds.x + (element.bounds.width || 480) / 2);
-  const centerY = element.pointerCenter?.y ?? element.center?.y ?? (element.bounds.y + (element.bounds.height || 480) / 2);
-  const hourPosX = element.hourPos?.x ?? 11;
-  const hourPosY = element.hourPos?.y ?? 118;  // pivot at 85% of 140px hand height
-  const minutePosX = element.minutePos?.x ?? 8;
-  const minutePosY = element.minutePos?.y ?? 172; // pivot at 86% of 200px hand height
-  const secondPosX = element.secondPos?.x ?? 4;
-  const secondPosY = element.secondPos?.y ?? 180; // pivot at 75% of 240px hand height
-  const hourSrc = toAssetPath(element.hourHandSrc || 'hour_hand.png')!;
-  const minuteSrc = toAssetPath(element.minuteHandSrc || 'minute_hand.png')!;
-  const secondSrc = toAssetPath(element.secondHandSrc || 'second_hand.png')!;
-  const coverSrc = toAssetPath(element.coverSrc);
-  const coverBaseW = (element.coverWidth && element.coverWidth > 0) ? element.coverWidth : 30;
-  const coverBaseH = (element.coverHeight && element.coverHeight > 0) ? element.coverHeight : 30;
-  const coverScale = (element.handHubScale ?? 1) * (element.handLengthScale ?? 1);
-  const coverW = Math.max(1, Math.round(coverBaseW * coverScale));
-  const coverH = Math.max(1, Math.round(coverBaseH * coverScale));
-  const hasSeconds = !element.hideSeconds;
-
-  const secondParams = hasSeconds ? `
-                    second_centerX: px(${centerX}),
-                    second_centerY: px(${centerY}),
-                    second_posX: px(${secondPosX}),
-                    second_posY: px(${secondPosY}),
-                    second_path: '${secondSrc}',` : '';
-
-  const coverOverlay = coverSrc ? `
-                // ${element.name} - Hub overlay (kept above hands)
-                hmUI.createWidget(hmUI.widget.IMG, {
-                    x: px(${centerX - Math.round(coverW / 2)}),
-                    y: px(${centerY - Math.round(coverH / 2)}),
-            w: px(${coverW}),
-            h: px(${coverH}),
-                    src: '${coverSrc}',
-                    show_level: hmUI.show_level.ONLY_NORMAL
-                });` : '';
-
-  return `
-                // ${element.name} - TIME_POINTER Widget (Analog Clock)
-                hmUI.createWidget(hmUI.widget.TIME_POINTER, {
-                    hour_centerX: px(${centerX}),
-                    hour_centerY: px(${centerY}),
-                    hour_posX: px(${hourPosX}),
-                    hour_posY: px(${hourPosY}),
-                  hour_path: '${hourSrc}',
-                    minute_centerX: px(${centerX}),
-                    minute_centerY: px(${centerY}),
-                    minute_posX: px(${minutePosX}),
-                    minute_posY: px(${minutePosY}),
-                    minute_path: '${minuteSrc}',${secondParams}
-                    show_level: hmUI.show_level.ONLY_NORMAL
-                });${coverOverlay}`;
-}
-
-// GAUGE_POINTER - Data-driven rotating needle (IMG_POINTER)
-function generateGaugePointerWidgetV3(element: WatchFaceElement): string {
-  const width = element.bounds.width || 40;
-  const height = element.bounds.height || 120;
-  const pivot = normalizeGaugePivot(element);
-  const pivotX = Math.round(width * pivot.pivotX);
-  const pivotY = Math.round(height * pivot.pivotY);
-  const centerX = Math.round(element.bounds.x + pivotX);
-  const centerY = Math.round(element.bounds.y + pivotY);
-  const src = gaugePointerAssetName(element);
-  const dataType = element.dataType || 'BATTERY';
-  // Stored angles use 0=12PM convention (same as canvas rotate reference).
-  // IMG_POINTER on device uses 0=3PM convention (same as ARC_PROGRESS per Manual).
-  // Convert: deviceAngle = storedAngle - 90.
-  const startAngle = (element.startAngle ?? -90) - 90;
-  const endAngle = (element.endAngle ?? 90) - 90;
-  return `
-                // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
-                // DEBUG: bounds=(${element.bounds.x},${element.bounds.y},${width}x${height}) pivot=(${pivotX},${pivotY}) center=(${centerX},${centerY})
-                hmUI.createWidget(hmUI.widget.IMG_POINTER, {
-                    src: '${src}',
-                    center_x: px(${centerX}),
-                    center_y: px(${centerY}),
-                    x: px(${pivotX}),
-                    y: px(${pivotY}),
-                    start_angle: ${startAngle},
-                    end_angle: ${endAngle},
-                    type: hmUI.data_type.${dataType},
-                    invalid_visible: true,
-                    show_level: hmUI.show_level.ONLY_NORMAL
+// Generate widget code for each element (V2 format)
+function generateWidgetCode(
+  element: WatchFaceElement,
+  widgetIndex: number,
+  isAod: boolean = false,
+  resolution = { width: 480, height: 480 },
+): string {
+  console.log(`[JSGen] generateWidgetCode: element=${element.name}, type=${element.type}, src=${element.src}`);
+  
+  // Skip background element - already handled.
+  // Exception: gauge pair siblings (gaugePairId set) must never be skipped even if they
+  // happen to cover the full screen (e.g. centered gauge on 480px face → bounds 0,0,480,480).
+  if (isProjectBackgroundElement(element, resolution)) {
+    return '';
+  }
+  
+  // Skip dynamic widget types - they're handled separately (as dedicated top-level widgets).
+  // IMPORTANT: use TYPE check, not name check — name-based matching wrongly kills
+  // TIME_POINTER (name='TIME_POINTER' contains 'time') and engrave FILL_RECT frames
+  // named e.g. "Time Display Frame" (parent name has 'time').
+  if (element.type === 'IMG_TIME' || element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') {
+    return '';
+  }
+  
+  const showLevel = isAod ? 'ONLY_AOD' : 'ONLY_NORMAL';
+  
+  // Dispatch by element type
+  switch (element.type) {
+    case 'ARC_PROGRESS':
+      return generateArcProgressWidget(element, widgetIndex, showLevel);
+    case 'TEXT_IMG':
+      return generateTextImgWidget(element, widgetIndex, showLevel);
+    case 'TIME_POINTER':
+      return generateTimePointerWidget(element, widgetIndex, showLevel);
+    case 'GAUGE_POINTER':
+      return generateGaugePointerWidget(element, widgetIndex, showLevel);
+    case 'TEXT':
+      return generateTextWidget(element, widgetIndex, showLevel);
+    case 'BUTTON':
+      return generateButtonWidget(element, widgetIndex, showLevel);
+    case 'IMG_STATUS':
+      return generateImgStatusWidget(element, widgetIndex, showLevel);
+    case 'CIRCLE':
+      if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'Circle');
+      if (element.shapeType === 'fill_rect') return generateFillRectWidget(element, widgetIndex, showLevel);
+      if (element.shapeType === 'stroke_rect') return generateStrokeRectWidget(element, widgetIndex, showLevel);
+      if (element.shapeType === 'rounded_rect') return generateFillRectWidget(element, widgetIndex, showLevel); // baked as PNG
+      return generateCircleWidget(element, widgetIndex, showLevel);
+    case 'IMG_LEVEL':
+      return generateImgLevelWidget(element, widgetIndex, showLevel);
+    case 'FILL_RECT': {
+      // If this is an engrave/emboss frame element, bake it as a pre-rendered PNG (IMG widget)
+      if (element.engraveFrame) {
+        const safeName = element.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `frame_${safeName}.png`;
+        return `
+                // ${element.name} - Engrave Frame (pre-rendered IMG)
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    w: px(${element.bounds.width}),
+                    h: px(${element.bounds.height}),
+                  src: '${filename}',
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
+      }
+      if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'Fill Rect');
+      return generateFillRectWidget(element, widgetIndex, showLevel);
+    }
+    case 'STROKE_RECT':
+      if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'Stroke Rect');
+      return generateStrokeRectWidget(element, widgetIndex, showLevel);
+    case 'IMG_ANIM':
+      return generateImgAnimWidget(element, widgetIndex, showLevel);
+    case 'IMG_PROGRESS':
+      return generateImgProgressWidget(element, widgetIndex, showLevel);
+    case 'DATE_POINTER':
+      return generateDatePointerWidget(element, widgetIndex, showLevel, resolution);
+    case 'IMG_CLICK':
+      return generateImgClickWidget(element, widgetIndex, showLevel);
+    case 'IMG':
+    default:
+      break;
+  }
+  
+  // Handle IMG elements (static images)
+  // GAUGE_POINTER - Data-driven rotating needle (IMG_POINTER)
+  function generateGaugePointerWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+    const width = element.bounds.width || 40;
+    const height = element.bounds.height || 120;
+    const pivot = normalizeGaugePivot(element);
+    const pivotX = Math.round(width * pivot.pivotX);
+    const pivotY = Math.round(height * pivot.pivotY);
+    const centerX = Math.round(element.bounds.x + pivotX);
+    const centerY = Math.round(element.bounds.y + pivotY);
+    // Both canvas and Zepp OS IMG_POINTER use the same 0=12 convention (image points UP at 0°).
+    // No conversion needed — pass through directly.
+    const startAngle = element.startAngle ?? -90;
+    const endAngle = element.endAngle ?? 90;
+    const src = gaugePointerAssetName(element);
+    const dataType = element.dataType || 'BATTERY';
+
+    return `
+                  // ${element.name} - IMG_POINTER Widget (Gauge Pointer)
+                  let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_POINTER, {
+                      src: '${src}',
+                      center_x: px(${centerX}),
+                      center_y: px(${centerY}),
+                      x: px(${pivotX}),
+                      y: px(${pivotY}),
+                      start_angle: ${startAngle},
+                      end_angle: ${endAngle},
+                      type: hmUI.data_type.${dataType},
+                      invalid_visible: true,
+                      show_level: hmUI.show_level.${showLevel}
+                  });`;
+  }
+
+  if (element.type === 'IMG') {
+    // Drop-shadow baked → padded shadow PNG
+    if (element.dropShadow) return _shadowImgWidget(element, widgetIndex, showLevel, 'IMG');
+
+    const w = element.bounds.width || 50;
+    const h = element.bounds.height || 50;
+    const imgSrc = element.iconKey ? `icon_${element.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png` : (element.src || 'placeholder.png');
+    
+    // Regular IMG elements (icons, indicators) - raw coordinates matching reference
+    return `
+                // ${element.name}
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    w: px(${w}),
+                    h: px(${h}),
+                    src: '${imgSrc}',
+                    alpha: 255,
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+  }
+  
+  console.log(`[JSGen] No widget code generated for ${element.name} (type: ${element.type})`);
+  return ''; // Skip unsupported types
 }
 
+// ============================================================
 // ARC_PROGRESS - Arc progress indicator (battery, steps, etc.)
-function generateArcProgressWidgetV3(element: WatchFaceElement): string {
+// Pattern from Zepp OS v1.0 docs + ZeppPlayer engine
+// ============================================================
+function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const centerX = element.center?.x ?? (element.bounds.x + (element.bounds.width || 100) / 2);
   const centerY = element.center?.y ?? (element.bounds.y + (element.bounds.height || 100) / 2);
   const radius = element.radius ?? Math.min(element.bounds.width || 100, element.bounds.height || 100) / 2;
@@ -712,13 +854,14 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
   const bgB = Math.round(parseInt(hexStr.slice(4, 6), 16) * 0.45).toString(16).padStart(2, '0');
   const bgColorValue = `0x${bgR}${bgG}${bgB}`;
 
+  // If dataType is specified, use type for auto-binding on FOREGROUND only
   const typeParam = element.dataType
     ? `\n                    type: hmUI.data_type.${element.dataType},`
     : '';
 
   return `
                 // ${element.name} - Faint full-range background (setProperty forces level:100 on firmware)
-                const faintArc_v3 = hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
+                const faintArc_${widgetIndex} = hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
                     radius: px(${radius}),
@@ -727,11 +870,11 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
                     color: ${bgColorValue},
                     line_width: px(${lineWidth}),
                     level: 100,
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });
-                faintArc_v3.setProperty(hmUI.prop.MORE, { level: 100 });
+                faintArc_${widgetIndex}.setProperty(hmUI.prop.MORE, { level: 100 });
                 // ${element.name} - ARC_PROGRESS Widget (data-bound foreground)
-                hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.ARC_PROGRESS, {
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
                     radius: px(${radius}),
@@ -739,12 +882,16 @@ function generateArcProgressWidgetV3(element: WatchFaceElement): string {
                     end_angle: ${endAngle},
                     color: ${colorValue},
                     line_width: px(${lineWidth}),${typeParam}
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
+// ============================================================
 // TEXT_IMG - Number display using image font arrays
-function generateTextImgWidgetV3(element: WatchFaceElement): string {
+// Pattern from Zepp OS v1.0 docs + ZeppPlayer engine
+// ============================================================
+function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  // Build font_array from element.fontArray or element.images
   const fontImages = element.fontArray || element.images || [];
   const hasLegacyWeatherIconFontArray =
     element.dataType === 'WEATHER_CURRENT' &&
@@ -765,15 +912,17 @@ function generateTextImgWidgetV3(element: WatchFaceElement): string {
     fontArrayStr = `[${arr.join(', ')}]`;
   }
 
+  // If dataType is specified, use type for auto-binding (e.g., BATTERY, STEP, HEART)
   const typeParam = element.dataType
     ? `\n                    type: hmUI.data_type.${element.dataType},`
     : '';
+
   const hSpace = element.hSpace ?? 1;
-  const alignH = normalizeHorizontalDigitAlign(element.alignH, 'LEFT');
+  const alignH = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
 
   return `
                 // ${element.name} - TEXT_IMG Widget
-                hmUI.createWidget(hmUI.widget.TEXT_IMG, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}),
@@ -781,37 +930,84 @@ function generateTextImgWidgetV3(element: WatchFaceElement): string {
                     font_array: ${fontArrayStr},${typeParam}
                     h_space: ${hSpace},
                     align_h: hmUI.align.${alignH},
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// TEXT - Text display with curvedText → IMG and font embedding support
-function generateTextWidgetV3(element: WatchFaceElement): string {
-  // Curved text: emit pre-rendered PNG as IMG widget
-  if (element.curvedText) {
-    const radius = element.curvedText.radius;
-    const fs = element.fontSize ?? 16;
-    const size = (radius + fs) * 2 + 20;
-    const cx = element.bounds.x + Math.floor(element.bounds.width / 2);
-    const cy = element.bounds.y + Math.floor(element.bounds.height / 2);
-    const imgX = Math.round(cx - size / 2);
-    const imgY = Math.round(cy - size / 2);
-    return `
-                // ${element.name} - Arch Text (pre-rendered PNG)
-                hmUI.createWidget(hmUI.widget.IMG, {
-                    x: px(${imgX}),
-                    y: px(${imgY}),
-                    w: px(${size}),
-                    h: px(${size}),
-                    src: 'curved_text_${element.id}.png',
-                    show_level: hmUI.show_level.ONLY_NORMAL
-                });`;
-  }
+// ============================================================
+// TIME_POINTER - Analog clock hands (hour/minute/second in ONE widget)
+// Pattern from Zepp OS watchface docs + reference watchfaces
+// ============================================================
+function generateTimePointerWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  const centerX = element.center?.x ?? 240;
+  const centerY = element.center?.y ?? 240;
+  const hourPosX = element.hourPos?.x ?? 11;
+  const hourPosY = element.hourPos?.y ?? 118;  // pivot at 85% of 140px hand height
+  const minutePosX = element.minutePos?.x ?? 8;
+  const minutePosY = element.minutePos?.y ?? 172; // pivot at 86% of 200px hand height
+  const secondPosX = element.secondPos?.x ?? 4;
+  const secondPosY = element.secondPos?.y ?? 180; // pivot at 75% of 240px hand height
+    const toHandPath = (src?: string): string | undefined => {
+      if (!src) return undefined;
+      const clean = src.replace(/^assets\//, '').trim();
+      if (!clean) return undefined;
+      // Balance-class V2 runtime resolves hand assets by filename in watchface config.
+      return clean;
+    };
+    const hourSrc = toHandPath(element.hourHandSrc || 'hour_hand.png')!;
+    const minuteSrc = toHandPath(element.minuteHandSrc || 'minute_hand.png')!;
+    const secondSrc = toHandPath(element.secondHandSrc || 'second_hand.png')!;
+    const coverSrc = toHandPath(element.coverSrc);
+  const coverBaseW = (element.coverWidth && element.coverWidth > 0) ? element.coverWidth : 30;
+  const coverBaseH = (element.coverHeight && element.coverHeight > 0) ? element.coverHeight : 30;
+  const coverScale = (element.handHubScale ?? 1) * (element.handLengthScale ?? 1);
+  const coverW = Math.max(1, Math.round(coverBaseW * coverScale));
+  const coverH = Math.max(1, Math.round(coverBaseH * coverScale));
+  const hasSeconds = !element.hideSeconds;
 
+  const secondParams = hasSeconds ? `
+                    second_centerX: px(${centerX}),
+                    second_centerY: px(${centerY}),
+                    second_posX: px(${secondPosX}),
+                    second_posY: px(${secondPosY}),
+                    second_path: '${secondSrc}',` : '';
+
+  const coverOverlay = coverSrc ? `
+                // ${element.name} - Hub overlay (kept above hands)
+                let widget_${widgetIndex}_cover = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${centerX - Math.round(coverW / 2)}),
+                    y: px(${centerY - Math.round(coverH / 2)}),
+            w: px(${coverW}),
+            h: px(${coverH}),
+                    src: '${coverSrc}',
+                    show_level: hmUI.show_level.${showLevel}
+                });` : '';
+
+  return `
+                // ${element.name} - TIME_POINTER Widget (Analog Clock)
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TIME_POINTER, {
+                    hour_centerX: px(${centerX}),
+                    hour_centerY: px(${centerY}),
+                    hour_posX: px(${hourPosX}),
+                    hour_posY: px(${hourPosY}),
+                  hour_path: '${hourSrc}',
+                    minute_centerX: px(${centerX}),
+                    minute_centerY: px(${centerY}),
+                    minute_posX: px(${minutePosX}),
+                    minute_posY: px(${minutePosY}),
+                    minute_path: '${minuteSrc}',${secondParams}
+                    show_level: hmUI.show_level.${showLevel}
+                });${coverOverlay}`;
+}
+
+// ============================================================
+// TEXT - Dynamic text display (e.g., city name, sensor values)
+// Pattern from working Brushed Steel reference
+// ============================================================
+function generateTextWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const textSize = element.fontSize ?? 20;
   const colorHex = element.color ?? '0xFFFFFFFF';
   const colorValue = colorHex.startsWith('0x') ? colorHex : `0x${colorHex.replace('#', '')}`;
-  const textContent = element.text ?? '';
   const charSpace = element.charSpace ?? 0;
   const lineSpace = element.lineSpace ?? 0;
 
@@ -821,9 +1017,51 @@ function generateTextWidgetV3(element: WatchFaceElement): string {
     ? `\n                    font: 'fonts/${fontEntry.fontFile}',`
     : '';
 
+  // Date format mode: build a getText callback from the format string
+  if (element.dateFormat) {
+    const fmt = element.dateFormat;
+    // Map format tokens to gettext_by_id / manual date construction
+    let textExpr: string;
+    if (fmt === 'DD/MM') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")}/${String(hmSensor.time.month).padStart(2,"0")}`';
+    } else if (fmt === 'MM/DD') {
+      textExpr = '`${String(hmSensor.time.month).padStart(2,"0")}/${String(hmSensor.time.day).padStart(2,"0")}`';
+    } else if (fmt === 'DD/MM/YYYY') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")}/${String(hmSensor.time.month).padStart(2,"0")}/${hmSensor.time.year}`';
+    } else if (fmt === 'MM/DD/YYYY') {
+      textExpr = '`${String(hmSensor.time.month).padStart(2,"0")}/${String(hmSensor.time.day).padStart(2,"0")}/${hmSensor.time.year}`';
+    } else if (fmt === 'DD-MM-YYYY') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")}-${String(hmSensor.time.month).padStart(2,"0")}-${hmSensor.time.year}`';
+    } else if (fmt === 'DD MMM') {
+      textExpr = '`${String(hmSensor.time.day).padStart(2,"0")} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][hmSensor.time.month-1]}`';
+    } else if (fmt === 'MMM DD') {
+      textExpr = '`${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][hmSensor.time.month-1]} ${String(hmSensor.time.day).padStart(2,"0")}`';
+    } else {
+      textExpr = '`${hmSensor.time.day}/${hmSensor.time.month}`';
+    }
+    return `
+                // ${element.name} - TEXT Widget (date format: ${fmt})
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TEXT, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    w: px(${element.bounds.width || 100}),
+                    h: px(${element.bounds.height || 40}),
+                    text_size: px(${textSize}),
+                    char_space: ${charSpace},
+                    color: ${colorValue},
+                    line_space: ${lineSpace},
+                    align_v: hmUI.align.CENTER_V,
+                    text_style: hmUI.text_style.ELLIPSIS,
+                    align_h: hmUI.align.CENTER_H,
+                    text: ${textExpr},${fontLine}
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+  }
+
+  const textContent = element.text ?? '';
   return `
                 // ${element.name} - TEXT Widget
-                hmUI.createWidget(hmUI.widget.TEXT, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TEXT, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}),
@@ -836,19 +1074,22 @@ function generateTextWidgetV3(element: WatchFaceElement): string {
                     text_style: hmUI.text_style.ELLIPSIS,
                     align_h: hmUI.align.CENTER_H,
                     text: '${textContent}',${fontLine}
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// BUTTON - Clickable shortcut button
-function generateButtonWidgetV3(element: WatchFaceElement): string {
+// ============================================================
+// BUTTON - Clickable shortcut button (launches app)
+// Pattern from working Brushed Steel reference
+// ============================================================
+function generateButtonWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const normalSrc = element.normalSrc || element.src || 'trasparente.png';
   const pressSrc = element.pressSrc || normalSrc;
   const clickAction = element.clickAction || '';
 
   let result = `
                 // ${element.name} - BUTTON Widget
-                hmUI.createWidget(hmUI.widget.BUTTON, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.BUTTON, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}),
@@ -857,7 +1098,7 @@ function generateButtonWidgetV3(element: WatchFaceElement): string {
                     press_src: '${pressSrc}',
                     normal_src: '${normalSrc}',
                     click_func: () => {},
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 
   if (clickAction) {
@@ -868,41 +1109,49 @@ function generateButtonWidgetV3(element: WatchFaceElement): string {
                     x: px(${element.bounds.x}), y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}), h: px(${element.bounds.height || 35}),
                     type: hmUI.data_type.${clickAction},
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
   }
 
   return result;
 }
 
-const STATUS_DEFAULT_SRC_V3: Record<string, string> = {
+// ============================================================
+// IMG_STATUS - System status indicators (bluetooth, DND, lock)
+// Pattern from working Brushed Steel reference
+// ============================================================
+// Per-statusType default image filenames (match StudioApp.tsx buildAssetImages)
+const STATUS_DEFAULT_SRC: Record<string, string> = {
   DISCONNECT: 'bluetooth_30x30.png',
   CLOCK:      'alarm_30x30.png',
   DISTURB:    'dnd_30x30.png',
   LOCK:       'lock_30x30.png',
 };
 
-// IMG_STATUS - System status indicators (bluetooth, DND, lock)
-function generateImgStatusWidgetV3(element: WatchFaceElement): string {
+function generateImgStatusWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const statusType = element.statusType || 'DISCONNECT';
-  const defaultSrc = STATUS_DEFAULT_SRC_V3[statusType] ?? 'bluetooth_30x30.png';
+  const defaultSrc = STATUS_DEFAULT_SRC[statusType] ?? 'bluetooth_30x30.png';
+  // If user picked a custom icon via iconKey, use that PNG; else use per-statusType default
   const src = element.iconKey
     ? `icon_${element.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`
     : (element.src || defaultSrc);
 
   return `
                 // ${element.name} - IMG_STATUS Widget
-                hmUI.createWidget(hmUI.widget.IMG_STATUS, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_STATUS, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     src: '${src}',
                     type: hmUI.system_status.${statusType},
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// CIRCLE - Filled/stroked circle
-function generateCircleWidgetV3(element: WatchFaceElement): string {
+// ============================================================
+// CIRCLE - Simple filled/stroked circle
+// Pattern from Zepp OS v1.0 docs
+// ============================================================
+function generateCircleWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const centerX = element.center?.x ?? (element.bounds.x + (element.bounds.width || 50) / 2);
   const centerY = element.center?.y ?? (element.bounds.y + (element.bounds.height || 50) / 2);
   const radius = element.radius ?? Math.min(element.bounds.width || 50, element.bounds.height || 50) / 2;
@@ -912,19 +1161,25 @@ function generateCircleWidgetV3(element: WatchFaceElement): string {
 
   return `
                 // ${element.name} - CIRCLE Widget
-                hmUI.createWidget(hmUI.widget.CIRCLE, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.CIRCLE, {
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
                     radius: px(${radius}),
                     color: ${colorValue},${alphaLine}
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
+// ============================================================
 // IMG_LEVEL - Level-based image display (weather icons, etc.)
-function generateImgLevelWidgetV3(element: WatchFaceElement): string {
+// Pattern from working Brushed Steel reference (with data_type)
+// ============================================================
+function generateImgLevelWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  // Build image_array from element.images or single element.src
   const images = element.images || (element.src ? [element.src] : []);
   const imageArrayStr = `[${images.map(img => `"${img}"`).join(', ')}]`;
+
+  // If dataType is specified, use type for auto-binding
   const resolvedImgLevelType =
     element.dataType === 'WEATHER_CURRENT' || element.dataType === 'WEATHER_STATUS'
       ? 'WEATHER'
@@ -935,58 +1190,66 @@ function generateImgLevelWidgetV3(element: WatchFaceElement): string {
 
   return `
                 // ${element.name} - IMG_LEVEL Widget
-                hmUI.createWidget(hmUI.widget.IMG_LEVEL, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_LEVEL, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     image_array: ${imageArrayStr},
                     image_length: ${images.length},${typeParam}
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
+// ============================================================
 // FILL_RECT - Solid filled rectangle
-function generateFillRectWidgetV3(element: WatchFaceElement): string {
+// ============================================================
+function generateFillRectWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const colorHex = element.color ?? '0x333333';
   const colorValue = colorHex.startsWith('0x') ? colorHex : `0x${colorHex.replace('#', '')}`;
   const alphaLine = element.alpha !== undefined ? `\n                    alpha: ${element.alpha},` : '';
   return `
                 // ${element.name} - FILL_RECT Widget
-                hmUI.createWidget(hmUI.widget.FILL_RECT, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.FILL_RECT, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}),
                     h: px(${element.bounds.height || 10}),
                     color: ${colorValue},${alphaLine}
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
+// ============================================================
 // STROKE_RECT - Outlined rectangle
-function generateStrokeRectWidgetV3(element: WatchFaceElement): string {
+// ============================================================
+function generateStrokeRectWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const colorHex = element.color ?? '0xFFFFFF';
   const colorValue = colorHex.startsWith('0x') ? colorHex : `0x${colorHex.replace('#', '')}`;
   const lineWidth = element.lineWidth ?? 2;
   return `
                 // ${element.name} - STROKE_RECT Widget
-                hmUI.createWidget(hmUI.widget.STROKE_RECT, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.STROKE_RECT, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}),
                     h: px(${element.bounds.height || 10}),
                     color: ${colorValue},
                     line_width: px(${lineWidth}),
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// IMG_ANIM - Animated image sequence
-function generateImgAnimWidgetV3(element: WatchFaceElement): string {
+// ============================================================
+// IMG_ANIM - Animated image sequence (folder-based frames)
+// anim_path: folder containing sequentially-named frames
+// anim_fps: playback speed, repeat_count: 0=infinite 1=once
+// ============================================================
+function generateImgAnimWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const animPath = element.animPath || 'anim/default';
   const animFps = element.animFps ?? 25;
   const repeatCount = element.repeatCount ?? 0;
   return `
                 // ${element.name} - IMG_ANIM Widget
-                hmUI.createWidget(hmUI.widget.IMG_ANIM, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_ANIM, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}),
@@ -995,12 +1258,16 @@ function generateImgAnimWidgetV3(element: WatchFaceElement): string {
                     anim_fps: ${animFps},
                     repeat_count: ${repeatCount},
                     anim_status: hmUI.anim_status.START,
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// IMG_PROGRESS - Sequential image array progress
-function generateImgProgressWidgetV3(element: WatchFaceElement): string {
+// ============================================================
+// IMG_PROGRESS - Sequential image array progress display
+// image_array: array of images, image_length: count
+// x_array / y_array: per-image positions (same length as images)
+// ============================================================
+function generateImgProgressWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const images = element.images || (element.src ? [element.src] : []);
   const imageArrayStr = `[${images.map(img => `'${img}'`).join(', ')}]`;
   const xArr = images.map((_, i) => element.bounds.x + i * (element.bounds.width || 20));
@@ -1010,17 +1277,25 @@ function generateImgProgressWidgetV3(element: WatchFaceElement): string {
   const typeParam = element.dataType ? `\n                    type: hmUI.data_type.${element.dataType},` : '';
   return `
                 // ${element.name} - IMG_PROGRESS Widget
-                hmUI.createWidget(hmUI.widget.IMG_PROGRESS, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_PROGRESS, {
                     image_array: ${imageArrayStr},
                     image_length: ${images.length},
                     x_array: ${xArrayStr},
                     y_array: ${yArrayStr},${typeParam}
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
+// ============================================================
 // DATE_POINTER - Analog pointer driven by date values
-function generateDatePointerWidgetV3(element: WatchFaceElement, resolution: { width: number; height: number }): string {
+// dateType: MONTH | DAY | WEEK → maps to hmUI.date constant
+// ============================================================
+function generateDatePointerWidget(
+  element: WatchFaceElement,
+  widgetIndex: number,
+  showLevel: string,
+  resolution: { width: number; height: number },
+): string {
   const dateType = element.dateType ?? 'DAY';
   const centerX = element.center?.x ?? resolution.width / 2;
   const centerY = element.center?.y ?? resolution.height / 2;
@@ -1028,33 +1303,37 @@ function generateDatePointerWidgetV3(element: WatchFaceElement, resolution: { wi
   const posY = element.hourPos?.y ?? 60;
   return `
                 // ${element.name} - DATE_POINTER Widget (${dateType})
-                hmUI.createWidget(hmUI.widget.DATE_POINTER, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.DATE_POINTER, {
                     date_type: hmUI.date.${dateType},
                     center_x: px(${centerX}),
                     center_y: px(${centerY}),
                     posX: px(${posX}),
                     posY: px(${posY}),
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
-// IMG_CLICK - Interactive image area
-function generateImgClickWidgetV3(element: WatchFaceElement): string {
+// ============================================================
+// IMG_CLICK - Interactive image area (used for MOON data type)
+// Tapping triggers data_type action (e.g., MOON phase toggle)
+// ============================================================
+function generateImgClickWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const src = element.src || 'moon_icon.png';
   const typeParam = element.dataType ? `\n                    type: hmUI.data_type.${element.dataType},` : '';
   return `
                 // ${element.name} - IMG_CLICK Widget
-                hmUI.createWidget(hmUI.widget.IMG_CLICK, {
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_CLICK, {
                     x: px(${element.bounds.x}),
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 50}),
                     h: px(${element.bounds.height || 50}),
                     src: '${src}',${typeParam}
-                    show_level: hmUI.show_level.ONLY_NORMAL
+                    show_level: hmUI.show_level.${showLevel}
                 });`;
 }
 
 // Generate unique app ID
 function generateAppId(): number {
-  return Math.floor(1000000 + Math.random() * 9000000);
+  return Math.floor(Math.random() * (9999999 - 1000000 + 1)) + 1000000;
 }
+

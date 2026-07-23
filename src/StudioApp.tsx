@@ -3968,28 +3968,18 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
           }
         }
       }
-      // Spec 110: derive configVersion from specGroups.supportedConfigVersions.
-      // Models supporting v3 get the modern generator; others fall back to v2 (safe default).
-      const buildSpecGroupKey = Object.values(watchModels).find(
-        m => m.name === state.watchFaceConfig?.watchModel
-      )?.specGroup ?? '';
-      const buildSpecGroup = specGroups[buildSpecGroupKey];
-      const derivedConfigVersion: 'v2' | 'v3' =
-        buildSpecGroup?.supportedConfigVersions?.includes('v3') ? 'v3' : 'v2';
-
-      const configForBuild: WatchFaceConfig = {
-        ...state.watchFaceConfig,
-        elements: exportElements,
-        backgroundTransform: mainBackgroundTransform,
-        aodElements: exportAodElements,
-        aodBackgroundMode: effectiveAodBackgroundMode,
-        aodBackgroundSrc: effectiveAodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' || effectiveAodBackgroundMode === 'SOLID_COLOR'
-          ? 'aod_background.png'
-          : null,
-        aodSolidColor: effectiveAodBackgroundMode === 'SOLID_COLOR' ? aodSolidColor : null,
-        aodBackgroundTransform,
-        configVersion: derivedConfigVersion,
-      };
+        const configForBuild: WatchFaceConfig = {
+          ...state.watchFaceConfig,
+          elements: exportElements,
+          backgroundTransform: mainBackgroundTransform,
+          aodElements: exportAodElements,
+          aodBackgroundMode: effectiveAodBackgroundMode,
+          aodBackgroundSrc: effectiveAodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' || effectiveAodBackgroundMode === 'SOLID_COLOR'
+            ? 'aod_background.png'
+            : null,
+          aodSolidColor: effectiveAodBackgroundMode === 'SOLID_COLOR' ? aodSolidColor : null,
+          aodBackgroundTransform,
+        };
 
       // Inject engrave/emboss frame PNGs for FILL_RECT elements with engraveFrame
       for (const el of exportCombinedElements) {
