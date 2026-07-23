@@ -142,7 +142,7 @@ function generateAppJson(config: WatchFaceConfig): string {
     defaultLanguage: 'en-US',
     debug: false,
     targets: {
-      default: {
+      [platformMeta.targetKey]: {
         module: {
           watchface: {
             path: 'watchface/index',
@@ -154,15 +154,6 @@ function generateAppJson(config: WatchFaceConfig): string {
         },
         platforms: platformMeta.platforms,
         designWidth: config.resolution.width,
-      },
-    },
-    module: {
-      watchface: {
-        path: 'watchface/index',
-        main: 1,
-        editable: 0,
-        lockscreen: 0,
-        hightCost: 0,
       },
     },
     packageInfo: {
@@ -341,10 +332,10 @@ function generateWatchfaceIndexJs(config: WatchFaceConfig): string {
   const zById = new Map(visibleElements.map(el => [el.id, el.zIndex]));
   const elements = [...visibleElements].sort((a, b) => {
     const az = (a.engraveFrame && a.engraveFrame.linked !== false)
-      ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) - 0.5
+      ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) + 0.5
       : a.zIndex;
     const bz = (b.engraveFrame && b.engraveFrame.linked !== false)
-      ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) - 0.5
+      ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) + 0.5
       : b.zIndex;
     return az - bz;
   });
