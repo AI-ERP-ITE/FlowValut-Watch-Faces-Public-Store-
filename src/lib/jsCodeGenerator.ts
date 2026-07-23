@@ -183,7 +183,6 @@ function getPlatformMeta(config: WatchFaceConfig): {
   platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }>;
 } {
   const model = getModelEntry(config.watchModel);
-  const allModels = getModelEntries();
   const fallbackShape: 'r' | 's' = config.resolution.width === config.resolution.height ? 'r' : 's';
   const fallbackResTag = fallbackShape === 'r'
     ? `w${config.resolution.width}`
@@ -205,20 +204,14 @@ function getPlatformMeta(config: WatchFaceConfig): {
     }
   }
 
-  const compatibleModels = model?.specGroup
-    ? allModels.filter((entry) => entry.specGroup === model.specGroup)
-    : (model ? [model] : []);
-
   const platforms: Array<{ name: string; st: 'r' | 's'; sr: string; deviceSource: number }> =
-    compatibleModels.length > 0
-      ? compatibleModels.flatMap((entry) =>
-          entry.deviceSources.map((source) => ({
-            name: config.watchModel,
-            st,
-            sr,
-            deviceSource: source,
-          }))
-        )
+    model && model.deviceSources.length > 0
+      ? model.deviceSources.map((source) => ({
+          name: model.name,
+          st,
+          sr,
+          deviceSource: source,
+        }))
       : [{
           name: config.watchModel || 'Compatible Device',
           st,
