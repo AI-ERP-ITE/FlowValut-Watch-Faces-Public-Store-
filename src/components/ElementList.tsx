@@ -67,6 +67,7 @@ export function ElementList({
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
     // Requires a small delay for the UI to update correctly during drag
     setTimeout(() => {
       if (e.target instanceof HTMLElement) {
@@ -100,11 +101,47 @@ export function ElementList({
 
     // Work on a visually sorted copy (highest zIndex first)
     const sortedElements = [...elements].sort((a, b) => b.zIndex - a.zIndex);
-    const [draggedElement] = sortedElements.splice(draggedIndex, 1);
-    sortedElements.splice(targetIndex, 0, draggedElement);
+    const draggedElement = sortedElements[draggedIndex];
+    
+    let groupElements = [draggedElement];
+    if (draggedElement.gaugePairId) {
+      groupElements = sortedElements.filter(el => el.gaugePairId === draggedElement.gaugePairId);
+    }
+
+    const groupIds = new Set(groupElements.map(el => el.id));
+    const remainingElements = sortedElements.filter(el => !groupIds.has(el.id));
+
+    const targetElement = sortedElements[targetIndex];
+    
+    // Prevent dropping onto another element of the same gauge group
+    if (draggedElement.gaugePairId && targetElement.gaugePairId === draggedElement.gaugePairId) {
+       handleDragEnd(e);
+       return;
+    }
+
+    let insertAt = remainingElements.findIndex(el => el.id === targetElement.id);
+    if (insertAt === -1) {
+       insertAt = remainingElements.length;
+    } else {
+       if (draggedIndex < targetIndex) {
+          insertAt += 1;
+       }
+    }
+
+    if (draggedElement.gaugePairId && groupElements.length > 1) {
+       groupElements.sort((a, b) => {
+         if (a.type === 'GAUGE_POINTER' && b.type !== 'GAUGE_POINTER') return -1;
+         if (b.type === 'GAUGE_POINTER' && a.type !== 'GAUGE_POINTER') return 1;
+         if (a.type === 'IMG_LEVEL' && b.type !== 'IMG_LEVEL') return -1;
+         if (b.type === 'IMG_LEVEL' && a.type !== 'IMG_LEVEL') return 1;
+         return 0;
+       });
+    }
+
+    remainingElements.splice(insertAt, 0, ...groupElements);
 
     // Pass the newly visual-ordered list back to StudioApp to recalculate sequence numbers
-    onReorder(sortedElements);
+    onReorder(remainingElements);
     handleDragEnd(e);
   };
 
