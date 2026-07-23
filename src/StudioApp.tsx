@@ -2164,7 +2164,16 @@ function StudioApp() {
   }, [aodElements, editorMode, updateAodBackgroundTransform, updateMainBackgroundTransform]);
 
 
-  const handleReorderElements = useCallback((newElements: WatchFaceElement[]) => {
+  const handleReorderElements = useCallback((visuallySortedElements: WatchFaceElement[]) => {
+    // visuallySortedElements is Top (highest zIndex) -> Bottom (lowest zIndex)
+    const total = visuallySortedElements.length;
+    let nextZIndex = total;
+
+    const newElements = visuallySortedElements.map((el) => {
+      const assigned = nextZIndex--;
+      return { ...el, zIndex: assigned };
+    });
+
     if (editorMode === 'MAIN') {
       dispatch({ type: 'REORDER_ELEMENTS', payload: newElements });
     } else {
@@ -4257,6 +4266,27 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             exportAodElementCount: exportAodElements?.length ?? 0,
           },
         });
+      }
+
+      // Pre-process: convert any remaining data: URL elements (e.g. from Add Image) into
+      // physical File objects so the ZPK builder only ever sees clean filenames.
+      for (const el of configForBuild.elements) {
+        if (el.type === 'IMG' && el.src && el.src.startsWith('data:')) {
+          try {
+            const res = await fetch(el.src);
+            const blob = await res.blob();
+            const filename = `static_img_${el.id.slice(0, 6)}.png`;
+            const file = new File([blob], filename, { type: 'image/png' });
+            const existingIdx = elementFiles.findIndex((f) => f.src === filename);
+            if (existingIdx >= 0) elementFiles[existingIdx] = { src: filename, file };
+            else elementFiles.push({ src: filename, file });
+            el.src = filename;
+            el.assetFilename = filename;
+            console.log(`[App] Converted Add Image data URL to file: ${filename}`);
+          } catch (err) {
+            console.error('[App] Failed to convert data URL for element:', el.name, err);
+          }
+        }
       }
 
       const zpkResult = await buildZPK({

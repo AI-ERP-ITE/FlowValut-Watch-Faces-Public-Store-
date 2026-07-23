@@ -328,7 +328,23 @@ function generateAppJs(config: WatchFaceConfig): string {
 // Generate watchface/index.js - Matching working ZPK structure with proper lifecycle
 function generateWatchfaceIndexJs(config: WatchFaceConfig): string {
   const visibleElements = config.elements.filter((el) => el.visible);
-  const elements = [...visibleElements];
+  
+  // Pre-process layers: sort correctly by zIndex for rendering.
+  // Decorative engraveFrames must render immediately after their target element.
+  const zById = new Map(visibleElements.map(el => [el.id, el.zIndex]));
+  const elements = [...visibleElements].sort((a, b) => {
+    const az = (a.engraveFrame && a.engraveFrame.linked !== false)
+      ? (zById.get(a.engraveFrame.frameOf) ?? a.zIndex) - 0.5
+      : a.zIndex;
+    const bz = (b.engraveFrame && b.engraveFrame.linked !== false)
+      ? (zById.get(b.engraveFrame.frameOf) ?? b.zIndex) - 0.5
+      : b.zIndex;
+    return az - bz;
+  });
+
+  /* const aodElements = config.aodElements
+    ? [...config.aodElements].filter((e) => e.visible).sort((a, b) => a.zIndex - b.zIndex)
+    : []; */
   
   let widgetsCode = '';
   

@@ -98,16 +98,13 @@ export function ElementList({
       return;
     }
 
-    const newElements = [...elements];
-    const [draggedElement] = newElements.splice(draggedIndex, 1);
-    newElements.splice(targetIndex, 0, draggedElement);
-    
-    // Update zIndex sequentially based on array order
-    newElements.forEach((el, idx) => {
-      el.zIndex = idx;
-    });
+    // Work on a visually sorted copy (highest zIndex first)
+    const sortedElements = [...elements].sort((a, b) => b.zIndex - a.zIndex);
+    const [draggedElement] = sortedElements.splice(draggedIndex, 1);
+    sortedElements.splice(targetIndex, 0, draggedElement);
 
-    onReorder(newElements);
+    // Pass the newly visual-ordered list back to StudioApp to recalculate sequence numbers
+    onReorder(sortedElements);
     handleDragEnd(e);
   };
 
@@ -131,6 +128,9 @@ export function ElementList({
     setEditingId(null);
   };
 
+  // Visually sort elements so highest zIndex is on Top (Photoshop style)
+  const sortedElements = [...elements].sort((a, b) => b.zIndex - a.zIndex);
+
   return (
     <div className={cn('space-y-2', className)}>
       <h4 className="text-sm font-medium text-zinc-400 mb-3">
@@ -138,7 +138,7 @@ export function ElementList({
       </h4>
       
       <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 flex flex-col">
-        {elements.map((element, index) => {
+        {sortedElements.map((element, index) => {
           const warning = elementWarnings?.[element.id];
           const hasWarning = !!warning?.hasFlickerRisk;
           const warningColorClass = warning?.severity === 'high' ? 'text-red-400' : 'text-amber-400';
@@ -214,7 +214,7 @@ export function ElementList({
               ) : (
                 <p className="text-sm font-medium text-white truncate flex items-center group/name">
                   {element.engraveFrame && <span className="text-amber-400 mr-1">🔗</span>}
-                  <span className="truncate">{element.displayName || element.name}</span>
+                  <span className="truncate">[{element.zIndex}] {element.displayName || element.name}</span>
                   {hasWarning && (
                     <span title={warningTitle} className={cn('inline-flex align-middle ml-2 shrink-0', warningColorClass)}>
                       <AlertTriangle className="h-3.5 w-3.5" />

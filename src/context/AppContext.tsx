@@ -163,25 +163,42 @@ function appReducer(state: AppState, action: Action): AppState {
       if (action.payload.changes.zIndex !== undefined) {
         const targetId = action.payload.id;
         const requestedZIndex = action.payload.changes.zIndex;
-        const targetElementIndex = updatedElements.findIndex(el => el.id === targetId);
+        const targetElement = updatedElements.find(el => el.id === targetId);
         
-        if (targetElementIndex !== -1) {
-          const targetElement = updatedElements[targetElementIndex];
+        if (targetElement) {
           let groupElements = [targetElement];
-          
           if (targetElement.gaugePairId) {
             groupElements = updatedElements.filter(el => el.gaugePairId === targetElement.gaugePairId);
+          }
+          
+          if (targetElement.gaugePairId && groupElements.length > 1) {
+            groupElements.sort((a, b) => {
+               if (a.type === 'GAUGE_POINTER') return -1;
+               if (b.type === 'GAUGE_POINTER') return 1;
+               if (a.type === 'IMG_LEVEL') return -1;
+               if (b.type === 'IMG_LEVEL') return 1;
+               return 0;
+            });
           }
 
           const groupIds = new Set(groupElements.map(el => el.id));
           updatedElements = updatedElements.filter(el => !groupIds.has(el.id));
+          updatedElements.sort((a, b) => a.zIndex - b.zIndex);
           
-          const relativeTargetIndex = groupElements.findIndex(el => el.id === targetId);
-          const targetInsertionPoint = Math.max(0, Math.min(requestedZIndex, updatedElements.length + groupElements.length - 1));
-          const groupInsertionPoint = Math.max(0, Math.min(targetInsertionPoint - relativeTargetIndex, updatedElements.length));
+          let bottomRequestedZIndex = requestedZIndex;
+          if (targetElement.gaugePairId && groupElements.length > 1) {
+             if (targetElement.type === 'GAUGE_POINTER') {
+                 bottomRequestedZIndex = requestedZIndex - (groupElements.length - 1);
+             } else if (targetElement.type === 'IMG_LEVEL') {
+                 const hasBackground = groupElements.some(el => el.type !== 'GAUGE_POINTER' && el.type !== 'IMG_LEVEL');
+                 bottomRequestedZIndex = requestedZIndex - (hasBackground ? 1 : 0);
+             }
+          }
           
-          updatedElements.splice(groupInsertionPoint, 0, ...groupElements);
-          updatedElements = updatedElements.map((el, i) => ({ ...el, zIndex: i }));
+          const insertionIndex = Math.max(0, Math.min(bottomRequestedZIndex - 1, updatedElements.length));
+          groupElements.reverse();
+          updatedElements.splice(insertionIndex, 0, ...groupElements);
+          updatedElements = updatedElements.map((el, i) => ({ ...el, zIndex: i + 1 }));
         }
       }
 
@@ -202,25 +219,42 @@ function appReducer(state: AppState, action: Action): AppState {
       if (action.payload.changes.zIndex !== undefined) {
         const targetId = action.payload.id;
         const requestedZIndex = action.payload.changes.zIndex;
-        const targetElementIndex = isolatedElements.findIndex(el => el.id === targetId);
+        const targetElement = isolatedElements.find(el => el.id === targetId);
         
-        if (targetElementIndex !== -1) {
-          const targetElement = isolatedElements[targetElementIndex];
+        if (targetElement) {
           let groupElements = [targetElement];
-          
           if (targetElement.gaugePairId) {
             groupElements = isolatedElements.filter(el => el.gaugePairId === targetElement.gaugePairId);
+          }
+          
+          if (targetElement.gaugePairId && groupElements.length > 1) {
+            groupElements.sort((a, b) => {
+               if (a.type === 'GAUGE_POINTER') return -1;
+               if (b.type === 'GAUGE_POINTER') return 1;
+               if (a.type === 'IMG_LEVEL') return -1;
+               if (b.type === 'IMG_LEVEL') return 1;
+               return 0;
+            });
           }
 
           const groupIds = new Set(groupElements.map(el => el.id));
           isolatedElements = isolatedElements.filter(el => !groupIds.has(el.id));
+          isolatedElements.sort((a, b) => a.zIndex - b.zIndex);
           
-          const relativeTargetIndex = groupElements.findIndex(el => el.id === targetId);
-          const targetInsertionPoint = Math.max(0, Math.min(requestedZIndex, isolatedElements.length + groupElements.length - 1));
-          const groupInsertionPoint = Math.max(0, Math.min(targetInsertionPoint - relativeTargetIndex, isolatedElements.length));
+          let bottomRequestedZIndex = requestedZIndex;
+          if (targetElement.gaugePairId && groupElements.length > 1) {
+             if (targetElement.type === 'GAUGE_POINTER') {
+                 bottomRequestedZIndex = requestedZIndex - (groupElements.length - 1);
+             } else if (targetElement.type === 'IMG_LEVEL') {
+                 const hasBackground = groupElements.some(el => el.type !== 'GAUGE_POINTER' && el.type !== 'IMG_LEVEL');
+                 bottomRequestedZIndex = requestedZIndex - (hasBackground ? 1 : 0);
+             }
+          }
           
-          isolatedElements.splice(groupInsertionPoint, 0, ...groupElements);
-          isolatedElements = isolatedElements.map((el, i) => ({ ...el, zIndex: i }));
+          const insertionIndex = Math.max(0, Math.min(bottomRequestedZIndex - 1, isolatedElements.length));
+          groupElements.reverse();
+          isolatedElements.splice(insertionIndex, 0, ...groupElements);
+          isolatedElements = isolatedElements.map((el, i) => ({ ...el, zIndex: i + 1 }));
         }
       }
 
@@ -240,11 +274,8 @@ function appReducer(state: AppState, action: Action): AppState {
         return changes ? bumpElementVersion({ ...el, ...changes }) : el;
       });
 
-      if (action.payload.some(p => p.changes.zIndex !== undefined)) {
-        batchUpdated.sort((a, b) => a.zIndex - b.zIndex);
-        batchUpdated = batchUpdated.map((el, i) => ({ ...el, zIndex: i }));
-      }
-
+      // Batch update does not need side-effect array sorting anymore.
+      // If a batch explicitly modifies zIndex, we let it be.
       return {
         ...state,
         watchFaceConfig: { ...state.watchFaceConfig, elements: batchUpdated },
