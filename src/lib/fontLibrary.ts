@@ -105,6 +105,8 @@ export function registerCustomFontsInLibrary(names: string[]): void {
     fontWeight: '400',
     color: '#FFFFFF',
     category: 'display' as FontCategory,
+    embeddable: true,
+    fontFile: `custom_${name.replace(/[^a-zA-Z0-9_-]/g, '_')}.ttf`,
   }));
 }
 

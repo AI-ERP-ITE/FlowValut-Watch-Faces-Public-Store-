@@ -4,7 +4,7 @@
 
 import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import modelsData from '../../models.json';
-import { FONT_STYLES } from '@/lib/fontLibrary';
+import { getFontStyle } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
@@ -1025,7 +1025,7 @@ function generateTextWidget(element: WatchFaceElement, widgetIndex: number, show
   const lineSpace = element.lineSpace ?? 0;
 
   // Check if selected font is embeddable
-  const fontEntry = element.fontStyle ? FONT_STYLES.find(f => f.key === element.fontStyle) : undefined;
+  const fontEntry = element.fontStyle ? getFontStyle(element.fontStyle) : undefined;
   const fontLine = (fontEntry?.embeddable && fontEntry.fontFile)
     ? `\n                    font: 'fonts/${fontEntry.fontFile}',`
     : '';

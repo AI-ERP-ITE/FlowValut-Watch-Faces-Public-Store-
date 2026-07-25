@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { projectRasterNormalizationTarget } from '@/lib/projectRasterGeometry';
 import type { WatchFaceConfig } from '@/types';
 import { generateWatchFaceCode } from './jsCodeGenerator';
-import { FONT_STYLES } from '@/lib/fontLibrary';
+import { getFontStyle } from '@/lib/fontLibrary';
 
 export interface ZPKBuildOptions {
   config: WatchFaceConfig;
@@ -304,7 +304,7 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
       const fontFilesToPack = new Set<string>();
       for (const el of fixedConfig.elements) {
         if (el.type === 'TEXT' && el.fontStyle) {
-          const fontEntry = FONT_STYLES.find(f => f.key === el.fontStyle);
+          const fontEntry = getFontStyle(el.fontStyle);
           if (fontEntry?.embeddable && fontEntry.fontFile) {
             fontFilesToPack.add(fontEntry.fontFile);
           }
@@ -316,9 +316,15 @@ export async function buildZPK(options: ZPKBuildOptions): Promise<ZPKBuildResult
         if (fontsFolder) {
           for (const fontFile of fontFilesToPack) {
             try {
-              const response = await fetch(`/fonts/${fontFile}`);
-              if (!response.ok) throw new Error(`HTTP ${response.status}`);
-              const blob = await response.blob();
+              let blob: Blob;
+              const customFontFile = normalizedElementFiles.find(ef => ef.src === fontFile);
+              if (customFontFile) {
+                blob = customFontFile.file;
+              } else {
+                const response = await fetch(`/fonts/${fontFile}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                blob = await response.blob();
+              }
               fontsFolder.file(fontFile, blob);
               console.log('[ZPK] Font packed:', fontFile, 'size:', blob.size);
             } catch (err) {

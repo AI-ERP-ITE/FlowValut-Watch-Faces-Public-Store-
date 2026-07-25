@@ -4515,6 +4515,29 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         });
       }
 
+      // Inject Custom Fonts from IndexedDB
+      const fontKeysInUse = new Set<string>();
+      for (const el of [...(configForBuild.elements || []), ...(configForBuild.aodElements || [])]) {
+        if (el.type === 'TEXT' && el.fontStyle && el.fontStyle.startsWith('custom-font:')) {
+          fontKeysInUse.add(el.fontStyle.replace('custom-font:', ''));
+        }
+      }
+      
+      if (fontKeysInUse.size > 0) {
+        const customFonts = await loadCustomFonts();
+        for (const fontName of fontKeysInUse) {
+          const fontRecord = customFonts.find(f => f.name === fontName);
+          if (fontRecord) {
+            const fontFileName = `custom_${fontName.replace(/[^a-zA-Z0-9_-]/g, '_')}.ttf`;
+            const fontFile = new File([fontRecord.buffer], fontFileName, { type: 'font/ttf' });
+            const existingIdx = elementFiles.findIndex(f => f.src === fontFileName);
+            if (existingIdx >= 0) elementFiles[existingIdx] = { src: fontFileName, file: fontFile };
+            else elementFiles.push({ src: fontFileName, file: fontFile });
+            console.log(`[App] Injected custom font into build: ${fontFileName}`);
+          }
+        }
+      }
+
       // Pre-process: convert any remaining data: URL elements (e.g. from Add Image) into
       // physical File objects so the ZPK builder only ever sees clean filenames.
       for (const el of configForBuild.elements) {
