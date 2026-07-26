@@ -222,3 +222,6 @@ The current system flattens each uploaded ZPK into a catalog product. The genera
 12. Legacy store URLs and paid downloads continue to work.
 13. Public builds contain no private routes; private routes remain guarded.
 14. Firebase, private Pages, and public Pages deployment verification all pass before closure.
+### Technical Target authority
+
+The selected catalog model ID is the authority for Technical Target resolution. Studio persists both the stable model ID and its configured `specGroup` on new Workshop records. Display labels are compatibility inputs only. New builds fail closed when the target cannot be resolved; existing approved builds with blank legacy metadata may recover through the existing release field, while builds with a saved target cannot be classified against a different target.

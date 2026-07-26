@@ -95,3 +95,10 @@
 - `READY` packages can resume as `VALIDATING`; `VALIDATING` retries resume; `CURRENT` retries return the existing result.
 - Existing immutable release objects are reused only when their hashes and parity identity match exactly.
 - Reopening a classified build restores its hierarchy and revision instead of creating a duplicate package.
+## Technical Target propagation and recovery
+
+- Canonical model IDs, exact display names, and vendor-prefixed legacy display names resolve to the same Technical Target.
+- Ambiguous normalized model names fail closed instead of guessing.
+- New Workshop build reservations reject a missing Technical Target.
+- Release classification rejects a selected target that conflicts with the approved build target.
+- A legacy approved build with no saved target can use the existing release field to select a verified configured target.

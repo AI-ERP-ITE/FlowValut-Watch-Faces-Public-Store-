@@ -121,4 +121,7 @@
 - [x] T115 Preserve the established ZPK/QR artifact generation and move its output to the exact immutable Workshop Build path without store publication.
 - [x] T116 Retain the exact generated FVWF/ZPK pair for an in-session Workshop retry without rebuilding.
 - [x] T117 Report artifact-specific upload failures and expose an explicit zero-build Project state in Admin.
+- [x] T118 Propagate the canonical model ID and Technical Target into every new Workshop build without display-name dependence.
+- [x] T119 Keep the existing release step while allowing explicit recovery selection only for builds whose Technical Target is missing.
+- [x] T120 Reject new blank-target builds and reject release classifications that conflict with an approved build's saved target.
 - [x] T113 Review the final isolated diff and receive explicit deployment approval.
