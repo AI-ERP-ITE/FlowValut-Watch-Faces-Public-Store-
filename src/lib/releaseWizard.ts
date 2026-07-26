@@ -7,6 +7,8 @@ export interface ReleaseWizardDraft {
   variantName: string; variantCode: string;
   editionName?: string; editionCode?: string;
   technicalTargetId: string; revision: string;
+  description?: string; designStory?: string;
+  categories?: string[]; tags?: string[];
   regularPrice: number; campaignPrice?: number;
   offerType?: 'SKU' | 'BUNDLE'; bundleSkuIds?: string[];
 }

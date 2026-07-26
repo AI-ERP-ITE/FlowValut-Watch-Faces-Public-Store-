@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchyOption, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
+import { deleteAbandonedTechnicalPackage, fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchyOption, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
 import { findNormalizedConflict, nextRevision, releaseWizardPreview, type ReleaseWizardDraft } from '@/lib/releaseWizard';
 import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 import { resolveUniqueTargetByResolution, type TechnicalTargetDefinition } from '@/lib/watchModelTarget';
@@ -10,6 +10,7 @@ const NEW = '__new__';
 const emptyDraft: ReleaseWizardDraft = {
   designDnaName: '', designDnaCode: '', collectionName: '', collectionCode: '', modelName: '', modelNumber: 1,
   variantName: '', variantCode: '', editionName: '', editionCode: '', technicalTargetId: '', revision: 'v1.0',
+  description: '', designStory: '', categories: [], tags: [],
   regularPrice: 8, campaignPrice: 4, offerType: 'SKU', bundleSkuIds: [],
 };
 
@@ -19,6 +20,10 @@ function optionLabel(option: HierarchyOption) {
 
 function TextField({ label, value, disabled, onChange, error }: { label: string; value: string | number; disabled?: boolean; onChange: (value: string) => void; error?: boolean }) {
   return <label className={`text-[10px] ${error ? 'text-red-400' : 'text-[#9ba6b8]'}`}>{label}<input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={`mt-1 w-full rounded border ${error ? 'border-red-500/50 bg-red-950/20 text-red-100' : 'border-[#34354b] bg-[#0c0d14] text-white'} px-2 py-2 text-xs disabled:opacity-60`} /></label>;
+}
+
+function commaSeparatedValues(value: string): string[] {
+  return [...new Set(value.split(',').map((item) => item.trim()).filter(Boolean))];
 }
 
 export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildResolution }: { projectId: string; buildId: string; defaultTarget?: string; buildResolution?: { width: number; height: number } }) {
@@ -65,7 +70,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
         const dna = result.designDnas?.find((item) => item.id === collection?.parentId);
         if (sku && model && collection && dna) {
           setDnaId(dna.id); setCollectionId(collection.id); setModelId(model.id); setSkuId(sku.id);
-          setDraft((current) => ({ ...current, designDnaName: dna.name, designDnaCode: dna.code ?? '', collectionName: collection.name, collectionCode: collection.code ?? '', modelName: model.name, modelNumber: model.modelNumber ?? 1, variantName: sku.variantName, variantCode: sku.variantCode, editionName: sku.editionName ?? '', editionCode: sku.editionCode ?? '', technicalTargetId: existingPackage.technicalTargetId, revision: existingPackage.revision }));
+          setDraft((current) => ({ ...current, designDnaName: dna.name, designDnaCode: dna.code ?? '', collectionName: collection.name, collectionCode: collection.code ?? '', modelName: model.name, modelNumber: model.modelNumber ?? 1, description: model.description ?? '', designStory: model.designStory ?? '', categories: model.categories ?? [], tags: model.tags ?? [], variantName: sku.variantName, variantCode: sku.variantCode, editionName: sku.editionName ?? '', editionCode: sku.editionCode ?? '', technicalTargetId: existingPackage.technicalTargetId, revision: existingPackage.revision }));
           return;
         }
       }
@@ -94,7 +99,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
       return;
     }
     const revisions = (snapshot.technicalPackages || [])
-      .filter((item) => skuId !== NEW && item.skuId === skuId && item.technicalTargetId === draft.technicalTargetId && ['CURRENT', 'SUPERSEDED'].includes(item.state))
+      .filter((item) => skuId !== NEW && item.skuId === skuId && item.technicalTargetId === draft.technicalTargetId && !['FAILED', 'TRASHED'].includes(item.state))
       .map((item) => item.revision);
     setDraft((current) => ({ ...current, revision: nextRevision(revisions) }));
   }, [buildId, draft.technicalTargetId, projectId, skuId, snapshot]);
@@ -103,18 +108,18 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
   function selectDna(id: string) {
     setDnaId(id); setCollectionId(NEW); setModelId(NEW); setSkuId(NEW);
     const item = snapshot?.designDnas.find((candidate) => candidate.id === id);
-    patch({ designDnaName: item?.name ?? '', designDnaCode: item?.code ?? '', collectionName: '', collectionCode: '', modelName: '', modelNumber: 1, variantName: '', variantCode: '', editionName: '', editionCode: '' });
+    patch({ designDnaName: item?.name ?? '', designDnaCode: item?.code ?? '', collectionName: '', collectionCode: '', modelName: '', modelNumber: 1, description: '', designStory: '', categories: [], tags: [], variantName: '', variantCode: '', editionName: '', editionCode: '' });
   }
   function selectCollection(id: string) {
     setCollectionId(id); setModelId(NEW); setSkuId(NEW);
     const item = snapshot?.collections.find((candidate) => candidate.id === id);
     const nextNumber = Math.max(0, ...(snapshot?.productModels.filter((model) => model.parentId === id).map((model) => model.modelNumber ?? 0) ?? [])) + 1;
-    patch({ collectionName: item?.name ?? '', collectionCode: item?.code ?? '', modelName: '', modelNumber: nextNumber || 1, variantName: '', variantCode: '', editionName: '', editionCode: '' });
+    patch({ collectionName: item?.name ?? '', collectionCode: item?.code ?? '', modelName: '', modelNumber: nextNumber || 1, description: '', designStory: '', categories: [], tags: [], variantName: '', variantCode: '', editionName: '', editionCode: '' });
   }
   function selectModel(id: string) {
     setModelId(id); setSkuId(NEW);
     const item = snapshot?.productModels.find((candidate) => candidate.id === id);
-    patch({ modelName: item?.name ?? '', modelNumber: item?.modelNumber ?? 1, variantName: '', variantCode: '', editionName: '', editionCode: '' });
+    patch({ modelName: item?.name ?? '', modelNumber: item?.modelNumber ?? 1, description: item?.description ?? '', designStory: item?.designStory ?? '', categories: item?.categories ?? [], tags: item?.tags ?? [], variantName: '', variantCode: '', editionName: '', editionCode: '' });
   }
   function selectSku(id: string) {
     setSkuId(id);
@@ -144,6 +149,20 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
       setSkuId(newSkuId);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Release operation failed'); }
     finally { setBusy(false); }
+  }
+
+  async function discardAbandonedPackage(packageId: string) {
+    if (!window.confirm(`Remove abandoned release classification ${packageId}?\n\nThe approved Workshop FVWF and Test ZPK remain untouched.`)) return;
+    setBusy(true);
+    try {
+      await deleteAbandonedTechnicalPackage(packageId);
+      setSnapshot(await fetchStoreHierarchy());
+      toast.success('Abandoned release classification removed. Workshop artifacts were preserved.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to remove abandoned release classification');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -187,11 +206,25 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
           <TextField label="Regular price USD" value={draft.regularPrice} onChange={(value) => patch({ regularPrice: Number(value) })} />
           <TextField label="Campaign price USD" value={draft.campaignPrice ?? ''} onChange={(value) => patch({ campaignPrice: value ? Number(value) : undefined })} />
         </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="text-[10px] text-[#9ba6b8]">Store description<textarea value={draft.description ?? ''} onChange={(event) => patch({ description: event.target.value })} maxLength={5000} rows={4} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white" /></label>
+          <label className="text-[10px] text-[#9ba6b8]">Design story (optional)<textarea value={draft.designStory ?? ''} onChange={(event) => patch({ designStory: event.target.value })} maxLength={10000} rows={4} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white" /></label>
+          <TextField label="Categories (comma separated)" value={(draft.categories ?? []).join(', ')} onChange={(value) => patch({ categories: commaSeparatedValues(value) })} />
+          <TextField label="Search tags (comma separated)" value={(draft.tags ?? []).join(', ')} onChange={(value) => patch({ tags: commaSeparatedValues(value) })} />
+        </div>
         <label className="block text-[10px] text-[#9ba6b8]">Offer<select value={draft.offerType ?? 'SKU'} onChange={(event) => patch({ offerType: event.target.value as 'SKU' | 'BUNDLE' })} className="mt-1 w-full max-w-sm rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white"><option value="SKU">Individual watchface</option><option value="BUNDLE">Complete Color Collection</option></select></label>
         {draft.offerType === 'BUNDLE' && <div className="rounded border border-[#30324a] p-3 text-xs text-[#9ba6b8]"><p className="mb-2">Include existing SKUs in this Complete Color Collection:</p><div className="grid gap-2 sm:grid-cols-2">{(snapshot.skus || []).filter((item) => item.productModelId === modelId && item.id !== skuId).map((item) => <label key={item.id} className="flex gap-2"><input type="checkbox" checked={draft.bundleSkuIds?.includes(item.id) ?? false} onChange={(event) => patch({ bundleSkuIds: event.target.checked ? [...(draft.bundleSkuIds ?? []), item.id] : (draft.bundleSkuIds ?? []).filter((id) => id !== item.id) })} />{item.name}</label>)}</div></div>}
       </>}
       {preview && <div className={`rounded border ${activeConflictsCount ? 'border-red-900/50 bg-red-950/20' : 'border-[#30324a]'} p-2 text-xs`}><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className={activeConflictsCount ? 'text-red-300 font-medium' : 'text-emerald-300'}>{activeConflictsCount ? `${activeConflictsCount} conflict(s): A name you entered is already in use elsewhere. Please enter a globally unique name or select the existing one from the dropdown.` : 'No unresolved normalized conflicts.'}</p></div>}
       {!draft.technicalTargetId && <p className="text-xs text-amber-300">The build has no saved technical target. Select the verified target in the existing field before continuing.</p>}
+      {(snapshot?.technicalPackages ?? [])
+        .filter((item) => item.approvedWorkshopProjectId === projectId && item.approvedWorkshopBuildId === buildId && ['READY', 'VALIDATING', 'FAILED', 'TRASHED'].includes(item.state))
+        .map((item) => (
+          <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-xs">
+            <span className="text-amber-200">{item.technicalTargetId} · {item.revision} · {item.state}</span>
+            <Button disabled={busy} onClick={() => discardAbandonedPackage(item.id)} variant="outline" className="h-8 border-red-900 text-red-300">Discard abandoned classification</Button>
+          </div>
+        ))}
       <div className="flex gap-2"><Button disabled={busy || !preview || !draft.technicalTargetId || activeConflictsCount > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || !draft.technicalTargetId || activeConflictsCount > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
       <p className="text-[10px] text-[#747c90]">Release reuses the approved physical-test ZPK and rewrites only allowlisted name metadata. Failed or interrupted releases can be resumed safely.</p>
     </div>

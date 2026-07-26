@@ -2784,7 +2784,8 @@ function StudioApp() {
   const workshopDeepLinkLoadedRef = useRef(false);
   const [latestUploadResult, setLatestUploadResult] = useState<StudioUploadResult | null>(null);
   const [specGroups, setSpecGroups] = useState<Record<string, SpecGroup>>({});
-const [watchModels, setWatchModels] = useState<Record<string, { name?: string; specGroup?: string }>>({});
+  const [watchModels, setWatchModels] = useState<Record<string, { name?: string; specGroup?: string }>>({});
+  const watchModelsLoadPromiseRef = useRef<Promise<Record<string, { name?: string; specGroup?: string }>> | null>(null);
 
   // ── Spec 110: Derive canvas geometry from specGroups (placed AFTER state declarations) ──
   // models.json keys are slugs (e.g. 'active-2-square') but watchModel holds display names
@@ -2810,7 +2811,9 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     fetchPublicConfig<Record<string, SpecGroup>>('specGroups')
       .then((data) => setSpecGroups(data))
       .catch(() => setSpecGroups({}));
-    fetchPublicConfig<Record<string, { specGroup?: string }>>('models')
+    const modelsRequest = fetchPublicConfig<Record<string, { name?: string; specGroup?: string }>>('models');
+    watchModelsLoadPromiseRef.current = modelsRequest;
+    modelsRequest
       .then((data) => setWatchModels(data))
       .catch(() => setWatchModels({}));
   }, []);
@@ -3552,16 +3555,25 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       };
     }
 
-    const loadedModelTarget = resolveWatchModelTarget(chosenConfig.watchModel, watchModels);
+    let availableWatchModels = watchModels;
+    if (Object.keys(availableWatchModels).length === 0 && watchModelsLoadPromiseRef.current) {
+      try {
+        availableWatchModels = await watchModelsLoadPromiseRef.current;
+      } catch {
+        toast.error('Watch model configuration could not be loaded. Check the connection and try again.');
+        return false;
+      }
+    }
+    const loadedModelTarget = resolveWatchModelTarget(chosenConfig.watchModel, availableWatchModels);
     if (!loadedModelTarget) {
       toast.error(
-        Object.keys(watchModels).length === 0
-          ? 'Watch model configuration is still loading. Wait a moment and load the FVWF again.'
+        Object.keys(availableWatchModels).length === 0
+          ? 'Watch model configuration is unavailable. Check the connection and try again.'
           : `The FVWF watch model "${chosenConfig.watchModel || 'unknown'}" is not configured. Select its watch model before loading.`,
       );
-      return;
+      return false;
     }
-    const canonicalWatchModel = watchModels[loadedModelTarget.modelId]?.name?.trim() || chosenConfig.watchModel;
+    const canonicalWatchModel = availableWatchModels[loadedModelTarget.modelId]?.name?.trim() || chosenConfig.watchModel;
     chosenConfig = { ...chosenConfig, watchModel: canonicalWatchModel };
     setWatchModel(canonicalWatchModel);
 
@@ -3580,6 +3592,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
     dispatch(actions.setStep('preview'));
     toast.success(`${pending.restoreBackground ? 'Project' : 'Widgets'} loaded: ${pending.fileName}`);
+    return true;
   }, [dispatch, watchModels]);
 
   const requestProjectLoad = useCallback(async (pending: Omit<PendingProjectLoad, 'targetResolution' | 'targetWatchModel'>) => {
@@ -3595,7 +3608,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       return;
     }
 
-    await commitProjectLoad({
+    return commitProjectLoad({
       ...pending,
       targetResolution: isValidCanvasResolution(pending.config.resolution)
         ? pending.config.resolution
@@ -3651,15 +3664,19 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         const text = await fetchWorkshopProjectFile(projectId, buildId);
         const artifact = parseProjectFileArtifact(text);
         if (!window.confirm(`Open ${artifact.watchFaceConfig.name || buildId}? This replaces the current Studio canvas.`)) return;
-        await requestProjectLoad({
+        const loaded = await requestProjectLoad({
           config: withNormalizedPointerEffects(artifact.watchFaceConfig),
           backgroundImage: artifact.backgroundImage,
           fileName: artifact.watchFaceConfig.name || buildId,
           restoreBackground: true,
         });
-        setWorkshopProjectId(projectId);
-        setWorkshopBuildId(buildId);
-        toast.success(`Workshop ${buildId} opened.`);
+        if (loaded) {
+          setWorkshopProjectId(projectId);
+          setWorkshopBuildId(buildId);
+          toast.success(`Workshop ${buildId} opened.`);
+        } else {
+          workshopDeepLinkLoadedRef.current = false;
+        }
       } catch (error) {
         workshopDeepLinkLoadedRef.current = false;
         toast.error(error instanceof Error ? error.message : 'Failed to open Workshop build');

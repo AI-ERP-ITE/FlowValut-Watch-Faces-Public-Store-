@@ -1,7 +1,10 @@
 import { adminFetch } from './studioFirebasePublishApi';
 import type { ReleaseWizardDraft } from './releaseWizard';
 
-export interface HierarchyOption { id: string; name: string; code?: string; parentId?: string; modelNumber?: number }
+export interface HierarchyOption {
+  id: string; name: string; code?: string; parentId?: string; modelNumber?: number;
+  description?: string; designStory?: string; categories?: string[]; tags?: string[];
+}
 export interface SkuHierarchyOption extends HierarchyOption { productModelId: string; variantName: string; variantCode: string; editionName?: string; editionCode?: string; state?: string }
 export interface TechnicalPackageOption { id: string; skuId: string; technicalTargetId: string; revision: string; state: string; approvedWorkshopProjectId?: string; approvedWorkshopBuildId?: string }
 export interface HierarchySnapshot { designDnas: HierarchyOption[]; collections: HierarchyOption[]; productModels: HierarchyOption[]; skus: SkuHierarchyOption[]; technicalTargets: HierarchyOption[]; technicalPackages: TechnicalPackageOption[]; offers: HierarchyOption[] }
@@ -25,4 +28,11 @@ export async function submitReleaseClassification(input: ReleaseWizardDraft & { 
 
 export async function releaseVerifiedPackage(packageId: string) {
   return adminFetch<{ canonicalName: string; releasedZpkPath: string; parityReportPath: string; hashes: { approved: string; released: string } }>('adminReleasePackage', { method: 'POST', body: JSON.stringify({ packageId }) });
+}
+
+export async function deleteAbandonedTechnicalPackage(packageId: string) {
+  return adminFetch<{ ok: true; packageId: string }>('adminStoreHierarchy', {
+    method: 'DELETE',
+    body: JSON.stringify({ packageId, confirmation: `DELETE ${packageId}` }),
+  });
 }
