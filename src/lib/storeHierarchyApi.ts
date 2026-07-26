@@ -7,7 +7,16 @@ export interface TechnicalPackageOption { id: string; skuId: string; technicalTa
 export interface HierarchySnapshot { designDnas: HierarchyOption[]; collections: HierarchyOption[]; productModels: HierarchyOption[]; skus: SkuHierarchyOption[]; technicalTargets: HierarchyOption[]; technicalPackages: TechnicalPackageOption[]; offers: HierarchyOption[] }
 
 export async function fetchStoreHierarchy(): Promise<HierarchySnapshot> {
-  return adminFetch<HierarchySnapshot>('adminStoreHierarchy', { method: 'GET' });
+  const result = await adminFetch<HierarchySnapshot>('adminStoreHierarchy', { method: 'GET' });
+  return {
+    designDnas: result.designDnas || [],
+    collections: result.collections || [],
+    productModels: result.productModels || [],
+    skus: result.skus || [],
+    technicalTargets: result.technicalTargets || [],
+    technicalPackages: result.technicalPackages || [],
+    offers: result.offers || [],
+  };
 }
 
 export async function submitReleaseClassification(input: ReleaseWizardDraft & { projectId: string; buildId: string; action: 'READY' | 'RELEASE' }) {

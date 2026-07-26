@@ -45,19 +45,19 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
   useEffect(() => {
     void fetchStoreHierarchy().then((result) => {
       setSnapshot(result);
-      const existingPackage = result.technicalPackages.find((item) => item.approvedWorkshopProjectId === projectId && item.approvedWorkshopBuildId === buildId);
+      const existingPackage = result.technicalPackages?.find((item) => item.approvedWorkshopProjectId === projectId && item.approvedWorkshopBuildId === buildId);
       if (existingPackage) {
-        const sku = result.skus.find((item) => item.id === existingPackage.skuId);
-        const model = result.productModels.find((item) => item.id === sku?.productModelId);
-        const collection = result.collections.find((item) => item.id === model?.parentId);
-        const dna = result.designDnas.find((item) => item.id === collection?.parentId);
+        const sku = result.skus?.find((item) => item.id === existingPackage.skuId);
+        const model = result.productModels?.find((item) => item.id === sku?.productModelId);
+        const collection = result.collections?.find((item) => item.id === model?.parentId);
+        const dna = result.designDnas?.find((item) => item.id === collection?.parentId);
         if (sku && model && collection && dna) {
           setDnaId(dna.id); setCollectionId(collection.id); setModelId(model.id); setSkuId(sku.id);
           setDraft((current) => ({ ...current, designDnaName: dna.name, designDnaCode: dna.code ?? '', collectionName: collection.name, collectionCode: collection.code ?? '', modelName: model.name, modelNumber: model.modelNumber ?? 1, variantName: sku.variantName, variantCode: sku.variantCode, editionName: sku.editionName ?? '', editionCode: sku.editionCode ?? '', technicalTargetId: existingPackage.technicalTargetId, revision: existingPackage.revision }));
           return;
         }
       }
-      const detected = result.technicalTargets.find((target) => target.id === defaultTarget || target.name === defaultTarget);
+      const detected = result.technicalTargets?.find((target) => target.id === defaultTarget || target.name === defaultTarget);
       setDraft((current) => ({ ...current, technicalTargetId: detected?.id || defaultTarget }));
     }).catch((error) => toast.error(error instanceof Error ? error.message : 'Failed to load store hierarchy'));
   }, [buildId, defaultTarget, projectId]);
@@ -69,7 +69,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
       setDraft((current) => ({ ...current, revision: existingForBuild.revision }));
       return;
     }
-    const revisions = snapshot.technicalPackages
+    const revisions = (snapshot.technicalPackages || [])
       .filter((item) => skuId !== NEW && item.skuId === skuId && item.technicalTargetId === draft.technicalTargetId && ['CURRENT', 'SUPERSEDED'].includes(item.state))
       .map((item) => item.revision);
     setDraft((current) => ({ ...current, revision: nextRevision(revisions) }));
@@ -128,7 +128,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
       {!snapshot && <p className="text-xs text-[#9097aa]">Loading controlled hierarchy…</p>}
       {snapshot && <>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="text-[10px] text-[#9ba6b8]">1. Design DNA<select value={dnaId} onChange={(event) => selectDna(event.target.value)} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white"><option value={NEW}>Create new…</option>{snapshot.designDnas.map((item) => <option key={item.id} value={item.id}>{optionLabel(item)}</option>)}</select></label>
+          <label className="text-[10px] text-[#9ba6b8]">1. Design DNA<select value={dnaId} onChange={(event) => selectDna(event.target.value)} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white"><option value={NEW}>Create new…</option>{(snapshot.designDnas || []).map((item) => <option key={item.id} value={item.id}>{optionLabel(item)}</option>)}</select></label>
           <label className="text-[10px] text-[#9ba6b8]">2. Collection<select value={collectionId} onChange={(event) => selectCollection(event.target.value)} disabled={!draft.designDnaName} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-50"><option value={NEW}>Create new…</option>{collections.map((item) => <option key={item.id} value={item.id}>{optionLabel(item)}</option>)}</select></label>
           <label className="text-[10px] text-[#9ba6b8]">3. Design Model<select value={modelId} onChange={(event) => selectModel(event.target.value)} disabled={!draft.collectionName} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-50"><option value={NEW}>Create new…</option>{models.map((item) => <option key={item.id} value={item.id}>{optionLabel(item)}</option>)}</select></label>
           <label className="text-[10px] text-[#9ba6b8]">4. Variant / Edition<select value={skuId} onChange={(event) => selectSku(event.target.value)} disabled={!draft.modelName} className="mt-1 w-full rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white disabled:opacity-50"><option value={NEW}>Create new SKU…</option>{skus.map((item) => <option key={item.id} value={item.id}>{item.variantName}{item.editionName ? ` · ${item.editionName}` : ''}</option>)}</select></label>
@@ -150,7 +150,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
           <TextField label="Campaign price USD" value={draft.campaignPrice ?? ''} onChange={(value) => patch({ campaignPrice: value ? Number(value) : undefined })} />
         </div>
         <label className="block text-[10px] text-[#9ba6b8]">Offer<select value={draft.offerType ?? 'SKU'} onChange={(event) => patch({ offerType: event.target.value as 'SKU' | 'BUNDLE' })} className="mt-1 w-full max-w-sm rounded border border-[#34354b] bg-[#0c0d14] px-2 py-2 text-xs text-white"><option value="SKU">Individual watchface</option><option value="BUNDLE">Complete Color Collection</option></select></label>
-        {draft.offerType === 'BUNDLE' && <div className="rounded border border-[#30324a] p-3 text-xs text-[#9ba6b8]"><p className="mb-2">Include existing SKUs in this Complete Color Collection:</p><div className="grid gap-2 sm:grid-cols-2">{snapshot.skus.filter((item) => item.productModelId === modelId && item.id !== skuId).map((item) => <label key={item.id} className="flex gap-2"><input type="checkbox" checked={draft.bundleSkuIds?.includes(item.id) ?? false} onChange={(event) => patch({ bundleSkuIds: event.target.checked ? [...(draft.bundleSkuIds ?? []), item.id] : (draft.bundleSkuIds ?? []).filter((id) => id !== item.id) })} />{item.name}</label>)}</div></div>}
+        {draft.offerType === 'BUNDLE' && <div className="rounded border border-[#30324a] p-3 text-xs text-[#9ba6b8]"><p className="mb-2">Include existing SKUs in this Complete Color Collection:</p><div className="grid gap-2 sm:grid-cols-2">{(snapshot.skus || []).filter((item) => item.productModelId === modelId && item.id !== skuId).map((item) => <label key={item.id} className="flex gap-2"><input type="checkbox" checked={draft.bundleSkuIds?.includes(item.id) ?? false} onChange={(event) => patch({ bundleSkuIds: event.target.checked ? [...(draft.bundleSkuIds ?? []), item.id] : (draft.bundleSkuIds ?? []).filter((id) => id !== item.id) })} />{item.name}</label>)}</div></div>}
       </>}
       {preview && <div className={`rounded border ${activeConflictsCount ? 'border-red-900/50 bg-red-950/20' : 'border-[#30324a]'} p-2 text-xs`}><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className={activeConflictsCount ? 'text-red-300 font-medium' : 'text-emerald-300'}>{activeConflictsCount ? `${activeConflictsCount} conflict(s): A name you entered is already in use elsewhere. Please enter a globally unique name or select the existing one from the dropdown.` : 'No unresolved normalized conflicts.'}</p></div>}
       <div className="flex gap-2"><Button disabled={busy || !preview || activeConflictsCount > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || activeConflictsCount > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
