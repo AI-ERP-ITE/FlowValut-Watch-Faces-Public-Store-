@@ -2787,7 +2787,11 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
   // ── Spec 110: Derive canvas geometry from specGroups (placed AFTER state declarations) ──
   // models.json keys are slugs (e.g. 'active-2-square') but watchModel holds display names
   // (e.g. 'Active 2 Square'). Search by the name field instead of direct key lookup.
-  const _activeModelEntry = Object.values(watchModels).find(m => m.name === watchModel);
+  const _activeModelEntry = Object.values(watchModels).find(m => 
+    m.name === watchModel || 
+    m.name === `Amazfit ${watchModel}` || 
+    `Amazfit ${m.name}` === watchModel
+  );
   const activeSpecGroupKey = _activeModelEntry?.specGroup ?? '';
   const activeSpecGroup = specGroups[activeSpecGroupKey] ?? null;
   const _resolvedResolution = (() => {
