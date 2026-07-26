@@ -36,6 +36,7 @@ import { applyLegacyMigration, auditLegacyZpkPage, dryRunLegacyMigration, fetchL
 function WorkshopPreviewImage({ projectId, buildId, kind, fallbackLabel }: { projectId: string; buildId: string; kind: 'mainPreview' | 'aodPreview'; fallbackLabel: string }) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -50,7 +51,28 @@ function WorkshopPreviewImage({ projectId, buildId, kind, fallbackLabel }: { pro
   if (error || !src) {
     return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-[#1c2331] text-[9px] text-[#485b73]">{fallbackLabel}</div>;
   }
-  return <img src={src} alt={fallbackLabel} className="h-12 w-12 shrink-0 rounded object-cover border border-[#2c3340]" />;
+  return (
+    <>
+      <img 
+        src={src} 
+        alt={fallbackLabel} 
+        className="h-12 w-12 shrink-0 rounded object-cover border border-[#2c3340] cursor-pointer" 
+        onClick={() => setIsExpanded(true)}
+      />
+      {isExpanded && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setIsExpanded(false)}
+        >
+          <img 
+            src={src} 
+            alt={fallbackLabel} 
+            className="max-h-[90vh] max-w-[90vw] rounded object-contain shadow-2xl" 
+          />
+        </div>
+      )}
+    </>
+  );
 }
 
 export function AdminOpsPage() {
