@@ -3551,6 +3551,20 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         aodElements: chosenConfig.aodElements?.map(updateBackgroundElement) ?? chosenConfig.aodElements,
       };
     }
+
+    const loadedModelTarget = resolveWatchModelTarget(chosenConfig.watchModel, watchModels);
+    if (!loadedModelTarget) {
+      toast.error(
+        Object.keys(watchModels).length === 0
+          ? 'Watch model configuration is still loading. Wait a moment and load the FVWF again.'
+          : `The FVWF watch model "${chosenConfig.watchModel || 'unknown'}" is not configured. Select its watch model before loading.`,
+      );
+      return;
+    }
+    const canonicalWatchModel = watchModels[loadedModelTarget.modelId]?.name?.trim() || chosenConfig.watchModel;
+    chosenConfig = { ...chosenConfig, watchModel: canonicalWatchModel };
+    setWatchModel(canonicalWatchModel);
+
     setPendingProjectLoad(null);
     dispatch(actions.setWatchFaceConfig(chosenConfig));
     setAodElements(chosenConfig.aodElements && chosenConfig.aodElements.length > 0 ? chosenConfig.aodElements : null);
@@ -3566,7 +3580,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
     dispatch(actions.setStep('preview'));
     toast.success(`${pending.restoreBackground ? 'Project' : 'Widgets'} loaded: ${pending.fileName}`);
-  }, [dispatch]);
+  }, [dispatch, watchModels]);
 
   const requestProjectLoad = useCallback(async (pending: Omit<PendingProjectLoad, 'targetResolution' | 'targetWatchModel'>) => {
     const targetResolution = activeSpecGroup
