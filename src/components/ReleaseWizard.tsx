@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchyOption, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
 import { findNormalizedConflict, nextRevision, releaseWizardPreview, type ReleaseWizardDraft } from '@/lib/releaseWizard';
+import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 
 const NEW = '__new__';
 const emptyDraft: ReleaseWizardDraft = {
@@ -27,6 +28,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
   const [collectionId, setCollectionId] = useState(NEW);
   const [modelId, setModelId] = useState(NEW);
   const [skuId, setSkuId] = useState(NEW);
+  const [configuredTargetIds, setConfiguredTargetIds] = useState<string[]>([]);
 
   const collections = useMemo(() => snapshot?.collections.filter((item) => dnaId !== NEW && item.parentId === dnaId) ?? [], [dnaId, snapshot]);
   const models = useMemo(() => snapshot?.productModels.filter((item) => collectionId !== NEW && item.parentId === collectionId) ?? [], [collectionId, snapshot]);
@@ -41,6 +43,15 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
     };
   }, [dnaId, collectionId, modelId, draft.designDnaName, draft.collectionName, draft.modelName, snapshot]);
   const activeConflictsCount = Object.values(conflicts).filter(Boolean).length;
+  const technicalTargets = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const target of snapshot?.technicalTargets ?? []) options.set(target.id, optionLabel(target));
+    for (const id of configuredTargetIds) if (!options.has(id)) options.set(id, id);
+    if (draft.technicalTargetId && !options.has(draft.technicalTargetId)) {
+      options.set(draft.technicalTargetId, draft.technicalTargetId);
+    }
+    return [...options.entries()].map(([id, label]) => ({ id, label }));
+  }, [configuredTargetIds, draft.technicalTargetId, snapshot]);
 
   useEffect(() => {
     void fetchStoreHierarchy().then((result) => {
@@ -61,6 +72,12 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
       setDraft((current) => ({ ...current, technicalTargetId: detected?.id || defaultTarget }));
     }).catch((error) => toast.error(error instanceof Error ? error.message : 'Failed to load store hierarchy'));
   }, [buildId, defaultTarget, projectId]);
+
+  useEffect(() => {
+    void fetchPublicConfig<Record<string, unknown>>('specGroups')
+      .then((groups) => setConfiguredTargetIds(Object.keys(groups).sort()))
+      .catch(() => setConfiguredTargetIds([]));
+  }, []);
 
   useEffect(() => {
     if (!snapshot || !draft.technicalTargetId) return;
@@ -144,7 +161,21 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
           <TextField label="Variant code" value={draft.variantCode} disabled={skuId !== NEW} onChange={(value) => patch({ variantCode: value })} />
           <TextField label="Widget Edition (optional)" value={draft.editionName ?? ''} disabled={skuId !== NEW} onChange={(value) => patch({ editionName: value })} />
           <TextField label="Edition code (optional)" value={draft.editionCode ?? ''} disabled={skuId !== NEW} onChange={(value) => patch({ editionCode: value })} />
-          <TextField label="Detected Technical Variant" value={draft.technicalTargetId || 'Not detected'} disabled onChange={() => undefined} />
+          <label className={`text-[10px] ${draft.technicalTargetId ? 'text-[#9ba6b8]' : 'text-amber-300'}`}>
+            Detected Technical Variant
+            <select
+              value={draft.technicalTargetId}
+              onChange={(event) => patch({ technicalTargetId: event.target.value })}
+              className={`mt-1 w-full rounded border px-2 py-2 text-xs text-white ${
+                draft.technicalTargetId
+                  ? 'border-[#34354b] bg-[#0c0d14]'
+                  : 'border-amber-600/60 bg-amber-950/20'
+              }`}
+            >
+              <option value="">Not detected — select verified target…</option>
+              {technicalTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
+            </select>
+          </label>
           <TextField label="Next revision" value={draft.revision} onChange={(value) => patch({ revision: value })} />
           <TextField label="Regular price USD" value={draft.regularPrice} onChange={(value) => patch({ regularPrice: Number(value) })} />
           <TextField label="Campaign price USD" value={draft.campaignPrice ?? ''} onChange={(value) => patch({ campaignPrice: value ? Number(value) : undefined })} />
@@ -153,7 +184,8 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
         {draft.offerType === 'BUNDLE' && <div className="rounded border border-[#30324a] p-3 text-xs text-[#9ba6b8]"><p className="mb-2">Include existing SKUs in this Complete Color Collection:</p><div className="grid gap-2 sm:grid-cols-2">{(snapshot.skus || []).filter((item) => item.productModelId === modelId && item.id !== skuId).map((item) => <label key={item.id} className="flex gap-2"><input type="checkbox" checked={draft.bundleSkuIds?.includes(item.id) ?? false} onChange={(event) => patch({ bundleSkuIds: event.target.checked ? [...(draft.bundleSkuIds ?? []), item.id] : (draft.bundleSkuIds ?? []).filter((id) => id !== item.id) })} />{item.name}</label>)}</div></div>}
       </>}
       {preview && <div className={`rounded border ${activeConflictsCount ? 'border-red-900/50 bg-red-950/20' : 'border-[#30324a]'} p-2 text-xs`}><p className="text-white">{preview.canonicalName}</p><p className="font-mono text-violet-300">{preview.internalCode}</p><p className={activeConflictsCount ? 'text-red-300 font-medium' : 'text-emerald-300'}>{activeConflictsCount ? `${activeConflictsCount} conflict(s): A name you entered is already in use elsewhere. Please enter a globally unique name or select the existing one from the dropdown.` : 'No unresolved normalized conflicts.'}</p></div>}
-      <div className="flex gap-2"><Button disabled={busy || !preview || activeConflictsCount > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || activeConflictsCount > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
+      {!draft.technicalTargetId && <p className="text-xs text-amber-300">The build has no saved technical target. Select the verified target in the existing field before continuing.</p>}
+      <div className="flex gap-2"><Button disabled={busy || !preview || !draft.technicalTargetId || activeConflictsCount > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || !draft.technicalTargetId || activeConflictsCount > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
       <p className="text-[10px] text-[#747c90]">Release reuses the approved physical-test ZPK and rewrites only allowlisted name metadata. Failed or interrupted releases can be resumed safely.</p>
     </div>
   );

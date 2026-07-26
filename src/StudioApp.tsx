@@ -88,6 +88,7 @@ import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics
 import { buildProjectFileConfig } from '@/lib/projectFileConfig';
 import { createProjectFileArtifact, createProjectFileBlob, parseProjectFileArtifact } from '@/lib/projectFileArtifact';
 import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob, fetchWorkshopProjectFile } from '@/lib/workshopApi';
+import { resolveWatchModelTarget } from '@/lib/watchModelTarget';
 import { storeArchitectureFlags } from '@/lib/storeArchitecture';
 import {
   canvasResolutionsMatch,
@@ -113,6 +114,7 @@ interface PendingWorkshopSave {
   workshopLabel: string;
   resolution: { width: number; height: number };
   specGroup?: string;
+  deviceId?: string;
   parentBuildId?: string;
   fvwf: Blob;
   zpk: Blob;
@@ -2787,12 +2789,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
   // ── Spec 110: Derive canvas geometry from specGroups (placed AFTER state declarations) ──
   // models.json keys are slugs (e.g. 'active-2-square') but watchModel holds display names
   // (e.g. 'Active 2 Square'). Search by the name field instead of direct key lookup.
-  const _activeModelEntry = Object.values(watchModels).find(m => 
-    m.name === watchModel || 
-    m.name === `Amazfit ${watchModel}` || 
-    `Amazfit ${m.name}` === watchModel
-  );
-  const activeSpecGroupKey = _activeModelEntry?.specGroup ?? '';
+  const activeModelTarget = resolveWatchModelTarget(watchModel, watchModels);
+  const activeSpecGroupKey = activeModelTarget?.specGroup ?? '';
   const activeSpecGroup = specGroups[activeSpecGroupKey] ?? null;
   const _resolvedResolution = (() => {
     if (!activeSpecGroup?.resolution) return { w: 480, h: 480 };
@@ -4594,9 +4592,8 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
 
       dispatch(actions.setZpkBlob(zpkResult.blob));
 
-      const derivedSpecGroup = Object.values(watchModels).find(
-        m => m.name === configForBuild.watchModel
-      )?.specGroup ?? null;
+      const derivedTarget = resolveWatchModelTarget(configForBuild.watchModel, watchModels);
+      const derivedSpecGroup = derivedTarget?.specGroup ?? null;
 
       if (storeArchitectureFlags.workshop) {
         let pendingSave: PendingWorkshopSave | null = null;
@@ -4608,6 +4605,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             const project = await createWorkshopProject({
               workingTitle: configForBuild.name,
               tags: [],
+              targetDeviceId: derivedTarget?.modelId,
             });
             activeProjectId = project.projectId;
             setWorkshopProjectId(activeProjectId);
@@ -4617,6 +4615,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
             workshopLabel: configForBuild.name || `Watch test ${new Date().toISOString().slice(0, 10)}`,
             resolution: configForBuild.resolution,
             specGroup: derivedSpecGroup ?? undefined,
+            deviceId: derivedTarget?.modelId,
             parentBuildId: workshopBuildId ?? undefined,
             fvwf: workshopProjectBlob,
             zpk: zpkResult.blob,
@@ -4734,7 +4733,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId, workshopBuildId]);
+  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId, workshopBuildId, watchModels]);
 
   const retryWorkshopSave = useCallback(async () => {
     if (!pendingWorkshopSave || retryingWorkshopSave) return;
@@ -4742,7 +4741,11 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
     try {
       let activeProjectId = pendingWorkshopSave.projectId;
       if (!activeProjectId) {
-        const project = await createWorkshopProject({ workingTitle: pendingWorkshopSave.workshopLabel, tags: [] });
+        const project = await createWorkshopProject({
+          workingTitle: pendingWorkshopSave.workshopLabel,
+          tags: [],
+          targetDeviceId: pendingWorkshopSave.deviceId,
+        });
         activeProjectId = project.projectId;
         setWorkshopProjectId(activeProjectId);
       }
