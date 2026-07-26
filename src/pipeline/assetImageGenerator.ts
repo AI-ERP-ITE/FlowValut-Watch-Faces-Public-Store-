@@ -277,7 +277,14 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
             // Derive digit size from element bounds (2 digits)
             const dateDigitW = el.w ? Math.floor(el.w / 2) : DATE_DIGIT.w;
             const dateDigitH = el.h ?? DATE_DIGIT.h;
-            images.push(...generateDigitImages('date_digit', dateDigitW, dateDigitH, dateColor));
+            images.push(...generateDigitImages(
+              'date_digit', 
+              dateDigitW, 
+              dateDigitH, 
+              dateColor,
+              { fontFamily: el.fontFamily ?? 'Arial', fontWeight: 'bold' },
+              { tabular: true }
+            ));
             generatedSets.add('date_digits');
           }
         }
@@ -312,7 +319,14 @@ export function generatePipelineAssets(elements: ResolvedElement[]): ElementImag
           // Derive digit size from element bounds (estimate ~4 chars)
           const txtDigitW = el.w ? Math.floor(el.w / 4) : TEXT_IMG_DIGIT.w;
           const txtDigitH = el.h ?? TEXT_IMG_DIGIT.h;
-          images.push(...generateDigitImages(prefix, txtDigitW, txtDigitH, color));
+          images.push(...generateDigitImages(
+            prefix, 
+            txtDigitW, 
+            txtDigitH, 
+            color,
+            { fontFamily: el.fontFamily ?? 'Arial', fontWeight: 'bold' },
+            { tabular: true }
+          ));
           generatedSets.add(`textimg_${prefix}`);
         }
         break;
