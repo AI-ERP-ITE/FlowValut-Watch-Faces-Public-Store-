@@ -175,6 +175,7 @@ function resolvedToWatchFaceElement(el: ResolvedElement, idx: number): WatchFace
   if (el.widget === 'IMG_TIME') {
     base.bounds = { x: el.x!, y: el.y!, width: el.w!, height: el.h! };
     base.images = el.assets.fontArray;
+    base.font = el.fontFamily;
     return base;
   }
 
@@ -186,6 +187,7 @@ function resolvedToWatchFaceElement(el: ResolvedElement, idx: number): WatchFace
     } else {
       base.images = el.assets.fontArray;
     }
+    base.font = el.fontFamily;
     return base;
   }
 
@@ -193,6 +195,7 @@ function resolvedToWatchFaceElement(el: ResolvedElement, idx: number): WatchFace
   if (el.widget === 'IMG_WEEK') {
     base.bounds = { x: el.x!, y: el.y!, width: el.w!, height: el.h! };
     base.images = el.assets.weekArray;
+    base.font = el.fontFamily;
     return base;
   }
 
@@ -201,6 +204,7 @@ function resolvedToWatchFaceElement(el: ResolvedElement, idx: number): WatchFace
     base.bounds = { x: el.x!, y: el.y!, width: el.w!, height: el.h! };
     base.fontArray = el.assets.fontArray;
     base.dataType = el.dataType;
+    base.font = el.fontFamily;
     return base;
   }
 

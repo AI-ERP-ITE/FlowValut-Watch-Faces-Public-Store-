@@ -20,7 +20,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, RefreshCw } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { getCurrentAuthUser, isFirebaseAuthConfigured, subscribeAuthState } from '@/lib/firebaseAuthClient';
 import { fetchParametricLibraryFromFirebase, saveParametricLibraryToFirebase, fetchParametricThemesFromFirebase, saveParametricThemesToFirebase, fetchParametricProgressFromFirebase, saveParametricProgressToFirebase } from '@/lib/studioFirebasePublishApi';
-import { FONT_STYLES } from '@/lib/fontLibrary';
+import { FONT_STYLES, getFontStyle } from '@/lib/fontLibrary';
 import {
   normalizeLegacyGradientLayers,
   normalizeLegacyMaterialLayers,
@@ -9198,12 +9198,10 @@ export default function ParametricPage() {
                             <select
                               value={getStringParam('token.font.styleKey', 'arial')}
                               onChange={(e) => {
-                                const nextStyle = FONT_STYLES.find((style) => style.key === e.target.value);
+                                const nextStyle = getFontStyle(e.target.value);
                                 setStringParam('token.font.styleKey', e.target.value);
-                                if (nextStyle) {
-                                  setStringParam('token.font.family', nextStyle.fontFamily);
-                                  setStringParam('token.font.weight', nextStyle.fontWeight);
-                                }
+                                setStringParam('token.font.family', nextStyle.fontFamily);
+                                setStringParam('token.font.weight', nextStyle.fontWeight);
                               }}
                               className="h-8 w-full rounded border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-100"
                             >

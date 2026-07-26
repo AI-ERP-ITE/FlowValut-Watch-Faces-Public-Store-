@@ -17,7 +17,7 @@ import { PropertyPanel } from '@/components/PropertyPanel';
 
 import { useApp, actions } from '@/context/AppContext';
 import { buildZPK } from '@/lib/zpkBuilder';
-import { FONT_STYLES } from '@/lib/fontLibrary';
+import { getFontStyle } from '@/lib/fontLibrary';
 import { uploadStudioArtifactsToFirebase, publishStudioWatchfaceToFirebase, fetchAdminCatalogFromFirebase, type StudioUploadResult } from '@/lib/studioFirebasePublishApi';
 import { generateQRCode } from '@/lib/qrGenerator';
 import { getIconByKey } from '@/lib/iconLibrary';
@@ -1395,8 +1395,8 @@ function regenerateDigitFilesFromElements(
     const color = rawColor.startsWith('0x') || rawColor.startsWith('0X')
       ? '#' + rawColor.slice(2, 8)
       : rawColor.substring(0, 7);
-    const fontEntry = el.fontStyle ? FONT_STYLES.find(f => f.key === el.fontStyle) : undefined;
-    const fontFamily = fontEntry?.fontFamily ?? 'Arial';
+    const fontEntry = el.fontStyle ? getFontStyle(el.fontStyle) : undefined;
+    const fontFamily = fontEntry?.fontFamily ?? el.font ?? 'Arial';
     const fontWeight = fontEntry?.fontWeight ?? 'bold';
     const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
 
@@ -3366,7 +3366,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         assets: el.iconKey
           ? { src: `icon_${el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png` }
           : {},
-        fontFamily: el.font,
+        fontFamily: el.fontStyle ? getFontStyle(el.fontStyle).fontFamily : el.font,
       })) as unknown as Parameters<typeof generatePipelineAssets>[0];
 
       const elementImages: ElementImage[] = generatePipelineAssets(resolvedElements);
@@ -3477,7 +3477,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         assets: el.iconKey
           ? { src: `icon_${el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png` }
           : {},
-        fontFamily: el.font,
+        fontFamily: el.fontStyle ? getFontStyle(el.fontStyle).fontFamily : el.font,
       })) as unknown as Parameters<typeof generatePipelineAssets>[0];
 
       const elementImages: ElementImage[] = generatePipelineAssets(resolvedElements);
