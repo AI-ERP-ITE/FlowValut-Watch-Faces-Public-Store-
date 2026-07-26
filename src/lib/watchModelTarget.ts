@@ -3,6 +3,10 @@ export interface WatchModelTarget {
   specGroup?: string;
 }
 
+export interface TechnicalTargetDefinition {
+  resolution?: string;
+}
+
 function normalizedModelName(value: string): string {
   return value
     .normalize('NFKD')
@@ -41,4 +45,18 @@ export function resolveWatchModelTarget(
   return matches.length === 1
     ? { modelId: matches[0][0], specGroup: matches[0][1].specGroup!.trim() }
     : null;
+}
+
+export function resolveUniqueTargetByResolution(
+  resolution: { width: number; height: number } | undefined,
+  targets: Record<string, TechnicalTargetDefinition>,
+): string | null {
+  if (!resolution || !Number.isInteger(resolution.width) || !Number.isInteger(resolution.height)) {
+    return null;
+  }
+  const expected = `${resolution.width}x${resolution.height}`.toLowerCase();
+  const matches = Object.entries(targets)
+    .filter(([, target]) => target.resolution?.trim().toLowerCase() === expected)
+    .map(([id]) => id);
+  return matches.length === 1 ? matches[0] : null;
 }

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchyOption, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
 import { findNormalizedConflict, nextRevision, releaseWizardPreview, type ReleaseWizardDraft } from '@/lib/releaseWizard';
 import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
+import { resolveUniqueTargetByResolution, type TechnicalTargetDefinition } from '@/lib/watchModelTarget';
 
 const NEW = '__new__';
 const emptyDraft: ReleaseWizardDraft = {
@@ -20,7 +21,7 @@ function TextField({ label, value, disabled, onChange, error }: { label: string;
   return <label className={`text-[10px] ${error ? 'text-red-400' : 'text-[#9ba6b8]'}`}>{label}<input value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={`mt-1 w-full rounded border ${error ? 'border-red-500/50 bg-red-950/20 text-red-100' : 'border-[#34354b] bg-[#0c0d14] text-white'} px-2 py-2 text-xs disabled:opacity-60`} /></label>;
 }
 
-export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { projectId: string; buildId: string; defaultTarget?: string }) {
+export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildResolution }: { projectId: string; buildId: string; defaultTarget?: string; buildResolution?: { width: number; height: number } }) {
   const [draft, setDraft] = useState<ReleaseWizardDraft>({ ...emptyDraft, technicalTargetId: defaultTarget });
   const [snapshot, setSnapshot] = useState<HierarchySnapshot | null>(null);
   const [busy, setBusy] = useState(false);
@@ -28,7 +29,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
   const [collectionId, setCollectionId] = useState(NEW);
   const [modelId, setModelId] = useState(NEW);
   const [skuId, setSkuId] = useState(NEW);
-  const [configuredTargetIds, setConfiguredTargetIds] = useState<string[]>([]);
+  const [configuredTargets, setConfiguredTargets] = useState<Record<string, TechnicalTargetDefinition>>({});
 
   const collections = useMemo(() => snapshot?.collections.filter((item) => dnaId !== NEW && item.parentId === dnaId) ?? [], [dnaId, snapshot]);
   const models = useMemo(() => snapshot?.productModels.filter((item) => collectionId !== NEW && item.parentId === collectionId) ?? [], [collectionId, snapshot]);
@@ -46,12 +47,12 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
   const technicalTargets = useMemo(() => {
     const options = new Map<string, string>();
     for (const target of snapshot?.technicalTargets ?? []) options.set(target.id, optionLabel(target));
-    for (const id of configuredTargetIds) if (!options.has(id)) options.set(id, id);
+    for (const id of Object.keys(configuredTargets)) if (!options.has(id)) options.set(id, id);
     if (draft.technicalTargetId && !options.has(draft.technicalTargetId)) {
       options.set(draft.technicalTargetId, draft.technicalTargetId);
     }
     return [...options.entries()].map(([id, label]) => ({ id, label }));
-  }, [configuredTargetIds, draft.technicalTargetId, snapshot]);
+  }, [configuredTargets, draft.technicalTargetId, snapshot]);
 
   useEffect(() => {
     void fetchStoreHierarchy().then((result) => {
@@ -74,10 +75,16 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '' }: { proj
   }, [buildId, defaultTarget, projectId]);
 
   useEffect(() => {
-    void fetchPublicConfig<Record<string, unknown>>('specGroups')
-      .then((groups) => setConfiguredTargetIds(Object.keys(groups).sort()))
-      .catch(() => setConfiguredTargetIds([]));
+    void fetchPublicConfig<Record<string, TechnicalTargetDefinition>>('specGroups')
+      .then((groups) => setConfiguredTargets(groups))
+      .catch(() => setConfiguredTargets({}));
   }, []);
+
+  useEffect(() => {
+    if (draft.technicalTargetId) return;
+    const recovered = resolveUniqueTargetByResolution(buildResolution, configuredTargets);
+    if (recovered) patch({ technicalTargetId: recovered });
+  }, [buildResolution, configuredTargets, draft.technicalTargetId]);
 
   useEffect(() => {
     if (!snapshot || !draft.technicalTargetId) return;

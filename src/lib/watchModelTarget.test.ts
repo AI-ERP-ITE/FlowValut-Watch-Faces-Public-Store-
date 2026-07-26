@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveWatchModelTarget } from './watchModelTarget';
+import { resolveUniqueTargetByResolution, resolveWatchModelTarget } from './watchModelTarget';
 
 const models = {
   'balance-2': { name: 'Amazfit Balance 2', specGroup: '480-round-v2' },
@@ -23,6 +23,22 @@ describe('resolveWatchModelTarget', () => {
     expect(resolveWatchModelTarget('AMAZFIT_balance-2', {
       first: models['balance-2'],
       second: { name: 'Balance 2', specGroup: 'other-target' },
+    })).toBeNull();
+  });
+});
+
+describe('resolveUniqueTargetByResolution', () => {
+  it('recovers a single configured target for a legacy blank build', () => {
+    expect(resolveUniqueTargetByResolution({ width: 480, height: 480 }, {
+      '480-round': { resolution: '480x480' },
+      '466-round': { resolution: '466x466' },
+    })).toBe('480-round');
+  });
+
+  it('refuses to guess when multiple targets share a resolution', () => {
+    expect(resolveUniqueTargetByResolution({ width: 480, height: 480 }, {
+      first: { resolution: '480x480' },
+      second: { resolution: '480x480' },
     })).toBeNull();
   });
 });
