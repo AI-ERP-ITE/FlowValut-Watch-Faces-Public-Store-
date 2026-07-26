@@ -134,6 +134,7 @@ export function normalize(elements: AIElement[]): NormalizedElement[] {
         endAngle: el.endAngle,
         lineWidth: el.lineWidth,
         color: el.color,
+        fontFamily: el.fontFamily,
       };
 
       // Link second (and beyond) compound elements back to the first

@@ -3366,6 +3366,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         assets: el.iconKey
           ? { src: `icon_${el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png` }
           : {},
+        fontFamily: el.font,
       })) as unknown as Parameters<typeof generatePipelineAssets>[0];
 
       const elementImages: ElementImage[] = generatePipelineAssets(resolvedElements);
@@ -3476,6 +3477,7 @@ const [watchModels, setWatchModels] = useState<Record<string, { name?: string; s
         assets: el.iconKey
           ? { src: `icon_${el.iconKey.replace(/[^a-zA-Z0-9_-]/g, '_')}.png` }
           : {},
+        fontFamily: el.font,
       })) as unknown as Parameters<typeof generatePipelineAssets>[0];
 
       const elementImages: ElementImage[] = generatePipelineAssets(resolvedElements);
