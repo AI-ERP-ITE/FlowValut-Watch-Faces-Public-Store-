@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { adminFetchMock } = vi.hoisted(() => ({ adminFetchMock: vi.fn() }));
 vi.mock('./studioFirebasePublishApi', () => ({ adminFetch: adminFetchMock }));
 
-import { createWorkshopBuild, dataUrlToBlob } from './workshopApi';
+import { createWorkshopBuild, dataUrlToBlob, deleteWorkshopProject, permanentlyDeleteWorkshopBuild } from './workshopApi';
 
 describe('workshopApi artifact conversion', () => {
   beforeEach(() => {
@@ -44,5 +44,20 @@ describe('workshopApi artifact conversion', () => {
     await expect(createWorkshopBuild({ projectId: 'project-1', workshopLabel: 'Broken', resolution: { width: 480, height: 480 }, fvwf: new Blob(['{}']), zpk: new Blob(['zpk']) })).rejects.toThrow('Workshop ZPK upload failed: HTTP 500');
     expect(adminFetchMock.mock.calls[1][0]).toBe('workshopAbortBuild');
     expect(JSON.parse(adminFetchMock.mock.calls[1][1].body)).toEqual({ projectId: 'project-1', buildId: 'build-0003' });
+  });
+
+  it('sends the exact typed confirmations for permanent Workshop deletion', async () => {
+    adminFetchMock.mockResolvedValue({ ok: true });
+    await permanentlyDeleteWorkshopBuild('project-1', 'build-0004', 'DELETE project-1/build-0004');
+    await deleteWorkshopProject('project-1', 'DELETE project-1');
+    expect(JSON.parse(adminFetchMock.mock.calls[0][1].body)).toEqual({
+      projectId: 'project-1',
+      buildId: 'build-0004',
+      confirmation: 'DELETE project-1/build-0004',
+    });
+    expect(JSON.parse(adminFetchMock.mock.calls[1][1].body)).toEqual({
+      projectId: 'project-1',
+      confirmation: 'DELETE project-1',
+    });
   });
 });

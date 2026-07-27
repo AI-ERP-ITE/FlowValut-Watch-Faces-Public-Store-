@@ -68,9 +68,10 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
         const model = result.productModels?.find((item) => item.id === sku?.productModelId);
         const collection = result.collections?.find((item) => item.id === model?.parentId);
         const dna = result.designDnas?.find((item) => item.id === collection?.parentId);
+        const offer = result.offers?.find((item) => item.id === existingPackage.offerId);
         if (sku && model && collection && dna) {
           setDnaId(dna.id); setCollectionId(collection.id); setModelId(model.id); setSkuId(sku.id);
-          setDraft((current) => ({ ...current, designDnaName: dna.name, designDnaCode: dna.code ?? '', collectionName: collection.name, collectionCode: collection.code ?? '', modelName: model.name, modelNumber: model.modelNumber ?? 1, description: model.description ?? '', designStory: model.designStory ?? '', categories: model.categories ?? [], tags: model.tags ?? [], variantName: sku.variantName, variantCode: sku.variantCode, editionName: sku.editionName ?? '', editionCode: sku.editionCode ?? '', technicalTargetId: existingPackage.technicalTargetId, revision: existingPackage.revision }));
+          setDraft((current) => ({ ...current, designDnaName: dna.name, designDnaCode: dna.code ?? '', collectionName: collection.name, collectionCode: collection.code ?? '', modelName: model.name, modelNumber: model.modelNumber ?? 1, description: model.description ?? '', designStory: model.designStory ?? '', categories: model.categories ?? [], tags: model.tags ?? [], variantName: sku.variantName, variantCode: sku.variantCode, editionName: sku.editionName ?? '', editionCode: sku.editionCode ?? '', technicalTargetId: existingPackage.technicalTargetId, revision: existingPackage.revision, offerType: offer?.type ?? 'SKU', bundleSkuIds: offer?.type === 'BUNDLE' ? (offer.includedSkuIds ?? []).filter((id) => id !== sku.id) : [], regularPrice: offer?.regularPrice ?? current.regularPrice, campaignPrice: offer?.campaignPrice ?? current.campaignPrice }));
           return;
         }
       }

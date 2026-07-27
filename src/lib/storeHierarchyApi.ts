@@ -4,9 +4,10 @@ import type { ReleaseWizardDraft } from './releaseWizard';
 export interface HierarchyOption {
   id: string; name: string; code?: string; parentId?: string; modelNumber?: number;
   description?: string; designStory?: string; categories?: string[]; tags?: string[];
+  type?: 'SKU' | 'BUNDLE'; includedSkuIds?: string[]; regularPrice?: number; campaignPrice?: number | null;
 }
 export interface SkuHierarchyOption extends HierarchyOption { productModelId: string; variantName: string; variantCode: string; editionName?: string; editionCode?: string; state?: string }
-export interface TechnicalPackageOption { id: string; skuId: string; technicalTargetId: string; revision: string; state: string; approvedWorkshopProjectId?: string; approvedWorkshopBuildId?: string }
+export interface TechnicalPackageOption { id: string; skuId: string; offerId?: string; technicalTargetId: string; revision: string; state: string; approvedWorkshopProjectId?: string; approvedWorkshopBuildId?: string }
 export interface HierarchySnapshot { designDnas: HierarchyOption[]; collections: HierarchyOption[]; productModels: HierarchyOption[]; skus: SkuHierarchyOption[]; technicalTargets: HierarchyOption[]; technicalPackages: TechnicalPackageOption[]; offers: HierarchyOption[] }
 
 export async function fetchStoreHierarchy(): Promise<HierarchySnapshot> {

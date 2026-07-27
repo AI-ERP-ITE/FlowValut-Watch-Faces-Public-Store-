@@ -8,11 +8,20 @@ export interface PublicDevice { id: string; name: string; brand: string; technic
 export interface StoreReadModel { collections: PublicCollection[]; designModels: PublicDesignModel[]; skus: PublicSku[]; technicalPackages: PublicTechnicalPackage[]; offers: PublicOffer[]; technicalTargets: PublicTechnicalTarget[]; devices: PublicDevice[]; legacyMappings: Array<{ legacyWatchfaceId: string; productModelId: string; skuId: string }>; metrics: { uniqueDesignModels: number; sellableSkus: number } }
 
 export function modelSkus(model: StoreReadModel, productModelId: string) { return model.skus.filter((sku) => sku.productModelId === productModelId); }
-export function skuOffer(model: StoreReadModel, skuId: string) { return model.offers.find((offer) => offer.includedSkuIds.includes(skuId)) ?? null; }
+export function skuOffers(model: StoreReadModel, skuId: string) { return model.offers.filter((offer) => offer.includedSkuIds.includes(skuId)); }
+export function skuOffer(model: StoreReadModel, skuId: string) {
+  const offers = skuOffers(model, skuId);
+  return offers.find((offer) => offer.type === 'SKU') ?? offers[0] ?? null;
+}
 export function skuPackages(model: StoreReadModel, skuId: string) { return model.technicalPackages.filter((item) => item.skuId === skuId); }
 export function compatibleDevices(model: StoreReadModel, skuId: string) {
   const targets = new Set(skuPackages(model, skuId).map((item) => item.technicalTargetId));
   return model.devices.filter((device) => targets.has(device.technicalTargetId));
+}
+export function offerCompatibleDevices(model: StoreReadModel, offer: PublicOffer) {
+  return model.devices.filter((device) => offer.includedSkuIds.every((skuId) =>
+    model.technicalPackages.some((item) => item.skuId === skuId && item.technicalTargetId === device.technicalTargetId),
+  ));
 }
 export function resolveLegacyDesignModel(model: StoreReadModel, legacyId: string) {
   const mapping = model.legacyMappings.find((item) => item.legacyWatchfaceId === legacyId);

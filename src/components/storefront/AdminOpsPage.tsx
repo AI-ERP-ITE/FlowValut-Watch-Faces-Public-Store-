@@ -221,10 +221,12 @@ export function AdminOpsPage() {
   }
 
   async function handleDeleteProject(projectId: string) {
-    if (!window.confirm("Are you sure you want to permanently delete this project and ALL its builds? This action cannot be undone.")) return;
+    const required = `DELETE ${projectId}`;
+    const confirmation = window.prompt(`Permanent deletion removes this project and all of its trashed build artifacts.\n\nType exactly:\n${required}`);
+    if (confirmation !== required) return;
     setLoadingCatalog(true);
     try {
-      await deleteWorkshopProject(projectId);
+      await deleteWorkshopProject(projectId, confirmation);
       toast.success(`Project ${projectId} deleted successfully.`);
       setWorkshopProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (e) {
@@ -493,10 +495,10 @@ export function AdminOpsPage() {
                       <Button onClick={() => editWorkshopProject(project)} disabled={workshopBusyId === project.id} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">Edit Project</Button>
                       <Button 
                         onClick={() => handleDeleteProject(project.id)} 
-                        disabled={workshopBusyId === project.id || project.builds.some(b => b.state === 'APPROVED')} 
+                        disabled={workshopBusyId === project.id || project.builds.some((build) => build.state !== 'TRASHED')}
                         variant="outline" 
                         className="h-8 border-red-900/50 text-red-400 hover:bg-red-950/30"
-                        title={project.builds.some(b => b.state === 'APPROVED') ? "Cannot delete project with approved builds" : "Delete Project"}
+                        title={project.builds.some((build) => build.state !== 'TRASHED') ? "Move every build to Trash before deleting the project" : "Delete Project"}
                       >
                         Delete Project
                       </Button>
