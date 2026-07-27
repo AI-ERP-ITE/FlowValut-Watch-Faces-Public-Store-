@@ -132,7 +132,16 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
     if (!preview || !draft.technicalTargetId) return toast.error('Complete every required identity selection.');
     setBusy(true);
     try {
-      const result = await submitReleaseClassification({ ...draft, projectId, buildId, action });
+      const result = await submitReleaseClassification({
+        ...draft,
+        projectId,
+        buildId,
+        action,
+        selectedDesignDnaId: dnaId === NEW ? undefined : dnaId,
+        selectedCollectionId: collectionId === NEW ? undefined : collectionId,
+        selectedProductModelId: modelId === NEW ? undefined : modelId,
+        selectedSkuId: skuId === NEW ? undefined : skuId,
+      });
       if (action === 'RELEASE' && result.packageState !== 'CURRENT') {
         await releaseVerifiedPackage(result.packageId);
         toast.success(`${result.canonicalName} released with verified ZPK parity.`);

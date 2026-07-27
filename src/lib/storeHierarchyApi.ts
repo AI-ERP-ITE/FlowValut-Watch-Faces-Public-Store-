@@ -23,7 +23,15 @@ export async function fetchStoreHierarchy(): Promise<HierarchySnapshot> {
   };
 }
 
-export async function submitReleaseClassification(input: ReleaseWizardDraft & { projectId: string; buildId: string; action: 'READY' | 'RELEASE' }) {
+export async function submitReleaseClassification(input: ReleaseWizardDraft & {
+  projectId: string;
+  buildId: string;
+  action: 'READY' | 'RELEASE';
+  selectedDesignDnaId?: string;
+  selectedCollectionId?: string;
+  selectedProductModelId?: string;
+  selectedSkuId?: string;
+}) {
   return adminFetch<{ packageId: string; canonicalName: string; internalCode: string; packageState: 'READY' | 'VALIDATING' | 'CURRENT'; conflicts: string[]; resumed?: boolean }>('adminStoreHierarchy', { method: 'POST', body: JSON.stringify(input) });
 }
 
