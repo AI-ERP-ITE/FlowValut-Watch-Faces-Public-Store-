@@ -102,3 +102,16 @@
 - New Workshop build reservations reject a missing Technical Target.
 - Release classification rejects a selected target that conflicts with the approved build target.
 - A legacy approved build with no saved target can use the existing release field to select a verified configured target.
+
+## Post-audit stabilization evidence
+
+- Public catalog/media responses do not expose released or Workshop ZPK paths; entitlement fulfillment remains the delivery authority.
+- Repeating a partially completed release accepts existing artifacts only when their hashes and immutable release identity match.
+- Reopening classification restores description, story, categories, tags, Offer type, included colors, and pricing.
+- A Complete Color Collection contains at least two SKUs from one Design Model and remains Draft until every included SKU is CURRENT for the same Technical Target.
+- Checkout rejects a selected device before order/payment creation unless every included SKU has exactly one CURRENT released package for that device target.
+- Workshop permanent deletion requires Trash plus typed confirmation, blocks release references, and retains Firestore records when Storage deletion cannot be verified.
+- Functions compile and tests pass: 20/20.
+- Focused Workshop/storefront tests pass: 21/21.
+- Canonical public and private production builds pass.
+- Full Studio baseline is unchanged: 34 test files and 187 tests pass; the same 11 unrelated rendering/effects tests fail.

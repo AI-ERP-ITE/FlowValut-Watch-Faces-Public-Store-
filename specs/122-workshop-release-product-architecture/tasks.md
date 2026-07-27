@@ -95,7 +95,7 @@
 - [x] T091 Build Functions and deploy endpoints with explicit Firebase project.
 - [ ] T092 Deploy Firestore/Storage configuration when changed.
 - [x] T093 Verify endpoints with `functions:list` and frontend environment contracts.
-- [ ] T094 Run canonical public and private builds.
+- [x] T094 Run canonical public and private builds.
 - [ ] T095 Deploy with `npm run deploy:full:public` only.
 - [ ] T096 Verify live public/private routes, hashes, assets, catalog, auth, checkout, and legacy compatibility.
 - [x] T097 Record the private origin commit and deployed bundle hash.
@@ -125,3 +125,16 @@
 - [x] T119 Keep the existing release step while allowing explicit recovery selection only for builds whose Technical Target is missing.
 - [x] T120 Reject new blank-target builds and reject release classifications that conflict with an approved build's saved target.
 - [x] T113 Review the final isolated diff and receive explicit deployment approval.
+
+## Phase 11: Post-audit workflow stabilization
+
+- [x] T121 Keep released ZPK binaries behind entitlement fulfillment; public release media exposes previews only.
+- [x] T122 Make interrupted release retries verify and reuse only byte-identical ZPK and parity-report artifacts.
+- [x] T123 Resume saved classification with its existing descriptions, tags, Offer, pricing, SKU membership, and release identity.
+- [x] T124 Implement distinct Individual and Complete Color Collection Offers and activate a bundle only when every included color is deliverable for the same Technical Target.
+- [x] T125 Validate selected-device fulfillment for every included SKU before creating an order or payment.
+- [x] T126 Restore Workshop project/build deletion endpoints with Trash, reason, typed confirmation, reference guards, verified object deletion, and storage accounting.
+- [ ] T127 Move the GitHub bridge credential to a Firebase Secret binding and exclude Firebase debug logs from source control (explicitly deferred by the owner).
+- [x] T128 Pass focused frontend tests (21/21), Functions tests (20/20), TypeScript compilation, and canonical public/private builds.
+- [x] T129 Confirm the full Studio suite retains its pre-existing baseline: 34 files and 187 tests pass; the same 11 unrelated rendering/effects tests fail.
+- [ ] T130 Deploy approved targets and verify live hashes/routes; credential migration remains outside this deployment scope.
