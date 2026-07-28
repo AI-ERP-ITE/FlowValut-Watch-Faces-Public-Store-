@@ -172,10 +172,10 @@ export function AdminOpsPage() {
     setWorkshopBusyId(buildId);
     try {
       await approveWorkshopBuild(projectId, buildId);
-      setWorkshopProjects((projects) => projects.map((project) => ({
+      setWorkshopProjects((projects) => projects.map((project) => project.id === projectId ? {
         ...project,
         builds: project.builds.map((build) => build.id === buildId ? { ...build, state: 'APPROVED' } : build),
-      })));
+      } : project));
       toast.success(`${buildId} approved.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to approve build');
@@ -190,7 +190,9 @@ export function AdminOpsPage() {
     setWorkshopBusyId(buildId);
     try {
       const result = await setWorkshopBuildLifecycle(projectId, buildId, action, reason);
-      setWorkshopProjects((projects) => projects.map((project) => ({ ...project, builds: project.builds.map((build) => build.id === buildId ? { ...build, state: result.state } : build) })));
+      setWorkshopProjects((projects) => projects.map((project) => project.id === projectId
+        ? { ...project, builds: project.builds.map((build) => build.id === buildId ? { ...build, state: result.state } : build) }
+        : project));
       toast.success(`${buildId} ${action === 'TRASH' ? 'moved to Trash' : 'restored'}.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Workshop lifecycle update failed');
@@ -207,10 +209,10 @@ export function AdminOpsPage() {
     setWorkshopBusyId(buildId);
     try {
       await permanentlyDeleteWorkshopBuild(projectId, buildId, confirmation);
-      setWorkshopProjects((projects) => projects.map((project) => ({
+      setWorkshopProjects((projects) => projects.map((project) => project.id === projectId ? {
         ...project,
         builds: project.builds.filter((build) => build.id !== buildId),
-      })));
+      } : project));
       if (releaseBuild?.projectId === projectId && releaseBuild.buildId === buildId) setReleaseBuild(null);
       toast.success(`${buildId} permanently deleted.`);
     } catch (error) {
@@ -521,12 +523,12 @@ export function AdminOpsPage() {
                             <p className="text-[10px] text-[#738095]">{build.state} · {build.resolution.width}×{build.resolution.height} · {(build.storageBytes / 1024 / 1024).toFixed(1)} MB</p>
                           </div>
                           <a
-                            href={`${import.meta.env.BASE_URL}studio?workshopProject=${encodeURIComponent(project.id)}&build=${encodeURIComponent(build.id)}`}
+                            href={`${import.meta.env.BASE_URL}${project.tags?.includes('editable-watchface') ? 'editable-watchfaces/' : 'studio'}?workshopProject=${encodeURIComponent(project.id)}&build=${encodeURIComponent(build.id)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="rounded border border-cyan-900 px-2 py-1 text-cyan-300 hover:bg-cyan-950/40"
                           >
-                            Open in Studio
+                            {project.tags?.includes('editable-watchface') ? 'Open in Editable Composer' : 'Open in Studio'}
                           </a>
                           <Button onClick={() => downloadWorkshopArtifact(project.id, build.id, 'fvwf')} disabled={busy} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">
                             <Download className="h-3.5 w-3.5 mr-1" /> FVWF

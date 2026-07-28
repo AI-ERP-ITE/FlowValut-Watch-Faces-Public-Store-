@@ -129,3 +129,22 @@ export async function createWorkshopBuild(input: {
     throw error;
   }
 }
+
+export async function getWorkshopArtifactUrl(input: {
+  projectId: string;
+  buildId: string;
+  kind: 'fvwf' | 'zpk' | 'qr' | 'mainPreview' | 'aodPreview';
+}): Promise<string> {
+  const result = await adminFetch<{ url: string }>('workshopArtifactAccess', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return result.url;
+}
+
+export async function fetchWorkshopProjectFile(projectId: string, buildId: string): Promise<string> {
+  const url = await getWorkshopArtifactUrl({ projectId, buildId, kind: 'fvwf' });
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to load Workshop project (${response.status})`);
+  return response.text();
+}

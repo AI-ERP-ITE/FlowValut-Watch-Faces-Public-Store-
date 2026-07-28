@@ -29,7 +29,12 @@ import {
 import { compileEditableV2Plan } from './editableV2';
 import { buildEditableV2Zpk, type EditableZpkBuildResult } from './editableZpkBuilder';
 import { signInAdminWithGoogle, subscribeAuthState } from '@/lib/firebaseAuthClient';
-import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob } from '@/lib/workshopApi';
+import {
+  createWorkshopBuild,
+  createWorkshopProject,
+  dataUrlToBlob,
+  fetchWorkshopProjectFile,
+} from '@/lib/workshopApi';
 import { loadCustomHandStyles, type CustomHandRecord } from '@/lib/customHandStore';
 import { hydrateArtifactCustomHands, mergeCustomHandRecords } from './customHandParity';
 
@@ -65,6 +70,7 @@ export function ComposerWorkspace() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const variantCanvasRefs = useRef(new Map<string, HTMLCanvasElement>());
   const aodCanvasRef = useRef<HTMLCanvasElement>(null);
+  const workshopDeepLinkLoadedRef = useRef(false);
   const [project, setProject] = useState(() => createFvwcProject());
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [comparisonSourceId, setComparisonSourceId] = useState<string | null>(null);
@@ -116,6 +122,52 @@ export function ComposerWorkspace() {
       params.get('build') || window.localStorage.getItem(`${prefix}.build`),
     );
   }, [project.id]);
+
+  useEffect(() => {
+    if (workshopDeepLinkLoadedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get('workshopProject');
+    const buildId = params.get('build');
+    if (!projectId || !buildId) return;
+    workshopDeepLinkLoadedRef.current = true;
+
+    void (async () => {
+      try {
+        const text = await fetchWorkshopProjectFile(projectId, buildId);
+        const loaded = parseFvwc(text);
+        const availableHands = mergeCustomHandRecords(
+          await loadCustomHandStyles(),
+          loaded.customHandStyles,
+        );
+        const hydrated = {
+          ...loaded,
+          sourceBuilds: loaded.sourceBuilds.map((source) => ({
+            ...source,
+            artifact: hydrateArtifactCustomHands(source.artifact, availableHands).artifact,
+          })),
+          customHandStyles: availableHands,
+        };
+        if (!window.confirm(`Open ${hydrated.name || buildId}? This replaces the current Editable Composer project.`)) {
+          workshopDeepLinkLoadedRef.current = false;
+          return;
+        }
+        setProject(hydrated);
+        setCustomHandStyles(availableHands);
+        setSelectedSourceId(hydrated.baseBuildId ?? hydrated.sourceBuilds[0]?.id ?? null);
+        setComparisonSourceId(
+          hydrated.sourceBuilds.find((source) => source.id !== hydrated.baseBuildId)?.id ?? null,
+        );
+        setSelectedGroupId(hydrated.componentGroups[0]?.id ?? null);
+        setSelectedSlotId(hydrated.slots[0]?.id ?? null);
+        setWorkshopProjectId(projectId);
+        setWorkshopBuildId(buildId);
+        setMessage(`Workshop ${buildId} opened in its original project.`);
+      } catch (error) {
+        workshopDeepLinkLoadedRef.current = false;
+        setMessage(error instanceof Error ? error.message : 'Failed to open Workshop FVWC build.');
+      }
+    })();
+  }, []);
 
   function persistWorkshopLink(projectId: string, buildId?: string): void {
     const prefix = `flowvault.system-b.workshop.${project.id}`;
