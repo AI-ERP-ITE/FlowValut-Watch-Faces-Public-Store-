@@ -29,6 +29,11 @@ import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob } from '@/lib
 
 type ModelDefinition = { name?: string; specGroup?: string };
 const modelDefinitions = models as Record<string, ModelDefinition>;
+const BUILD_VERSION: string =
+  typeof import.meta.env.VITE_APP_BUILD_VERSION === 'string'
+  && import.meta.env.VITE_APP_BUILD_VERSION.trim().length > 0
+    ? import.meta.env.VITE_APP_BUILD_VERSION.trim()
+    : 'dev';
 
 function downloadText(text: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -326,6 +331,9 @@ export function ComposerWorkspace() {
         <div>
           <p className="system-b-eyebrow">FLOWVAULT · SYSTEM B · FVWC</p>
           <h1>Editable Watchface Composer</h1>
+          <span className="system-b-build-version">
+            AI-Powered ZeppOS Designer &nbsp;·&nbsp; <span className="font-mono text-zinc-400">{BUILD_VERSION}</span>
+          </span>
         </div>
         <div className="system-b-actions">
           <input

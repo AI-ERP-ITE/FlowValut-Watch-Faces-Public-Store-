@@ -375,7 +375,8 @@ export interface GeneratedHandSet {
 }
 
 export function generateHandSet(style: HandStyleKey): GeneratedHandSet {
-  const pal = PALETTES[style];
+  const resolvedStyle: HandStyleKey = PALETTES[style] ? style : 'silver';
+  const pal = PALETTES[resolvedStyle];
 
   // Per-style geometry overrides: [hourBase, hourTip, minuteBase, minuteTip, tailMult]
   // Defaults: hour baseHalfW=5, tip=1, tail=22; minute baseHalfW=3.5, tip=0.8, tail=28
@@ -386,7 +387,7 @@ export function generateHandSet(style: HandStyleKey): GeneratedHandSet {
     montagut: { hBase: 4, hTip: 0.7, hTail: 20, mBase: 2.8, mTip: 0.6, mTail: 26 },   // slim leaf
     olevs:    { hBase: 7, hTip: 1.8, hTail: 26, mBase: 5.5, mTip: 1.4, mTail: 32 },   // wide chrome
   };
-  const g = GEOM[style] ?? { hBase: 5, hTip: 1, hTail: 22, mBase: 3.5, mTip: 0.8, mTail: 28 };
+  const g = GEOM[resolvedStyle] ?? { hBase: 5, hTip: 1, hTail: 22, mBase: 3.5, mTip: 0.8, mTail: 28 };
 
   // Hour hand: 22×140, pivot at (11, 118)
   const hourHand = createCanvasImage(22, 140, (ctx, w, h) => {

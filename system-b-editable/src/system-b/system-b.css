@@ -317,3 +317,9 @@ h2 { margin: 0 0 14px; font-size: 16px; }
   border-radius: 12px;
   background: rgba(8, 38, 28, 0.9);
 }
+.system-b-build-version {
+  display: block;
+  margin-top: 0.25rem;
+  color: #71717a;
+  font-size: 0.75rem;
+}
