@@ -74,8 +74,8 @@
 - [x] Generate masks/previews/assets.
 - [x] Package editable ZPK.
 - [x] Generate QR and validation report.
-- [ ] Namespace a selected canonical FVWF background per variant instead of retaining the shared `background.png`.
-- [ ] Add a regression test proving two theme variants retain distinct background assets and runtime paths.
-- [ ] Build and publish the standalone private route at `/Watch-Faces/editable-watchfaces/`.
+- [x] Namespace a selected canonical FVWF background per variant instead of retaining the shared `background.png`.
+- [x] Add a regression test proving two theme variants retain distinct background assets and runtime paths.
+- [x] Build and publish the standalone private route at `/Watch-Faces/editable-watchfaces/`.
 - [ ] Test on the physical watch.
 
