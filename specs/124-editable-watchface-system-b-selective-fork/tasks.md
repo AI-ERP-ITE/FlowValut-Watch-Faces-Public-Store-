@@ -77,7 +77,7 @@
 - [x] Namespace a selected canonical FVWF background per variant instead of retaining the shared `background.png`.
 - [x] Add a regression test proving two theme variants retain distinct background assets and runtime paths.
 - [x] Build and publish the standalone private route at `/Watch-Faces/editable-watchfaces/`.
-- [ ] Resolve VARIANT canvas elements, background, transform, resolution, and shape from the same default-variant source.
-- [ ] Add a regression test proving a default-variant change switches both its group layers and embedded background.
+- [x] Resolve VARIANT canvas elements, background, transform, resolution, and shape from the same default-variant source.
+- [x] Add a regression test proving a default-variant change switches both its group layers and embedded background.
 - [ ] Test on the physical watch.
 
