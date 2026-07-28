@@ -14,24 +14,26 @@ async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
   return new File([blob], name, { type: blob.type || 'application/octet-stream' });
 }
 
-async function createMaskPngFile(
+async function createSelectionPngFile(
   width: number,
   height: number,
-  bounds: EditableV2Plan['slot']['bounds'],
+  selected: boolean,
   name: string,
 ): Promise<File> {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('Unable to create editable mask canvas.');
-  context.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  context.fillRect(0, 0, width, height);
-  context.strokeStyle = '#ffffff';
-  context.lineWidth = 4;
-  context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+  if (!context) throw new Error('Unable to create editable selection canvas.');
+  context.clearRect(0, 0, width, height);
+  if (selected) {
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = Math.max(2, Math.round(Math.min(width, height) * 0.025));
+    const inset = Math.ceil(context.lineWidth / 2);
+    context.strokeRect(inset, inset, Math.max(1, width - inset * 2), Math.max(1, height - inset * 2));
+  }
   const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Unable to encode editable mask.')), 'image/png');
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Unable to encode editable selection image.')), 'image/png');
   });
   return new File([blob], name, { type: 'image/png' });
 }
@@ -51,15 +53,18 @@ async function patchEditableArchive(
   for (const asset of plan.assets) {
     assets.file(asset.path, await dataUrlToFile(asset.dataUrl, asset.path.split('/').at(-1) || 'asset.png'));
   }
-  assets.file(
-    plan.slot.maskPath,
-    await createMaskPngFile(
-      plan.baseConfig.resolution.width,
-      plan.baseConfig.resolution.height,
-      plan.slot.bounds,
-      'edit_mask.png',
-    ),
-  );
+  assets.file(plan.slot.selectImagePath, await createSelectionPngFile(
+    plan.slot.bounds.width,
+    plan.slot.bounds.height,
+    true,
+    'select.png',
+  ));
+  assets.file(plan.slot.unselectImagePath, await createSelectionPngFile(
+    plan.slot.bounds.width,
+    plan.slot.bounds.height,
+    false,
+    'unselect.png',
+  ));
   const deviceBlob = await device.generateAsync({ type: 'blob', compression: 'STORE' });
   outer.file('device.zip', deviceBlob);
   outer.file('app.json', plan.generatedCode.appJson);
@@ -83,7 +88,6 @@ export async function buildEditableV2Zpk(
   ]);
   const allAssets = [...plan.assets, ...generatedAssets];
   const elementFiles = await Promise.all(allAssets
-    .filter((asset) => asset.path !== plan.slot.maskPath)
     .map(async (asset) => ({
       src: asset.path,
       file: await dataUrlToFile(asset.dataUrl, asset.path.split('/').at(-1) || 'asset.png'),

@@ -661,7 +661,7 @@ export function ComposerWorkspace() {
               }}
               backgroundImage={source.artifact.backgroundImage || config.background.src}
               backgroundTransform={config.backgroundTransform ?? undefined}
-              elements={config.elements.filter((element) => group.layerIds.includes(element.id))}
+              elements={config.elements}
               canvasW={config.resolution.width}
               canvasH={config.resolution.height}
               canvasShape={source.specGroup.includes('square') ? 'square' : 'round'}

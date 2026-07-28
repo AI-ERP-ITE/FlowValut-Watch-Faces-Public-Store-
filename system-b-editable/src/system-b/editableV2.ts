@@ -27,7 +27,8 @@ export interface EditableV2SlotPlan {
   editId: number;
   defaultTypeId: number;
   bounds: ComposerSlot['bounds'];
-  maskPath: string;
+  selectImagePath: string;
+  unselectImagePath: string;
   variants: EditableV2VariantPlan[];
 }
 
@@ -221,30 +222,25 @@ function editableRuntimeBlock(slot: EditableV2SlotPlan, baseConfig: WatchFaceCon
                     y: px(${slot.bounds.y}),
                     w: px(${slot.bounds.width}),
                     h: px(${slot.bounds.height}),
-                    select_image: '${slot.maskPath}',
-                    un_select_image: '${slot.maskPath}',
+                    select_image: '${slot.selectImagePath}',
+                    un_select_image: '${slot.unselectImagePath}',
                     default_type: ${slot.defaultTypeId},
                     optional_types: [
                     ${optionalTypes}
                     ],
                     count: ${slot.variants.length},
-                    tips_BG: '${slot.maskPath}',
-                    tips_x: 0,
-                    tips_y: 0,
-                    tips_width: px(${Math.max(1, slot.bounds.width)})
+                    select_list: {
+                        title_font_size: 34,
+                        title_align_h: hmUI.align.CENTER_H,
+                        list_item_vspace: 8,
+                        list_tips_text_font_size: 32,
+                        list_tips_text_align_h: hmUI.align.LEFT
+                    }
                 });
                 const editableType_${slot.editId} = editableGroup_${slot.editId}.getProperty(hmUI.prop.CURRENT_TYPE);
                 switch (editableType_${slot.editId}) {
                     ${branches}
                 }
-                hmUI.createWidget(hmUI.widget.WATCHFACE_EDIT_MASK, {
-                    x: px(0),
-                    y: px(0),
-                    w: px(__SYSTEM_B_WIDTH__),
-                    h: px(__SYSTEM_B_HEIGHT__),
-                    src: '${slot.maskPath}',
-                    show_level: hmUI.show_level.ONLY_EDIT
-                });
 `;
 }
 
@@ -360,7 +356,8 @@ export function compileEditableV2Plan(
     editId: deterministicNumber(slot.id, 100, 9000),
     defaultTypeId: FIRST_CUSTOM_EDIT_TYPE + Math.max(0, slot.variants.findIndex((variant) => variant.id === slot.defaultVariantId)),
     bounds: slot.bounds,
-    maskPath: `editable/${safeSegment(slot.id)}/edit_mask.png`,
+    selectImagePath: `editable/${safeSegment(slot.id)}/select.png`,
+    unselectImagePath: `editable/${safeSegment(slot.id)}/unselect.png`,
     variants,
   };
   const normalCode = generateWatchFaceCode(baseConfig);

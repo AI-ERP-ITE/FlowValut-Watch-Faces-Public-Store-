@@ -94,8 +94,10 @@ describe('editable V2 compiler', () => {
     expect(plan.slot.variants.map((variant) => variant.typeId)).toEqual([100000, 100001]);
     expect(plan.generatedCode.watchfaceIndexJs).toContain('WATCHFACE_EDIT_GROUP');
     expect(plan.generatedCode.watchfaceIndexJs).toContain('CURRENT_TYPE');
-    expect(plan.generatedCode.watchfaceIndexJs).toContain('WATCHFACE_EDIT_MASK');
-    expect(plan.generatedCode.watchfaceIndexJs).toContain('ONLY_EDIT');
+    expect(plan.generatedCode.watchfaceIndexJs).toContain('select_list');
+    expect(plan.generatedCode.watchfaceIndexJs).toContain(plan.slot.selectImagePath);
+    expect(plan.generatedCode.watchfaceIndexJs).toContain(plan.slot.unselectImagePath);
+    expect(plan.generatedCode.watchfaceIndexJs).not.toContain('WATCHFACE_EDIT_MASK');
     expect(() => new Function(plan.generatedCode.watchfaceIndexJs)).not.toThrow();
   });
 
@@ -109,6 +111,22 @@ describe('editable V2 compiler', () => {
   it('allocates a deterministic edit id', () => {
     const project = completeProject();
     expect(compileEditableV2Plan(project).slot.editId).toBe(compileEditableV2Plan(project).slot.editId);
+  });
+
+  it('preserves every non-editable base element as a fixed runtime widget', () => {
+    const project = completeProject();
+    project.sourceBuilds[0].artifact.watchFaceConfig.elements.push({
+      id: 'fixed_label',
+      type: 'TEXT',
+      name: 'Fixed label',
+      bounds: { x: 20, y: 20, width: 100, height: 30 },
+      visible: true,
+      zIndex: 1,
+      text: 'Fixed',
+    });
+    const plan = compileEditableV2Plan(project);
+    expect(plan.baseConfig.elements.some((element) => element.id.includes('fixed_label'))).toBe(true);
+    expect(plan.generatedCode.watchfaceIndexJs).toContain('Fixed label');
   });
 
   it('uses fixed base AOD when any variant has no dedicated AOD', () => {
