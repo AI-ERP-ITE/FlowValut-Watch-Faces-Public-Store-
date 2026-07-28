@@ -111,6 +111,32 @@ describe('editable V2 compiler', () => {
     expect(compileEditableV2Plan(project).slot.editId).toBe(compileEditableV2Plan(project).slot.editId);
   });
 
+  it('uses fixed base AOD when any variant has no dedicated AOD', () => {
+    const plan = compileEditableV2Plan(completeProject());
+    expect(plan.aodPolicy).toBe('FIXED_BASE_AOD');
+    expect(plan.slot.variants.every((variant) => variant.aodElements.length === 0)).toBe(true);
+  });
+
+  it('makes the selected variant control AOD when every source has dedicated AOD', () => {
+    const project = completeProject();
+    project.sourceBuilds.forEach((item) => {
+      item.artifact.watchFaceConfig.aodElements = [{
+        id: `${item.id}_aod`,
+        type: 'TEXT',
+        name: `${item.id} AOD`,
+        bounds: { x: 100, y: 100, width: 120, height: 40 },
+        visible: true,
+        zIndex: 1,
+        dataType: 'TIME',
+        text: item.id,
+      }];
+    });
+    const plan = compileEditableV2Plan(project);
+    expect(plan.aodPolicy).toBe('FOLLOW_VARIANT_AOD');
+    expect(plan.slot.variants.every((variant) => variant.aodElements.length === 1)).toBe(true);
+    expect(plan.generatedCode.watchfaceIndexJs).toContain('ONLY_AOD');
+  });
+
   it('packages a distinct embedded background for every full-theme variant', () => {
     const themedArtifact = (name: string, backgroundImage: string): ProjectFileArtifact => ({
       ...artifact(name, `${name}_value`, 'DATE'),

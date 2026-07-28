@@ -19,6 +19,7 @@ export interface EditableV2VariantPlan {
   title: string;
   previewPath: string;
   elements: WatchFaceElement[];
+  aodElements: WatchFaceElement[];
 }
 
 export interface EditableV2SlotPlan {
@@ -38,6 +39,7 @@ export interface EditableV2Plan {
   slot: EditableV2SlotPlan;
   assets: EditableAssetSource[];
   generatedCode: GeneratedCode;
+  aodPolicy: 'FOLLOW_VARIANT_AOD' | 'FIXED_BASE_AOD';
 }
 
 const FIRST_CUSTOM_EDIT_TYPE = 100000;
@@ -156,6 +158,15 @@ function extractNormalComposition(runtime: string, includeBackground: boolean): 
   return runtime.slice(start + startMarker.length, end).trim();
 }
 
+function extractAodComposition(runtime: string): string {
+  const startMarker = '// ========== AOD MODE BACKGROUND ==========';
+  const endMarker = '// Widget delegate for lifecycle management';
+  const start = runtime.indexOf(startMarker);
+  const end = runtime.indexOf(endMarker, start + startMarker.length);
+  if (start < 0 || end < 0) throw new Error('Unable to extract current V2 AOD widget block.');
+  return runtime.slice(start + startMarker.length, end).trim();
+}
+
 function editableRuntimeBlock(slot: EditableV2SlotPlan, baseConfig: WatchFaceConfig): string {
   const optionalTypes = slot.variants.map((variant) => `{
                         type: ${variant.typeId},
@@ -181,7 +192,8 @@ function editableRuntimeBlock(slot: EditableV2SlotPlan, baseConfig: WatchFaceCon
         format: 'TGA-P',
       },
       elements: variant.elements,
-      aodElements: [],
+      aodElements: variant.aodElements,
+      aodBackgroundMode: variant.aodElements.length > 0 ? 'NONE_BLACK' : undefined,
     };
     let widgetCode = extractNormalComposition(
       generateWatchFaceCode(variantConfig).watchfaceIndexJs,
@@ -189,6 +201,11 @@ function editableRuntimeBlock(slot: EditableV2SlotPlan, baseConfig: WatchFaceCon
     );
     if (variantBackground?.src) {
       widgetCode = widgetCode.replace("src: 'background.png'", `src: '${variantBackground.src}'`);
+    }
+    if (variant.aodElements.length > 0) {
+      widgetCode += `\n                        ${extractAodComposition(
+        generateWatchFaceCode(variantConfig).watchfaceIndexJs,
+      )}`;
     }
     return `case ${variant.typeId}: {
                         ${widgetCode}
@@ -243,7 +260,10 @@ ${block
 ${runtime.slice(insertionPoint)}`;
 }
 
-export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
+export function compileEditableV2Plan(
+  project: FvwcProjectV1,
+  variantPreviewDataUrls: Record<string, string> = {},
+): EditableV2Plan {
   const errors = validateComposerProject(project).filter((issue) => issue.severity === 'ERROR');
   if (errors.length > 0) throw new Error(errors.map((issue) => issue.message).join(' '));
   if (project.slots.length !== 1) {
@@ -255,6 +275,10 @@ export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
   if (slot.variants.length < 2 || slot.variants.length > 3) {
     throw new Error('The first editable V2 slice requires two or three variants.');
   }
+  const followVariantAod = slot.variants.every((variant) => {
+    const source = project.sourceBuilds.find((item) => item.id === variant.sourceBuildId);
+    return Boolean(source?.artifact.watchFaceConfig.aodElements?.length);
+  });
 
   const ownedBaseLayerIds = new Set(
     slot.variants.flatMap((variant) => {
@@ -283,7 +307,10 @@ export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
   const baseConfig: WatchFaceConfig = {
     ...rawBaseConfig,
     elements: fixedMain.elements,
-    aodElements: rawBaseConfig.aodElements ? fixedAod.elements : rawBaseConfig.aodElements,
+    aodElements: followVariantAod
+      ? []
+      : (rawBaseConfig.aodElements ? fixedAod.elements : rawBaseConfig.aodElements),
+    ...(followVariantAod ? { aodBackgroundMode: 'NONE_BLACK' as const } : {}),
   };
   const variants: EditableV2VariantPlan[] = slot.variants.map((variant, index) => {
     const group = project.componentGroups.find((item) => item.id === variant.componentGroupId);
@@ -303,7 +330,17 @@ export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
       variant.id,
     );
     assets.push(...namespaced.assets);
-    const previewDataUrl = source.artifact.backgroundImage;
+    const namespacedAod = followVariantAod
+      ? namespaceVariantElements(
+        assignGeneratedDigitPaths(
+          source.artifact.watchFaceConfig.aodElements ?? [],
+          `editable/${safeSegment(variant.id)}/aod/generated`,
+        ),
+        `${variant.id}_aod`,
+      )
+      : { elements: [], assets: [] };
+    assets.push(...namespacedAod.assets);
+    const previewDataUrl = variantPreviewDataUrls[variant.id] || source.artifact.backgroundImage;
     if (!previewDataUrl?.startsWith('data:')) {
       throw new Error(`${variant.name} requires an embedded FVWF preview/background for its edit preview.`);
     }
@@ -315,6 +352,7 @@ export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
       title: variant.name,
       previewPath,
       elements: namespaced.elements,
+      aodElements: namespacedAod.elements,
     };
   });
   const slotPlan: EditableV2SlotPlan = {
@@ -342,11 +380,14 @@ export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
     ...baseConfig.elements,
     ...variants.flatMap((variant) => variant.elements),
   ];
+  const packagingAodElements = followVariantAod
+    ? variants.flatMap((variant) => variant.aodElements)
+    : baseConfig.aodElements;
   return {
     projectId: project.id,
     name: baseConfig.name,
     baseConfig,
-    packagingConfig: { ...baseConfig, elements: packagingElements },
+    packagingConfig: { ...baseConfig, elements: packagingElements, aodElements: packagingAodElements },
     slot: slotPlan,
     assets,
     generatedCode: {
@@ -354,5 +395,6 @@ export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
       appJson: JSON.stringify(appJson, null, 2),
       watchfaceIndexJs,
     },
+    aodPolicy: followVariantAod ? 'FOLLOW_VARIANT_AOD' : 'FIXED_BASE_AOD',
   };
 }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import JSZip from 'jszip';
 import models from '../../models.json';
 import { InteractiveCanvas } from '@/components/InteractiveCanvas';
@@ -24,6 +24,8 @@ import {
 } from './composerDomain';
 import { compileEditableV2Plan } from './editableV2';
 import { buildEditableV2Zpk } from './editableZpkBuilder';
+import { signInAdminWithGoogle, subscribeAuthState } from '@/lib/firebaseAuthClient';
+import { publishEditableWorkshop, type EditableWorkshopResult } from './workshopPublish';
 
 type ModelDefinition = { name?: string; specGroup?: string };
 const modelDefinitions = models as Record<string, ModelDefinition>;
@@ -50,6 +52,8 @@ export function ComposerWorkspace() {
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const fvwcInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const variantCanvasRefs = useRef(new Map<string, HTMLCanvasElement>());
+  const aodCanvasRef = useRef<HTMLCanvasElement>(null);
   const [project, setProject] = useState(() => createFvwcProject());
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [comparisonSourceId, setComparisonSourceId] = useState<string | null>(null);
@@ -62,6 +66,11 @@ export function ComposerWorkspace() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Import two or more current FVWF V1 source projects.');
   const [editableArtifactSummary, setEditableArtifactSummary] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [workshopProjectId, setWorkshopProjectId] = useState<string | null>(null);
+  const [workshopResult, setWorkshopResult] = useState<EditableWorkshopResult | null>(null);
+
+  useEffect(() => subscribeAuthState((user) => setSignedIn(Boolean(user))), []);
 
   const selectedSource = project.sourceBuilds.find((source) => source.id === selectedSourceId)
     ?? project.sourceBuilds[0]
@@ -206,9 +215,15 @@ export function ComposerWorkspace() {
   async function exportEditableZpk(): Promise<void> {
     setBusy(true);
     try {
+      const variantPreviews = Object.fromEntries(
+        [...variantCanvasRefs.current.entries()].map(([id, canvas]) => [id, canvas.toDataURL('image/png')]),
+      );
+      const mainPreview = canvasRef.current?.toDataURL('image/png')
+        ?? project.sourceBuilds.find((source) => source.id === project.baseBuildId)?.artifact.backgroundImage;
       const result = await buildEditableV2Zpk(
         project,
-        canvasRef.current?.toDataURL('image/png') ?? null,
+        mainPreview ?? null,
+        variantPreviews,
       );
       const outer = await JSZip.loadAsync(result.blob);
       const deviceEntry = outer.file('device.zip');
@@ -230,10 +245,28 @@ export function ComposerWorkspace() {
         throw new Error('Editable archive verification failed.');
       }
       downloadBlob(result.blob, result.filename);
+      if (signedIn && mainPreview) {
+        const baseSource = project.sourceBuilds.find((source) => source.id === project.baseBuildId)!;
+        const published = await publishEditableWorkshop({
+          projectId: workshopProjectId,
+          workingTitle: project.name,
+          targetDeviceId: baseSource.canonicalModelId,
+          resolution: result.plan.baseConfig.resolution,
+          specGroup: baseSource.specGroup,
+          fvwc: new Blob([serializeFvwc(project)], { type: 'application/json' }),
+          zpk: result.blob,
+          mainPreview,
+          aodPreview: aodCanvasRef.current?.toDataURL('image/png') ?? null,
+        });
+        setWorkshopProjectId(published.projectId);
+        setWorkshopResult(published);
+      }
       setEditableArtifactSummary(
         `Generated ${result.filename} · ${result.size.toLocaleString()} bytes · edit_id ${result.plan.slot.editId}`,
       );
-      setMessage('Editable V2 ZPK generated and archive-verified.');
+      setMessage(signedIn
+        ? 'Editable ZPK, previews, hosted QR, and Admin build generated.'
+        : 'Editable ZPK generated locally. Sign in to also create the hosted QR and Admin build.');
     } catch (error) {
       setEditableArtifactSummary(null);
       setMessage(error instanceof Error ? error.message : 'Editable V2 export failed.');
@@ -286,13 +319,30 @@ export function ComposerWorkspace() {
             Save FVWC
           </button>
           <button type="button" onClick={validateEditablePlan} disabled={busy}>Validate editable V2</button>
+          {!signedIn && (
+            <button type="button" onClick={() => void signInAdminWithGoogle()} disabled={busy}>
+              Sign in for QR + Admin
+            </button>
+          )}
           <button type="button" onClick={() => void exportEditableZpk()} disabled={busy}>
-            Export editable V2 ZPK
+            Generate ZPK, previews &amp; QR
           </button>
         </div>
       </header>
 
       <p className="system-b-message" role="status">{busy ? 'Working…' : message}</p>
+      {workshopResult && (
+        <section className="composer-publish-result">
+          <img src={workshopResult.qrDataUrl} alt="Install editable watchface QR code" />
+          <div>
+            <strong>Workshop build #{workshopResult.buildNumber}</strong>
+            <a href={workshopResult.installUrl}>Open hosted install link</a>
+            <a href={`/Watch-Faces/admin?workshopProjectId=${encodeURIComponent(workshopResult.projectId)}&buildId=${encodeURIComponent(workshopResult.buildId)}`}>
+              Open in Admin
+            </a>
+          </div>
+        </section>
+      )}
 
       <nav className="composer-modebar" aria-label="Canvas mode">
         {(['SOURCE', 'OVERLAY', 'BASE', 'VARIANT', 'COMBINATION'] as ComposerCanvasMode[]).map((mode) => (
@@ -492,6 +542,45 @@ export function ComposerWorkspace() {
         </ul>
         {editableArtifactSummary && <p className="editable-artifact-summary">{editableArtifactSummary}</p>}
       </section>
+      <div className="composer-export-canvases" aria-hidden="true">
+        {selectedSlot?.variants.map((variant) => {
+          const source = project.sourceBuilds.find((item) => item.id === variant.sourceBuildId);
+          const group = project.componentGroups.find((item) => item.id === variant.componentGroupId);
+          if (!source || !group) return null;
+          const config = source.artifact.watchFaceConfig;
+          return (
+            <InteractiveCanvas
+              key={variant.id}
+              ref={(canvas) => {
+                if (canvas) variantCanvasRefs.current.set(variant.id, canvas);
+                else variantCanvasRefs.current.delete(variant.id);
+              }}
+              backgroundImage={source.artifact.backgroundImage || config.background.src}
+              backgroundTransform={config.backgroundTransform ?? undefined}
+              elements={config.elements.filter((element) => group.layerIds.includes(element.id))}
+              canvasW={config.resolution.width}
+              canvasH={config.resolution.height}
+              canvasShape={source.specGroup.includes('square') ? 'square' : 'round'}
+            />
+          );
+        })}
+        {(() => {
+          const defaultVariant = selectedSlot?.variants.find((variant) => variant.id === selectedSlot.defaultVariantId);
+          const source = project.sourceBuilds.find((item) => item.id === defaultVariant?.sourceBuildId)
+            ?? project.sourceBuilds.find((item) => item.id === project.baseBuildId);
+          const config = source?.artifact.watchFaceConfig;
+          if (!source || !config?.aodElements?.length) return null;
+          return (
+            <InteractiveCanvas
+              ref={aodCanvasRef}
+              elements={config.aodElements}
+              canvasW={config.resolution.width}
+              canvasH={config.resolution.height}
+              canvasShape={source.specGroup.includes('square') ? 'square' : 'round'}
+            />
+          );
+        })()}
+      </div>
     </main>
   );
 }

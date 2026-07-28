@@ -69,8 +69,9 @@ async function patchEditableArchive(
 export async function buildEditableV2Zpk(
   project: FvwcProjectV1,
   previewDataUrl?: string | null,
+  variantPreviewDataUrls: Record<string, string> = {},
 ): Promise<EditableZpkBuildResult> {
-  const plan = compileEditableV2Plan(project);
+  const plan = compileEditableV2Plan(project, variantPreviewDataUrls);
   const baseSource = project.sourceBuilds.find((source) => source.id === project.baseBuildId)!;
   const backgroundDataUrl = baseSource.artifact.backgroundImage;
   if (!backgroundDataUrl?.startsWith('data:')) {

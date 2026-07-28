@@ -259,3 +259,31 @@ h2 { margin: 0 0 14px; font-size: 16px; }
   .composer-layout { grid-template-columns: 270px minmax(420px, 1fr); }
   .composer-layout > .composer-panel:last-child { grid-column: 1 / -1; height: auto; max-height: 420px; }
 }
+.composer-export-canvases {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  pointer-events: none;
+}
+
+.composer-publish-result {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 1.5rem 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(124, 217, 255, 0.35);
+  border-radius: 12px;
+  background: rgba(8, 24, 38, 0.92);
+}
+
+.composer-publish-result img {
+  width: 132px;
+  height: 132px;
+  background: white;
+}
+
+.composer-publish-result div {
+  display: grid;
+  gap: 0.5rem;
+}
