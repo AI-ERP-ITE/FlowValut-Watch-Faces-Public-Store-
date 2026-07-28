@@ -15,9 +15,45 @@ async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
   return new File([blob], name, { type: blob.type || 'application/octet-stream' });
 }
 
+async function createSelectionBackgroundFile(
+  dataUrl: string,
+  bounds: EditableV2Plan['slot']['bounds'],
+): Promise<File> {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const next = new Image();
+    next.onload = () => resolve(next);
+    next.onerror = () => reject(new Error('Unable to load editable selection background.'));
+    next.src = dataUrl;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bounds.width));
+  canvas.height = Math.max(1, Math.round(bounds.height));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Unable to crop editable selection background.');
+  context.drawImage(
+    image,
+    bounds.x,
+    bounds.y,
+    bounds.width,
+    bounds.height,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+  );
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (value) => value ? resolve(value) : reject(new Error('Unable to encode editable selection background.')),
+      'image/png',
+    );
+  });
+  return new File([blob], 'selection.png', { type: 'image/png' });
+}
+
 async function patchEditableArchive(
   normalBlob: Blob,
   plan: EditableV2Plan,
+  selectionBackgroundDataUrl: string,
 ): Promise<Blob> {
   const outer = await JSZip.loadAsync(normalBlob);
   const deviceEntry = outer.file('device.zip');
@@ -30,11 +66,7 @@ async function patchEditableArchive(
   for (const asset of plan.assets) {
     assets.file(asset.path, await dataUrlToFile(asset.dataUrl, asset.path.split('/').at(-1) || 'asset.png'));
   }
-  const defaultVariant = plan.slot.variants.find((variant) => variant.typeId === plan.slot.defaultTypeId)
-    ?? plan.slot.variants[0];
-  const defaultPreview = plan.assets.find((asset) => asset.path === defaultVariant?.previewPath);
-  if (!defaultPreview) throw new Error('Editable default variant preview is missing.');
-  const selectionImage = await dataUrlToFile(defaultPreview.dataUrl, 'selection.png');
+  const selectionImage = await createSelectionBackgroundFile(selectionBackgroundDataUrl, plan.slot.bounds);
   assets.file(plan.slot.selectImagePath, selectionImage);
   assets.file(plan.slot.unselectImagePath, selectionImage);
   const deviceBlob = await device.generateAsync({ type: 'blob', compression: 'STORE' });
@@ -67,6 +99,13 @@ export async function buildEditableV2Zpk(
   if (!backgroundDataUrl?.startsWith('data:')) {
     throw new Error('The base FVWF requires an embedded background.');
   }
+  const selectedSlot = preparedProject.slots[0];
+  const defaultVariant = selectedSlot?.variants.find((variant) => variant.id === selectedSlot.defaultVariantId)
+    ?? selectedSlot?.variants[0];
+  const selectionSource = preparedProject.sourceBuilds.find(
+    (source) => source.id === defaultVariant?.sourceBuildId,
+  ) ?? baseSource;
+  const selectionBackgroundDataUrl = selectionSource.artifact.backgroundImage ?? backgroundDataUrl;
   const generatedAssets = renderGeneratedDigitAssets([
     ...plan.packagingConfig.elements,
     ...(plan.packagingConfig.aodElements ?? []),
@@ -84,7 +123,7 @@ export async function buildEditableV2Zpk(
     previewDataUrl: previewDataUrl ?? backgroundDataUrl,
   });
   plan.assets.push(...generatedAssets);
-  const blob = await patchEditableArchive(normal.blob, plan);
+  const blob = await patchEditableArchive(normal.blob, plan, selectionBackgroundDataUrl);
   return {
     blob,
     size: blob.size,

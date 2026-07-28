@@ -46,6 +46,22 @@ const BUILD_VERSION: string =
     ? import.meta.env.VITE_APP_BUILD_VERSION.trim()
     : 'dev';
 
+function previewElementsWithoutDuplicateBackground(source: ComposerSourceBuild) {
+  const config = source.artifact.watchFaceConfig;
+  return config.elements.filter((element) => !(
+    element.type === 'IMG'
+    && element.bounds.x === 0
+    && element.bounds.y === 0
+    && element.bounds.width === config.resolution.width
+    && element.bounds.height === config.resolution.height
+    && (
+      element.src === config.background.src
+      || element.assetFilename === config.background.src
+      || element.name.trim().toLowerCase() === 'background'
+    )
+  ));
+}
+
 function downloadText(text: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const anchor = document.createElement('a');
@@ -782,7 +798,7 @@ export function ComposerWorkspace() {
               }}
               backgroundImage={source.artifact.backgroundImage || config.background.src}
               backgroundTransform={config.backgroundTransform ?? undefined}
-              elements={config.elements}
+              elements={previewElementsWithoutDuplicateBackground(source)}
               canvasW={config.resolution.width}
               canvasH={config.resolution.height}
               canvasShape={source.specGroup.includes('square') ? 'square' : 'round'}
@@ -799,6 +815,10 @@ export function ComposerWorkspace() {
           return (
             <InteractiveCanvas
               ref={aodCanvasRef}
+              backgroundImage={config.aodBackgroundMode === 'NONE_BLACK'
+                ? undefined
+                : source.artifact.backgroundImage ?? undefined}
+              backgroundTransform={config.aodBackgroundTransform ?? config.backgroundTransform ?? undefined}
               elements={config.aodElements}
               canvasW={config.resolution.width}
               canvasH={config.resolution.height}

@@ -264,11 +264,6 @@ export function compileEditableV2Plan(
   if (slot.variants.length < 2 || slot.variants.length > 3) {
     throw new Error('The first editable V2 slice requires two or three variants.');
   }
-  const followVariantAod = slot.variants.every((variant) => {
-    const source = project.sourceBuilds.find((item) => item.id === variant.sourceBuildId);
-    return Boolean(source?.artifact.watchFaceConfig.aodElements?.length);
-  });
-
   const ownedBaseLayerIds = new Set(
     slot.variants.flatMap((variant) => {
       const group = project.componentGroups.find((item) => item.id === variant.componentGroupId);
@@ -296,10 +291,7 @@ export function compileEditableV2Plan(
   const baseConfig: WatchFaceConfig = {
     ...rawBaseConfig,
     elements: fixedMain.elements,
-    aodElements: followVariantAod
-      ? []
-      : (rawBaseConfig.aodElements ? fixedAod.elements : rawBaseConfig.aodElements),
-    ...(followVariantAod ? { aodBackgroundMode: 'NONE_BLACK' as const } : {}),
+    aodElements: rawBaseConfig.aodElements ? fixedAod.elements : rawBaseConfig.aodElements,
   };
   const variants: EditableV2VariantPlan[] = slot.variants.map((variant, index) => {
     const group = project.componentGroups.find((item) => item.id === variant.componentGroupId);
@@ -319,16 +311,6 @@ export function compileEditableV2Plan(
       variant.id,
     );
     assets.push(...namespaced.assets);
-    const namespacedAod = followVariantAod
-      ? namespaceVariantElements(
-        assignGeneratedDigitPaths(
-          source.artifact.watchFaceConfig.aodElements ?? [],
-          `editable/${safeSegment(variant.id)}/aod/generated`,
-        ),
-        `${variant.id}_aod`,
-      )
-      : { elements: [], assets: [] };
-    assets.push(...namespacedAod.assets);
     const previewDataUrl = variantPreviewDataUrls[variant.id] || source.artifact.backgroundImage;
     if (!previewDataUrl?.startsWith('data:')) {
       throw new Error(`${variant.name} requires an embedded FVWF preview/background for its edit preview.`);
@@ -341,7 +323,7 @@ export function compileEditableV2Plan(
       title: variant.name,
       previewPath,
       elements: namespaced.elements,
-      aodElements: namespacedAod.elements,
+      aodElements: [],
     };
   });
   const slotPlan: EditableV2SlotPlan = {
@@ -370,9 +352,7 @@ export function compileEditableV2Plan(
     ...baseConfig.elements,
     ...variants.flatMap((variant) => variant.elements),
   ];
-  const packagingAodElements = followVariantAod
-    ? variants.flatMap((variant) => variant.aodElements)
-    : baseConfig.aodElements;
+  const packagingAodElements = baseConfig.aodElements;
   return {
     projectId: project.id,
     name: baseConfig.name,
@@ -385,6 +365,6 @@ export function compileEditableV2Plan(
       appJson: JSON.stringify(appJson, null, 2),
       watchfaceIndexJs,
     },
-    aodPolicy: followVariantAod ? 'FOLLOW_VARIANT_AOD' : 'FIXED_BASE_AOD',
+    aodPolicy: 'FIXED_BASE_AOD',
   };
 }

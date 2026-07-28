@@ -145,7 +145,7 @@ describe('editable V2 compiler', () => {
     expect(plan.slot.variants.every((variant) => variant.aodElements.length === 0)).toBe(true);
   });
 
-  it('makes the selected variant control AOD when every source has dedicated AOD', () => {
+  it('keeps the complete base AOD even when every source has dedicated AOD', () => {
     const project = completeProject();
     project.sourceBuilds.forEach((item) => {
       item.artifact.watchFaceConfig.aodElements = [{
@@ -160,8 +160,10 @@ describe('editable V2 compiler', () => {
       }];
     });
     const plan = compileEditableV2Plan(project);
-    expect(plan.aodPolicy).toBe('FOLLOW_VARIANT_AOD');
-    expect(plan.slot.variants.every((variant) => variant.aodElements.length === 1)).toBe(true);
+    expect(plan.aodPolicy).toBe('FIXED_BASE_AOD');
+    expect(plan.slot.variants.every((variant) => variant.aodElements.length === 0)).toBe(true);
+    expect(plan.baseConfig.aodElements?.[0].name).toBe('heart AOD');
+    expect(plan.packagingConfig.aodElements).toEqual(plan.baseConfig.aodElements);
     expect(plan.generatedCode.watchfaceIndexJs).toContain('ONLY_AOD');
   });
 
