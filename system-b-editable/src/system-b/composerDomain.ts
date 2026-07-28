@@ -162,6 +162,63 @@ export function touchProject(project: FvwcProjectV1): FvwcProjectV1 {
   return { ...project, updatedAt: nowIso() };
 }
 
+export function selectSlotForFirstSliceExport(
+  project: FvwcProjectV1,
+  selectedSlotId: string | null,
+): FvwcProjectV1 {
+  if (project.slots.length === 1) return project;
+  const selectedSlot = project.slots.find((slot) => slot.id === selectedSlotId);
+  if (!selectedSlot) throw new Error('Select one editable slot to export.');
+  return { ...project, slots: [selectedSlot] };
+}
+
+export function deleteComposerVariant(
+  project: FvwcProjectV1,
+  slotId: string,
+  variantId: string,
+): FvwcProjectV1 {
+  const slot = project.slots.find((item) => item.id === slotId);
+  if (!slot) throw new Error('Editable slot not found.');
+  if (slot.variants.length <= 1) {
+    throw new Error('Delete the slot instead; a slot cannot remain without a variant.');
+  }
+  const variants = slot.variants.filter((variant) => variant.id !== variantId);
+  if (variants.length === slot.variants.length) throw new Error('Variant not found.');
+  return touchProject({
+    ...project,
+    slots: project.slots.map((item) => item.id === slotId
+      ? {
+        ...item,
+        variants,
+        defaultVariantId: item.defaultVariantId === variantId
+          ? variants[0].id
+          : item.defaultVariantId,
+      }
+      : item),
+  });
+}
+
+export function deleteComposerSlot(project: FvwcProjectV1, slotId: string): FvwcProjectV1 {
+  if (!project.slots.some((slot) => slot.id === slotId)) throw new Error('Editable slot not found.');
+  return touchProject({ ...project, slots: project.slots.filter((slot) => slot.id !== slotId) });
+}
+
+export function deleteComponentGroup(project: FvwcProjectV1, groupId: string): FvwcProjectV1 {
+  const dependent = project.slots.find((slot) => (
+    slot.variants.some((variant) => variant.componentGroupId === groupId)
+  ));
+  if (dependent) {
+    throw new Error(`Delete the referencing variant or slot "${dependent.name}" before deleting this group.`);
+  }
+  if (!project.componentGroups.some((group) => group.id === groupId)) {
+    throw new Error('Component group not found.');
+  }
+  return touchProject({
+    ...project,
+    componentGroups: project.componentGroups.filter((group) => group.id !== groupId),
+  });
+}
+
 export function addSourceBuild(
   project: FvwcProjectV1,
   source: ComposerSourceBuild,

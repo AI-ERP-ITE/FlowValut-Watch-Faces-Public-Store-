@@ -5,8 +5,12 @@ import {
   createComponentGroup,
   createFvwcProject,
   createSlotFromGroup,
+  deleteComponentGroup,
+  deleteComposerSlot,
+  deleteComposerVariant,
   parseFvwc,
   resolveCanvasPresentation,
+  selectSlotForFirstSliceExport,
   serializeFvwc,
   setBaseBuild,
   setDefaultVariant,
@@ -179,5 +183,52 @@ describe('FVWC composer domain', () => {
     expect(parsed.format).toBe('flowvault-editable-watchface-composer');
     expect(parsed.fvwcSchemaVersion).toBe(1);
     expect(parsed.sourceBuilds[0].artifact).toEqual(artifact);
+  });
+
+  it('exports only the currently selected slot for the first V2 slice', () => {
+    project = addSourceBuild(project, source('build_a', 'aaa'));
+    project = createComponentGroup(project, {
+      name: 'Heart',
+      sourceBuildId: 'build_a',
+      layerIds: ['heart_value'],
+    });
+    project = createSlotFromGroup(project, project.componentGroups[0].id, 'First');
+    const second = { ...structuredClone(project.slots[0]), id: 'slot_second', name: 'Second' };
+    project = { ...project, slots: [...project.slots, second] };
+    const selected = selectSlotForFirstSliceExport(project, 'slot_second');
+    expect(selected.slots.map((slot) => slot.id)).toEqual(['slot_second']);
+    expect(project.slots).toHaveLength(2);
+  });
+
+  it('enforces variant then slot then group deletion order', () => {
+    const secondArtifact = structuredClone(artifact);
+    secondArtifact.watchFaceConfig.elements[0] = {
+      ...secondArtifact.watchFaceConfig.elements[0],
+      id: 'steps_value',
+    };
+    project = addSourceBuild(project, source('build_a', 'aaa'));
+    project = addSourceBuild(project, source('build_b', 'bbb', secondArtifact));
+    project = createComponentGroup(project, {
+      name: 'Heart',
+      sourceBuildId: 'build_a',
+      layerIds: ['heart_value'],
+    });
+    project = createComponentGroup(project, {
+      name: 'Steps',
+      sourceBuildId: 'build_b',
+      layerIds: ['steps_value'],
+    });
+    project = createSlotFromGroup(project, project.componentGroups[0].id, 'Readout');
+    project = addVariantToSlot(project, project.slots[0].id, project.componentGroups[1].id, 'DATA_ONLY');
+    const slotId = project.slots[0].id;
+    const secondVariantId = project.slots[0].variants[1].id;
+
+    expect(() => deleteComponentGroup(project, project.componentGroups[1].id)).toThrow(/referencing variant or slot/);
+    project = deleteComposerVariant(project, slotId, secondVariantId);
+    expect(() => deleteComposerVariant(project, slotId, project.slots[0].variants[0].id)).toThrow(/Delete the slot/);
+    project = deleteComposerSlot(project, slotId);
+    project = deleteComponentGroup(project, project.componentGroups[1].id);
+    expect(project.slots).toHaveLength(0);
+    expect(project.componentGroups).toHaveLength(1);
   });
 });

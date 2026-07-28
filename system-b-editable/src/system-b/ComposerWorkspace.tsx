@@ -11,9 +11,13 @@ import {
   createComponentGroup,
   createFvwcProject,
   createSlotFromGroup,
+  deleteComponentGroup,
+  deleteComposerSlot,
+  deleteComposerVariant,
   parseFvwc,
   resolveCanvasPresentation,
   serializeFvwc,
+  selectSlotForFirstSliceExport,
   setBaseBuild,
   setDefaultVariant,
   sha256Text,
@@ -217,7 +221,7 @@ export function ComposerWorkspace() {
 
   function validateEditablePlan(): void {
     try {
-      const plan = compileEditableV2Plan(project);
+      const plan = compileEditableV2Plan(selectSlotForFirstSliceExport(project, selectedSlotId));
       setEditableArtifactSummary(
         `V2 plan valid · edit_id ${plan.slot.editId} · ${plan.slot.variants.length} variants · ${plan.assets.length + 1} editable assets`,
       );
@@ -231,13 +235,14 @@ export function ComposerWorkspace() {
   async function exportEditableZpk(): Promise<void> {
     setBusy(true);
     try {
+      const exportProject = selectSlotForFirstSliceExport(project, selectedSlotId);
       const variantPreviews = Object.fromEntries(
         [...variantCanvasRefs.current.entries()].map(([id, canvas]) => [id, canvas.toDataURL('image/png')]),
       );
       const mainPreview = canvasRef.current?.toDataURL('image/png')
         ?? project.sourceBuilds.find((source) => source.id === project.baseBuildId)?.artifact.backgroundImage;
       const result = await buildEditableV2Zpk(
-        project,
+        exportProject,
         mainPreview ?? null,
         variantPreviews,
       );
@@ -267,7 +272,7 @@ export function ComposerWorkspace() {
         let activeProjectId = workshopProjectId;
         if (!activeProjectId) {
           const created = await createWorkshopProject({
-            workingTitle: project.name,
+            workingTitle: exportProject.name,
             tags: ['editable-watchface', 'fvwc'],
             targetDeviceId: baseSource.canonicalModelId,
           });
@@ -276,12 +281,12 @@ export function ComposerWorkspace() {
         }
         const published = await createWorkshopBuild({
           projectId: activeProjectId,
-          workshopLabel: project.name,
+          workshopLabel: exportProject.name,
           resolution: result.plan.baseConfig.resolution,
           specGroup: baseSource.specGroup,
           deviceId: baseSource.canonicalModelId,
           notes: 'System B editable watchface; source artifact stored in the FVWF slot uses FVWC schema.',
-          fvwf: new Blob([serializeFvwc(project)], { type: 'application/json' }),
+          fvwf: new Blob([serializeFvwc(exportProject)], { type: 'application/json' }),
           zpk: result.blob,
           mainPreview: dataUrlToBlob(mainPreview),
           aodPreview: aodCanvasRef.current
@@ -310,6 +315,36 @@ export function ComposerWorkspace() {
 
   if (!authChecked) {
     return <main className="system-b-auth"><p>Checking private access…</p></main>;
+  }
+
+  function removeGroup(groupId: string): void {
+    try {
+      setProject(deleteComponentGroup(project, groupId));
+      if (selectedGroupId === groupId) setSelectedGroupId(null);
+      setMessage('Component group deleted.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Group deletion failed.');
+    }
+  }
+
+  function removeSlot(slotId: string): void {
+    try {
+      const next = deleteComposerSlot(project, slotId);
+      setProject(next);
+      if (selectedSlotId === slotId) setSelectedSlotId(next.slots[0]?.id ?? null);
+      setMessage('Editable slot deleted. Its component groups are now available for deletion.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Slot deletion failed.');
+    }
+  }
+
+  function removeVariant(slotId: string, variantId: string): void {
+    try {
+      setProject(deleteComposerVariant(project, slotId, variantId));
+      setMessage('Variant deleted.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Variant deletion failed.');
+    }
   }
 
   if (!signedIn) {
@@ -506,18 +541,22 @@ export function ComposerWorkspace() {
           <h2>Component groups</h2>
           <div className="composer-stack">
             {project.componentGroups.map((group) => (
-              <button
-                type="button"
-                key={group.id}
-                className={`group-card ${selectedGroupId === group.id ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedGroupId(group.id);
-                  setSelectedSourceId(group.sourceBuildId);
-                }}
-              >
-                <strong>{group.name}</strong>
-                <span>{group.layerIds.length} layers</span>
-              </button>
+              <div className="composer-entity-row" key={group.id}>
+                <button
+                  type="button"
+                  className={`group-card ${selectedGroupId === group.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedGroupId(group.id);
+                    setSelectedSourceId(group.sourceBuildId);
+                  }}
+                >
+                  <strong>{group.name}</strong>
+                  <span>{group.layerIds.length} layers</span>
+                </button>
+                <button type="button" className="composer-delete" onClick={() => removeGroup(group.id)}>
+                  Delete
+                </button>
+              </div>
             ))}
           </div>
           <label>
@@ -535,19 +574,23 @@ export function ComposerWorkspace() {
           <h2>Editable slots</h2>
           <div className="composer-stack">
             {project.slots.map((slot) => (
-              <button
-                type="button"
-                key={slot.id}
-                className={`slot-card ${selectedSlotId === slot.id ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedSlotId(slot.id);
-                  setCanvasMode('VARIANT');
-                }}
-              >
-                <strong>{slot.name}</strong>
-                <span>{slot.family}</span>
-                <span>{slot.variants.length} variants</span>
-              </button>
+              <div className="composer-entity-row" key={slot.id}>
+                <button
+                  type="button"
+                  className={`slot-card ${selectedSlotId === slot.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedSlotId(slot.id);
+                    setCanvasMode('VARIANT');
+                  }}
+                >
+                  <strong>{slot.name}</strong>
+                  <span>{slot.family}</span>
+                  <span>{slot.variants.length} variants</span>
+                </button>
+                <button type="button" className="composer-delete" onClick={() => removeSlot(slot.id)}>
+                  Delete
+                </button>
+              </div>
             ))}
           </div>
           <button
@@ -562,15 +605,24 @@ export function ComposerWorkspace() {
           {selectedSlot && (
             <div className="variant-list">
               {selectedSlot.variants.map((variant) => (
-                <label key={variant.id}>
-                  <input
-                    type="radio"
-                    name={`default-${selectedSlot.id}`}
-                    checked={selectedSlot.defaultVariantId === variant.id}
-                    onChange={() => setProject(setDefaultVariant(project, selectedSlot.id, variant.id))}
-                  />
-                  <span><strong>{variant.name}</strong><small>{variant.mode}</small></span>
-                </label>
+                <div className="composer-entity-row" key={variant.id}>
+                  <label>
+                    <input
+                      type="radio"
+                      name={`default-${selectedSlot.id}`}
+                      checked={selectedSlot.defaultVariantId === variant.id}
+                      onChange={() => setProject(setDefaultVariant(project, selectedSlot.id, variant.id))}
+                    />
+                    <span><strong>{variant.name}</strong><small>{variant.mode}</small></span>
+                  </label>
+                  <button
+                    type="button"
+                    className="composer-delete"
+                    onClick={() => removeVariant(selectedSlot.id, variant.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
               ))}
             </div>
           )}
