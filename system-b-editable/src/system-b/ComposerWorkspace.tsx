@@ -77,7 +77,12 @@ export function ComposerWorkspace() {
   const [editableArtifactSummary, setEditableArtifactSummary] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [workshopProjectId, setWorkshopProjectId] = useState<string | null>(null);
+  const [workshopProjectId, setWorkshopProjectId] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('workshopProject'),
+  );
+  const [workshopBuildId, setWorkshopBuildId] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get('build'),
+  );
   const [workshopResult, setWorkshopResult] = useState<{
     projectId: string;
     buildId: string;
@@ -91,6 +96,27 @@ export function ComposerWorkspace() {
     setSignedIn(Boolean(user));
     setAuthChecked(true);
   }), []);
+
+  useEffect(() => {
+    const prefix = `flowvault.system-b.workshop.${project.id}`;
+    const params = new URLSearchParams(window.location.search);
+    setWorkshopProjectId(
+      params.get('workshopProject') || window.localStorage.getItem(`${prefix}.project`),
+    );
+    setWorkshopBuildId(
+      params.get('build') || window.localStorage.getItem(`${prefix}.build`),
+    );
+  }, [project.id]);
+
+  function persistWorkshopLink(projectId: string, buildId?: string): void {
+    const prefix = `flowvault.system-b.workshop.${project.id}`;
+    window.localStorage.setItem(`${prefix}.project`, projectId);
+    if (buildId) window.localStorage.setItem(`${prefix}.build`, buildId);
+    const url = new URL(window.location.href);
+    url.searchParams.set('workshopProject', projectId);
+    if (buildId) url.searchParams.set('build', buildId);
+    window.history.replaceState(null, '', url);
+  }
 
   const selectedSource = project.sourceBuilds.find((source) => source.id === selectedSourceId)
     ?? project.sourceBuilds[0]
@@ -278,6 +304,7 @@ export function ComposerWorkspace() {
           });
           activeProjectId = created.projectId;
           setWorkshopProjectId(activeProjectId);
+          persistWorkshopLink(activeProjectId);
         }
         const published = await createWorkshopBuild({
           projectId: activeProjectId,
@@ -286,6 +313,7 @@ export function ComposerWorkspace() {
           specGroup: baseSource.specGroup,
           deviceId: baseSource.canonicalModelId,
           notes: 'System B editable watchface; source artifact stored in the FVWF slot uses FVWC schema.',
+          parentBuildId: workshopBuildId ?? undefined,
           fvwf: new Blob([serializeFvwc(exportProject)], { type: 'application/json' }),
           zpk: result.blob,
           mainPreview: dataUrlToBlob(mainPreview),
@@ -293,6 +321,8 @@ export function ComposerWorkspace() {
             ? dataUrlToBlob(aodCanvasRef.current.toDataURL('image/png'))
             : undefined,
         });
+        setWorkshopBuildId(published.buildId);
+        persistWorkshopLink(published.projectId, published.buildId);
         setWorkshopResult(published);
       }
       setEditableArtifactSummary(
@@ -415,8 +445,10 @@ export function ComposerWorkspace() {
           <img src={workshopResult.qrDataUrl} alt="Install editable watchface QR code" />
           <div>
             <strong>Workshop build #{workshopResult.buildNumber}</strong>
+            <span>Project {workshopResult.projectId}</span>
+            <span>Build {workshopResult.buildId}</span>
             <a href={workshopResult.installUrl}>Open hosted install link</a>
-            <a href={`/Watch-Faces/admin?workshopProjectId=${encodeURIComponent(workshopResult.projectId)}&buildId=${encodeURIComponent(workshopResult.buildId)}`}>
+            <a href="/Watch-Faces/admin">
               Open in Admin
             </a>
           </div>
