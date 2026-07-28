@@ -85,5 +85,9 @@
 - [x] Save FVWC, ZPK, main preview, AOD preview, and hosted-install QR through Workshop.
 - [x] Display the finalized QR and link to the existing private Admin page.
 - [x] Preserve local ZPK download when auth or backend publication is unavailable.
+- [x] Preserve all non-editable base widgets while replacing only selected variant-group widgets.
+- [x] Generate separate transparent selected/unselected edit frames.
+- [x] Omit the incompatible full-screen edit mask for combined background-and-widget themes.
+- [x] Add Zepp full-screen `select_list` configuration and clean flattened option previews.
 - [ ] Test on the physical watch.
 

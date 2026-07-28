@@ -64,6 +64,10 @@ ZIP bytes need not match when timestamps or compression metadata differ.
 - When every variant has dedicated AOD elements, the selected editable type creates the corresponding namespaced `ONLY_AOD` branch.
 - When one or more variants lacks dedicated AOD elements, only the fixed base AOD is emitted.
 - Every optional type preview contains the composed background and selected group layers.
+- Every non-owned base element remains present in the fixed runtime composition.
+- Combined background-and-widget variants do not emit `WATCHFACE_EDIT_MASK`.
+- Selected and unselected edit frames are separate transparent PNG assets.
+- The editable group includes `select_list` for the full-screen option selector.
 
 ## Workshop/Admin/QR gate
 
