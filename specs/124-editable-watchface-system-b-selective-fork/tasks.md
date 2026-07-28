@@ -89,5 +89,6 @@
 - [x] Generate separate transparent selected/unselected edit frames.
 - [x] Omit the incompatible full-screen edit mask for combined background-and-widget themes.
 - [x] Add Zepp full-screen `select_list` configuration and clean flattened option previews.
+- [x] Persist Workshop project/build linkage per FVWC so later exports append Build 2+ instead of creating another Build 1 project.
 - [ ] Test on the physical watch.
 
