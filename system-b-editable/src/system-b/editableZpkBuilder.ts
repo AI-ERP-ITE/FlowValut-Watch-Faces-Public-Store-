@@ -3,6 +3,7 @@ import { buildZPK, type ZPKBuildResult } from '@/lib/zpkBuilder';
 import type { FvwcProjectV1 } from './composerDomain';
 import { compileEditableV2Plan, type EditableV2Plan } from './editableV2';
 import { renderGeneratedDigitAssets } from './digitAssetPreparation';
+import { prepareConfigPointersLikeSystemA } from './systemAPointerExport';
 
 export interface EditableZpkBuildResult extends ZPKBuildResult {
   plan: EditableV2Plan;
@@ -12,30 +13,6 @@ async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   return new File([blob], name, { type: blob.type || 'application/octet-stream' });
-}
-
-async function createSelectionPngFile(
-  width: number,
-  height: number,
-  selected: boolean,
-  name: string,
-): Promise<File> {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('Unable to create editable selection canvas.');
-  context.clearRect(0, 0, width, height);
-  if (selected) {
-    context.strokeStyle = '#ffffff';
-    context.lineWidth = Math.max(2, Math.round(Math.min(width, height) * 0.025));
-    const inset = Math.ceil(context.lineWidth / 2);
-    context.strokeRect(inset, inset, Math.max(1, width - inset * 2), Math.max(1, height - inset * 2));
-  }
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Unable to encode editable selection image.')), 'image/png');
-  });
-  return new File([blob], name, { type: 'image/png' });
 }
 
 async function patchEditableArchive(
@@ -53,18 +30,13 @@ async function patchEditableArchive(
   for (const asset of plan.assets) {
     assets.file(asset.path, await dataUrlToFile(asset.dataUrl, asset.path.split('/').at(-1) || 'asset.png'));
   }
-  assets.file(plan.slot.selectImagePath, await createSelectionPngFile(
-    plan.slot.bounds.width,
-    plan.slot.bounds.height,
-    true,
-    'select.png',
-  ));
-  assets.file(plan.slot.unselectImagePath, await createSelectionPngFile(
-    plan.slot.bounds.width,
-    plan.slot.bounds.height,
-    false,
-    'unselect.png',
-  ));
+  const defaultVariant = plan.slot.variants.find((variant) => variant.typeId === plan.slot.defaultTypeId)
+    ?? plan.slot.variants[0];
+  const defaultPreview = plan.assets.find((asset) => asset.path === defaultVariant?.previewPath);
+  if (!defaultPreview) throw new Error('Editable default variant preview is missing.');
+  const selectionImage = await dataUrlToFile(defaultPreview.dataUrl, 'selection.png');
+  assets.file(plan.slot.selectImagePath, selectionImage);
+  assets.file(plan.slot.unselectImagePath, selectionImage);
   const deviceBlob = await device.generateAsync({ type: 'blob', compression: 'STORE' });
   outer.file('device.zip', deviceBlob);
   outer.file('app.json', plan.generatedCode.appJson);
@@ -76,8 +48,21 @@ export async function buildEditableV2Zpk(
   previewDataUrl?: string | null,
   variantPreviewDataUrls: Record<string, string> = {},
 ): Promise<EditableZpkBuildResult> {
-  const plan = compileEditableV2Plan(project, variantPreviewDataUrls);
-  const baseSource = project.sourceBuilds.find((source) => source.id === project.baseBuildId)!;
+  const preparedProject: FvwcProjectV1 = {
+    ...project,
+    sourceBuilds: await Promise.all(project.sourceBuilds.map(async (source) => ({
+      ...source,
+      artifact: {
+        ...source.artifact,
+        watchFaceConfig: await prepareConfigPointersLikeSystemA(
+          source.artifact.watchFaceConfig,
+          project.customHandStyles ?? [],
+        ),
+      },
+    }))),
+  };
+  const plan = compileEditableV2Plan(preparedProject, variantPreviewDataUrls);
+  const baseSource = preparedProject.sourceBuilds.find((source) => source.id === preparedProject.baseBuildId)!;
   const backgroundDataUrl = baseSource.artifact.backgroundImage;
   if (!backgroundDataUrl?.startsWith('data:')) {
     throw new Error('The base FVWF requires an embedded background.');

@@ -94,7 +94,7 @@ describe('editable V2 compiler', () => {
     expect(plan.slot.variants.map((variant) => variant.typeId)).toEqual([100000, 100001]);
     expect(plan.generatedCode.watchfaceIndexJs).toContain('WATCHFACE_EDIT_GROUP');
     expect(plan.generatedCode.watchfaceIndexJs).toContain('CURRENT_TYPE');
-    expect(plan.generatedCode.watchfaceIndexJs).toContain('select_list');
+    expect(plan.generatedCode.watchfaceIndexJs).not.toContain('select_list');
     expect(plan.generatedCode.watchfaceIndexJs).toContain(plan.slot.selectImagePath);
     expect(plan.generatedCode.watchfaceIndexJs).toContain(plan.slot.unselectImagePath);
     expect(plan.generatedCode.watchfaceIndexJs).not.toContain('WATCHFACE_EDIT_MASK');

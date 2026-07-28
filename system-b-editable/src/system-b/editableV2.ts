@@ -228,14 +228,7 @@ function editableRuntimeBlock(slot: EditableV2SlotPlan, baseConfig: WatchFaceCon
                     optional_types: [
                     ${optionalTypes}
                     ],
-                    count: ${slot.variants.length},
-                    select_list: {
-                        title_font_size: 34,
-                        title_align_h: hmUI.align.CENTER_H,
-                        list_item_vspace: 8,
-                        list_tips_text_font_size: 32,
-                        list_tips_text_align_h: hmUI.align.LEFT
-                    }
+                    count: ${slot.variants.length}
                 });
                 const editableType_${slot.editId} = editableGroup_${slot.editId}.getProperty(hmUI.prop.CURRENT_TYPE);
                 switch (editableType_${slot.editId}) {

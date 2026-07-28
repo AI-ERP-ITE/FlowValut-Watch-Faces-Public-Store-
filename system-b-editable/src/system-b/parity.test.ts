@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import models from '../../models.json';
 import {
   createProjectFileArtifact,
@@ -19,6 +22,21 @@ const minimalConfig: WatchFaceConfig = {
 };
 
 describe('current System A V2 baseline copies', () => {
+  it.each([
+    ['components/InteractiveCanvas.tsx'],
+    ['lib/zpkBuilder.ts'],
+    ['lib/jsCodeGenerator.ts'],
+    ['lib/handStyles.ts'],
+    ['lib/customHandStore.ts'],
+  ])('keeps %s byte-identical to System A', (relativePath) => {
+    const systemA = readFileSync(path.resolve('..', 'src', relativePath));
+    const systemB = readFileSync(path.resolve('src', relativePath));
+    const hash = (value: Buffer) => createHash('sha256')
+      .update(value.toString('utf8').replace(/\r\n/g, '\n'))
+      .digest('hex');
+    expect(hash(systemB)).toBe(hash(systemA));
+  });
+
   it('round-trips FVWF V1 without changing the config', () => {
     const artifact = createProjectFileArtifact(minimalConfig, 'data:image/png;base64,AA==');
     const parsed = parseProjectFileArtifact(serializeProjectFileArtifact(artifact));
