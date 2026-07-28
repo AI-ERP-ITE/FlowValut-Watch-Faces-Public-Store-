@@ -19,6 +19,7 @@ Follow all phases in order — do not skip steps.
 | GitHub repo | https://github.com/AI-ERP-ITE/Watch-Faces |
 | Live site | https://ai-erp-ite.github.io/Watch-Faces/ |
 | Studio | https://ai-erp-ite.github.io/Watch-Faces/studio/ |
+| Editable System B | https://ai-erp-ite.github.io/Watch-Faces/editable-watchfaces/ |
 
 ### Repo Guard (Run Before Any Deploy)
 
@@ -42,6 +43,9 @@ Write-Output "Repo root OK: $repoRootNorm"
 - [ ] Studio route uses `app/docs/studio/index.html`
 - [ ] Both HTML files must point to the latest built asset hash from `app/dist/assets/`
 - [ ] If one route is updated and the other is not, deployment is considered failed
+- [ ] `system-b-editable/dist/` is built with base `/Watch-Faces/editable-watchfaces/`
+- [ ] Root and docs `editable-watchfaces/` directories contain the same standalone bundle
+- [ ] The live standalone HTML and its referenced JS/CSS assets return HTTP 200
 
 ### Entry Surface Clarification (Prevent White/Blank Page)
 
