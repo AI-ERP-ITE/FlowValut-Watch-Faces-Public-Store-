@@ -41,6 +41,7 @@ ZIP bytes need not match when timestamps or compression metadata differ.
 ## FVWC gate
 
 - Source builds remain immutable.
+- VARIANT preview resolves its elements and background from one default-variant source; the last manually selected source cannot leak into the preview.
 - Assets survive save/reopen.
 - Duplicate imports are detected.
 - Base, group, slot, variant, and default invariants hold.
