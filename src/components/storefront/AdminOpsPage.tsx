@@ -222,11 +222,10 @@ export function AdminOpsPage() {
 
   async function handleDeleteProject(projectId: string) {
     const required = `DELETE ${projectId}`;
-    const confirmation = window.prompt(`Permanent deletion removes this project and all of its trashed build artifacts.\n\nType exactly:\n${required}`);
-    if (confirmation !== required) return;
+    if (!window.confirm('Are you sure you want to permanently delete this project? This cannot be undone.')) return;
     setLoadingCatalog(true);
     try {
-      await deleteWorkshopProject(projectId, confirmation);
+      await deleteWorkshopProject(projectId, required);
       toast.success(`Project ${projectId} deleted successfully.`);
       setWorkshopProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (e) {

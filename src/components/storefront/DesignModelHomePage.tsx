@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
 import { DesignModelCard } from './DesignModelCard';
-import { resolveLegacySku, skuPackages } from '@/lib/storeReadModel';
+import { resolveFeaturedSelection } from '@/lib/storeReadModel';
 
 export function DesignModelHomePage() {
   const { data, loading, error, globalDeviceId } = useStoreReadModel();
@@ -37,31 +37,7 @@ export function DesignModelHomePage() {
 
   const featuredData = useMemo(() => {
     if (!data || !featuredFaceId) return null;
-
-    // Try as a legacy SKU ID first
-    const legacySku = resolveLegacySku(data, featuredFaceId);
-    if (legacySku) {
-      const model = data.designModels.find(m => m.id === legacySku.productModelId);
-      if (model) {
-        const pkgs = skuPackages(data, legacySku.id);
-        const pkg = pkgs.find(p => p.mainPreviewPath) || pkgs[0];
-        return { model, sku: legacySku, pkg };
-      }
-    }
-
-    // Then try as a direct DesignModel ID or Slug
-    const directModel = data.designModels.find(m => m.id === featuredFaceId || m.slug === featuredFaceId);
-    if (directModel) {
-      const modelSkus = data.skus.filter(s => s.productModelId === directModel.id);
-      const skuToUse = modelSkus[0];
-      if (skuToUse) {
-        const pkgs = skuPackages(data, skuToUse.id);
-        const pkg = pkgs.find(p => p.mainPreviewPath) || pkgs[0];
-        return { model: directModel, sku: skuToUse, pkg };
-      }
-    }
-
-    return null;
+    return resolveFeaturedSelection(data, featuredFaceId);
   }, [data, featuredFaceId]);
 
   if (loading) return <Status text="Loading the collection…" />; if (error || !data) return <Status text={error ?? 'Store unavailable'} />;

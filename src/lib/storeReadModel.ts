@@ -14,6 +14,18 @@ export function skuOffer(model: StoreReadModel, skuId: string) {
   return offers.find((offer) => offer.type === 'SKU') ?? offers[0] ?? null;
 }
 export function skuPackages(model: StoreReadModel, skuId: string) { return model.technicalPackages.filter((item) => item.skuId === skuId); }
+export function resolveFeaturedSelection(model: StoreReadModel, selectedId: string) {
+  const directPackage = model.technicalPackages.find((item) => item.id === selectedId);
+  const directSku = model.skus.find((item) => item.id === (directPackage?.skuId ?? selectedId));
+  const selectedSku = directSku ?? resolveLegacySku(model, selectedId);
+  const directModel = model.designModels.find((item) => item.id === selectedId || item.slug === selectedId);
+  const selectedModel = directModel ?? model.designModels.find((item) => item.id === selectedSku?.productModelId);
+  const resolvedSku = selectedSku ?? model.skus.find((item) => item.productModelId === selectedModel?.id);
+  if (!selectedModel || !resolvedSku) return null;
+  const packages = skuPackages(model, resolvedSku.id);
+  const selectedPackage = directPackage ?? packages.find((item) => item.mainPreviewPath) ?? packages[0];
+  return { model: selectedModel, sku: resolvedSku, pkg: selectedPackage };
+}
 export function compatibleDevices(model: StoreReadModel, skuId: string) {
   const targets = new Set(skuPackages(model, skuId).map((item) => item.technicalTargetId));
   return model.devices.filter((device) => targets.has(device.technicalTargetId));
