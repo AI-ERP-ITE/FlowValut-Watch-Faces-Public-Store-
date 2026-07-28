@@ -184,7 +184,12 @@ export function ComposerWorkspace() {
       setSelectedLayerId(null);
       setSelectedGroupId(loaded.componentGroups[0]?.id ?? null);
       setSelectedSlotId(loaded.slots[0]?.id ?? null);
-      setMessage(`Opened ${file.name}.`);
+      setCanvasMode('SOURCE');
+      const totalElements = loaded.sourceBuilds.reduce(
+        (count, source) => count + source.artifact.watchFaceConfig.elements.length,
+        0,
+      );
+      setMessage(`Opened ${file.name}: ${loaded.sourceBuilds.length} complete source builds, ${totalElements} source elements.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'FVWC load failed.');
     } finally {

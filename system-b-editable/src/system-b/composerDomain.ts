@@ -112,7 +112,10 @@ export function resolveCanvasPresentation(
       ?? selectedSource;
     return {
       source,
-      elements: variant ? elementsForGroup(project, variant.componentGroupId) : [],
+      // A variant is previewed as its complete immutable source face. Groups
+      // remain ownership references for compilation; they must never hide the
+      // source's fixed widgets in the authoring canvas or exported preview.
+      elements: source?.artifact.watchFaceConfig.elements ?? [],
     };
   }
   if (mode === 'COMBINATION') {

@@ -178,11 +178,24 @@ describe('FVWC composer domain', () => {
   });
 
   it('round-trips the FVWC schema', () => {
-    project = addSourceBuild(project, source('build_a', 'aaa'));
+    const artifactWithPointer = structuredClone(artifact);
+    artifactWithPointer.watchFaceConfig.elements.push({
+      id: 'time_pointer',
+      type: 'TIME_POINTER',
+      name: 'Time pointers',
+      bounds: { x: 0, y: 0, width: 480, height: 480 },
+      visible: true,
+      zIndex: 10,
+      pointerCenter: { x: 240, y: 240 },
+    });
+    project = addSourceBuild(project, source('build_a', 'aaa', artifactWithPointer));
     const parsed = parseFvwc(serializeFvwc(project));
     expect(parsed.format).toBe('flowvault-editable-watchface-composer');
     expect(parsed.fvwcSchemaVersion).toBe(1);
-    expect(parsed.sourceBuilds[0].artifact).toEqual(artifact);
+    expect(parsed.sourceBuilds[0].artifact).toEqual(artifactWithPointer);
+    expect(parsed.sourceBuilds[0].artifact.watchFaceConfig.elements.some(
+      (element) => element.type === 'TIME_POINTER',
+    )).toBe(true);
   });
 
   it('exports only the currently selected slot for the first V2 slice', () => {

@@ -124,8 +124,18 @@ describe('editable V2 compiler', () => {
       zIndex: 1,
       text: 'Fixed',
     });
+    project.sourceBuilds[0].artifact.watchFaceConfig.elements.push({
+      id: 'fixed_time_pointer',
+      type: 'TIME_POINTER',
+      name: 'Fixed time pointers',
+      bounds: { x: 0, y: 0, width: 480, height: 480 },
+      visible: true,
+      zIndex: 10,
+      pointerCenter: { x: 240, y: 240 },
+    });
     const plan = compileEditableV2Plan(project);
     expect(plan.baseConfig.elements.some((element) => element.id.includes('fixed_label'))).toBe(true);
+    expect(plan.baseConfig.elements.some((element) => element.id.includes('fixed_time_pointer'))).toBe(true);
     expect(plan.generatedCode.watchfaceIndexJs).toContain('Fixed label');
   });
 
