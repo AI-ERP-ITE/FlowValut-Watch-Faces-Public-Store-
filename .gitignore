@@ -7,6 +7,7 @@ pnpm-lock.yaml
 # Production build output (docs/ is the GitHub Pages folder, not dist/)
 dist/
 build/
+system-b-editable/artifacts/
 
 # Environment variables
 .env
