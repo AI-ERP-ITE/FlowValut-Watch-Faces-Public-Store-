@@ -7,4 +7,4 @@
 - [x] Pass records into all System B canvases.
 - [x] Add unit tests.
 - [x] Run System B tests and private production build.
-- [ ] Deploy privately and verify the live System B entry/assets.
+- [x] Deploy privately and verify the live System B entry/assets.

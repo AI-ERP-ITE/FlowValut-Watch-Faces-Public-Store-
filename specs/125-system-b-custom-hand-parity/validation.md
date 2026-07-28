@@ -7,4 +7,4 @@
 - [x] Missing custom hand records produce an explicit import/load failure.
 - [x] Unit tests pass.
 - [x] Production build passes.
-- [ ] Live entrypoint and hashed assets return HTTP 200.
+- [x] Live entrypoint and hashed assets return HTTP 200.
