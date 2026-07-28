@@ -6,6 +6,7 @@ import {
   createFvwcProject,
   createSlotFromGroup,
   parseFvwc,
+  resolveCanvasPresentation,
   serializeFvwc,
   setBaseBuild,
   setDefaultVariant,
@@ -132,6 +133,44 @@ describe('FVWC composer domain', () => {
     const second = project.slots[0].variants[1];
     project = setDefaultVariant(project, project.slots[0].id, second.id);
     expect(project.slots[0].defaultVariantId).toBe(second.id);
+  });
+
+  it('resolves variant layers and background from the same default-variant source', () => {
+    const secondArtifact = structuredClone(artifact);
+    secondArtifact.backgroundImage = 'data:image/png;base64,AQ==';
+    secondArtifact.watchFaceConfig.name = 'Steps';
+    secondArtifact.watchFaceConfig.elements[0] = {
+      ...secondArtifact.watchFaceConfig.elements[0],
+      id: 'steps_value',
+      name: 'Steps Value',
+      dataType: 'STEP',
+    };
+    project = addSourceBuild(project, source('build_a', 'aaa'));
+    project = addSourceBuild(project, source('build_b', 'bbb', secondArtifact));
+    project = createComponentGroup(project, {
+      name: 'Heart',
+      sourceBuildId: 'build_a',
+      layerIds: ['heart_value'],
+    });
+    project = createComponentGroup(project, {
+      name: 'Steps',
+      sourceBuildId: 'build_b',
+      layerIds: ['steps_value'],
+    });
+    project = createSlotFromGroup(project, project.componentGroups[0].id, 'Readout');
+    project = addVariantToSlot(project, project.slots[0].id, project.componentGroups[1].id, 'DATA_ONLY');
+    project = setDefaultVariant(project, project.slots[0].id, project.slots[0].variants[1].id);
+
+    const presentation = resolveCanvasPresentation(
+      project,
+      'VARIANT',
+      'build_a',
+      project.slots[0].id,
+    );
+
+    expect(presentation.source?.id).toBe('build_b');
+    expect(presentation.source?.artifact.backgroundImage).toBe('data:image/png;base64,AQ==');
+    expect(presentation.elements.map((element) => element.id)).toEqual(['steps_value']);
   });
 
   it('round-trips the FVWC schema', () => {

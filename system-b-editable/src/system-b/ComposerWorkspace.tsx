@@ -5,7 +5,6 @@ import { InteractiveCanvas } from '@/components/InteractiveCanvas';
 import { ElementList } from '@/components/ElementList';
 import { parseProjectFileArtifact } from '@/lib/projectFileArtifact';
 import { resolveWatchModelTarget } from '@/lib/watchModelTarget';
-import type { WatchFaceElement } from '@/types';
 import {
   addSourceBuild,
   addVariantToSlot,
@@ -13,6 +12,7 @@ import {
   createFvwcProject,
   createSlotFromGroup,
   parseFvwc,
+  resolveCanvasPresentation,
   serializeFvwc,
   setBaseBuild,
   setDefaultVariant,
@@ -21,7 +21,6 @@ import {
   type ComposerCanvasMode,
   type ComposerSourceBuild,
   type EditableMode,
-  type FvwcProjectV1,
 } from './composerDomain';
 import { compileEditableV2Plan } from './editableV2';
 import { buildEditableV2Zpk } from './editableZpkBuilder';
@@ -36,14 +35,6 @@ function downloadText(text: string, filename: string): void {
   anchor.download = filename;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-function groupElements(project: FvwcProjectV1, groupId: string): WatchFaceElement[] {
-  const group = project.componentGroups.find((item) => item.id === groupId);
-  const source = project.sourceBuilds.find((item) => item.id === group?.sourceBuildId);
-  if (!group || !source) return [];
-  return source.artifact.watchFaceConfig.elements
-    .filter((element) => group.layerIds.includes(element.id));
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -80,26 +71,11 @@ export function ComposerWorkspace() {
   const selectedSlot = project.slots.find((slot) => slot.id === selectedSlotId) ?? null;
   const issues = useMemo(() => validateComposerProject(project), [project]);
 
-  const canvasElements = useMemo(() => {
-    if (!selectedSource) return [];
-    if (canvasMode === 'BASE') {
-      return project.sourceBuilds.find((source) => source.id === project.baseBuildId)
-        ?.artifact.watchFaceConfig.elements ?? selectedSource.artifact.watchFaceConfig.elements;
-    }
-    if (canvasMode === 'VARIANT' && selectedSlot) {
-      const variant = selectedSlot.variants.find((item) => item.id === selectedSlot.defaultVariantId)
-        ?? selectedSlot.variants[0];
-      return variant ? groupElements(project, variant.componentGroupId) : [];
-    }
-    if (canvasMode === 'COMBINATION') {
-      return project.slots.flatMap((slot) => {
-        const variant = slot.variants.find((item) => item.id === slot.defaultVariantId)
-          ?? slot.variants[0];
-        return variant ? groupElements(project, variant.componentGroupId) : [];
-      });
-    }
-    return selectedSource.artifact.watchFaceConfig.elements;
-  }, [canvasMode, project, selectedSlot, selectedSource]);
+  const canvasPresentation = useMemo(
+    () => resolveCanvasPresentation(project, canvasMode, selectedSourceId, selectedSlotId),
+    [canvasMode, project, selectedSlotId, selectedSourceId],
+  );
+  const canvasElements = canvasPresentation.elements;
 
   async function importFvwfFiles(files: FileList): Promise<void> {
     setBusy(true);
@@ -266,8 +242,9 @@ export function ComposerWorkspace() {
     }
   }
 
-  const activeConfig = selectedSource?.artifact.watchFaceConfig;
-  const activeBackground = selectedSource?.artifact.backgroundImage || activeConfig?.background.src;
+  const activeSource = canvasPresentation.source;
+  const activeConfig = activeSource?.artifact.watchFaceConfig;
+  const activeBackground = activeSource?.artifact.backgroundImage || activeConfig?.background.src;
 
   return (
     <main className="system-b-shell composer-shell">
@@ -399,7 +376,7 @@ export function ComposerWorkspace() {
                 onMultiToggle={toggleLayer}
                 canvasW={activeConfig.resolution.width}
                 canvasH={activeConfig.resolution.height}
-                canvasShape={selectedSource?.specGroup.includes('square') ? 'square' : 'round'}
+                canvasShape={activeSource?.specGroup.includes('square') ? 'square' : 'round'}
                 showGrid
               />
               {canvasMode === 'OVERLAY' && comparisonSource && (

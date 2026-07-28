@@ -74,6 +74,65 @@ export interface ComposerValidationIssue {
   variantId?: string;
 }
 
+export interface ComposerCanvasPresentation {
+  source: ComposerSourceBuild | null;
+  elements: WatchFaceElement[];
+}
+
+function elementsForGroup(project: FvwcProjectV1, groupId: string): WatchFaceElement[] {
+  const group = project.componentGroups.find((item) => item.id === groupId);
+  const source = project.sourceBuilds.find((item) => item.id === group?.sourceBuildId);
+  if (!group || !source) return [];
+  return source.artifact.watchFaceConfig.elements
+    .filter((element) => group.layerIds.includes(element.id));
+}
+
+export function resolveCanvasPresentation(
+  project: FvwcProjectV1,
+  mode: ComposerCanvasMode,
+  selectedSourceId: string | null,
+  selectedSlotId: string | null,
+): ComposerCanvasPresentation {
+  const selectedSource = project.sourceBuilds.find((source) => source.id === selectedSourceId)
+    ?? project.sourceBuilds[0]
+    ?? null;
+  if (mode === 'BASE') {
+    const source = project.sourceBuilds.find((item) => item.id === project.baseBuildId)
+      ?? selectedSource;
+    return {
+      source,
+      elements: source?.artifact.watchFaceConfig.elements ?? [],
+    };
+  }
+  if (mode === 'VARIANT') {
+    const slot = project.slots.find((item) => item.id === selectedSlotId);
+    const variant = slot?.variants.find((item) => item.id === slot.defaultVariantId)
+      ?? slot?.variants[0];
+    const source = project.sourceBuilds.find((item) => item.id === variant?.sourceBuildId)
+      ?? selectedSource;
+    return {
+      source,
+      elements: variant ? elementsForGroup(project, variant.componentGroupId) : [],
+    };
+  }
+  if (mode === 'COMBINATION') {
+    const source = project.sourceBuilds.find((item) => item.id === project.baseBuildId)
+      ?? selectedSource;
+    return {
+      source,
+      elements: project.slots.flatMap((slot) => {
+        const variant = slot.variants.find((item) => item.id === slot.defaultVariantId)
+          ?? slot.variants[0];
+        return variant ? elementsForGroup(project, variant.componentGroupId) : [];
+      }),
+    };
+  }
+  return {
+    source: selectedSource,
+    elements: selectedSource?.artifact.watchFaceConfig.elements ?? [],
+  };
+}
+
 function nowIso(): string {
   return new Date().toISOString();
 }
