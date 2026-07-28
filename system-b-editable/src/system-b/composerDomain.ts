@@ -1,4 +1,5 @@
 import type { ProjectFileArtifact } from '@/lib/projectFileArtifact';
+import type { CustomHandRecord } from '@/lib/customHandStore';
 import type { WatchFaceElement } from '@/types';
 
 export const FVWC_FORMAT = 'flowvault-editable-watchface-composer' as const;
@@ -62,6 +63,7 @@ export interface FvwcProjectV1 {
   sourceBuilds: ComposerSourceBuild[];
   componentGroups: ComposerComponentGroup[];
   slots: ComposerSlot[];
+  customHandStyles?: CustomHandRecord[];
 }
 
 export interface ComposerValidationIssue {
@@ -158,6 +160,7 @@ export function createFvwcProject(name = 'Editable Watchface Project'): FvwcProj
     sourceBuilds: [],
     componentGroups: [],
     slots: [],
+    customHandStyles: [],
   };
 }
 
@@ -440,7 +443,7 @@ export function parseFvwc(text: string): FvwcProjectV1 {
   if (!Array.isArray(value.sourceBuilds) || !Array.isArray(value.componentGroups) || !Array.isArray(value.slots)) {
     throw new Error('FVWC project collections are invalid.');
   }
-  return value as FvwcProjectV1;
+  return { ...value, customHandStyles: value.customHandStyles ?? [] } as FvwcProjectV1;
 }
 
 export async function sha256Text(text: string): Promise<string> {

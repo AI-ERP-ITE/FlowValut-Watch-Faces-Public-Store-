@@ -30,6 +30,8 @@ import { compileEditableV2Plan } from './editableV2';
 import { buildEditableV2Zpk, type EditableZpkBuildResult } from './editableZpkBuilder';
 import { signInAdminWithGoogle, subscribeAuthState } from '@/lib/firebaseAuthClient';
 import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob } from '@/lib/workshopApi';
+import { loadCustomHandStyles, type CustomHandRecord } from '@/lib/customHandStore';
+import { hydrateArtifactCustomHands, mergeCustomHandRecords } from './customHandParity';
 
 type ModelDefinition = { name?: string; specGroup?: string };
 const modelDefinitions = models as Record<string, ModelDefinition>;
@@ -91,11 +93,18 @@ export function ComposerWorkspace() {
     qrDataUrl: string;
   } | null>(null);
   const [generatedZpk, setGeneratedZpk] = useState<EditableZpkBuildResult | null>(null);
+  const [customHandStyles, setCustomHandStyles] = useState<CustomHandRecord[]>([]);
 
   useEffect(() => subscribeAuthState((user) => {
     setSignedIn(Boolean(user));
     setAuthChecked(true);
   }), []);
+
+  useEffect(() => {
+    void loadCustomHandStyles()
+      .then(setCustomHandStyles)
+      .catch(() => setMessage('Custom pointer library could not be loaded.'));
+  }, []);
 
   useEffect(() => {
     const prefix = `flowvault.system-b.workshop.${project.id}`;
@@ -139,7 +148,13 @@ export function ComposerWorkspace() {
     try {
       for (const file of [...files]) {
         const text = await file.text();
-        const artifact = parseProjectFileArtifact(text);
+        const parsedArtifact = parseProjectFileArtifact(text);
+        const availableHands = mergeCustomHandRecords(
+          customHandStyles,
+          project.customHandStyles,
+          await loadCustomHandStyles(),
+        );
+        const { artifact, referencedHands } = hydrateArtifactCustomHands(parsedArtifact, availableHands);
         const target = resolveWatchModelTarget(artifact.watchFaceConfig.watchModel, modelDefinitions);
         if (!target) throw new Error(`${file.name}: unresolved watch model "${artifact.watchFaceConfig.watchModel}".`);
         const canonicalModelName = modelDefinitions[target.modelId]?.name?.trim()
@@ -160,9 +175,14 @@ export function ComposerWorkspace() {
           artifact: normalizedArtifact,
         };
         next = addSourceBuild(next, source);
+        next = {
+          ...next,
+          customHandStyles: mergeCustomHandRecords(next.customHandStyles, referencedHands),
+        };
         imported.push(source.id);
       }
       setProject(next);
+      setCustomHandStyles((current) => mergeCustomHandRecords(current, next.customHandStyles));
       if (!selectedSourceId && imported[0]) setSelectedSourceId(imported[0]);
       if (!comparisonSourceId && imported[1]) setComparisonSourceId(imported[1]);
       setMessage(`Imported ${imported.length} immutable source build${imported.length === 1 ? '' : 's'}.`);
@@ -177,15 +197,25 @@ export function ComposerWorkspace() {
     setBusy(true);
     try {
       const loaded = parseFvwc(await file.text());
-      setProject(loaded);
-      setSelectedSourceId(loaded.baseBuildId ?? loaded.sourceBuilds[0]?.id ?? null);
-      setComparisonSourceId(loaded.sourceBuilds.find((source) => source.id !== loaded.baseBuildId)?.id ?? null);
+      const availableHands = mergeCustomHandRecords(
+        await loadCustomHandStyles(),
+        loaded.customHandStyles,
+      );
+      const hydratedSources = loaded.sourceBuilds.map((source) => ({
+        ...source,
+        artifact: hydrateArtifactCustomHands(source.artifact, availableHands).artifact,
+      }));
+      const hydrated = { ...loaded, sourceBuilds: hydratedSources, customHandStyles: availableHands };
+      setProject(hydrated);
+      setCustomHandStyles(availableHands);
+      setSelectedSourceId(hydrated.baseBuildId ?? hydrated.sourceBuilds[0]?.id ?? null);
+      setComparisonSourceId(hydrated.sourceBuilds.find((source) => source.id !== hydrated.baseBuildId)?.id ?? null);
       setSelectedLayerIds([]);
       setSelectedLayerId(null);
-      setSelectedGroupId(loaded.componentGroups[0]?.id ?? null);
-      setSelectedSlotId(loaded.slots[0]?.id ?? null);
+      setSelectedGroupId(hydrated.componentGroups[0]?.id ?? null);
+      setSelectedSlotId(hydrated.slots[0]?.id ?? null);
       setCanvasMode('SOURCE');
-      const totalElements = loaded.sourceBuilds.reduce(
+      const totalElements = hydrated.sourceBuilds.reduce(
         (count, source) => count + source.artifact.watchFaceConfig.elements.length,
         0,
       );
@@ -551,6 +581,7 @@ export function ComposerWorkspace() {
                 canvasW={activeConfig.resolution.width}
                 canvasH={activeConfig.resolution.height}
                 canvasShape={activeSource?.specGroup.includes('square') ? 'square' : 'round'}
+                customHandStyles={customHandStyles}
                 showGrid
               />
               {canvasMode === 'OVERLAY' && comparisonSource && (
@@ -562,6 +593,7 @@ export function ComposerWorkspace() {
                     canvasW={comparisonSource.artifact.watchFaceConfig.resolution.width}
                     canvasH={comparisonSource.artifact.watchFaceConfig.resolution.height}
                     canvasShape={comparisonSource.specGroup.includes('square') ? 'square' : 'round'}
+                    customHandStyles={customHandStyles}
                   />
                 </div>
               )}
@@ -702,6 +734,7 @@ export function ComposerWorkspace() {
               canvasW={config.resolution.width}
               canvasH={config.resolution.height}
               canvasShape={source.specGroup.includes('square') ? 'square' : 'round'}
+              customHandStyles={customHandStyles}
             />
           );
         })}
@@ -718,6 +751,7 @@ export function ComposerWorkspace() {
               canvasW={config.resolution.width}
               canvasH={config.resolution.height}
               canvasShape={source.specGroup.includes('square') ? 'square' : 'round'}
+              customHandStyles={customHandStyles}
             />
           );
         })()}

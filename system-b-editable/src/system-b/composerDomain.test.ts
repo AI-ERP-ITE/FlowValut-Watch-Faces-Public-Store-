@@ -189,6 +189,19 @@ describe('FVWC composer domain', () => {
       pointerCenter: { x: 240, y: 240 },
     });
     project = addSourceBuild(project, source('build_a', 'aaa', artifactWithPointer));
+    project = {
+      ...project,
+      customHandStyles: [{
+        key: 'custom_hand:royal',
+        name: 'Royal',
+        hourDataUrl: 'data:image/png;base64,HOUR',
+        minuteDataUrl: 'data:image/png;base64,MINUTE',
+        secondDataUrl: 'data:image/png;base64,SECOND',
+        coverDataUrl: 'data:image/png;base64,COVER',
+        swatchDataUrl: 'data:image/png;base64,SWATCH',
+        createdAt: 1,
+      }],
+    };
     const parsed = parseFvwc(serializeFvwc(project));
     expect(parsed.format).toBe('flowvault-editable-watchface-composer');
     expect(parsed.fvwcSchemaVersion).toBe(1);
@@ -196,6 +209,7 @@ describe('FVWC composer domain', () => {
     expect(parsed.sourceBuilds[0].artifact.watchFaceConfig.elements.some(
       (element) => element.type === 'TIME_POINTER',
     )).toBe(true);
+    expect(parsed.customHandStyles?.[0].key).toBe('custom_hand:royal');
   });
 
   it('exports only the currently selected slot for the first V2 slice', () => {
