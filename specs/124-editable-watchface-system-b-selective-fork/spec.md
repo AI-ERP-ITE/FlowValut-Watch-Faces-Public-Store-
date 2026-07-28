@@ -26,7 +26,30 @@ Local URL:
 http://localhost:5184/editable-watchfaces/
 ```
 
-Production hosting remains unselected and requires separate approval.
+Production URL:
+
+```text
+https://ai-erp-ite.github.io/Watch-Faces/editable-watchfaces/
+```
+
+## AOD policy
+
+Official Zepp OS editable-pointer guidance reads the saved editable configuration in AOD and
+suppresses the second hand there. System B therefore supports a selected theme following into
+AOD only when every variant source contains a dedicated AOD layout. If any variant lacks a
+dedicated AOD layout, the slot exports with the base build's fixed AOD.
+
+## Workshop, Admin, and QR
+
+Editable export reuses the private Workshop pipeline:
+
+1. Build and archive-verify the editable V2 ZPK.
+2. Save the serialized FVWC source, exact ZPK, main preview, AOD preview, and installation QR
+   as one Workshop build.
+3. Generate the QR only from the backend-provided hosted install URL.
+4. Expose the QR and a link to the existing private Admin page after finalization.
+5. If authentication/backend upload fails, preserve the local ZPK download and report that QR
+   and Admin handoff are unavailable.
 
 ## Current authoritative baseline
 

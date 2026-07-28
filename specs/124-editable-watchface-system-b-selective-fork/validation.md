@@ -61,6 +61,16 @@ ZIP bytes need not match when timestamps or compression metadata differ.
 - Required masks and assets exist.
 - ZPK archive structure is valid.
 - The physical watch exposes selection and renders every variant correctly.
+- When every variant has dedicated AOD elements, the selected editable type creates the corresponding namespaced `ONLY_AOD` branch.
+- When one or more variants lacks dedicated AOD elements, only the fixed base AOD is emitted.
+- Every optional type preview contains the composed background and selected group layers.
+
+## Workshop/Admin/QR gate
+
+- QR generation uses the backend-provided hosted install URL, never a local blob URL.
+- Workshop finalization occurs only after FVWC source, exact ZPK, QR, and requested previews upload.
+- A finalized build is visible through the existing private Admin Workshop list.
+- Backend/auth failure does not discard or block local ZPK download.
 
 ## Private deployment gate
 

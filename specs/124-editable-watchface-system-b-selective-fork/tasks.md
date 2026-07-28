@@ -73,11 +73,17 @@
 - [x] Emit `editable: 1`.
 - [x] Generate masks/previews/assets.
 - [x] Package editable ZPK.
-- [x] Generate QR and validation report.
+- [x] Generate hosted-install QR and validation report.
 - [x] Namespace a selected canonical FVWF background per variant instead of retaining the shared `background.png`.
 - [x] Add a regression test proving two theme variants retain distinct background assets and runtime paths.
 - [x] Build and publish the standalone private route at `/Watch-Faces/editable-watchfaces/`.
 - [x] Resolve VARIANT canvas elements, background, transform, resolution, and shape from the same default-variant source.
 - [x] Add a regression test proving a default-variant change switches both its group layers and embedded background.
+- [x] Generate complete per-variant previews from the background and selected component group.
+- [x] Follow the selected theme into AOD only when every source has a dedicated AOD layout.
+- [x] Fall back to fixed base AOD when any variant lacks a dedicated AOD layout.
+- [x] Save FVWC, ZPK, main preview, AOD preview, and hosted-install QR through Workshop.
+- [x] Display the finalized QR and link to the existing private Admin page.
+- [x] Preserve local ZPK download when auth or backend publication is unavailable.
 - [ ] Test on the physical watch.
 
