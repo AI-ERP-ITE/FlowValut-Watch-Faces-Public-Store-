@@ -78,30 +78,20 @@ export function DesignModelHomePage() {
             </div>
           </div>
           {featuredData && (
-            <div className="flex items-center justify-center lg:justify-end mt-10 lg:mt-0">
+            <div className="flex flex-col items-center justify-center lg:items-end lg:justify-end mt-10 lg:mt-0">
               <div className="store-hero-watch">
                 <div className="store-hero-watch-inner">
                   {imageSrc ? (
-                    <Link to={`/model/${featuredData.model.slug || featuredData.model.id}`}>
+                    <Link
+                      to={`/design/${featuredData.model.slug || featuredData.model.id}`}
+                      className="absolute inset-0 block"
+                      aria-label={`View ${featuredData.model.name}`}
+                    >
                     <img
                       src={imageSrc}
                       alt={`${featuredData.model.name} preview`}
-                      className="absolute inset-0 w-full h-full object-cover opacity-35 hover:opacity-50 transition-opacity"
+                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.01]"
                     />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <div className="text-2xl font-light tracking-[0.04em] text-[#f7f8fa]">Featured</div>
-                      <p className="mt-3 text-xs text-[#E8D2A8] max-w-[220px] truncate">
-                        {featuredData.model.name}
-                      </p>
-                      <p className="text-[10px] text-[#9ca3af] mt-1">
-                        Click to view model
-                      </p>
-                    </div>
-                    <div className="absolute top-8 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E8D2A8] pointer-events-none" />
-                    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-12 h-1 rounded-full bg-[#2a313e] overflow-hidden pointer-events-none">
-                      <div className="w-3/4 h-full bg-[#D4B57D]" />
-                    </div>
-                    <div className="absolute inset-0 ring-1 ring-white/10 pointer-events-none" />
                   </Link>
                 ) : (
                   <div className="w-24 h-24 rounded-full border-2 border-[#465064] flex items-center justify-center">
@@ -110,7 +100,13 @@ export function DesignModelHomePage() {
                 )}
               </div>
             </div>
-          </div>
+              <Link
+                to={`/design/${featuredData.model.slug || featuredData.model.id}`}
+                className="mt-3 text-xs text-[#9ca3af] transition-colors hover:text-[#E8D2A8]"
+              >
+                Click preview to view model
+              </Link>
+            </div>
           )}
         </div>
       </section>
