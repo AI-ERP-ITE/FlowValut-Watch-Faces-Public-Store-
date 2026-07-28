@@ -23,9 +23,9 @@ import {
   type EditableMode,
 } from './composerDomain';
 import { compileEditableV2Plan } from './editableV2';
-import { buildEditableV2Zpk } from './editableZpkBuilder';
+import { buildEditableV2Zpk, type EditableZpkBuildResult } from './editableZpkBuilder';
 import { signInAdminWithGoogle, subscribeAuthState } from '@/lib/firebaseAuthClient';
-import { publishEditableWorkshop, type EditableWorkshopResult } from './workshopPublish';
+import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob } from '@/lib/workshopApi';
 
 type ModelDefinition = { name?: string; specGroup?: string };
 const modelDefinitions = models as Record<string, ModelDefinition>;
@@ -67,10 +67,21 @@ export function ComposerWorkspace() {
   const [message, setMessage] = useState('Import two or more current FVWF V1 source projects.');
   const [editableArtifactSummary, setEditableArtifactSummary] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [workshopProjectId, setWorkshopProjectId] = useState<string | null>(null);
-  const [workshopResult, setWorkshopResult] = useState<EditableWorkshopResult | null>(null);
+  const [workshopResult, setWorkshopResult] = useState<{
+    projectId: string;
+    buildId: string;
+    buildNumber: number;
+    installUrl: string;
+    qrDataUrl: string;
+  } | null>(null);
+  const [generatedZpk, setGeneratedZpk] = useState<EditableZpkBuildResult | null>(null);
 
-  useEffect(() => subscribeAuthState((user) => setSignedIn(Boolean(user))), []);
+  useEffect(() => subscribeAuthState((user) => {
+    setSignedIn(Boolean(user));
+    setAuthChecked(true);
+  }), []);
 
   const selectedSource = project.sourceBuilds.find((source) => source.id === selectedSourceId)
     ?? project.sourceBuilds[0]
@@ -245,20 +256,33 @@ export function ComposerWorkspace() {
         throw new Error('Editable archive verification failed.');
       }
       downloadBlob(result.blob, result.filename);
-      if (signedIn && mainPreview) {
+      setGeneratedZpk(result);
+      if (mainPreview) {
         const baseSource = project.sourceBuilds.find((source) => source.id === project.baseBuildId)!;
-        const published = await publishEditableWorkshop({
-          projectId: workshopProjectId,
-          workingTitle: project.name,
-          targetDeviceId: baseSource.canonicalModelId,
+        let activeProjectId = workshopProjectId;
+        if (!activeProjectId) {
+          const created = await createWorkshopProject({
+            workingTitle: project.name,
+            tags: ['editable-watchface', 'fvwc'],
+            targetDeviceId: baseSource.canonicalModelId,
+          });
+          activeProjectId = created.projectId;
+          setWorkshopProjectId(activeProjectId);
+        }
+        const published = await createWorkshopBuild({
+          projectId: activeProjectId,
+          workshopLabel: project.name,
           resolution: result.plan.baseConfig.resolution,
           specGroup: baseSource.specGroup,
-          fvwc: new Blob([serializeFvwc(project)], { type: 'application/json' }),
+          deviceId: baseSource.canonicalModelId,
+          notes: 'System B editable watchface; source artifact stored in the FVWF slot uses FVWC schema.',
+          fvwf: new Blob([serializeFvwc(project)], { type: 'application/json' }),
           zpk: result.blob,
-          mainPreview,
-          aodPreview: aodCanvasRef.current?.toDataURL('image/png') ?? null,
+          mainPreview: dataUrlToBlob(mainPreview),
+          aodPreview: aodCanvasRef.current
+            ? dataUrlToBlob(aodCanvasRef.current.toDataURL('image/png'))
+            : undefined,
         });
-        setWorkshopProjectId(published.projectId);
         setWorkshopResult(published);
       }
       setEditableArtifactSummary(
@@ -278,6 +302,23 @@ export function ComposerWorkspace() {
   const activeSource = canvasPresentation.source;
   const activeConfig = activeSource?.artifact.watchFaceConfig;
   const activeBackground = activeSource?.artifact.backgroundImage || activeConfig?.background.src;
+
+  if (!authChecked) {
+    return <main className="system-b-auth"><p>Checking private access…</p></main>;
+  }
+
+  if (!signedIn) {
+    return (
+      <main className="system-b-auth">
+        <p className="system-b-eyebrow">FLOWVAULT · PRIVATE SYSTEM B</p>
+        <h1>Sign in to create editable watchfaces</h1>
+        <p>The same Firebase identity used by Studio and Admin is required.</p>
+        <button type="button" onClick={() => void signInAdminWithGoogle()}>
+          Sign in with Google
+        </button>
+      </main>
+    );
+  }
 
   return (
     <main className="system-b-shell composer-shell">
@@ -319,11 +360,6 @@ export function ComposerWorkspace() {
             Save FVWC
           </button>
           <button type="button" onClick={validateEditablePlan} disabled={busy}>Validate editable V2</button>
-          {!signedIn && (
-            <button type="button" onClick={() => void signInAdminWithGoogle()} disabled={busy}>
-              Sign in for QR + Admin
-            </button>
-          )}
           <button type="button" onClick={() => void exportEditableZpk()} disabled={busy}>
             Generate ZPK, previews &amp; QR
           </button>
@@ -341,6 +377,14 @@ export function ComposerWorkspace() {
               Open in Admin
             </a>
           </div>
+        </section>
+      )}
+      {generatedZpk && (
+        <section className="composer-local-result">
+          <strong>Local ZPK ready</strong>
+          <button type="button" onClick={() => downloadBlob(generatedZpk.blob, generatedZpk.filename)}>
+            Download {generatedZpk.filename}
+          </button>
         </section>
       )}
 
