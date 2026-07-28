@@ -1,0 +1,2636 @@
+import { Copy, FlipHorizontal, FlipVertical } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { WatchFaceElement } from '@/types';
+import { getIconLibrary, getFullIconLibrary } from '@/lib/iconLibrary';
+import type { IconEntry } from '@/lib/iconLibrary';
+import { cn } from '@/lib/utils';
+import { FONT_STYLES, getCustomFontStyles, getFontStyle } from '@/lib/fontLibrary';
+import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
+import type { WeatherStyle } from '@/lib/weatherIconSets';
+import { HAND_STYLES } from '@/lib/handStyles';
+import { getCustomHandSourceKind, type CustomHandRecord } from '@/lib/customHandStore';
+import type { CustomGaugePointerRecord } from '@/lib/customGaugePointerStore';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  getAllowedDataTypesForElement,
+  getDataTypeLabel,
+  getImageSwitcherExpectedImageCount,
+  resolveImageSwitcherFrameCount,
+  normalizeDataTypeForElement,
+  imageSwitcherDataTypesMatch,
+} from '@/lib/elementDataRules';
+import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
+import { renderHtmlToDataUrl, renderSvgToDataUrl } from '@/lib/customIconStore';
+import { extractFramesFromMarkup } from '@/lib/markupFrameExtractor';
+import { detectGauge } from '@/lib/gaugeDetector';
+import { renderGaugeAssets } from '@/lib/gaugeRenderer';
+import { normalizeHorizontalDigitAlign, type HorizontalDigitAlign } from '@/lib/digitAlignment';
+import { fitDigitFrameToContent } from '@/lib/digitFrameFit';
+import { measureDigitWidgetContent } from '@/lib/digitFrameMeasurement';
+import { isCompleteDayImageMode } from '@/lib/dateImageMode';
+
+export interface PropertyPanelProps {
+  element: WatchFaceElement | null;
+  canvasWidth?: number;
+  canvasHeight?: number;
+  onUpdateElement?: (id: string, changes: Partial<WatchFaceElement>) => void;
+  /** Updates only the selected element, bypassing linked-frame bounds synchronization. */
+  onUpdateElementIsolated?: (id: string, changes: Partial<WatchFaceElement>) => void;
+  className?: string;
+  elements?: WatchFaceElement[];
+  onAddFrame?: (parent: WatchFaceElement) => void;
+  onRemoveFrame?: (parent: WatchFaceElement) => void;
+  iconLibraryKey?: number; // increment to force icon list refresh
+  customHandStyles?: CustomHandRecord[]; // user-created hand styles from IconLab
+  customGaugePointers?: CustomGaugePointerRecord[]; // user-created gauge pointers from IconLab
+  switcherDefinitions?: import('@/types/imageSwitcher').ImageSwitcherDefinition[];
+  onOpenSwitcherLab?: () => void;
+  fontLibraryKey?: number; // increment to force font list refresh after lab uploads/deletes
+  /** Spec 091: called when buildGaugeFromMarkup creates a companion background IMG element. */
+  onAddSiblingElement?: (partialEl: Omit<WatchFaceElement, 'id'>) => void;
+  /** Called before re-building gauge siblings to remove stale ones (prevents duplicates). */
+  onRemoveSiblingElements?: (ids: string[]) => void;
+  extraSelectedIds?: string[];
+  onDuplicateSelected?: () => void;
+  onFlipHorizontal?: (mode: 'local' | 'canvas') => void;
+  onFlipVertical?: (mode: 'local' | 'canvas') => void;
+}
+
+const WIDGET_TYPES: WatchFaceElement['type'][] = [
+  'ARC_PROGRESS', 'TIME_POINTER', 'GAUGE_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
+  'TEXT_IMG', 'IMG', 'TEXT',
+  'IMG_LEVEL', 'IMG_STATUS', 'CIRCLE', 'BUTTON',
+];
+
+const APP_SHORTCUTS = [
+  { value: '', label: '— none —' },
+  { value: 'HEART', label: 'Heart Rate' },
+  { value: 'STEP', label: 'Steps / Activity' },
+  { value: 'BATTERY', label: 'Battery' },
+  { value: 'SPO2', label: 'Blood Oxygen' },
+  { value: 'STRESS', label: 'Stress' },
+  { value: 'SLEEP', label: 'Sleep' },
+  { value: 'CAL', label: 'Calories' },
+  { value: 'DISTANCE', label: 'Distance' },
+  { value: 'WEATHER_CURRENT', label: 'Weather' },
+  { value: 'MOON', label: 'Moon Phase' },
+  { value: 'PAI_WEEKLY', label: 'PAI Weekly' },
+  { value: 'AQI', label: 'Air Quality' },
+];
+
+const TYPE_LABELS: Record<string, string> = {
+  ARC_PROGRESS: 'Arc Progress',
+  TIME_POINTER: 'Clock Hands',
+  GAUGE_POINTER: 'Gauge Pointer',
+  TEXT_IMG: 'Text Image',
+  IMG: 'Image',
+  IMG_TIME: 'Time Image',
+  IMG_DATE: 'Date Image',
+  IMG_WEEK: 'Week Image',
+  IMG_LEVEL: 'Level Image',
+  IMG_STATUS: 'Status Image',
+  TEXT: 'Text',
+  CIRCLE: 'Circle',
+  BUTTON: 'Button',
+};
+
+// Module-level style clipboard — persists across element selections
+interface StyleClipboard {
+  color?: string;
+  fontSize?: number;
+  fontStyle?: string;
+  radius?: number;
+  lineWidth?: number;
+  startAngle?: number;
+  endAngle?: number;
+}
+let _styleClipboard: StyleClipboard | null = null;
+
+type PanelTab = 'position' | 'style' | 'effects' | 'data' | 'layer';
+const PanelTabContext = createContext<PanelTab>('position');
+
+function resolveSectionTab(label: string): PanelTab | null {
+  if (label === 'Layer') return 'layer';
+  if (label === 'App Shortcut' || label === 'Data Type' || label === 'Status Type') return 'data';
+
+  if (
+    label === 'Hand Scale'
+    || label === 'Hand Effects'
+    || label === 'Pointer Image Effects'
+    || label === 'Drop Shadow'
+    || label === 'Element Frame'
+    || label === 'Mode'
+    || label.startsWith('Depth')
+    || label.startsWith('Light Direction')
+    || label === 'Highlight Color'
+    || label === 'Shadow Color'
+    || label === 'Shape'
+    || label === 'Fill'
+    || label === 'Padding'
+    || label === 'Complete Day Image Effects'
+  ) {
+    return 'effects';
+  }
+
+  if (
+    label === 'Hand Style'
+    || label === 'Color'
+    || label === 'Text Content'
+    || label === 'Date Format'
+    || label === 'Weather Style'
+    || label === 'Icon'
+    || label === 'Disconnect Icon'
+    || label === 'Icon Effects'
+    || label === 'Name Format'
+    || label === 'Font Style'
+    || label === 'Curved Text'
+  ) {
+    return 'style';
+  }
+
+  if (
+    label === 'Widget Type'
+    || label === 'Position'
+    || label === 'Size'
+    || label === 'Shape Type'
+    || label === 'Arc Shape'
+    || label === 'Gauge Pointer'
+  ) {
+    return 'position';
+  }
+
+  return null;
+}
+
+export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, onUpdateElement, onUpdateElementIsolated, className, elements, onAddFrame, onRemoveFrame, iconLibraryKey, customHandStyles = [], customGaugePointers = [], switcherDefinitions = [], onOpenSwitcherLab, fontLibraryKey, onAddSiblingElement, onRemoveSiblingElements, onDuplicateSelected, onFlipHorizontal, onFlipVertical }: PropertyPanelProps) {
+  const [allIcons, setAllIcons] = useState<IconEntry[]>(() => getIconLibrary());
+  const [iconSearch, setIconSearch] = useState('');
+  const [fontSearch, setFontSearch] = useState('');
+  const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
+  const [activeTab, setActiveTab] = useState<PanelTab>('position');
+  const [gaugeMarkup, setGaugeMarkup] = useState('');
+  const [switcherMarkup, setSwitcherMarkup] = useState('');
+  const [iconMarkup, setIconMarkup] = useState('');
+  const [creatorStatus, setCreatorStatus] = useState('');
+  const tablerLoadedRef = useRef(false);
+
+  // Load Tabler icons lazily when an IMG element is selected
+  useEffect(() => {
+    if (element?.type !== 'IMG' || tablerLoadedRef.current) return;
+    tablerLoadedRef.current = true;
+    getFullIconLibrary().then(setAllIcons);
+  }, [element?.type]);
+
+  // Refresh icon list when new custom icons are saved (iconLibraryKey increments)
+  useEffect(() => {
+    if (!iconLibraryKey) return;
+    getFullIconLibrary().then(setAllIcons);
+  }, [iconLibraryKey]);
+
+  const allowedDataTypes = element
+    ? getAllowedDataTypesForElement(element.type, element.subtype)
+    : [];
+  const imageSwitcherExplicitCount = element?.type === 'IMG_LEVEL'
+    ? (element.imageSwitcherFrameCount ?? (Array.isArray(element.images) ? element.images.length : null))
+    : null;
+  const imageSwitcherPolicy = element?.type === 'IMG_LEVEL'
+    ? resolveImageSwitcherFrameCount(element.dataType, { explicitCount: imageSwitcherExplicitCount })
+    : null;
+  const expectedImageCount = element?.type === 'IMG_LEVEL'
+    ? getImageSwitcherExpectedImageCount(element.dataType, imageSwitcherExplicitCount)
+    : null;
+  const compatibleSwitcherDefinitions = useMemo(() => {
+    if (element?.type !== 'IMG_LEVEL' || !element.dataType) return switcherDefinitions;
+    return switcherDefinitions.filter(def => imageSwitcherDataTypesMatch(def.dataType, element.dataType));
+  }, [element?.dataType, element?.type, switcherDefinitions]);
+  const switcherDetection = useMemo(
+    () => extractFramesFromMarkup(switcherMarkup),
+    [switcherMarkup],
+  );
+  const fontStyles = useMemo(() => {
+    const merged = [...FONT_STYLES, ...getCustomFontStyles()];
+    const unique = new Map<string, (typeof merged)[number]>();
+    for (const style of merged) unique.set(style.key, style);
+    const query = fontSearch.trim().toLowerCase();
+    return [...unique.values()]
+      .filter((style) => !query || style.label.toLowerCase().includes(query) || style.key.toLowerCase().includes(query))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [fontSearch, fontLibraryKey]);
+
+  const update = (changes: Partial<WatchFaceElement>) => {
+    if (!element) return;
+    onUpdateElement?.(element.id, changes);
+  };
+
+  const buildGaugeFromMarkup = async (markupOverride?: string) => {
+    if (!element || element.type !== 'GAUGE_POINTER') return;
+    const sourceMarkup = markupOverride ?? gaugeMarkup;
+    setCreatorStatus('Building gauge — do not export until complete…');
+    try {
+    const extracted = extractFramesFromMarkup(sourceMarkup);
+    if (extracted.frames.length === 0) {
+      setCreatorStatus('No frame detected in gauge markup input.');
+      return;
+    }
+
+    const frame = extracted.frames[0];
+
+    // ── Spec 093: 3-phase data-model pipeline ─────────────────────────────
+    // Only attempt auto-split for SVG content (not raw HTML blobs)
+    if (frame.trim().toLowerCase().startsWith('<svg')) {
+      setCreatorStatus('Parsing gauge SVG…');
+
+      // Phase 1: detect — pure read, returns immutable cloned artifacts
+      const parsed = detectGauge(frame);
+      if (!parsed) {
+        setCreatorStatus('⚠ No needle or arc detected in SVG. Ensure the gauge has a rotating group or arc fill path.');
+        return;
+      }
+
+      // Phase 2: render — pure functions, no side effects
+      const result = await renderGaugeAssets(parsed, 400);
+
+      if (!result.needlePng && result.arcFrames.length === 0) {
+        setCreatorStatus('Gauge render failed. No needle or arc fill could be rendered.');
+        return;
+      }
+
+      // Phase 3: React apply ────────────────────────────────────────────────
+
+      // Remove stale siblings from a previous "Build from markup" run on this gauge.
+      // Identified by assetFilename prefix. Without this, repeated builds stack up duplicates.
+      if (onRemoveSiblingElements && elements) {
+        const bgFilename = `gauge_bg_${element.id}.png`;
+        const arcFilename = `gauge_arc_${element.id}_frame`;
+        const staleIds = elements
+          .filter(el => el.assetFilename === bgFilename || (el.assetFilename ?? '').startsWith(arcFilename))
+          .map(el => el.id);
+        if (staleIds.length > 0) onRemoveSiblingElements(staleIds);
+      }
+
+      // Gauge center: preserve the current element's visual center on canvas.
+      // All three layers are placed so their own center-of-rotation pixel lands
+      // exactly on this point, keeping them pixel-aligned with each other.
+      const gaugeCx = Math.round(element.bounds.x + element.bounds.width / 2);
+      const gaugeCy = Math.round(element.bounds.y + element.bounds.height / 2);
+      // Shared gaugePairId so all sibling layers auto-select as a group.
+      const gaugePairId = `gauge_group_${element.id}`;
+
+      const { layerLayouts } = result;
+      const nl = layerLayouts.needle;
+      // For arc-only gauges nl may be null — fall back to arc layout.
+      const refLayout = nl ?? layerLayouts.arc ?? { canvasW: 400, canvasH: 400, pivotFracX: 0.5, pivotFracY: 0.5, offsetX: -200, offsetY: -200 };
+
+      // Only update needle bounds / src if needle was actually rendered
+      if (result.needlePng && nl) {
+        const needleBounds = {
+          x: gaugeCx + nl.offsetX,
+          y: gaugeCy + nl.offsetY,
+          width: nl.canvasW,
+          height: nl.canvasH,
+        };
+        const { naturalAngle, arcStart, arcEnd } = result.geometry;
+        const pointerUpdates: Partial<WatchFaceElement> = {
+          src: result.needlePng,
+          assetFilename: `gauge_needle_${element.id}.png`,
+          pivotX: nl.pivotFracX,
+          pivotY: nl.pivotFracY,
+          previewAngle: naturalAngle,
+          bounds: needleBounds,
+          gaugePairId,
+        };
+        if (parsed.detected.arcRange) {
+          pointerUpdates.startAngle = arcStart;
+          pointerUpdates.endAngle = arcEnd;
+        }
+        update(pointerUpdates);
+      } else {
+        // Arc-only (no needle): update bounds + arc range on the GAUGE_POINTER element.
+        // Use arc layout if available, fallback to bg layout.
+        const al = layerLayouts.arc ?? layerLayouts.background;
+        if (al) {
+          const arcBoundsForPointer = {
+            x: gaugeCx + al.offsetX,
+            y: gaugeCy + al.offsetY,
+            width: al.canvasW,
+            height: al.canvasH,
+          };
+          const arcOnlyUpdates: Partial<WatchFaceElement> = {
+            bounds: arcBoundsForPointer,
+            pivotX: al.pivotFracX,
+            pivotY: al.pivotFracY,
+            gaugePairId,
+          };
+          // Use first arc frame or background as preview src so canvas shows something.
+          const previewSrc = result.arcFrames[0] || result.backgroundPng;
+          if (previewSrc) {
+            arcOnlyUpdates.src = previewSrc;
+            arcOnlyUpdates.assetFilename = `gauge_arc_preview_${element.id}.png`;
+          }
+          if (parsed.detected.arcRange) {
+            const { arcStart, arcEnd } = result.geometry;
+            arcOnlyUpdates.startAngle = arcStart;
+            arcOnlyUpdates.endAngle = arcEnd;
+          }
+          update(arcOnlyUpdates);
+        } else if (parsed.detected.arcRange) {
+          const { arcStart, arcEnd } = result.geometry;
+          update({ startAngle: arcStart, endAngle: arcEnd, gaugePairId });
+        }
+      }
+
+      // Shared zIndex values
+      const needleZ = element.zIndex ?? 10;
+      const bgZIndex = Math.max(0, needleZ - 2);
+      const arcZIndex = Math.max(bgZIndex + 1, needleZ - 1);
+      void refLayout; // used below via layerLayouts
+
+      // Create companion background IMG element if background was rendered
+      if (result.backgroundPng && onAddSiblingElement) {
+        const bl = layerLayouts.background ?? layerLayouts.needle ?? layerLayouts.arc;
+        if (bl) {
+          const bgBounds = {
+            x: gaugeCx + bl.offsetX,
+            y: gaugeCy + bl.offsetY,
+            width: bl.canvasW,
+            height: bl.canvasH,
+          };
+          onAddSiblingElement({
+            type: 'IMG',
+            name: `Gauge BG (${element.name})`,
+            bounds: bgBounds,
+            visible: true,
+            zIndex: bgZIndex,
+            src: result.backgroundPng,
+            assetFilename: `gauge_bg_${element.id}.png`,
+            gaugePairId,
+          });
+        }
+      }
+
+      // Create IMG_LEVEL sibling for arc fill frames if detected
+      if (result.arcFrames.length > 0 && onAddSiblingElement) {
+        const al = layerLayouts.arc ?? layerLayouts.needle ?? layerLayouts.background;
+        if (al) {
+          const arcBounds = {
+            x: gaugeCx + al.offsetX,
+            y: gaugeCy + al.offsetY,
+            width: al.canvasW,
+            height: al.canvasH,
+          };
+          onAddSiblingElement({
+            type: 'IMG_LEVEL',
+            name: `Gauge Arc Fill (${element.name})`,
+            bounds: arcBounds,
+            visible: true,
+            zIndex: arcZIndex,
+            images: result.arcFrames,
+            imageSwitcherFrameCount: result.arcFrames.length,
+            assetFilename: `gauge_arc_${element.id}_frame`,
+            dataType: element.dataType,
+            gaugePairId,
+          });
+        }
+      }
+
+      setCreatorStatus(result.statusMessage);
+      return;
+    }
+
+    // ── Legacy path for raw HTML (non-SVG) content ──────────────────────────
+    const dataUrl = await renderHtmlToDataUrl(frame, 256);
+    if (!dataUrl) {
+      setCreatorStatus('Gauge markup render failed. Ensure SVG or HTML includes a valid SVG node.');
+      return;
+    }
+    update({ src: dataUrl, assetFilename: `gauge_pointer_${element.id}.png` });
+    setCreatorStatus(`Gauge pointer built from markup (${extracted.strategy}).`);
+    } catch (err) {
+      setCreatorStatus(`⚠ Gauge build error: ${(err as Error).message}`);
+    }
+  };
+
+  const buildImageSwitcherFramesFromMarkup = async () => {
+    if (!element || element.type !== 'IMG_LEVEL') return;
+
+    const extracted = switcherDetection;
+    if (extracted.frames.length === 0) {
+      setCreatorStatus('No frames detected in switcher markup input.');
+      return;
+    }
+
+    const renderedFrames: string[] = [];
+    for (const frame of extracted.frames) {
+      const dataUrl = frame.trim().startsWith('<svg')
+        ? await renderSvgToDataUrl(frame, 128)
+        : await renderHtmlToDataUrl(frame, 128);
+      if (dataUrl) renderedFrames.push(dataUrl);
+    }
+
+    if (renderedFrames.length === 0) {
+      setCreatorStatus('Frame rendering failed. Verify each frame includes valid SVG content.');
+      return;
+    }
+
+    const minCount = imageSwitcherPolicy?.minCount ?? 2;
+    update({
+      images: renderedFrames,
+      imageSwitcherFrameCount: Math.max(minCount, renderedFrames.length),
+    });
+
+    const warningSuffix = extracted.warnings.length > 0 ? ` ${extracted.warnings[0]}` : '';
+    setCreatorStatus(`Parsed ${renderedFrames.length} frame(s) via ${extracted.strategy}.${warningSuffix}`);
+  };
+
+  const buildIconFromMarkup = async () => {
+    if (!element || (element.type !== 'IMG' && element.type !== 'IMG_STATUS')) return;
+
+    const extracted = extractFramesFromMarkup(iconMarkup);
+    if (extracted.frames.length === 0) {
+      setCreatorStatus('No icon frame detected in markup input.');
+      return;
+    }
+
+    const frame = extracted.frames[0];
+    const dataUrl = frame.trim().startsWith('<svg')
+      ? await renderSvgToDataUrl(frame, 256)
+      : await renderHtmlToDataUrl(frame, 256);
+
+    if (!dataUrl) {
+      setCreatorStatus('Icon markup render failed. Ensure valid SVG/HTML with SVG node.');
+      return;
+    }
+
+    update({
+      src: dataUrl,
+      iconKey: undefined,
+      assetFilename: element.type === 'IMG_STATUS' ? `status_custom_${element.id}.png` : `img_custom_${element.id}.png`,
+    });
+    setCreatorStatus(`Custom icon built from markup (${extracted.strategy}).`);
+  };
+
+  useEffect(() => {
+    if (!element) return;
+    if (allowedDataTypes.length === 0) return;
+
+    const normalized = normalizeDataTypeForElement(element.type, element.subtype, element.dataType);
+    if (normalized !== element.dataType) {
+      update({ dataType: normalized });
+    }
+  }, [
+    allowedDataTypes.length,
+    element?.dataType,
+    element?.id,
+    element?.subtype,
+    element?.type,
+  ]);
+
+  useEffect(() => {
+    if (!element) return;
+    if (element.engraveFrame) {
+      setActiveTab('effects');
+      return;
+    }
+    if (element.type === 'TIME_POINTER' || element.type === 'IMG' || element.type === 'IMG_STATUS') {
+      setActiveTab('style');
+      return;
+    }
+    if (element.type === 'GAUGE_POINTER') {
+      setActiveTab('effects');
+      return;
+    }
+    setActiveTab('position');
+  }, [element?.id, element?.type]);
+
+  useEffect(() => {
+    setCreatorStatus('');
+    setGaugeMarkup('');
+    setSwitcherMarkup('');
+    setIconMarkup('');
+  }, [element?.id, element?.type]);
+
+  if (!element) {
+    return (
+      <div className={`rounded-xl border border-white/10 bg-white/5 p-4 text-center text-sm text-white/40 ${className ?? ''}`}>
+        Click element on canvas to edit
+      </div>
+    );
+  }
+
+  // ── Frame element: show dedicated controls ──────────────────────────────
+  if (element.engraveFrame) {
+    const parentEl = elements?.find(e => e.id === element.engraveFrame!.frameOf);
+    const parentName = parentEl?.name ?? 'element';
+    const ef = element.engraveFrame;
+    const isLinked = ef.linked !== false;
+    const updateFrame = (patch: Partial<WatchFaceElement['engraveFrame'] & object>) =>
+      update({ engraveFrame: { ...ef, ...patch } });
+
+    const handleLinkToggle = (nowLinked: boolean) => {
+      if (nowLinked && parentEl) {
+        // Re-sync bounds to parent + padding immediately on re-link
+        const pad = ef.padding;
+        onUpdateElement?.(element.id, {
+          engraveFrame: { ...ef, linked: true },
+          bounds: {
+            x: parentEl.bounds.x - pad,
+            y: parentEl.bounds.y - pad,
+            width: parentEl.bounds.width + pad * 2,
+            height: parentEl.bounds.height + pad * 2,
+          },
+        });
+      } else {
+        updateFrame({ linked: false });
+      }
+    };
+
+    return (
+      <PanelTabContext.Provider value={activeTab}>
+      <div className={`rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-4 ${className ?? ''}`}>
+        <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-white/10 bg-black/20 p-1">
+          {([
+            { key: 'effects', label: 'Effects' },
+            { key: 'layer', label: 'Layer' },
+          ] as { key: PanelTab; label: string }[]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                'h-7 rounded-md border text-[11px] font-medium transition-colors',
+                activeTab === tab.key
+                  ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">⬚ Frame Effect</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleLinkToggle(!isLinked)}
+              title={isLinked ? 'Unlink from parent (move independently)' : 'Re-link to parent (auto-sync position)'}
+              className={cn('flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border transition-colors',
+                isLinked
+                  ? 'border-amber-500/50 text-amber-400 hover:border-amber-400'
+                  : 'border-white/20 text-white/40 hover:border-white/40 hover:text-white/60'
+              )}
+            >
+              {isLinked ? '🔗' : '⛓️‍💥'} {isLinked ? parentName : 'Unlinked'}
+            </button>
+          </div>
+        </div>
+
+        {/* Mode */}
+        <Section label="Mode">
+          <div className="flex gap-1.5">
+            {(['inner', 'outer'] as const).map(m => (
+              <button key={m} onClick={() => updateFrame({ mode: m })}
+                className={cn('flex-1 h-7 rounded border text-[11px] transition-colors',
+                  ef.mode === m ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                )}>
+                {m === 'inner' ? 'Engrave' : 'Emboss'}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-white/30 mt-1">{ef.mode === 'inner' ? 'Inset — sunken into surface' : 'Raised — lifted out of surface'}</p>
+        </Section>
+
+        {/* Depth */}
+        <Section label={`Depth (${typeof ef.depth === 'number' ? ef.depth : 6})`}>
+          <input
+            type="range" min={1} max={20}
+            value={typeof ef.depth === 'number' ? ef.depth : 6}
+            onChange={e => updateFrame({ depth: Number(e.target.value) })}
+            className="w-full accent-amber-500"
+          />
+          <div className="flex justify-between text-[9px] text-white/25 mt-0.5"><span>Subtle</span><span>Deep</span></div>
+        </Section>
+
+        {/* Light Direction */}
+        <Section label={`Light Direction (${ef.lightAngle ?? 135}°)`}>
+          <input
+            type="range" min={0} max={359}
+            value={ef.lightAngle ?? 135}
+            onChange={e => updateFrame({ lightAngle: Number(e.target.value) })}
+            className="w-full accent-amber-500"
+          />
+          <div className="grid grid-cols-4 gap-1 mt-1.5">
+            {[{label:'↖ TL', v:225},{label:'↗ TR', v:315},{label:'↙ BL', v:135},{label:'↘ BR', v:45}].map(p => (
+              <button key={p.v} onClick={() => updateFrame({ lightAngle: p.v })}
+                className={cn('h-6 rounded border text-[10px] transition-colors',
+                  (ef.lightAngle ?? 135) === p.v ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/40 hover:border-white/30'
+                )}>{p.label}</button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Highlight / Shadow Colors */}
+        <Section label="Highlight Color">
+          <div className="flex items-center gap-2">
+            <input type="color" value={ef.highlightColor ?? '#FFFFFF'}
+              onChange={e => updateFrame({ highlightColor: e.target.value })}
+              className="w-8 h-7 rounded cursor-pointer border-0 bg-transparent" />
+            <div className="flex-1">
+              <input type="range" min={0} max={100}
+                value={Math.round((ef.highlightOpacity ?? 0.6) * 100)}
+                onChange={e => updateFrame({ highlightOpacity: Number(e.target.value) / 100 })}
+                className="w-full accent-amber-500" />
+              <div className="text-[9px] text-white/30 text-right">{Math.round((ef.highlightOpacity ?? 0.6) * 100)}%</div>
+            </div>
+          </div>
+        </Section>
+
+        <Section label="Shadow Color">
+          <div className="flex items-center gap-2">
+            <input type="color" value={ef.shadowColor ?? '#000000'}
+              onChange={e => updateFrame({ shadowColor: e.target.value })}
+              className="w-8 h-7 rounded cursor-pointer border-0 bg-transparent" />
+            <div className="flex-1">
+              <input type="range" min={0} max={100}
+                value={Math.round((ef.shadowOpacity ?? 0.6) * 100)}
+                onChange={e => updateFrame({ shadowOpacity: Number(e.target.value) / 100 })}
+                className="w-full accent-amber-500" />
+              <div className="text-[9px] text-white/30 text-right">{Math.round((ef.shadowOpacity ?? 0.6) * 100)}%</div>
+            </div>
+          </div>
+        </Section>
+
+        {/* Shape */}
+        <Section label="Shape">
+          <div className="grid grid-cols-3 gap-1">
+            {(['rect', 'circle', 'rounded'] as const).map(s => (
+              <button key={s} onClick={() => updateFrame({ shape: s })}
+                className={cn('h-7 rounded border text-[11px] transition-colors capitalize',
+                  (ef.shape ?? 'rect') === s ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                )}>
+                {s === 'rect' ? 'Rectangle' : s === 'circle' ? 'Circle' : 'Rounded'}
+              </button>
+            ))}
+          </div>
+          {(ef.shape === 'rounded') && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[10px] text-white/40 w-16 shrink-0">Corner R</span>
+              <Input type="number" value={ef.cornerRadius ?? 12}
+                onChange={e => updateFrame({ cornerRadius: Math.max(0, Math.min(100, Number(e.target.value))) })}
+                className="h-7 text-xs bg-white/5 border-white/10 text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <span className="text-[10px] text-white/30">px</span>
+            </div>
+          )}
+        </Section>
+
+        {/* Fill */}
+        <Section label="Fill">
+          <div className="flex gap-1.5 mb-2">
+            {(['none', 'color'] as const).map(fm => (
+              <button key={fm} onClick={() => updateFrame({ fillMode: fm })}
+                className={cn('flex-1 h-7 rounded border text-[11px] transition-colors capitalize',
+                  ef.fillMode === fm ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                )}>
+                {fm === 'none' ? 'None' : 'Color'}
+              </button>
+            ))}
+          </div>
+          {ef.fillMode === 'color' && (
+            <div className="flex items-center gap-2">
+              <input type="color" value={ef.fillColor}
+                onChange={e => updateFrame({ fillColor: e.target.value })}
+                className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
+              <Input value={ef.fillColor}
+                onChange={e => updateFrame({ fillColor: e.target.value })}
+                className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white" />
+            </div>
+          )}
+        </Section>
+
+        {/* Padding */}
+        <Section label="Padding">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-white/40 w-6 shrink-0">Pad</span>
+            <Input type="number" value={ef.padding}
+              onChange={e => updateFrame({ padding: Math.max(-20, Math.min(40, Number(e.target.value))) })}
+              className="h-7 text-xs bg-white/5 border-white/10 text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+            <span className="text-[10px] text-white/30">px</span>
+          </div>
+        </Section>
+
+        {/* Layer */}
+        <Section label="Layer">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Switch checked={element.visible} onCheckedChange={v => update({ visible: v })} id={`vis-frame-${element.id}`} />
+              <Label htmlFor={`vis-frame-${element.id}`} className="text-xs text-white/60">Visible</Label>
+            </div>
+            <div className="flex items-center gap-1 w-24">
+              <span className="text-[10px] text-white/40 w-4 shrink-0">Z</span>
+              <Input type="number" value={Math.round(element.zIndex)} onChange={e => update({ zIndex: Number(e.target.value) })}
+                className="h-7 text-xs bg-white/5 border-white/10 text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+            </div>
+          </div>
+        </Section>
+      </div>
+      </PanelTabContext.Provider>
+    );
+  }
+
+  const handleTypeChange = (newType: WatchFaceElement['type']) => {
+    if (newType === element.type) return;
+    const changes: Partial<WatchFaceElement> = { type: newType };
+    switch (newType) {
+      case 'ARC_PROGRESS':
+        changes.center = element.center ?? { x: canvasWidth / 2, y: canvasHeight / 2 };
+        changes.radius = element.radius ?? 100;
+        changes.startAngle = element.startAngle ?? 135;
+        changes.endAngle = element.endAngle ?? 345;
+        changes.lineWidth = element.lineWidth ?? 8;
+        changes.color = element.color ?? '0x00FF00';
+        break;
+      case 'TIME_POINTER':
+        changes.center = { x: 240, y: 240 };
+        changes.hourPos = { x: 11, y: 118 };
+        changes.minutePos = { x: 8, y: 172 };
+        changes.secondPos = { x: 4, y: 180 };
+        break;
+      case 'GAUGE_POINTER':
+        changes.src = element.src ?? DEFAULT_GAUGE_POINTER_FILENAME;
+        changes.startAngle = element.startAngle ?? -90;
+        changes.endAngle = element.endAngle ?? 90;
+        changes.pivotX = normalizeGaugePivot(element).pivotX;
+        changes.pivotY = normalizeGaugePivot(element).pivotY;
+        break;
+      case 'TEXT':
+        changes.fontSize = element.fontSize ?? 20;
+        changes.color = element.color ?? '0xFFFFFFFF';
+        changes.text = element.text ?? '';
+        break;
+      case 'CIRCLE':
+        changes.center = element.center ?? { x: element.bounds.x + element.bounds.width / 2, y: element.bounds.y + element.bounds.height / 2 };
+        changes.radius = element.radius ?? Math.min(element.bounds.width, element.bounds.height) / 2;
+        changes.color = element.color ?? '0xFFFFFF';
+        break;
+    }
+    update(changes);
+  };
+
+  const setX = (v: number) => update({ bounds: { ...element.bounds, x: clamp(v, 0, canvasWidth) } });
+  const setY = (v: number) => update({ bounds: { ...element.bounds, y: clamp(v, 0, canvasHeight) } });
+  const setW = (v: number) => update({ bounds: { ...element.bounds, width: clamp(v, 1, canvasWidth) } });
+  const setH = (v: number) => update({ bounds: { ...element.bounds, height: clamp(v, 1, canvasHeight) } });
+
+  const handleCopyStyle = () => {
+    _styleClipboard = {
+      color: element.color,
+      fontSize: element.fontSize,
+      fontStyle: element.fontStyle,
+      radius: element.radius,
+      lineWidth: element.lineWidth,
+      startAngle: element.startAngle,
+      endAngle: element.endAngle,
+    };
+    setClipboardHasData(true);
+    toast.success('Style copied!');
+  };
+
+  const handlePasteStyle = () => {
+    if (!_styleClipboard) return;
+    const changes: Partial<WatchFaceElement> = {};
+    if (_styleClipboard.color !== undefined) changes.color = _styleClipboard.color;
+    if (_styleClipboard.fontSize !== undefined) changes.fontSize = _styleClipboard.fontSize;
+    if (_styleClipboard.fontStyle !== undefined) changes.fontStyle = _styleClipboard.fontStyle;
+    if (element.type === 'ARC_PROGRESS') {
+      if (_styleClipboard.radius !== undefined) changes.radius = _styleClipboard.radius;
+      if (_styleClipboard.lineWidth !== undefined) changes.lineWidth = _styleClipboard.lineWidth;
+      if (_styleClipboard.startAngle !== undefined) changes.startAngle = _styleClipboard.startAngle;
+      if (_styleClipboard.endAngle !== undefined) changes.endAngle = _styleClipboard.endAngle;
+    }
+    update(changes);
+    toast.success('Style pasted!');
+  };
+
+  const isCentered = element.type === 'ARC_PROGRESS' || element.type === 'TIME_POINTER';
+  const isSizeLocked = false; // Allow resizing all elements in editor
+
+  return (
+    <PanelTabContext.Provider value={activeTab}>
+    <div className={`rounded-xl border border-white/10 bg-white/5 p-4 space-y-4 ${className ?? ''}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-white/60 uppercase tracking-wider">
+          {TYPE_LABELS[element.type] ?? element.type}
+          {element.subtype && <span className="ml-1 text-cyan-400/70">({element.subtype})</span>}
+        </span>
+        <span className="text-xs text-white/40 truncate max-w-[100px]">{element.name}</span>
+      </div>
+      {/* Copy / Paste Style */}
+      <div className="flex gap-1.5">
+        <button
+          onClick={handleCopyStyle}
+          className="flex-1 h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/50 hover:border-cyan-500/40 hover:text-cyan-400 transition-colors"
+          title="Copy color, font size, arc shape"
+        >
+          Copy Style
+        </button>
+        {clipboardHasData && (
+          <button
+            onClick={handlePasteStyle}
+            className="flex-1 h-6 rounded border border-cyan-500/30 bg-cyan-500/10 text-[10px] text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+            title="Paste copied style to this element"
+          >
+            Paste Style
+          </button>
+        )}
+      </div>
+
+      {/* Transforms & Alignment */}
+      <div className="border-t border-white/5 pt-3 mt-1 space-y-2">
+        <span className="text-[10px] font-semibold text-white/45 uppercase tracking-wider block">Transforms</span>
+        <div className="flex flex-col gap-1.5">
+          <button
+            onClick={onDuplicateSelected}
+            className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+            title="Duplicate selected element(s)"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Duplicate
+          </button>
+          
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => onFlipHorizontal?.('canvas')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Mirror horizontally relative to canvas center"
+            >
+              <FlipHorizontal className="h-3.5 w-3.5" />
+              Mirror H (Canvas)
+            </button>
+            <button
+              onClick={() => onFlipVertical?.('canvas')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Mirror vertically relative to canvas center"
+            >
+              <FlipVertical className="h-3.5 w-3.5" />
+              Mirror V (Canvas)
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => onFlipHorizontal?.('local')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Flip selected element(s) horizontally in place"
+            >
+              <FlipHorizontal className="h-3.5 w-3.5 opacity-50" />
+              Flip H (Local)
+            </button>
+            <button
+              onClick={() => onFlipVertical?.('local')}
+              className="flex h-7 items-center justify-center gap-1 rounded border border-white/10 bg-white/5 text-[11px] text-white/70 hover:border-cyan-500/40 hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+              title="Flip selected element(s) vertically in place"
+            >
+              <FlipVertical className="h-3.5 w-3.5 opacity-50" />
+              Flip V (Local)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-white/10 bg-black/20 p-1 md:grid-cols-5">
+        {([
+          { key: 'position', label: 'Position' },
+          { key: 'style', label: 'Style' },
+          { key: 'effects', label: 'Effects' },
+          { key: 'data', label: 'Data' },
+          { key: 'layer', label: 'Layer' },
+        ] as { key: PanelTab; label: string }[]).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              'h-7 rounded-md border text-[11px] font-medium transition-colors',
+              activeTab === tab.key
+                ? 'border-cyan-500 bg-cyan-500/20 text-cyan-200'
+                : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4 xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:pr-1 xl:pb-24">
+
+      {/* Widget Type */}
+      <Section label="Widget Type">
+        <Select value={element.type} onValueChange={v => handleTypeChange(v as WatchFaceElement['type'])}>
+          <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {WIDGET_TYPES.map(wt => (
+              <SelectItem key={wt} value={wt}>{TYPE_LABELS[wt] ?? wt}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Section>
+
+      {/* Position */}
+      <Section label="Position">
+        {element.type === 'TIME_POINTER' ? (
+          <FieldRow>
+            <NumField label="CX" value={element.center?.x ?? 240} onChange={v => update({ center: { x: clamp(v, 0, 480), y: element.center?.y ?? 240 } })} />
+            <NumField label="CY" value={element.center?.y ?? 240} onChange={v => update({ center: { x: element.center?.x ?? 240, y: clamp(v, 0, 480) } })} />
+          </FieldRow>
+        ) : isCentered ? (
+          <FieldRow>
+            <NumField label="CX" value={element.center?.x ?? canvasWidth / 2} onChange={v => update({ center: { x: clamp(v, 0, canvasWidth), y: element.center?.y ?? canvasHeight / 2 } })} />
+            <NumField label="CY" value={element.center?.y ?? canvasHeight / 2} onChange={v => update({ center: { x: element.center?.x ?? canvasWidth / 2, y: clamp(v, 0, canvasHeight) } })} />
+          </FieldRow>
+        ) : (
+          <FieldRow>
+            <NumField label="X" value={element.bounds.x} onChange={setX} />
+            <NumField label="Y" value={element.bounds.y} onChange={setY} />
+          </FieldRow>
+        )}
+      </Section>
+
+      {/* Size — hidden for centered (arc/pointer) elements */}
+      {!isCentered && (
+        <Section label="Size">
+          <FieldRow>
+            <NumField label="W" value={element.bounds.width} onChange={setW} disabled={isSizeLocked} />
+            <NumField label="H" value={element.bounds.height} onChange={setH} disabled={isSizeLocked} />
+          </FieldRow>
+          {isSizeLocked && (
+            <p className="text-[10px] text-white/30 mt-1">Size determined by digit images</p>
+          )}
+        </Section>
+      )}
+
+      {/* Shape Type — CIRCLE elements only */}
+      {element.type === 'CIRCLE' && (
+        <Section label="Shape Type">
+          <div className="grid grid-cols-2 gap-1.5">
+            {([
+              { value: 'circle',       label: 'Circle'      },
+              { value: 'fill_rect',    label: 'Filled Rect' },
+              { value: 'stroke_rect',  label: 'Stroke Rect' },
+              { value: 'rounded_rect', label: 'Rounded Rect'},
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => update({ shapeType: opt.value })}
+                className={`py-1.5 px-2 rounded border text-xs transition-colors ${
+                  (element.shapeType ?? 'circle') === opt.value
+                    ? 'border-cyan-500 bg-cyan-500/20 text-white'
+                    : 'border-white/10 bg-white/5 text-zinc-400 hover:border-zinc-500'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {(element.shapeType === 'rounded_rect') && (
+            <div className="mt-2">
+              <label className="block text-[10px] text-zinc-400 mb-1">Corner Radius</label>
+              <input
+                type="range" min={0} max={60} step={1}
+                value={element.shapeCornerRadius ?? 12}
+                onChange={e => update({ shapeCornerRadius: Number(e.target.value) })}
+                className="w-full accent-cyan-400"
+              />
+              <span className="text-[10px] text-zinc-400">{element.shapeCornerRadius ?? 12}px</span>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* Color */}
+      {(element.color !== undefined || element.type === 'ARC_PROGRESS' || element.type === 'CIRCLE') && (
+        <Section label="Color">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={toCssColor(element.color ?? '0x00CC88')}
+              onChange={e => update({ color: e.target.value })}
+              className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
+            />
+            <Input
+              value={toCssColor(element.color ?? '0x00CC88')}
+              onChange={e => update({ color: e.target.value })}
+              className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
+            />
+          </div>
+        </Section>
+      )}
+
+      {/* Text Content — TEXT elements only */}
+      {element.type === 'TEXT' && (
+        <Section label="Text Content">
+          <Input
+            value={element.text ?? ''}
+            onChange={e => update({ text: e.target.value })}
+            placeholder="Enter text…"
+            className="h-7 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/30"
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] text-white/40 w-14">Font size</span>
+            <input
+              type="number"
+              value={element.fontSize ?? 16}
+              min={8}
+              max={80}
+              onChange={e => update({ fontSize: Number(e.target.value) })}
+              className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] text-white/40 w-14">Char gap</span>
+            <input
+              type="number"
+              value={element.charSpace ?? 0}
+              min={-10}
+              max={30}
+              onChange={e => update({ charSpace: Number(e.target.value) })}
+              className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
+              title="Letter spacing (Zepp char_space)"
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] text-white/40 w-14">Line gap</span>
+            <input
+              type="number"
+              value={element.lineSpace ?? 0}
+              min={-10}
+              max={30}
+              onChange={e => update({ lineSpace: Number(e.target.value) })}
+              className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
+              title="Line spacing (Zepp line_space)"
+            />
+          </div>
+        </Section>
+      )}
+
+      {/* Date Format — TEXT elements with dateFormat set, or enabled via toggle */}
+      {element.type === 'TEXT' && (() => {
+        const DATE_FORMATS = [
+          { value: 'DD/MM',       label: 'DD/MM',        sample: '21/04' },
+          { value: 'MM/DD',       label: 'MM/DD',        sample: '04/21' },
+          { value: 'DD/MM/YYYY',  label: 'DD/MM/YYYY',   sample: '21/04/2026' },
+          { value: 'MM/DD/YYYY',  label: 'MM/DD/YYYY',   sample: '04/21/2026' },
+          { value: 'DD-MM-YYYY',  label: 'DD-MM-YYYY',   sample: '21-04-2026' },
+          { value: 'DD MMM',      label: 'DD MMM',       sample: '21 Apr' },
+          { value: 'MMM DD',      label: 'MMM DD',       sample: 'Apr 21' },
+        ] as const;
+        const isDateMode = !!element.dateFormat;
+        return (
+          <Section label="Date Format">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                onClick={() => update({ dateFormat: isDateMode ? undefined : 'DD/MM' })}
+                className={`flex-1 py-1 rounded border text-[11px] transition-colors ${
+                  isDateMode
+                    ? 'border-cyan-500 bg-cyan-500/20 text-cyan-300'
+                    : 'border-white/10 bg-white/5 text-zinc-500 hover:border-zinc-500'
+                }`}
+              >
+                {isDateMode ? 'Date mode: ON' : 'Enable date mode'}
+              </button>
+            </div>
+            {isDateMode && (
+              <div className="grid grid-cols-2 gap-1.5">
+                {DATE_FORMATS.map(fmt => (
+                  <button
+                    key={fmt.value}
+                    onClick={() => update({ dateFormat: fmt.value })}
+                    className={`py-1.5 px-2 rounded border text-left transition-colors ${
+                      element.dateFormat === fmt.value
+                        ? 'border-cyan-500 bg-cyan-500/20 text-white'
+                        : 'border-white/10 bg-white/5 text-zinc-400 hover:border-zinc-500'
+                    }`}
+                  >
+                    <span className="block text-[11px] font-mono">{fmt.label}</span>
+                    <span className="block text-[9px] text-zinc-500">{fmt.sample}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Section>
+        );
+      })()}
+
+      {/* DataType — shown only when current element accepts data bindings */}
+      {allowedDataTypes.length > 0 && (
+        <Section label="Data Type">
+          <Select value={element.dataType ?? '__none__'} onValueChange={v => {
+            const nextDataType = v === '__none__' ? undefined : v;
+            const linkedDefinition = switcherDefinitions.find(def => def.id === element.imageSwitcherDefinitionId);
+            update({
+              dataType: nextDataType,
+              imageSwitcherDefinitionId: linkedDefinition && imageSwitcherDataTypesMatch(linkedDefinition.dataType, nextDataType)
+                ? element.imageSwitcherDefinitionId
+                : undefined,
+            });
+          }}>
+            <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
+              <SelectValue placeholder="— none —" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— none —</SelectItem>
+              {allowedDataTypes.map((dataType) => (
+                <SelectItem key={dataType} value={dataType}>{getDataTypeLabel(dataType)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {element.type === 'IMG_LEVEL' && expectedImageCount !== null && (
+            <div className="mt-1 space-y-1">
+              <p className="text-[10px] text-white/40">
+                Expected images for {getDataTypeLabel(element.dataType ?? '')}: {expectedImageCount}
+                {Array.isArray(element.images) ? `, current: ${element.images.length}` : ''}
+              </p>
+              {imageSwitcherPolicy && !imageSwitcherPolicy.strictFixed && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-white/45 w-18 shrink-0">Frame count</span>
+                    <Input
+                      type="number"
+                      min={imageSwitcherPolicy.minCount}
+                      max={99}
+                      value={element.imageSwitcherFrameCount ?? expectedImageCount}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        if (!Number.isFinite(next)) return;
+                        update({ imageSwitcherFrameCount: Math.max(imageSwitcherPolicy.minCount, Math.floor(next)) });
+                      }}
+                      className="h-7 text-xs bg-white/5 border-white/10 text-white"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <Switch
+                      checked={element.imageSwitcherStrict === true}
+                      onCheckedChange={(checked) => update({ imageSwitcherStrict: !!checked })}
+                    />
+                    <span className="text-[10px] text-white/55">Strict count validation on export</span>
+                  </label>
+                </>
+              )}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* Image Switcher link — IMG_LEVEL only */}
+      {element.type === 'IMG_LEVEL' && (
+        <Section label="Image Switcher">
+          <div className="space-y-2">
+            <p className="text-[10px] text-white/40">
+              Link a saved Switcher Definition to drive images automatically from a live data value.
+            </p>
+            <Select
+              value={element.imageSwitcherDefinitionId ?? '__none__'}
+              onValueChange={(v) => {
+                const definition = switcherDefinitions.find(def => def.id === v);
+                update({
+                  imageSwitcherDefinitionId: v === '__none__' ? undefined : v,
+                  ...(definition ? { imageSwitcherFrameCount: definition.slotCount } : {}),
+                });
+              }}
+            >
+              <SelectTrigger className="h-7 text-xs bg-zinc-800 border-white/10 text-white">
+                <SelectValue placeholder="— none (manual images) —" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— none (manual images) —</SelectItem>
+                {compatibleSwitcherDefinitions.map((def) => (
+                  <SelectItem key={def.id} value={def.id}>
+                    {def.name}{imageSwitcherDataTypesMatch(def.dataType, 'MOON') ? ` (${def.slotCount} phases)` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {onOpenSwitcherLab && (
+              <button
+                onClick={onOpenSwitcherLab}
+                className="w-full text-[10px] py-1 px-2 rounded border border-cyan-500/30 bg-cyan-500/8 hover:bg-cyan-500/15 text-cyan-400 transition-colors"
+              >
+                Open in Switcher Lab
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* Status type picker — IMG_STATUS only (4 official Zepp OS system_status values) */}
+      {element.type === 'IMG_STATUS' && (() => {
+        const STATUS_OPTIONS = [
+          { value: 'DISCONNECT', label: 'Bluetooth Off', desc: 'Shows when Bluetooth is disconnected' },
+          { value: 'CLOCK',      label: 'Alarm Active',  desc: 'Shows when an alarm is set' },
+          { value: 'DISTURB',    label: 'Do Not Disturb', desc: 'Shows when DND mode is on' },
+          { value: 'LOCK',       label: 'Screen Locked',  desc: 'Shows when screen lock is on' },
+        ] as const;
+        const current = element.statusType ?? 'DISCONNECT';
+        return (
+          <Section label="Status Type">
+            <div className="space-y-1">
+              {STATUS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => update({ statusType: opt.value, src: undefined })}
+                  className={cn(
+                    'w-full text-left px-2.5 py-1.5 rounded border text-[11px] transition-colors',
+                    current === opt.value
+                      ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                      : 'border-white/10 bg-white/5 text-white/60 hover:border-white/30'
+                  )}
+                >
+                  <span className="font-medium">{opt.label}</span>
+                  <span className="block text-[9px] text-white/35 mt-0.5">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        );
+      })()}
+
+      {/* ARC-specific fields */}
+      {element.type === 'ARC_PROGRESS' && (
+        <>
+          <Section label="Arc Shape">
+            <FieldRow>
+              <NumField label="R" value={element.radius ?? 100} onChange={v => update({ radius: clamp(v, 10, 240) })} />
+              <NumField label="LW" value={element.lineWidth ?? 8} onChange={v => update({ lineWidth: clamp(v, 1, 40) })} />
+            </FieldRow>
+            <FieldRow>
+              <NumField label="Sta°" value={element.startAngle ?? 135} onChange={v => update({ startAngle: v })} />
+              <NumField label="End°" value={element.endAngle ?? 345} onChange={v => update({ endAngle: v })} />
+            </FieldRow>
+          </Section>
+          <Section label="Arc Ticks">
+            <FieldRow>
+              <NumField label="Count" value={element.tickCount ?? 0} onChange={v => update({ tickCount: Math.max(0, v) })} />
+              <NumField label="Width" value={element.tickWidth ?? 2} onChange={v => update({ tickWidth: clamp(v, 1, 20) })} />
+            </FieldRow>
+            <FieldRow>
+              <NumField label="Length" value={element.tickLength ?? 10} onChange={v => update({ tickLength: clamp(v, 1, 50) })} />
+              <div className="flex flex-col gap-1 w-full">
+                <span className="text-[10px] text-white/40 px-1 truncate">Color</span>
+                <input
+                  type="color"
+                  value={element.tickColor ?? '#FFFFFF'}
+                  onChange={e => update({ tickColor: e.target.value })}
+                  className="h-[22px] w-full rounded border-0 bg-transparent p-0 cursor-pointer"
+                />
+              </div>
+            </FieldRow>
+            <div className="mt-2 flex items-center justify-between px-1">
+              <span className="text-[10px] text-white/40">Show Start/End Ticks</span>
+              <input
+                type="checkbox"
+                checked={!(element.hideStartEndTicks ?? false)}
+                onChange={e => update({ hideStartEndTicks: !e.target.checked })}
+                className="w-3.5 h-3.5 rounded border-white/20 bg-black/20 text-cyan-500 cursor-pointer"
+              />
+            </div>
+          </Section>
+        </>
+      )}
+
+      {element.type === 'GAUGE_POINTER' && (
+        <Section label="Gauge Pointer">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-white/40 w-14 shrink-0">Source</span>
+              <Input
+                value={element.src ?? DEFAULT_GAUGE_POINTER_FILENAME}
+                onChange={e => update({ src: e.target.value || DEFAULT_GAUGE_POINTER_FILENAME })}
+                className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <FieldRow>
+              <NumField label="Start°" value={element.startAngle ?? -90} onChange={v => update({ startAngle: v })} />
+              <NumField label="End°" value={element.endAngle ?? 90} onChange={v => update({ endAngle: v })} />
+            </FieldRow>
+            <FieldRow>
+              <NumField
+                label="Pivot X"
+                value={Number((element.pivotX ?? normalizeGaugePivot(element).pivotX).toFixed(2))}
+                onChange={v => update({ pivotX: clamp(v, 0, 1) })}
+                step="0.01"
+              />
+              <NumField
+                label="Pivot Y"
+                value={Number((element.pivotY ?? normalizeGaugePivot(element).pivotY).toFixed(2))}
+                onChange={v => update({ pivotY: clamp(v, 0, 1) })}
+                step="0.01"
+              />
+            </FieldRow>
+            <p className="text-[9px] text-white/35">Pivot uses normalized values in local pointer box (0..1).</p>
+            <button
+              onClick={() => update({ guideArcVisible: !element.guideArcVisible })}
+              className={cn(
+                'w-full h-7 rounded border text-[11px] transition-colors',
+                element.guideArcVisible
+                  ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200'
+                  : 'border-white/15 bg-white/5 text-white/50 hover:border-cyan-500/40 hover:text-white/80'
+              )}
+            >
+              {element.guideArcVisible ? '⬡ Guide Arc ON' : '⬡ Guide Arc OFF'}
+            </button>
+            {customGaugePointers.length > 0 && (
+              <div className="pt-2 border-t border-white/10 space-y-1">
+                <p className="text-[9px] text-cyan-400/60 uppercase tracking-wider">My Gauge Pointers</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {customGaugePointers.map(gp => {
+                    const active = element.src === gp.dataUrl;
+                    return (
+                      <button
+                        key={gp.key}
+                        title={gp.name}
+                        onClick={() => {
+                          if (gp.sourceHtml?.trim()) {
+                            // Run full 3-phase pipeline — needle PNG + background + arc siblings.
+                            // Do NOT apply gp.dataUrl first: it may be a stale whole-gauge image
+                            // from a pre-093 save. Only the pipeline produces the correct needle PNG.
+                            void buildGaugeFromMarkup(gp.sourceHtml);
+                          } else {
+                            // No source HTML — old record with no raw SVG stored.
+                            // Apply stored needle PNG directly (best effort).
+                            update({
+                              src: gp.dataUrl,
+                              assetFilename: `gauge_needle_${element.id}.png`,
+                              pivotX: gp.pivotX,
+                              pivotY: gp.pivotY,
+                              ...(gp.startAngle != null ? { startAngle: gp.startAngle } : {}),
+                              ...(gp.endAngle != null ? { endAngle: gp.endAngle } : {}),
+                            });
+                          }
+                        }}
+                        className={cn(
+                          'flex flex-col items-center gap-1 py-2 px-1 rounded border text-[9px] transition-colors',
+                          active
+                            ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                            : 'border-cyan-500/20 bg-cyan-500/5 text-white/60 hover:border-cyan-500/50 hover:text-white/90'
+                        )}
+                      >
+                        <img
+                          src={gp.dataUrl}
+                          alt={gp.name}
+                          className="w-8 h-16 object-contain"
+                          style={{ borderRadius: 2, border: active ? '1px solid #22d3ee' : '1px solid rgba(100,200,255,0.15)' }}
+                        />
+                        <span className="leading-tight text-center px-0.5 truncate w-full">{gp.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <p className="text-[10px] text-cyan-300/80 uppercase tracking-wider">SVG/HTML Gauge Creator</p>
+              <textarea
+                value={gaugeMarkup}
+                onChange={(e) => setGaugeMarkup(e.target.value)}
+                placeholder="Paste SVG or HTML for the gauge pointer."
+                className="w-full h-24 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
+                spellCheck={false}
+              />
+              {/* Arc data binding — chooses which data the generated arc layer will track */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/50 shrink-0">Arc data:</span>
+                <Select
+                  value={element.dataType ?? '__none__'}
+                  onValueChange={v => update({ dataType: v === '__none__' ? undefined : v })}
+                >
+                  <SelectTrigger className="h-6 flex-1 text-[10px] bg-white/5 border-white/15">
+                    <SelectValue placeholder="— none —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— none —</SelectItem>
+                    {allowedDataTypes.map(dt => (
+                      <SelectItem key={dt} value={dt}>{getDataTypeLabel(dt)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <button
+                onClick={() => { void buildGaugeFromMarkup(); }}
+                className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+              >
+                Build Gauge Pointer From Markup
+              </button>
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {element.type === 'IMG_LEVEL' && (
+        <Section label="Image Switcher Batch Creator">
+          <div className="space-y-2">
+            <p className="text-[10px] text-white/45 leading-relaxed">
+              Paste one HTML/SVG source. Parser auto-splits frames from multiple <code>&lt;svg&gt;</code> tags or frame markers
+              (<code>data-frame-index</code>, <code>data-index</code>, <code>id=frame-*</code>, <code>id=imglvl-*</code>).
+            </p>
+            {(element.dataType === 'WEATHER_CURRENT' || element.dataType === 'WEATHER_STATUS') && (
+              <p className="text-[10px] text-cyan-300/80">
+                Weather mode detected: parsed frames are used as your custom weather icon/status set.
+              </p>
+            )}
+            <textarea
+              value={switcherMarkup}
+              onChange={(e) => setSwitcherMarkup(e.target.value)}
+              placeholder="Paste one SVG/HTML containing one or many frame definitions."
+              className="w-full h-28 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
+              spellCheck={false}
+            />
+            {switcherMarkup.trim().length > 0 && (
+              <div className="rounded border border-cyan-500/25 bg-cyan-500/10 p-2 space-y-1">
+                <p className="text-[10px] text-cyan-200">
+                  Detected frames: {switcherDetection.frames.length} via {switcherDetection.strategy}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {switcherDetection.frameIndexes.map((index) => (
+                    <span key={index} className="px-1.5 py-0.5 rounded border border-cyan-400/30 text-[9px] text-cyan-200/90">
+                      #{index}
+                    </span>
+                  ))}
+                </div>
+                {switcherDetection.warnings.length > 0 && (
+                  <p className="text-[9px] text-amber-300/90">{switcherDetection.warnings[0]}</p>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => { void buildImageSwitcherFramesFromMarkup(); }}
+              className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+            >
+              Parse And Build IMG_LEVEL Frames
+            </button>
+            <p className="text-[9px] text-white/35">
+              Built frames are stored inline as data URLs and exported as deterministic PNG files.
+            </p>
+          </div>
+        </Section>
+      )}
+
+      {creatorStatus && (
+        <p className="text-[10px] text-cyan-300/80">{creatorStatus}</p>
+      )}
+
+      {/* TIME_POINTER-specific fields */}
+      {element.type === 'TIME_POINTER' && (
+        <Section label="Hand Style">
+          <div className="grid grid-cols-5 gap-1.5">
+            {HAND_STYLES.map(hs => {
+              const active = (element.handStyle ?? 'silver') === hs.key;
+              return (
+                <button
+                  key={hs.key}
+                  title={hs.label}
+                  onClick={() => update({ handStyle: hs.key })}
+                  className={cn(
+                    'flex flex-col items-center gap-1 py-1.5 rounded border text-[9px] transition-colors',
+                    active
+                      ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30 hover:text-white/80'
+                  )}
+                >
+                  <span
+                    className="w-4 h-4 rounded-full border"
+                    style={{
+                      background: `radial-gradient(circle at 35% 35%, white 0%, ${hs.swatch} 60%, #111 100%)`,
+                      borderColor: active ? '#22d3ee' : 'rgba(255,255,255,0.15)',
+                    }}
+                  />
+                  <span className="leading-tight text-center px-0.5">{hs.label.split(' ')[0]}</span>
+                </button>
+              );
+            })}
+          </div>
+          {/* Custom hand styles from IconLab — separate section with real hand preview */}
+          {customHandStyles.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-[9px] text-cyan-400/60 uppercase tracking-wider">My Hand Styles</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {customHandStyles.map(ch => {
+                  const active = element.handStyle === ch.key;
+                  const handChanges: Partial<WatchFaceElement> = { handStyle: ch.key };
+                  if (typeof ch.hourPosX === 'number' && typeof ch.hourPosY === 'number') {
+                    handChanges.hourPos = { x: ch.hourPosX, y: ch.hourPosY };
+                  }
+                  if (typeof ch.minutePosX === 'number' && typeof ch.minutePosY === 'number') {
+                    handChanges.minutePos = { x: ch.minutePosX, y: ch.minutePosY };
+                  }
+                  if (typeof ch.secondPosX === 'number' && typeof ch.secondPosY === 'number') {
+                    handChanges.secondPos = { x: ch.secondPosX, y: ch.secondPosY };
+                  }
+                  return (
+                    <button
+                      key={ch.key}
+                      title={`Custom: ${ch.name}`}
+                      onClick={() => update(handChanges)}
+                      className={cn(
+                        'flex flex-col items-center gap-1 py-2 px-1 rounded border text-[9px] transition-colors',
+                        active
+                          ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                          : 'border-cyan-500/20 bg-cyan-500/5 text-white/60 hover:border-cyan-500/50 hover:text-white/90'
+                      )}
+                    >
+                      {/* Show hour hand image at actual aspect ratio (22:140 ≈ 1:6.4) */}
+                      <img
+                        src={ch.hourDataUrl}
+                        alt={ch.name}
+                        className="w-5 h-14 object-contain"
+                        style={{ borderRadius: 2, border: active ? '1px solid #22d3ee' : '1px solid rgba(100,200,255,0.15)' }}
+                      />
+                      <span className="leading-tight text-center truncate w-full px-0.5 mt-0.5">{ch.name}</span>
+                      <span className="text-[7px] uppercase tracking-wide rounded border border-white/10 px-1 py-0.5 text-white/40">
+                        {getCustomHandSourceKind(ch) === 'png' ? 'PNG' : getCustomHandSourceKind(ch) === 'html' ? 'HTML' : 'Legacy'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Seconds toggle */}
+          <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!(element.hideSeconds ?? false)}
+              onChange={e => {
+                const show = e.target.checked;
+                const changes: Partial<WatchFaceElement> = { hideSeconds: !show };
+                if (show && element.handStyle) {
+                  const ch = customHandStyles.find(h => h.key === element.handStyle);
+                  if (ch && typeof ch.secondPosX === 'number' && typeof ch.secondPosY === 'number') {
+                    changes.secondPos = { x: ch.secondPosX, y: ch.secondPosY };
+                  }
+                }
+                update(changes);
+              }}
+              className="accent-cyan-400 w-3 h-3"
+            />
+            <span className="text-[11px] text-white/70">Show seconds hand</span>
+          </label>
+        </Section>
+      )}
+
+      {/* TIME_POINTER — Hand Scale */}
+      {element.type === 'TIME_POINTER' && (
+        <Section label="Hand Scale">
+          {/* Scale whole */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Scale whole</span>
+              <span className="text-[10px] text-cyan-400 font-mono w-10 text-right">{(element.handLengthScale ?? 1).toFixed(2)}×</span>
+            </div>
+            <input
+              type="range" min="0.5" max="3.0" step="0.05"
+              value={element.handLengthScale ?? 1}
+              onChange={e => update({ handLengthScale: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-2 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Hub size</span>
+              <span className="text-[10px] text-cyan-400 font-mono w-10 text-right">{(element.handHubScale ?? 1).toFixed(2)}×</span>
+            </div>
+            <input
+              type="range" min="0.5" max="3.0" step="0.05"
+              value={element.handHubScale ?? 1}
+              onChange={e => update({ handHubScale: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          {/* Scale each */}
+          <details className="mt-2">
+            <summary className="text-[10px] text-white/40 cursor-pointer hover:text-white/70 select-none">Scale each hand individually ▸</summary>
+            <div className="mt-2 space-y-3 pl-1 border-l border-white/10">
+              {/* Hour */}
+              <div>
+                <span className="text-[9px] text-white/40 uppercase tracking-wider">Hour</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[9px] text-white/30 w-10">Length</span>
+                  <input type="range" min="0.5" max="3.0" step="0.05"
+                    value={element.handHourLength ?? (element.handLengthScale ?? 1)}
+                    onChange={e => update({ handHourLength: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-400 h-1" />
+                  <span className="text-[9px] font-mono text-cyan-400 w-8 text-right">{(element.handHourLength ?? (element.handLengthScale ?? 1)).toFixed(2)}×</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-white/30 w-10">Width</span>
+                  <input type="range" min="0.5" max="3.0" step="0.05"
+                    value={element.handHourWidth ?? 1}
+                    onChange={e => update({ handHourWidth: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-400 h-1" />
+                  <span className="text-[9px] font-mono text-cyan-400 w-8 text-right">{(element.handHourWidth ?? 1).toFixed(2)}×</span>
+                </div>
+              </div>
+              {/* Minute */}
+              <div>
+                <span className="text-[9px] text-white/40 uppercase tracking-wider">Minute</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[9px] text-white/30 w-10">Length</span>
+                  <input type="range" min="0.5" max="3.0" step="0.05"
+                    value={element.handMinuteLength ?? (element.handLengthScale ?? 1)}
+                    onChange={e => update({ handMinuteLength: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-400 h-1" />
+                  <span className="text-[9px] font-mono text-cyan-400 w-8 text-right">{(element.handMinuteLength ?? (element.handLengthScale ?? 1)).toFixed(2)}×</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-white/30 w-10">Width</span>
+                  <input type="range" min="0.5" max="3.0" step="0.05"
+                    value={element.handMinuteWidth ?? 1}
+                    onChange={e => update({ handMinuteWidth: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-400 h-1" />
+                  <span className="text-[9px] font-mono text-cyan-400 w-8 text-right">{(element.handMinuteWidth ?? 1).toFixed(2)}×</span>
+                </div>
+              </div>
+              {/* Second */}
+              {!element.hideSeconds && (
+                <div>
+                  <span className="text-[9px] text-white/40 uppercase tracking-wider">Second</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[9px] text-white/30 w-10">Length</span>
+                    <input type="range" min="0.5" max="3.0" step="0.05"
+                      value={element.handSecondLength ?? (element.handLengthScale ?? 1)}
+                      onChange={e => update({ handSecondLength: Number(e.target.value) })}
+                      className="flex-1 accent-cyan-400 h-1" />
+                    <span className="text-[9px] font-mono text-cyan-400 w-8 text-right">{(element.handSecondLength ?? (element.handLengthScale ?? 1)).toFixed(2)}×</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] text-white/30 w-10">Width</span>
+                    <input type="range" min="0.5" max="3.0" step="0.05"
+                      value={element.handSecondWidth ?? 1}
+                      onChange={e => update({ handSecondWidth: Number(e.target.value) })}
+                      className="flex-1 accent-cyan-400 h-1" />
+                    <span className="text-[9px] font-mono text-cyan-400 w-8 text-right">{(element.handSecondWidth ?? 1).toFixed(2)}×</span>
+                  </div>
+                </div>
+              )}
+
+              {((element.handLengthScale ?? 1) > 2
+                || (element.handHourLength ?? (element.handLengthScale ?? 1)) > 2
+                || (element.handMinuteLength ?? (element.handLengthScale ?? 1)) > 2
+                || (element.handSecondLength ?? (element.handLengthScale ?? 1)) > 2
+                || (element.handHourWidth ?? 1) > 2
+                || (element.handMinuteWidth ?? 1) > 2
+                || (element.handSecondWidth ?? 1) > 2) && (
+                <p className="text-[9px] text-amber-400/80 leading-snug">
+                  Values above 2.00x can amplify source raster artifacts. Prefer fixing pointer size in HTML when possible.
+                </p>
+              )}
+            </div>
+          </details>
+        </Section>
+      )}
+
+      {/* TIME_POINTER — Hand Effects */}
+      {element.type === 'TIME_POINTER' && (
+        <Section label="Hand Effects">
+          {/* Shadow */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Shadow</span>
+              <span className="text-[10px] text-white/40 font-mono w-8 text-right">{Math.round((element.handShadow ?? 0) * 100)}%</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.05"
+              value={element.handShadow ?? 0}
+              onChange={e => update({ handShadow: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1" />
+          </div>
+          {/* Glow */}
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Glow / Neon</span>
+              <span className="text-[10px] text-white/40 font-mono w-8 text-right">{Math.round((element.handGlow ?? 0) * 100)}%</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.05"
+              value={element.handGlow ?? 0}
+              onChange={e => update({ handGlow: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1" />
+          </div>
+          {/* Speed trail */}
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Speed trail</span>
+              <span className="text-[10px] text-white/40 font-mono w-8 text-right">{Math.round((element.handTrail ?? 0) * 100)}%</span>
+            </div>
+            <input type="range" min="0" max="1" step="0.05"
+              value={element.handTrail ?? 0}
+              onChange={e => update({ handTrail: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1" />
+          </div>
+          {/* Tint color */}
+          <div className="mt-2">
+            <span className="text-[10px] text-white/50 block mb-1">Tint / Accent color</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={element.handTint ?? '#4488FF'}
+                onChange={e => update({ handTint: e.target.value })}
+                className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent"
+              />
+              <button
+                onClick={() => update({ handTint: undefined })}
+                className="text-[9px] text-white/30 hover:text-white/60 border border-white/10 rounded px-1.5 h-5"
+                title="Remove tint"
+              >none</button>
+              {element.handTint && (
+                <span className="text-[9px] font-mono text-white/50">{element.handTint}</span>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* POINTER effects — TIME_POINTER + GAUGE_POINTER */}
+      {(element.type === 'TIME_POINTER' || element.type === 'GAUGE_POINTER') && (
+        <Section label="Pointer Image Effects">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Brightness</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerBrightness ?? 0)}</span>
+            </div>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={element.pointerBrightness ?? 0}
+              onChange={e => update({ pointerBrightness: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Contrast</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerContrast ?? 0)}</span>
+            </div>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={element.pointerContrast ?? 0}
+              onChange={e => update({ pointerContrast: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Saturation</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerSaturation ?? 0)}</span>
+            </div>
+            <input
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={element.pointerSaturation ?? 0}
+              onChange={e => update({ pointerSaturation: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Hue</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round(element.pointerHue ?? 0)}deg</span>
+            </div>
+            <input
+              type="range"
+              min="-180"
+              max="180"
+              step="1"
+              value={element.pointerHue ?? 0}
+              onChange={e => update({ pointerHue: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+          <div className="space-y-1 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-white/50">Opacity</span>
+              <span className="text-[10px] text-white/40 font-mono w-12 text-right">{Math.round((element.pointerOpacity ?? 1) * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={element.pointerOpacity ?? 1}
+              onChange={e => update({ pointerOpacity: Number(e.target.value) })}
+              className="w-full accent-cyan-400 h-1"
+            />
+          </div>
+        </Section>
+      )}
+
+      {/* Weather style picker — IMG_LEVEL + weather condition aliases */}
+      {element.type === 'IMG_LEVEL' && (element.dataType === 'WEATHER_CURRENT' || element.dataType === 'WEATHER_STATUS') && (
+        <Section label="Weather Style">
+          <div className="space-y-2">
+            {element.dataType === 'WEATHER_CURRENT' && null}
+            <div className="flex gap-2">
+              {WEATHER_STYLES.map(ws => (
+                <button
+                  key={ws.key}
+                  onClick={() => update({ weatherStyle: ws.key, images: generateWeatherSet(ws.key as WeatherStyle), imageSwitcherDefinitionId: undefined })}
+                  className={cn(
+                    'flex-1 h-7 rounded border text-[10px]',
+                    !element.imageSwitcherDefinitionId && (element.weatherStyle ?? 'flat') === ws.key
+                      ? 'border-cyan-500 bg-cyan-500/20 text-white'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                  )}
+                >
+                  {ws.label}
+                </button>
+              ))}
+            </div>
+            {/* Preview strip: show codes 0,1,2,4,5,8,11,20,28 as samples */}
+            <WeatherPreviewStrip style={(element.weatherStyle ?? 'flat') as WeatherStyle} />
+          </div>
+        </Section>
+      )}
+
+      {/* Icon picker — IMG and IMG_STATUS elements */}
+      {(element.type === 'IMG' || element.type === 'IMG_STATUS') && (
+        <Section label={element.type === 'IMG_STATUS' ? 'Disconnect Icon' : 'Icon'}>
+          {element.type === 'IMG_STATUS' && (
+            <p className="text-[9px] text-amber-400/80 mb-1.5 leading-tight">
+              This icon shows only when the condition is inactive (e.g. Bluetooth OFF). This is official Zepp OS behavior — the widget is a warning indicator.
+            </p>
+          )}
+          <div className="space-y-2">
+            {/* Search box */}
+            <input
+              type="text"
+              placeholder="Search icons…"
+              value={iconSearch}
+              onChange={e => setIconSearch(e.target.value)}
+              className="w-full h-7 rounded border border-white/10 bg-white/5 px-2 text-[11px] text-white/80 placeholder:text-white/30 focus:outline-none focus:border-cyan-500/50"
+            />
+            {/* None button */}
+            <button
+              onClick={() => update({ iconKey: undefined })}
+              className={cn(
+                'w-full h-7 rounded border text-[10px] text-white/40',
+                !element.iconKey ? 'border-cyan-500 bg-cyan-500/20' : 'border-white/10 bg-white/5'
+              )}
+            >
+              None
+            </button>
+            <div className="max-h-56 overflow-y-auto pr-1 space-y-2">
+              {/* Custom (user-saved) icons — shown first */}
+              {(() => {
+                const q = iconSearch.trim().toLowerCase();
+                const customIcons = allIcons.filter(i =>
+                  i.source === 'custom' &&
+                  (q === '' || i.label.toLowerCase().includes(q) || i.key.toLowerCase().includes(q))
+                );
+                if (customIcons.length === 0) return null;
+                return (
+                  <div key="custom">
+                    <p className="text-[9px] text-cyan-400/60 uppercase tracking-wider mb-1">My Icons</p>
+                    <div className="grid grid-cols-6 gap-1">
+                      {customIcons.map(icon => (
+                        <button
+                          key={icon.key}
+                          onClick={() => update({ iconKey: icon.key })}
+                          className={cn(
+                            'relative p-1 rounded border',
+                            element.iconKey === icon.key ? 'border-cyan-500 bg-cyan-500/20' : 'border-cyan-500/20 bg-cyan-500/5 hover:border-cyan-500/50'
+                          )}
+                          title={icon.label}
+                        >
+                          <img src={icon.dataUrl} alt={icon.label} className="w-6 h-6 object-contain" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+              {(['health', 'fitness', 'weather', 'system', 'time'] as const).map(cat => {
+                const q = iconSearch.trim().toLowerCase();
+                const icons = allIcons.filter(i =>
+                  i.source !== 'custom' &&
+                  i.category === cat &&
+                  (q === '' || i.label.toLowerCase().includes(q) || i.key.toLowerCase().includes(q))
+                );
+                if (icons.length === 0) return null;
+                return (
+                  <div key={cat}>
+                    <p className="text-[9px] text-white/40 uppercase tracking-wider mb-1">{cat}</p>
+                    <div className="grid grid-cols-6 gap-1">
+                      {icons.map(icon => (
+                        <button
+                          key={icon.key}
+                          onClick={() => update({ iconKey: icon.key })}
+                          className={cn(
+                            'relative p-1 rounded border',
+                            element.iconKey === icon.key ? 'border-cyan-500 bg-cyan-500/20' : 'border-white/10 bg-white/5 hover:border-white/30'
+                          )}
+                          title={`${icon.label}${icon.source === 'tabler' ? ' (Tabler)' : ''}`}
+                        >
+                          <img src={icon.dataUrl} alt={icon.label} className="w-6 h-6 object-contain" />
+                          {icon.source === 'tabler' && (
+                            <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-violet-400" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[9px] text-white/25">
+              {allIcons.filter(i => i.source === 'tabler').length > 0
+                ? `${allIcons.length} icons — violet dot = Tabler`
+                : 'Loading Tabler icons…'}
+            </p>
+
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <p className="text-[10px] text-cyan-300/80 uppercase tracking-wider">SVG/HTML Icon Creator</p>
+              <textarea
+                value={iconMarkup}
+                onChange={(e) => setIconMarkup(e.target.value)}
+                placeholder="Paste SVG/HTML for this icon. First detected frame is used."
+                className="w-full h-20 rounded border border-white/10 bg-white/5 p-2 text-[11px] font-mono text-white/80 placeholder:text-white/30"
+                spellCheck={false}
+              />
+              <button
+                onClick={() => { void buildIconFromMarkup(); }}
+                className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+              >
+                Build Icon From Markup
+              </button>
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* Icon Effects — for image-like icon widgets supported by deterministic effects pipeline */}
+      {(element.type === 'IMG' || element.type === 'IMG_STATUS') && (element.iconKey || element.src) && (() => {
+        const updateEffect = (patch: Partial<Pick<WatchFaceElement, 'iconHue' | 'iconSaturation' | 'iconColorize' | 'iconColorizeOpacity'>>) =>
+          update(patch);
+        const hue = element.iconHue ?? 0;
+        const sat = element.iconSaturation ?? 100;
+        const colorize = element.iconColorize ?? '';
+        const colorizeOpacity = element.iconColorizeOpacity ?? 0.8;
+        const hasEffects = hue !== 0 || sat !== 100 || !!colorize;
+        return (
+          <Section label="Icon Effects">
+            <div className="space-y-2">
+              {/* Hue rotate */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/40 w-14 shrink-0">Hue</span>
+                <input type="range" min={-180} max={180} value={hue}
+                  onChange={e => updateEffect({ iconHue: Number(e.target.value) })}
+                  className="flex-1 accent-cyan-500 h-1" />
+                <span className="text-[10px] text-white/30 w-10 text-right">{hue > 0 ? `+${hue}` : hue}°</span>
+              </div>
+              {/* Saturation */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/40 w-14 shrink-0">Saturation</span>
+                <input type="range" min={0} max={200} value={sat}
+                  onChange={e => updateEffect({ iconSaturation: Number(e.target.value) })}
+                  className="flex-1 accent-cyan-500 h-1" />
+                <span className="text-[10px] text-white/30 w-10 text-right">{sat}%</span>
+              </div>
+              {/* Color fill overlay */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-white/40 w-14 shrink-0">Color fill</span>
+                <input type="color" value={colorize || '#ffffff'}
+                  onChange={e => updateEffect({ iconColorize: e.target.value })}
+                  className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent shrink-0" />
+                {colorize && (
+                  <>
+                    <input type="range" min={0} max={100} value={Math.round(colorizeOpacity * 100)}
+                      onChange={e => updateEffect({ iconColorizeOpacity: Number(e.target.value) / 100 })}
+                      className="flex-1 accent-cyan-500 h-1" />
+                    <span className="text-[10px] text-white/30 w-8 text-right">{Math.round(colorizeOpacity * 100)}%</span>
+                  </>
+                )}
+                {!colorize && <span className="text-[10px] text-white/25 flex-1">None — click to enable</span>}
+              </div>
+              {colorize && (
+                <button
+                  onClick={() => updateEffect({ iconColorize: undefined })}
+                  className="text-[10px] text-red-400/70 hover:text-red-400 transition-colors"
+                >
+                  Remove color fill
+                </button>
+              )}
+              {hasEffects && (
+                <button
+                  onClick={() => updateEffect({ iconHue: 0, iconSaturation: 100, iconColorize: undefined })}
+                  className="w-full h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/50 hover:text-white hover:border-white/30 transition-colors"
+                >
+                  Reset all effects
+                </button>
+              )}
+              {/* Extended photo-edit sliders */}
+              {(() => {
+                const pe = element.iconPhotoEdit ?? {};
+                const setPE = (key: string, val: number) =>
+                  update({ iconPhotoEdit: { ...pe, [key]: val } });
+                const v = (k: string) => Number((pe as Record<string,number>)[k] ?? 0);
+                const photoSliders: Array<{ key: string; label: string; min: number; max: number }> = [
+                  { key: 'exposure',    label: 'Exposure',    min: -100, max: 100 },
+                  { key: 'brightness',  label: 'Brightness',  min: -100, max: 100 },
+                  { key: 'contrast',    label: 'Contrast',    min: -100, max: 100 },
+                  { key: 'highlights',  label: 'Highlights',  min: -100, max: 100 },
+                  { key: 'shadows',     label: 'Shadows',     min: -100, max: 100 },
+                  { key: 'temperature', label: 'Temperature', min: -100, max: 100 },
+                  { key: 'tint',        label: 'Tint',        min: -100, max: 100 },
+                  { key: 'sharpness',   label: 'Sharpness',   min: 0,    max: 100 },
+                  { key: 'vignette',    label: 'Vignette',    min: 0,    max: 100 },
+                ];
+                const hasPhoto = photoSliders.some(s => v(s.key) !== 0);
+                return (
+                  <>
+                    {photoSliders.map(({ key, label, min, max }) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="text-[10px] text-white/40 w-20 shrink-0">{label}</span>
+                        <input type="range" min={min} max={max} step={1} value={v(key)}
+                          onChange={e => setPE(key, Number(e.target.value))}
+                          className="flex-1 accent-cyan-500 h-1" />
+                        <span
+                          className="text-[10px] text-white/30 w-10 text-right cursor-pointer hover:text-cyan-400"
+                          title="Double-click to reset"
+                          onDoubleClick={() => setPE(key, 0)}
+                        >{v(key) > 0 && min < 0 ? `+${v(key)}` : `${v(key)}`}</span>
+                      </div>
+                    ))}
+                    {hasPhoto && (
+                      <button
+                        onClick={() => update({ iconPhotoEdit: {} })}
+                        className="w-full h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/50 hover:text-white hover:border-white/30 transition-colors"
+                      >Reset photo edit</button>
+                    )}
+                  </>
+                );
+              })()}
+              <p className="text-[9px] text-amber-500/60">Effects are baked into ZPK export</p>
+            </div>
+          </Section>
+        );
+      })()}
+
+      {/* Widget type toggle — DATE/MONTH/WEEKDAY conversion */}
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_WEEK') && (
+        <Section label="Widget Type">
+          <div className="grid grid-cols-3 gap-1">
+            <button
+              onClick={() => update({ type: 'IMG_DATE', subtype: undefined })}
+              className={cn(
+                'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                element.type === 'IMG_DATE' && element.subtype !== 'month'
+                  ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+              )}
+            >
+              Date Digit
+            </button>
+            <button
+              onClick={() => update({ type: 'IMG_DATE', subtype: 'month' })}
+              className={cn(
+                'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                element.type === 'IMG_DATE' && element.subtype === 'month'
+                  ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+              )}
+            >
+              Month Name
+            </button>
+            <button
+              onClick={() => update({ type: 'IMG_WEEK' })}
+              className={cn(
+                'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                element.type === 'IMG_WEEK'
+                  ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                  : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+              )}
+            >
+              Weekday Name
+            </button>
+          </div>
+        </Section>
+      )}
+
+      {/* Name format — IMG_WEEK only */}
+      {element.type === 'IMG_WEEK' && (
+        <Section label="Name Format">
+          <div className="space-y-1">
+            {([
+              { value: 'full',    label: 'Full',    example: 'Monday' },
+              { value: 'short',   label: 'Short',   example: 'Mon' },
+              { value: 'initial', label: 'Initial', example: 'Mo.' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => update({ weekFormat: opt.value })}
+                className={cn(
+                  'w-full flex items-center justify-between px-2.5 py-1.5 rounded border text-[11px] transition-colors',
+                  (element.weekFormat ?? 'full') === opt.value
+                    ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                    : 'border-white/10 bg-white/5 text-white/60 hover:border-white/30'
+                )}
+              >
+                <span className="font-medium">{opt.label}</span>
+                <span className="text-white/35">{opt.example}</span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Name format — IMG_DATE month only */}
+      {element.type === 'IMG_DATE' && element.subtype === 'month' && (
+        <Section label="Name Format">
+          <div className="space-y-1">
+            {([
+              { value: 'full',    label: 'Full',    example: 'April' },
+              { value: 'short',   label: 'Short',   example: 'APR' },
+              { value: 'initial', label: 'Initial', example: 'Apr.' },
+            ] as const).map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => update({ monthFormat: opt.value } as Partial<WatchFaceElement>)}
+                className={cn(
+                  'w-full flex items-center justify-between px-2.5 py-1.5 rounded border text-[11px] transition-colors',
+                  ((element as { monthFormat?: string }).monthFormat ?? 'short') === opt.value
+                    ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                    : 'border-white/10 bg-white/5 text-white/60 hover:border-white/30'
+                )}
+              >
+                <span className="font-medium">{opt.label}</span>
+                <span className="text-white/35">{opt.example}</span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Digit size — digit widgets */}
+      {element.type === 'TEXT_IMG' && (
+        <Section label="Alignment">
+          <div className="grid grid-cols-3 gap-1">
+            {([
+              { value: 'LEFT', label: 'Left' },
+              { value: 'CENTER_H', label: 'Center' },
+              { value: 'RIGHT', label: 'Right' },
+            ] as const satisfies ReadonlyArray<{ value: HorizontalDigitAlign; label: string }>).map(option => {
+              const current = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => update({ alignH: option.value })}
+                  className={cn(
+                    'py-1.5 rounded border text-[11px] font-medium transition-colors',
+                    current === option.value
+                      ? 'border-cyan-500 bg-cyan-500/15 text-white'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30',
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[9px] text-white/35 mt-1">
+            Aligns the complete runtime value inside this widget frame.
+          </p>
+        </Section>
+      )}
+
+      {element.type === 'IMG_DATE' && element.subtype !== 'month' && (
+        <Section label="Widget Type">
+          <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.03] p-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium text-white/70">Complete Day Images (01–31)</p>
+                <p className="text-[9px] text-white/35">Off uses 10 compact tabular digits. On generates 31 complete frames for future decorations.</p>
+              </div>
+              <Switch
+                checked={isCompleteDayImageMode(element)}
+                onCheckedChange={checked => update({ dayImageMode: checked ? 'complete' : 'digits' })}
+                id={`day-mode-${element.id}`}
+              />
+            </div>
+            {isCompleteDayImageMode(element) && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('effects')}
+                className="h-6 w-full rounded border border-cyan-500/30 bg-cyan-500/10 px-2 text-[10px] text-cyan-300 hover:bg-cyan-500/20"
+              >
+                Open Effects
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG' || element.type === 'IMG_WEEK') && (
+        <Section label="Digit Size">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-white/40 w-14">Font size</span>
+            <input
+              type="number"
+              value={element.fontSize ?? element.bounds.height}
+              min={8}
+              max={400}
+              onChange={e => {
+                const fs = Number(e.target.value);
+                if (!fs || fs <= 0) return;
+                // Only set fontSize — do NOT touch bounds.
+                // Canvas uses el.fontSize directly; bake uses el.fontSize ?? bounds.height.
+                // Updating bounds triggers linked-frame sync in the reducer which can corrupt
+                // nearby IMG elements that are linked as decorative frames.
+                update({ fontSize: fs });
+              }}
+              className="w-full h-6 text-xs bg-white/5 border border-white/10 rounded px-2 text-white"
+            />
+          </div>
+          <p className="text-[9px] text-white/35 mt-1">Font size is the source of truth for render size.</p>
+          <button
+            type="button"
+            onClick={() => {
+              const font = getFontStyle(element.fontStyle ?? 'orbitron');
+              const fontSize = Math.max(4, Math.floor((element.fontSize ?? element.bounds.height) * 0.8));
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              if (!ctx) {
+                toast.error('Unable to measure this font.');
+                return;
+              }
+              ctx.font = `${font.fontWeight} ${fontSize}px ${font.fontFamily}`;
+              const content = measureDigitWidgetContent(element, text => ctx.measureText(text).width);
+              const alignH = element.type === 'TEXT_IMG'
+                ? normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H')
+                : element.type === 'IMG_TIME'
+                  ? 'LEFT'
+                  : 'CENTER_H';
+              const bounds = fitDigitFrameToContent({
+                bounds: element.bounds,
+                contentWidth: content.width,
+                contentHeight: content.height,
+                alignH,
+              });
+              if (onUpdateElementIsolated) onUpdateElementIsolated(element.id, { bounds });
+              else update({ bounds });
+            }}
+            className="mt-1 h-6 rounded border border-white/10 bg-white/5 px-2 text-[10px] text-white/60 hover:border-cyan-500/50 hover:text-white"
+          >
+            Reset Frame to Content / Range
+          </button>
+        </Section>
+      )}
+
+      {/* Preview test values — digit widgets */}
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG') && (
+        <Section label="Preview Test Value">
+          <div className="space-y-2">
+            <Input
+              value={element.previewValue ?? ''}
+              onChange={(e) => update({ previewValue: e.target.value })}
+              placeholder={
+                element.type === 'IMG_DATE'
+                  ? '31'
+                  : element.type === 'IMG_TIME'
+                    ? '10'
+                    : '888'
+              }
+              className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
+            />
+            <div className="grid grid-cols-5 gap-1">
+              {['05', '11', '28', '31', '88'].map((sample) => (
+                <button
+                  key={sample}
+                  onClick={() => update({ previewValue: sample })}
+                  className="h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/70 hover:border-cyan-500/50 hover:text-white"
+                >
+                  {sample}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => update({ previewValue: undefined })}
+              className="h-6 rounded border border-white/10 bg-white/5 px-2 text-[10px] text-white/50 hover:border-white/30 hover:text-white/80"
+            >
+              Clear Custom Value
+            </button>
+            <p className="text-[9px] text-white/35">Preview-only test sample for alignment/parity checks. Export runtime value binding is unchanged.</p>
+          </div>
+        </Section>
+      )}
+
+      {/* Font style picker — text/digit elements */}
+      {['IMG_TIME', 'TEXT_IMG', 'TEXT', 'IMG_DATE', 'IMG_WEEK'].includes(element.type) && (
+        <Section label="Font Style">
+          <div className="rounded-md border border-white/10 overflow-hidden">
+            {/* Selected font preview */}
+            <div className="px-3 py-2 bg-zinc-800 border-b border-white/10 flex items-center justify-between">
+              <span style={{
+                fontFamily: getFontStyle(element.fontStyle ?? 'bold-white').fontFamily,
+                fontWeight: getFontStyle(element.fontStyle ?? 'bold-white').fontWeight,
+                color: getFontStyle(element.fontStyle ?? 'bold-white').color,
+                fontSize: '20px',
+              }}>
+                12:34
+              </span>
+              <span className="text-[10px] text-white/40">{getFontStyle(element.fontStyle ?? 'bold-white').label}</span>
+            </div>
+            <div className="px-2 py-2 border-b border-white/10 bg-zinc-900/80">
+              <Input
+                value={fontSearch}
+                onChange={(e) => setFontSearch(e.target.value)}
+                placeholder="Search font name..."
+                className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder:text-white/35"
+              />
+            </div>
+            {/* Scrollable list */}
+            <div className="max-h-48 overflow-y-auto bg-zinc-900">
+              {fontStyles.map(style => (
+                <button
+                  key={style.key}
+                  onClick={() => update({ fontStyle: style.key, color: style.color })}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-1.5 text-left transition-colors',
+                    (element.fontStyle ?? 'bold-white') === style.key
+                      ? 'bg-cyan-500/20 border-l-2 border-cyan-500'
+                      : 'border-l-2 border-transparent hover:bg-white/5'
+                  )}
+                >
+                  <span style={{
+                    fontFamily: style.fontFamily,
+                    fontWeight: style.fontWeight,
+                    color: style.color,
+                    fontSize: '18px',
+                  }}>
+                    12:34
+                  </span>
+                  <span className="flex items-center gap-1 shrink-0 ml-2">
+                    <span className="text-[10px] text-white/30">{style.label}</span>
+                    {style.embeddable
+                      ? <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded px-1 leading-4" title="This font will be embedded in the ZPK file">✓ Embeds</span>
+                      : <span className="text-[9px] text-white/20" title="Preview only — device uses system font">preview only</span>
+                    }
+                  </span>
+                </button>
+              ))}
+              {fontStyles.length === 0 && (
+                <div className="px-3 py-3 text-xs text-white/45">No fonts match your search.</div>
+              )}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* Curved Text — TEXT elements only */}
+      {element.type === 'TEXT' && (
+        <Section label="Curved Text">
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="checkbox"
+              checked={!!element.curvedText}
+              onChange={e => {
+                if (e.target.checked) {
+                  update({ curvedText: { radius: 180, startAngle: -45, endAngle: 45 } });
+                } else {
+                  update({ curvedText: undefined });
+                }
+              }}
+              className="rounded"
+            />
+            <span className="text-xs text-white/60">Enable arc text</span>
+          </div>
+          {element.curvedText && (
+            <div className="space-y-2">
+              <FieldRow>
+                <NumField label="Radius" value={element.curvedText.radius} onChange={v => update({ curvedText: { ...element.curvedText!, radius: v } })} />
+              </FieldRow>
+              <FieldRow>
+                <NumField label="Start°" value={element.curvedText.startAngle} onChange={v => update({ curvedText: { ...element.curvedText!, startAngle: v } })} />
+                <NumField label="End°" value={element.curvedText.endAngle} onChange={v => update({ curvedText: { ...element.curvedText!, endAngle: v } })} />
+              </FieldRow>
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* Drop Shadow — all types except TIME_POINTER (has handShadow) and engraveFrame elements */}
+      {!['TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
+        <Section label="Drop Shadow">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] text-white/60">Enable shadow</span>
+            <Switch
+              checked={!!element.dropShadow}
+              onCheckedChange={checked => {
+                if (checked) {
+                  update({ dropShadow: { color: '#000000', opacity: 0.6, blur: 8, offsetX: 3, offsetY: 3 } });
+                } else {
+                  update({ dropShadow: undefined });
+                }
+              }}
+              id={`shadow-${element.id}`}
+            />
+          </div>
+          {element.dropShadow && (() => {
+            const ds = element.dropShadow;
+            const updateShadow = (patch: Partial<NonNullable<typeof element.dropShadow>>) =>
+              update({ dropShadow: { ...ds, ...patch } });
+            const previewOnly = ['TEXT', 'ARC_PROGRESS', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK', 'TEXT_IMG', 'IMG_ANIM'].includes(element.type);
+            return (
+              <div className="space-y-2">
+                {/* Color */}
+                <div className="flex items-center gap-2">
+                  <input type="color" value={ds.color}
+                    onChange={e => updateShadow({ color: e.target.value })}
+                    className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent" />
+                  <Input value={ds.color}
+                    onChange={e => updateShadow({ color: e.target.value })}
+                    className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white flex-1" />
+                  <span className="text-[10px] text-white/30 shrink-0">{Math.round(ds.opacity * 100)}%</span>
+                </div>
+                {/* Opacity */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Opacity</span>
+                  <input type="range" min={0} max={100} value={Math.round(ds.opacity * 100)}
+                    onChange={e => updateShadow({ opacity: Number(e.target.value) / 100 })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                </div>
+                {/* Blur */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Blur</span>
+                  <input type="range" min={0} max={40} value={ds.blur}
+                    onChange={e => updateShadow({ blur: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.blur}px</span>
+                </div>
+                {/* Offset X */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">X offset</span>
+                  <input type="range" min={-30} max={30} value={ds.offsetX}
+                    onChange={e => updateShadow({ offsetX: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetX}px</span>
+                </div>
+                {/* Offset Y */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/40 w-12 shrink-0">Y offset</span>
+                  <input type="range" min={-30} max={30} value={ds.offsetY}
+                    onChange={e => updateShadow({ offsetY: Number(e.target.value) })}
+                    className="flex-1 accent-cyan-500 h-1" />
+                  <span className="text-[10px] text-white/30 w-8 text-right">{ds.offsetY}px</span>
+                </div>
+                {previewOnly && (
+                  <p className="text-[9px] text-yellow-500/70 mt-1">⚠ Preview only for this runtime widget type — export keeps native widget behavior.</p>
+                )}
+              </div>
+            );
+          })()}
+        </Section>
+      )}
+
+      {element.type === 'IMG_DATE' && element.subtype !== 'month' && isCompleteDayImageMode(element) && (
+        <Section label="Complete Day Image Effects">
+          <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-[10px] text-white/50">
+            Complete mode is ready to bake future effects into every image from 01 through 31. Current generic date shadows remain preview-only until their device bake is implemented and verified.
+          </div>
+        </Section>
+      )}
+
+      {/* Element Frame toggle — hidden for ARC_PROGRESS, TIME_POINTER, and frame elements */}
+      {!['ARC_PROGRESS', 'TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
+        <Section label="Element Frame">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-white/60">Add 3D engrave / emboss frame</span>
+            <Switch
+              checked={!!element.frameElementId}
+              onCheckedChange={checked => {
+                if (checked) onAddFrame?.(element);
+                else onRemoveFrame?.(element);
+              }}
+              id={`frame-${element.id}`}
+            />
+          </div>
+          {element.frameElementId && (
+            <p className="text-[9px] text-amber-400/70 mt-1">Frame element created — select it in the list to edit.</p>
+          )}
+        </Section>
+      )}
+
+      {/* App Shortcut */}
+      <Section label="App Shortcut">
+        <Select value={element.clickAction ?? '__none__'} onValueChange={v => update({ clickAction: v === '__none__' ? undefined : v })}>
+          <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
+            <SelectValue placeholder="— none —" />
+          </SelectTrigger>
+          <SelectContent>
+            {APP_SHORTCUTS.map(s => (
+              <SelectItem key={s.value || '__none__'} value={s.value || '__none__'}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Section>
+
+      {/* Visible + zIndex */}
+      <Section label="Layer">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={element.visible}
+              onCheckedChange={v => update({ visible: v })}
+              id={`vis-${element.id}`}
+            />
+            <Label htmlFor={`vis-${element.id}`} className="text-xs text-white/60">Visible</Label>
+          </div>
+          <NumField label="Z" value={element.zIndex} onChange={v => update({ zIndex: v })} />
+        </div>
+      </Section>
+      </div>
+    </div>
+    </PanelTabContext.Provider>
+  );
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  const activeTab = useContext(PanelTabContext);
+  const sectionTab = resolveSectionTab(label);
+  if (sectionTab && sectionTab !== activeTab) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <span className="text-[10px] text-white/40 uppercase tracking-wider">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function FieldRow({ children }: { children: React.ReactNode }) {
+  return <div className="flex gap-2">{children}</div>;
+}
+
+function NumField({ label, value, onChange, disabled, step }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean; step?: string }) {
+  return (
+    <div className="flex items-center gap-1 flex-1">
+      <span className="text-[10px] text-white/40 w-9 shrink-0 text-right pr-1">{label}</span>
+      <Input
+        type="number"
+        value={step ? value : Math.round(value)}
+        step={step}
+        onChange={e => onChange(Number(e.target.value))}
+        disabled={disabled}
+        className={cn(
+          'h-7 text-xs bg-white/5 border-white/10 text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
+      />
+    </div>
+  );
+}
+
+// ─── Weather preview strip ─────────────────────────────────────────────────────
+
+const PREVIEW_CODES = [0, 2, 4, 5, 8, 11, 14, 20, 28];
+
+function WeatherPreviewStrip({ style }: { style: WeatherStyle }) {
+  const [dataUrls, setDataUrls] = useState<string[]>([]);
+  useEffect(() => {
+    // generateWeatherSet uses document.createElement, safe to call in useEffect
+    const all = generateWeatherSet(style);
+    setDataUrls(PREVIEW_CODES.map(c => all[c]));
+  }, [style]);
+
+  if (dataUrls.length === 0) return null;
+  return (
+    <div className="flex gap-1 flex-wrap">
+      {dataUrls.map((url, i) => (
+        <img key={i} src={url} alt={`weather_${PREVIEW_CODES[i]}`} className="w-7 h-7 rounded" />
+      ))}
+    </div>
+  );
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function toCssColor(color: string): string {
+  if (color.startsWith('0x') || color.startsWith('0X')) {
+    return '#' + color.slice(2).padStart(6, '0');
+  }
+  return color.startsWith('#') ? color : '#ffffff';
+}

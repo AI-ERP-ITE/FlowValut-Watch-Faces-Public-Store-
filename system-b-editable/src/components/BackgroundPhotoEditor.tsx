@@ -1,0 +1,718 @@
+// Spec 023 — Background Photo Editor
+// Non-destructive photo editor modal for the cropped background image.
+// Opens from an "Edit Photo" button in DesignInput; saves edited PNG back to state.
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { analyzeFlicker, type FlickerSeverity } from '@/utils/flickerEngine';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface EditParams {
+  exposure:    number;  // –100 … +100 (default 0)
+  brightness:  number;  // –100 … +100 (default 0)
+  contrast:    number;  // –100 … +100 (default 0)
+  highlights:  number;  // –100 … +100 (default 0)
+  shadows:     number;  // –100 … +100 (default 0)
+  saturation:  number;  // –100 … +100 (default 0)
+  hue:         number;  //    0 … 360  (default 0)
+  temperature: number;  // –100 … +100 (default 0, cool → warm)
+  tint:        number;  // –100 … +100 (default 0, green → magenta)
+  sharpness:   number;  //    0 … 100  (default 0)
+  vignette:    number;  //    0 … 100  (default 0)
+}
+
+export const DEFAULT_EDIT_PARAMS: EditParams = {
+  exposure:    0,
+  brightness:  0,
+  contrast:    0,
+  highlights:  0,
+  shadows:     0,
+  saturation:  0,
+  hue:         0,
+  temperature: 0,
+  tint:        0,
+  sharpness:   0,
+  vignette:    0,
+};
+
+const DEFAULT_SHADOW_CLAMP = 47;
+const DEFAULT_SHADOW_CLAMP_ENABLED = false;
+
+function applyShadowClampToImageData(imageData: ImageData, threshold: number): void {
+  const data = imageData.data;
+  const midpoint = threshold / 2;
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+    const a = data[i + 3];
+
+    if (a === 0) continue;
+
+    // Remap low-band channels to nearest allowed edge instead of hard-zeroing.
+    if (r > 0 && r < threshold) r = r <= midpoint ? 0 : threshold;
+    if (g > 0 && g < threshold) g = g <= midpoint ? 0 : threshold;
+    if (b > 0 && b < threshold) b = b <= midpoint ? 0 : threshold;
+
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+  }
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface Props {
+  sourceDataUrl: string;          // the cropped PNG from BackgroundCropTool (correct model dimensions)
+  onSave: (dataUrl: string) => void;
+  onCancel: () => void;
+  /** Spec 110: watch model shape for clip overlay in preview. Output PNG is always unclipped square. */
+  canvasShape?: 'round' | 'square';
+  canvasCornerRadius?: number;
+  /** Spec 110: target editor/export dimensions from active watch model. */
+  canvasWidth?: number;
+  canvasHeight?: number;
+}
+
+interface FlickerPreviewInfo {
+  ratio: number;
+  severity: FlickerSeverity;
+  forbiddenCount: number;
+  totalCount: number;
+}
+
+// ── T020: Reusable slider row ─────────────────────────────────────────────────
+
+interface SliderProps {
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  value: number;
+  defaultValue?: number;
+  unit?: string;
+  onChange: (v: number) => void;
+}
+
+function EditorSlider({ label, min, max, step = 1, value, defaultValue = 0, unit = '', onChange }: SliderProps) {
+  return (
+    <>
+      <div className="flex items-center gap-3 py-1">
+        <span className="text-zinc-400 text-xs w-24 flex-shrink-0">{label}</span>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="flex-1 accent-cyan-500 cursor-pointer"
+        />
+        {/* T032: double-click value badge to reset single param */}
+        <span
+          className="text-xs w-10 text-right flex-shrink-0 select-none cursor-pointer transition-colors hover:text-cyan-400 text-zinc-300"
+          title="Double-click to reset"
+          onDoubleClick={() => onChange(defaultValue)}
+        >
+          {value > 0 && min < 0 ? `+${value}` : `${value}`}{unit}
+        </span>
+      </div>
+    </>
+  );
+}
+
+// ── Section heading helper ────────────────────────────────────────────────────
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mt-5 mb-2 first:mt-0">
+      {children}
+    </h3>
+  );
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export function BackgroundPhotoEditor({ sourceDataUrl, onSave, onCancel, canvasShape, canvasCornerRadius, canvasWidth, canvasHeight }: Props) {
+  const [editParams, setEditParams] = useState<EditParams>(DEFAULT_EDIT_PARAMS);
+  const [shadowClamp, setShadowClamp] = useState<number>(DEFAULT_SHADOW_CLAMP);
+  const [shadowClampEnabled, setShadowClampEnabled] = useState<boolean>(DEFAULT_SHADOW_CLAMP_ENABLED);
+  const [flickerInfo, setFlickerInfo] = useState<FlickerPreviewInfo>({
+    ratio: 0,
+    severity: 'none',
+    forbiddenCount: 0,
+    totalCount: 0,
+  });
+
+  // T007: Store loaded HTMLImageElement so draw functions can access it
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  // T009: Ref to the visible preview canvas element
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // T012: Pending RAF handle — lets us cancel stale frames on rapid slider drag
+  const rafRef = useRef<number>(0);
+  // Tracks whether the source image has finished loading
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  const targetCanvasW = Math.max(1, Math.round(canvasWidth ?? 480));
+  const targetCanvasH = Math.max(1, Math.round(canvasHeight ?? 480));
+  const previewScale = Math.min(400 / targetCanvasW, 400 / targetCanvasH, 1);
+  const previewDisplayW = Math.max(1, Math.round(targetCanvasW * previewScale));
+  const previewDisplayH = Math.max(1, Math.round(targetCanvasH * previewScale));
+  const previewBorderRadius = canvasShape === 'square' && (canvasCornerRadius ?? 0) > 0
+    ? `${Math.max(0, Math.round((canvasCornerRadius ?? 0) * previewScale))}px`
+    : '50%';
+
+  // T006: Load sourceDataUrl into an HTMLImageElement on mount
+  useEffect(() => {
+    setImgLoaded(false);
+    imgRef.current = null;
+    const img = new Image();
+    img.onload = () => {
+      imgRef.current = img;
+      setImgLoaded(true); // T008: triggers initial preview draw via drawPreview effect below
+    };
+    img.src = sourceDataUrl;
+  }, [sourceDataUrl]);
+
+  // T011: Full pixel pipeline — runs on every editParams change.
+  // Steps: offscreen draw → CSS filter (exp+bright+contrast) → per-pixel ops
+  //        (highlights/shadows, temperature/tint, hue/sat) → sharpness →
+  //        copy to visible canvas with circle clip → vignette overlay.
+  const drawPreview = useCallback(() => {
+    const canvas = canvasRef.current;
+    const img    = imgRef.current;
+    if (!canvas || !img) return;
+
+    // Use target canvas dimensions from active model; draw source image scaled into this buffer.
+    const csW = targetCanvasW;
+    const csH = targetCanvasH;
+    const csShape: 'round' | 'square' = canvasShape ?? 'round';
+    const csRadius = canvasCornerRadius ?? 0;
+    const cxV = csW / 2;
+    const cyV = csH / 2;
+
+    const { exposure, brightness, contrast, highlights, shadows,
+            saturation, hue, temperature, tint, sharpness, vignette } = editParams;
+
+    // ── Step 1: Offscreen canvas matching source dimensions ─────────────────
+    const off    = document.createElement('canvas');
+    off.width    = csW;
+    off.height   = csH;
+    const offCtx = off.getContext('2d')!;
+
+    // ── Step 2: Bake exposure + brightness + contrast via CSS filter ──────
+    const expBrightFactor = Math.pow(2, exposure / 100) * Math.max(0, 1 + brightness / 100);
+    const contrastFactor  = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    offCtx.filter = `brightness(${expBrightFactor}) contrast(${contrastFactor})`;
+    offCtx.drawImage(img, 0, 0, csW, csH);
+    offCtx.filter = 'none';
+
+    // ── Steps 3–5: Per-pixel — highlights/shadows, temp/tint, hue/sat ────
+    const needsPixelOps = highlights !== 0 || shadows !== 0 ||
+                          temperature !== 0 || tint !== 0 ||
+                          hue !== 0 || saturation !== 0;
+
+    if (needsPixelOps) {
+      // Pre-compute scalars outside the loop for performance
+      const hlStr   = highlights / 100;
+      const shStr   = shadows    / 100;
+      const tempSh  = (temperature / 100) * 0.8;
+      const tintSh  = (tint        / 100) * 0.4;
+      const satMult = 1 + saturation / 100;
+      const doHS    = hue !== 0 || saturation !== 0;
+
+      const hue2rgb = (p: number, q: number, t: number): number => {
+        const tt = ((t % 1) + 1) % 1;
+        if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+        if (tt < 1 / 2) return q;
+        if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+        return p;
+      };
+
+      const imageData = offCtx.getImageData(0, 0, csW, csH);
+      const d = imageData.data;
+
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+
+        // Highlights / Shadows — luminance-targeted adjustment
+        if (highlights !== 0 || shadows !== 0) {
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (highlights !== 0) {
+            const delta = hlStr * Math.max(0, (lum - 0.5) * 2);
+            r = Math.min(1, Math.max(0, r + delta));
+            g = Math.min(1, Math.max(0, g + delta));
+            b = Math.min(1, Math.max(0, b + delta));
+          }
+          if (shadows !== 0) {
+            const delta = shStr * Math.max(0, (0.5 - lum) * 2);
+            r = Math.min(1, Math.max(0, r + delta));
+            g = Math.min(1, Math.max(0, g + delta));
+            b = Math.min(1, Math.max(0, b + delta));
+          }
+        }
+
+        // Temperature (cool ↔ warm): shift R and B channels
+        if (temperature !== 0) {
+          r = Math.min(1, Math.max(0, r + tempSh));
+          b = Math.min(1, Math.max(0, b - tempSh));
+        }
+
+        // Tint (green ↔ magenta)
+        if (tint !== 0) {
+          g = Math.min(1, Math.max(0, g - tintSh));
+          r = Math.min(1, Math.max(0, r + tintSh * 0.5));
+          b = Math.min(1, Math.max(0, b + tintSh * 0.5));
+        }
+
+        // Hue / Saturation — RGB → HSL → adjust → RGB
+        if (doHS) {
+          const cmax = Math.max(r, g, b);
+          const cmin = Math.min(r, g, b);
+          const dlt  = cmax - cmin;
+          let hh = 0, ss = 0;
+          const ll = (cmax + cmin) / 2;
+          if (dlt > 0) {
+            ss = ll > 0.5 ? dlt / (2 - cmax - cmin) : dlt / (cmax + cmin);
+            if      (cmax === r) hh = ((g - b) / dlt + (g < b ? 6 : 0)) / 6;
+            else if (cmax === g) hh = ((b - r) / dlt + 2) / 6;
+            else                 hh = ((r - g) / dlt + 4) / 6;
+          }
+          hh = ((((hh * 360 + hue) % 360) + 360) % 360) / 360;
+          ss = Math.min(1, Math.max(0, ss * satMult));
+          if (ss === 0) {
+            r = g = b = ll;
+          } else {
+            const q2 = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss;
+            const p2 = 2 * ll - q2;
+            r = hue2rgb(p2, q2, hh + 1 / 3);
+            g = hue2rgb(p2, q2, hh);
+            b = hue2rgb(p2, q2, hh - 1 / 3);
+          }
+        }
+
+        d[i]     = Math.min(255, Math.max(0, Math.round(r * 255)));
+        d[i + 1] = Math.min(255, Math.max(0, Math.round(g * 255)));
+        d[i + 2] = Math.min(255, Math.max(0, Math.round(b * 255)));
+      }
+      offCtx.putImageData(imageData, 0, 0);
+    }
+
+    // ── Step 6: Sharpness — 3×3 unsharp-mask convolution ─────────────────
+    // Kernel: [ 0,-1, 0, -1,5,-1, 0,-1, 0 ] blended by (sharpness/100)
+    if (sharpness > 0) {
+      const src = offCtx.getImageData(0, 0, csW, csH);
+      const dst = offCtx.createImageData(csW, csH);
+      const sd  = src.data;
+      const dd  = dst.data;
+      const amt = sharpness / 100;
+
+      for (let y = 1; y < csH - 1; y++) {
+        for (let x = 1; x < csW - 1; x++) {
+          const idx = (y * csW + x) * 4;
+          for (let c = 0; c < 3; c++) {
+            const center = sd[idx + c];
+            const conv   = Math.min(255, Math.max(0,
+              5 * center
+              - sd[((y - 1) * csW + x    ) * 4 + c]
+              - sd[((y + 1) * csW + x    ) * 4 + c]
+              - sd[(y       * csW + x - 1) * 4 + c]
+              - sd[(y       * csW + x + 1) * 4 + c],
+            ));
+            dd[idx + c] = Math.round(center + (conv - center) * amt);
+          }
+          dd[idx + 3] = sd[idx + 3];
+        }
+      }
+      // Copy 1-px border pixels unchanged
+      for (let x = 0; x < csW; x++) {
+        const top = x * 4;
+        const bot = ((csH - 1) * csW + x) * 4;
+        dd[top] = sd[top]; dd[top + 1] = sd[top + 1]; dd[top + 2] = sd[top + 2]; dd[top + 3] = sd[top + 3];
+        dd[bot] = sd[bot]; dd[bot + 1] = sd[bot + 1]; dd[bot + 2] = sd[bot + 2]; dd[bot + 3] = sd[bot + 3];
+      }
+      for (let y = 0; y < csH; y++) {
+        const lft = (y * csW) * 4;
+        const rgt = (y * csW + csW - 1) * 4;
+        dd[lft] = sd[lft]; dd[lft + 1] = sd[lft + 1]; dd[lft + 2] = sd[lft + 2]; dd[lft + 3] = sd[lft + 3];
+        dd[rgt] = sd[rgt]; dd[rgt + 1] = sd[rgt + 1]; dd[rgt + 2] = sd[rgt + 2]; dd[rgt + 3] = sd[rgt + 3];
+      }
+      offCtx.putImageData(dst, 0, 0);
+    }
+
+    // ── Step 7: Copy offscreen → visible canvas with shape clip ────────
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, csW, csH);
+    ctx.save();
+    ctx.beginPath();
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius);
+    } else {
+      ctx.arc(cxV, cyV, Math.min(cxV, cyV), 0, Math.PI * 2);
+    }
+    ctx.clip();
+    ctx.drawImage(off, 0, 0);
+    ctx.restore();
+
+    // ── Step 8: Vignette radial-gradient overlay ──────────────────────────
+    if (vignette > 0) {
+      const strength = (vignette / 100) * 0.85;
+      const grad = ctx.createRadialGradient(cxV, cyV, 0, cxV, cyV, Math.min(cxV, cyV));
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, `rgba(0,0,0,${strength.toFixed(3)})`);
+      ctx.save();
+      ctx.beginPath();
+      if (csShape === 'square' && csRadius > 0) {
+        ctx.roundRect(0, 0, csW, csH, csRadius);
+      } else {
+        ctx.arc(cxV, cyV, Math.min(cxV, cyV), 0, Math.PI * 2);
+      }
+      ctx.clip();
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, csW, csH);
+      ctx.restore();
+    }
+
+    const imageData = ctx.getImageData(0, 0, csW, csH);
+    if (shadowClampEnabled) {
+      applyShadowClampToImageData(imageData, shadowClamp);
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    const analysis = analyzeFlicker(imageData);
+    setFlickerInfo({
+      ratio: analysis.ratio,
+      severity: analysis.severity,
+      forbiddenCount: analysis.forbiddenCount,
+      totalCount: analysis.totalCount,
+    });
+  }, [canvasCornerRadius, canvasShape, editParams, shadowClamp, shadowClampEnabled, targetCanvasH, targetCanvasW]);
+
+  // T012: Schedule draw via RAF; cancel pending frame if params change again before it fires.
+  // T028: Cancel on unmount too.
+  useEffect(() => {
+    if (!imgLoaded) return;
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => drawPreview());
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [imgLoaded, editParams, drawPreview]);
+
+  // T003: Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
+  // T029: Export — run the full pixel pipeline on a fresh offscreen canvas
+  // and call onSave with the resulting data URL.
+  // T030: Export uses active model dimensions (full square/rect PNG, no clip)
+  // how Spec 011 stores backgroundImage. The circular mask is UI-only.
+  const handleSave = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+
+    const exportW = targetCanvasW;
+    const exportH = targetCanvasH;
+    const { exposure, brightness, contrast, highlights, shadows,
+            saturation, hue, temperature, tint, sharpness, vignette } = editParams;
+
+    const off    = document.createElement('canvas');
+    off.width    = exportW;
+    off.height   = exportH;
+    const offCtx = off.getContext('2d')!;
+
+    // Step 2: CSS filter — exposure × brightness + contrast
+    const expBrightFactor = Math.pow(2, exposure / 100) * Math.max(0, 1 + brightness / 100);
+    const contrastFactor  = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    offCtx.filter = `brightness(${expBrightFactor}) contrast(${contrastFactor})`;
+    offCtx.drawImage(img, 0, 0, exportW, exportH);
+    offCtx.filter = 'none';
+
+    // Steps 3–5: per-pixel ops
+    const needsPixelOps = highlights !== 0 || shadows !== 0 ||
+                          temperature !== 0 || tint !== 0 ||
+                          hue !== 0 || saturation !== 0;
+
+    if (needsPixelOps) {
+      const hlStr   = highlights / 100;
+      const shStr   = shadows    / 100;
+      const tempSh  = (temperature / 100) * 0.8;
+      const tintSh  = (tint        / 100) * 0.4;
+      const satMult = 1 + saturation / 100;
+      const doHS    = hue !== 0 || saturation !== 0;
+
+      const hue2rgb = (p: number, q: number, t: number): number => {
+        const tt = ((t % 1) + 1) % 1;
+        if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+        if (tt < 1 / 2) return q;
+        if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+        return p;
+      };
+
+      const imageData = offCtx.getImageData(0, 0, exportW, exportH);
+      const d = imageData.data;
+
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+
+        if (highlights !== 0 || shadows !== 0) {
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (highlights !== 0) {
+            const delta = hlStr * Math.max(0, (lum - 0.5) * 2);
+            r = Math.min(1, Math.max(0, r + delta));
+            g = Math.min(1, Math.max(0, g + delta));
+            b = Math.min(1, Math.max(0, b + delta));
+          }
+          if (shadows !== 0) {
+            const delta = shStr * Math.max(0, (0.5 - lum) * 2);
+            r = Math.min(1, Math.max(0, r + delta));
+            g = Math.min(1, Math.max(0, g + delta));
+            b = Math.min(1, Math.max(0, b + delta));
+          }
+        }
+        if (temperature !== 0) {
+          r = Math.min(1, Math.max(0, r + tempSh));
+          b = Math.min(1, Math.max(0, b - tempSh));
+        }
+        if (tint !== 0) {
+          g = Math.min(1, Math.max(0, g - tintSh));
+          r = Math.min(1, Math.max(0, r + tintSh * 0.5));
+          b = Math.min(1, Math.max(0, b + tintSh * 0.5));
+        }
+        if (doHS) {
+          const cmax = Math.max(r, g, b);
+          const cmin = Math.min(r, g, b);
+          const dlt  = cmax - cmin;
+          let hh = 0, ss = 0;
+          const ll = (cmax + cmin) / 2;
+          if (dlt > 0) {
+            ss = ll > 0.5 ? dlt / (2 - cmax - cmin) : dlt / (cmax + cmin);
+            if      (cmax === r) hh = ((g - b) / dlt + (g < b ? 6 : 0)) / 6;
+            else if (cmax === g) hh = ((b - r) / dlt + 2) / 6;
+            else                 hh = ((r - g) / dlt + 4) / 6;
+          }
+          hh = ((((hh * 360 + hue) % 360) + 360) % 360) / 360;
+          ss = Math.min(1, Math.max(0, ss * satMult));
+          if (ss === 0) {
+            r = g = b = ll;
+          } else {
+            const q2 = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss;
+            const p2 = 2 * ll - q2;
+            r = hue2rgb(p2, q2, hh + 1 / 3);
+            g = hue2rgb(p2, q2, hh);
+            b = hue2rgb(p2, q2, hh - 1 / 3);
+          }
+        }
+        d[i]     = Math.min(255, Math.max(0, Math.round(r * 255)));
+        d[i + 1] = Math.min(255, Math.max(0, Math.round(g * 255)));
+        d[i + 2] = Math.min(255, Math.max(0, Math.round(b * 255)));
+      }
+      offCtx.putImageData(imageData, 0, 0);
+    }
+
+    // Step 6: Sharpness
+    if (sharpness > 0) {
+      const src = offCtx.getImageData(0, 0, exportW, exportH);
+      const dst = offCtx.createImageData(exportW, exportH);
+      const sd  = src.data;
+      const dd  = dst.data;
+      const amt = sharpness / 100;
+      for (let y = 1; y < exportH - 1; y++) {
+        for (let x = 1; x < exportW - 1; x++) {
+          const idx = (y * exportW + x) * 4;
+          for (let c = 0; c < 3; c++) {
+            const center = sd[idx + c];
+            const conv   = Math.min(255, Math.max(0,
+              5 * center
+              - sd[((y - 1) * exportW + x    ) * 4 + c]
+              - sd[((y + 1) * exportW + x    ) * 4 + c]
+              - sd[(y       * exportW + x - 1) * 4 + c]
+              - sd[(y       * exportW + x + 1) * 4 + c],
+            ));
+            dd[idx + c] = Math.round(center + (conv - center) * amt);
+          }
+          dd[idx + 3] = sd[idx + 3];
+        }
+      }
+      for (let x = 0; x < exportW; x++) {
+        const top = x * 4;
+        const bot = ((exportH - 1) * exportW + x) * 4;
+        dd[top] = sd[top]; dd[top + 1] = sd[top + 1]; dd[top + 2] = sd[top + 2]; dd[top + 3] = sd[top + 3];
+        dd[bot] = sd[bot]; dd[bot + 1] = sd[bot + 1]; dd[bot + 2] = sd[bot + 2]; dd[bot + 3] = sd[bot + 3];
+      }
+      for (let y = 0; y < exportH; y++) {
+        const lft = (y * exportW) * 4;
+        const rgt = (y * exportW + exportW - 1) * 4;
+        dd[lft] = sd[lft]; dd[lft + 1] = sd[lft + 1]; dd[lft + 2] = sd[lft + 2]; dd[lft + 3] = sd[lft + 3];
+        dd[rgt] = sd[rgt]; dd[rgt + 1] = sd[rgt + 1]; dd[rgt + 2] = sd[rgt + 2]; dd[rgt + 3] = sd[rgt + 3];
+      }
+      offCtx.putImageData(dst, 0, 0);
+    }
+
+    // Step 7: Vignette (drawn directly onto export canvas — full square)
+    if (vignette > 0) {
+      const strength = (vignette / 100) * 0.85;
+      const cx = exportW / 2;
+      const cy = exportH / 2;
+      const radius = Math.min(cx, cy);
+      const grad = offCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, `rgba(0,0,0,${strength.toFixed(3)})`);
+      offCtx.fillStyle = grad;
+      offCtx.fillRect(0, 0, exportW, exportH);
+    }
+
+    if (shadowClampEnabled) {
+      const imageData = offCtx.getImageData(0, 0, exportW, exportH);
+      applyShadowClampToImageData(imageData, shadowClamp);
+      offCtx.putImageData(imageData, 0, 0);
+    }
+
+    // Step 8: Export at active model dimensions → dispatch via onSave
+    onSave(off.toDataURL('image/png'));
+  }, [editParams, onSave, shadowClamp, shadowClampEnabled, targetCanvasH, targetCanvasW]);
+
+  return (
+    // T003: Full-screen overlay with dark backdrop
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      {/* Modal panel */}
+      <div className="bg-[#1a1a1a] rounded-xl shadow-2xl flex flex-col w-full max-w-4xl max-h-[95vh] overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-700">
+          <h2 className="text-white font-semibold text-base">Edit Photo</h2>
+          <button
+            onClick={onCancel}
+            className="text-zinc-400 hover:text-white text-lg leading-none transition-colors"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body — T004: two-column on ≥900px, stacked on smaller viewports */}
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
+
+          {/* Left column: canvas preview area (fixed-width on desktop, full-width on mobile) */}
+          <div className="flex items-center justify-center p-6 bg-[#111111] md:flex-shrink-0">
+            {/* T009: Pixel buffer at active model dimensions, scaled for UI preview.
+                T010: circular clip + cyan border applied via style. */}
+            <canvas
+              ref={canvasRef}
+              width={targetCanvasW}
+              height={targetCanvasH}
+              style={{
+                width: previewDisplayW,
+                height: previewDisplayH,
+                borderRadius: previewBorderRadius,
+                border: '2px solid rgba(0,212,255,0.5)',
+                background: '#1a1a1a',
+                flexShrink: 0,
+              }}
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="hidden md:block w-px bg-zinc-700 flex-shrink-0" />
+          <div className="block md:hidden h-px bg-zinc-700 flex-shrink-0" />
+
+          {/* Right column: sliders panel — scrollable */}
+          <div className="flex-1 overflow-y-auto p-6 min-w-0">
+            <div className={`mb-3 rounded border px-3 py-2 text-xs ${flickerInfo.severity === 'high' ? 'border-red-500/40 bg-red-500/10 text-red-300' : flickerInfo.severity === 'medium' ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}>
+              <div className="font-semibold">Flicker risk: {flickerInfo.severity.toUpperCase()}</div>
+              <div className="mt-1 opacity-90">
+                Forbidden pixels: {flickerInfo.forbiddenCount}/{flickerInfo.totalCount} ({(flickerInfo.ratio * 100).toFixed(2)}%)
+              </div>
+            </div>
+
+            {/* T021: Light section */}
+            <SectionHeading>Light</SectionHeading>
+            <EditorSlider label="Exposure"   min={-100} max={100} value={editParams.exposure}
+              onChange={(v) => setEditParams((p) => ({ ...p, exposure: v }))} />
+            <EditorSlider label="Brightness" min={-100} max={100} value={editParams.brightness}
+              onChange={(v) => setEditParams((p) => ({ ...p, brightness: v }))} />
+            <EditorSlider label="Contrast"   min={-100} max={100} value={editParams.contrast}
+              onChange={(v) => setEditParams((p) => ({ ...p, contrast: v }))} />
+            <EditorSlider label="Highlights" min={-100} max={100} value={editParams.highlights}
+              onChange={(v) => setEditParams((p) => ({ ...p, highlights: v }))} />
+            <EditorSlider label="Shadows"    min={-100} max={100} value={editParams.shadows}
+              onChange={(v) => setEditParams((p) => ({ ...p, shadows: v }))} />
+
+            {/* T022: Colour section */}
+            <SectionHeading>Colour</SectionHeading>
+            <EditorSlider label="Saturation"  min={-100} max={100} value={editParams.saturation}
+              onChange={(v) => setEditParams((p) => ({ ...p, saturation: v }))} />
+            <EditorSlider label="Hue"         min={0} max={360} defaultValue={0} unit="°" value={editParams.hue}
+              onChange={(v) => setEditParams((p) => ({ ...p, hue: v }))} />
+            <EditorSlider label="Temperature" min={-100} max={100} value={editParams.temperature}
+              onChange={(v) => setEditParams((p) => ({ ...p, temperature: v }))} />
+            <EditorSlider label="Tint"        min={-100} max={100} value={editParams.tint}
+              onChange={(v) => setEditParams((p) => ({ ...p, tint: v }))} />
+
+            {/* T023: Detail section */}
+            <SectionHeading>Detail</SectionHeading>
+            <EditorSlider label="Sharpness" min={0} max={100} defaultValue={0} value={editParams.sharpness}
+              onChange={(v) => setEditParams((p) => ({ ...p, sharpness: v }))} />
+
+            <div className="flex items-center gap-3 py-1">
+              <span className="text-zinc-400 text-xs w-24 flex-shrink-0">Erase Flickery Shadows</span>
+              <label className="inline-flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={shadowClampEnabled}
+                  onChange={(e) => setShadowClampEnabled(e.target.checked)}
+                  className="accent-cyan-500"
+                />
+                <span>{shadowClampEnabled ? 'On' : 'Off'}</span>
+              </label>
+            </div>
+
+            <EditorSlider label="Shadow Clamp" min={30} max={60} step={1} defaultValue={DEFAULT_SHADOW_CLAMP} value={shadowClamp}
+              onChange={(v) => setShadowClamp(v)} />
+
+            {/* T024: Effects section */}
+            <SectionHeading>Effects</SectionHeading>
+            <EditorSlider label="Vignette" min={0} max={100} defaultValue={0} value={editParams.vignette}
+              onChange={(v) => setEditParams((p) => ({ ...p, vignette: v }))} />
+
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-zinc-700">
+          <Button
+            variant="outline"
+            className="border-zinc-600 text-zinc-300 hover:bg-zinc-700"
+            onClick={() => {
+              setEditParams(DEFAULT_EDIT_PARAMS);
+              setShadowClamp(DEFAULT_SHADOW_CLAMP);
+              setShadowClampEnabled(DEFAULT_SHADOW_CLAMP_ENABLED);
+            }}
+          >
+            Reset All
+          </Button>
+          <Button
+            variant="outline"
+            className="border-zinc-600 text-zinc-300 hover:bg-zinc-700"
+            onClick={onCancel}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="bg-cyan-600 hover:bg-cyan-500 text-white"
+            onClick={handleSave}
+          >
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

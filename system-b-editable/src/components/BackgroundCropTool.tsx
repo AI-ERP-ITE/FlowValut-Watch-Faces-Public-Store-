@@ -1,0 +1,323 @@
+// Spec 011 — Background Image Crop & Position Tool
+// Interactive canvas with circular mask, pan, scale, export.
+
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Grid3X3 } from 'lucide-react';
+
+const SIZE = 480; // fallback when no model props supplied
+
+interface Props {
+  file: File;
+  onConfirm: (dataUrl: string) => void;
+  onCancel: () => void;
+  /** Spec 110: output dimensions from the active watch model. Defaults to 480×480 round. */
+  width?: number;
+  height?: number;
+  shape?: 'round' | 'square';
+  cornerRadius?: number;
+}
+
+export function BackgroundCropTool({ file, onConfirm, onCancel, width, height, shape, cornerRadius }: Props) {
+  const csW = width ?? SIZE;
+  const csH = height ?? SIZE;
+  const csShape: 'round' | 'square' = shape ?? 'round';
+  const csRadius = cornerRadius ?? 0;
+  const csRx = csW / 2;  // horizontal center
+  const csRy = csH / 2;  // vertical center
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  // Pan offset (image top-left relative to canvas origin)
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  // Scale
+  const [scale, setScale] = useState(1);
+  const [minScale, setMinScale] = useState(1);
+
+  // Drag state
+  const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
+
+  // Grid overlay (visible canvas only — export is separate offscreen canvas)
+  const [showCropGrid, setShowCropGrid] = useState(false);
+
+  // ── T003: Load image ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      imgRef.current = img;
+
+      // T004/T005: compute min scale to fill canvas, center by default
+      const ms = Math.max(csW / img.naturalWidth, csH / img.naturalHeight);
+      setMinScale(ms);
+      setScale(ms);
+      setOffset({
+        x: (csW - img.naturalWidth * ms) / 2,
+        y: (csH - img.naturalHeight * ms) / 2,
+      });
+    };
+    img.src = url;
+  }, [file]);
+
+  // ── Draw ──────────────────────────────────────────────────────────────────
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, csW, csH);
+
+    // Clip to watch shape
+    ctx.save();
+    ctx.beginPath();
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius);
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy), 0, Math.PI * 2);
+    }
+    ctx.clip();
+    ctx.drawImage(img, offset.x, offset.y, img.naturalWidth * scale, img.naturalHeight * scale);
+    ctx.restore();
+
+    // Darkened overlay outside watch shape
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.beginPath();
+    ctx.rect(0, 0, csW, csH);
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius); // counter-clockwise hole
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy), 0, Math.PI * 2, true);
+    }
+    ctx.fill('evenodd');
+    ctx.restore();
+
+    // Shape border
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,212,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(1, 1, csW - 2, csH - 2, csRadius);
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy) - 1, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // Alignment grid (clipped to watch shape)
+    if (showCropGrid) {
+      ctx.save();
+      ctx.beginPath();
+      if (csShape === 'square' && csRadius > 0) {
+        ctx.roundRect(1, 1, csW - 2, csH - 2, csRadius);
+      } else {
+        ctx.arc(csRx, csRy, Math.min(csRx, csRy) - 1, 0, Math.PI * 2);
+      }
+      ctx.clip();
+      const thirdW = csW / 3;
+      const thirdH = csH / 3;
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 3; i++) {
+        ctx.beginPath(); ctx.moveTo(thirdW * i, 0); ctx.lineTo(thirdW * i, csH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, thirdH * i); ctx.lineTo(csW, thirdH * i); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath(); ctx.moveTo(csRx, 0); ctx.lineTo(csRx, csH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, csRy); ctx.lineTo(csW, csRy); ctx.stroke();
+      ctx.restore();
+    }
+  }, [offset, scale, showCropGrid]);
+
+  useEffect(() => { draw(); }, [draw]);
+
+  // ── T011: Constrain offset — center when image smaller than canvas, fill-clamp when larger ──
+  const constrain = useCallback((ox: number, oy: number, sc: number, img: HTMLImageElement) => {
+    const iw = img.naturalWidth * sc;
+    const ih = img.naturalHeight * sc;
+    const x = iw >= csW ? Math.min(0, Math.max(ox, csW - iw)) : (csW - iw) / 2;
+    const y = ih >= csH ? Math.min(0, Math.max(oy, csH - ih)) : (csH - ih) / 2;
+    return { x, y };
+  }, []);
+
+  // ── T008/T009: Pan handlers ───────────────────────────────────────────────
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, ox: offset.x, oy: offset.y };
+  }, [offset]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current || !imgRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    // Scale factor: canvas may be CSS-smaller than 480
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = csW / rect.width;
+    const scaleY = csH / rect.height;
+    const newOffset = constrain(
+      dragRef.current.ox + dx * scaleX,
+      dragRef.current.oy + dy * scaleY,
+      scale,
+      imgRef.current,
+    );
+    setOffset(newOffset);
+  }, [scale, constrain]);
+
+  const onPointerUp = useCallback(() => { dragRef.current = null; }, []);
+
+  // ── T012–T014: Scale slider ───────────────────────────────────────────────
+  const onScaleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newScale = parseFloat(e.target.value);
+    const img = imgRef.current;
+    if (!img) return;
+    const oldScale = scale;
+    const zoomRatio = newScale / oldScale;
+    const centerX = csW / 2;
+    const centerY = csH / 2;
+    setScale(newScale);
+    setOffset(prev => {
+      // Keep canvas-center anchored while zoom changes; user can still pan afterward.
+      const anchoredX = centerX - (centerX - prev.x) * zoomRatio;
+      const anchoredY = centerY - (centerY - prev.y) * zoomRatio;
+      return constrain(anchoredX, anchoredY, newScale, img);
+    });
+  }, [constrain, csH, csW, scale]);
+
+  const onOffsetInputChange = useCallback((axis: 'x' | 'y', rawValue: string) => {
+    const img = imgRef.current;
+    if (!img) return;
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return;
+    const next = Math.round(parsed);
+    setOffset(prev => {
+      const candidate = axis === 'x'
+        ? { x: next, y: prev.y }
+        : { x: prev.x, y: next };
+      return constrain(candidate.x, candidate.y, scale, img);
+    });
+  }, [constrain, scale]);
+
+  const handleRecenterPosition = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const centeredX = (csW - img.naturalWidth * scale) / 2;
+    const centeredY = (csH - img.naturalHeight * scale) / 2;
+    setOffset(constrain(centeredX, centeredY, scale, img));
+  }, [constrain, csH, csW, scale]);
+
+  // ── T019: Reset ───────────────────────────────────────────────────────────
+  const handleReset = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const ms = Math.max(csW / img.naturalWidth, csH / img.naturalHeight);
+    setScale(ms);
+    setOffset({
+      x: (csW - img.naturalWidth * ms) / 2,
+      y: (csH - img.naturalHeight * ms) / 2,
+    });
+  }, [csH, csW]);
+
+  // ── T016–T018: Export ─────────────────────────────────────────────────────
+  const handleConfirm = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    const off = document.createElement('canvas');
+    off.width = csW;
+    off.height = csH;
+    const ctx = off.getContext('2d')!;
+    ctx.beginPath();
+    if (csShape === 'square' && csRadius > 0) {
+      ctx.roundRect(0, 0, csW, csH, csRadius);
+    } else {
+      ctx.arc(csRx, csRy, Math.min(csRx, csRy), 0, Math.PI * 2);
+    }
+    ctx.clip();
+    ctx.drawImage(img, offset.x, offset.y, img.naturalWidth * scale, img.naturalHeight * scale);
+    onConfirm(off.toDataURL('image/png'));
+  }, [offset, scale, onConfirm]);
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      {/* Canvas — pixel buffer matches watch resolution, displayed at fixed CSS size */}
+      <canvas
+        ref={canvasRef}
+        width={csW}
+        height={csH}
+        style={{ width: 320, height: Math.round(320 * csH / csW), borderRadius: csShape === 'round' ? '50%' : csRadius > 0 ? `${Math.round(csRadius * 320 / csW)}px` : '4px', cursor: 'grab', touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+      />
+
+      {/* T012: Scale slider + grid toggle */}
+      <div className="w-full max-w-xs flex items-center gap-3">
+        <span className="text-xs text-zinc-400">Zoom</span>
+        <input
+          type="range"
+          min={0.1}
+          max={minScale * 4}
+          step={0.005}
+          value={scale}
+          onChange={onScaleChange}
+          className="flex-1 accent-cyan-500"
+        />
+        <button
+          onClick={() => setShowCropGrid(g => !g)}
+          title="Toggle alignment grid"
+          className={`p-1 rounded transition-colors ${showCropGrid ? 'text-cyan-400 bg-cyan-400/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+        >
+          <Grid3X3 className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="w-full max-w-xs grid grid-cols-2 gap-3">
+        <label className="text-[11px] text-zinc-400 flex items-center gap-2">
+          X
+          <input
+            type="number"
+            step={1}
+            value={Math.round(offset.x)}
+            onChange={(e) => onOffsetInputChange('x', e.target.value)}
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
+          />
+        </label>
+        <label className="text-[11px] text-zinc-400 flex items-center gap-2">
+          Y
+          <input
+            type="number"
+            step={1}
+            value={Math.round(offset.y)}
+            onChange={(e) => onOffsetInputChange('y', e.target.value)}
+            className="w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-200"
+          />
+        </label>
+      </div>
+      <div className="w-full max-w-xs flex justify-end">
+        <Button
+          variant="outline"
+          className="h-7 border-zinc-700 bg-zinc-900 px-2 text-[10px] text-zinc-300"
+          onClick={handleRecenterPosition}
+        >
+          Recenter Position
+        </Button>
+      </div>
+
+      {/* T019/T020: Reset + Confirm + Cancel */}
+      <div className="flex gap-3 w-full max-w-xs">
+        <Button variant="outline" className="flex-1 border-zinc-600 text-zinc-300" onClick={handleReset}>
+          Reset
+        </Button>
+        <Button variant="outline" className="flex-1 border-zinc-600 text-zinc-300" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white" onClick={handleConfirm}>
+          Use This
+        </Button>
+      </div>
+    </div>
+  );
+}

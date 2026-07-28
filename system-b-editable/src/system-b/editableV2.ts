@@ -1,0 +1,358 @@
+import { generateWatchFaceCode } from '@/lib/jsCodeGenerator';
+import type { ProjectFileArtifact } from '@/lib/projectFileArtifact';
+import type { GeneratedCode, WatchFaceConfig, WatchFaceElement } from '@/types';
+import {
+  validateComposerProject,
+  type ComposerSlot,
+  type FvwcProjectV1,
+} from './composerDomain';
+import { assignGeneratedDigitPaths } from './digitAssetPreparation';
+
+export interface EditableAssetSource {
+  path: string;
+  dataUrl: string;
+}
+
+export interface EditableV2VariantPlan {
+  id: string;
+  typeId: number;
+  title: string;
+  previewPath: string;
+  elements: WatchFaceElement[];
+}
+
+export interface EditableV2SlotPlan {
+  id: string;
+  editId: number;
+  defaultTypeId: number;
+  bounds: ComposerSlot['bounds'];
+  maskPath: string;
+  variants: EditableV2VariantPlan[];
+}
+
+export interface EditableV2Plan {
+  projectId: string;
+  name: string;
+  baseConfig: WatchFaceConfig;
+  packagingConfig: WatchFaceConfig;
+  slot: EditableV2SlotPlan;
+  assets: EditableAssetSource[];
+  generatedCode: GeneratedCode;
+}
+
+const FIRST_CUSTOM_EDIT_TYPE = 100000;
+const SUPPORTED_FIRST_SLICE_TYPES = new Set([
+  'TEXT',
+  'TEXT_IMG',
+  'IMG',
+  'IMG_STATUS',
+  'IMG_LEVEL',
+  'IMG_PROGRESS',
+  'IMG_DATE',
+  'IMG_TIME',
+  'IMG_WEEK',
+  'ARC_PROGRESS',
+]);
+
+function deterministicNumber(value: string, min: number, span: number): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return min + ((hash >>> 0) % span);
+}
+
+function safeSegment(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48)
+    || 'asset';
+}
+
+function dataUrlExtension(value: string): string {
+  const mime = /^data:([^;,]+)/.exec(value)?.[1]?.toLowerCase();
+  if (mime === 'image/jpeg') return 'jpg';
+  if (mime === 'image/webp') return 'webp';
+  if (mime === 'image/svg+xml') return 'svg';
+  return 'png';
+}
+
+interface NamespaceResult {
+  elements: WatchFaceElement[];
+  assets: EditableAssetSource[];
+}
+
+function namespaceVariantElements(
+  elements: WatchFaceElement[],
+  variantId: string,
+): NamespaceResult {
+  const namespace = `editable/${safeSegment(variantId)}`;
+  const assets: EditableAssetSource[] = [];
+  let assetCounter = 0;
+
+  const mapAsset = (value: string | undefined, label: string): string | undefined => {
+    if (!value) return value;
+    if (!value.startsWith('data:')) return value;
+    const path = `${namespace}/${safeSegment(label)}_${assetCounter}.${dataUrlExtension(value)}`;
+    assetCounter += 1;
+    assets.push({ path, dataUrl: value });
+    return path;
+  };
+
+  const nextElements = elements.map((element, elementIndex) => {
+    const next: WatchFaceElement = structuredClone(element);
+    next.id = `${variantId}__${element.id}`;
+    const src = mapAsset(next.src, next.assetFilename || next.name || `element_${elementIndex}`);
+    next.src = src;
+    if (src && !src.startsWith('data:')) next.assetFilename = src;
+    next.hourHandSrc = mapAsset(next.hourHandSrc, `hour_${elementIndex}`);
+    next.minuteHandSrc = mapAsset(next.minuteHandSrc, `minute_${elementIndex}`);
+    next.secondHandSrc = mapAsset(next.secondHandSrc, `second_${elementIndex}`);
+    next.coverSrc = mapAsset(next.coverSrc, `cover_${elementIndex}`);
+    next.pressSrc = mapAsset(next.pressSrc, `press_${elementIndex}`);
+    next.normalSrc = mapAsset(next.normalSrc, `normal_${elementIndex}`);
+    next.images = next.images?.map((value, imageIndex) => mapAsset(value, `frame_${elementIndex}_${imageIndex}`) ?? value);
+    next.fontArray = next.fontArray?.map((value, imageIndex) => mapAsset(value, `font_${elementIndex}_${imageIndex}`) ?? value);
+    return next;
+  });
+  return { elements: nextElements, assets };
+}
+
+function hydrateVariantBackground(
+  elements: WatchFaceElement[],
+  source: ProjectFileArtifact,
+): WatchFaceElement[] {
+  const embeddedBackground = source.backgroundImage;
+  const configuredPath = source.watchFaceConfig.background.src;
+  if (!embeddedBackground?.startsWith('data:')) return elements;
+
+  return elements.map((element) => {
+    if (
+      element.type !== 'IMG'
+      || (element.src !== configuredPath && element.assetFilename !== configuredPath)
+    ) {
+      return element;
+    }
+    return {
+      ...structuredClone(element),
+      src: embeddedBackground,
+      assetFilename: undefined,
+    };
+  });
+}
+
+function extractNormalComposition(runtime: string, includeBackground: boolean): string {
+  const startMarker = includeBackground
+    ? '// ========== NORMAL MODE BACKGROUND =========='
+    : '// ========== NORMAL MODE WIDGETS ==========';
+  const endMarker = '// ========== AOD MODE BACKGROUND ==========';
+  const start = runtime.indexOf(startMarker);
+  const end = runtime.indexOf(endMarker, start + startMarker.length);
+  if (start < 0 || end < 0) throw new Error('Unable to extract current V2 widget block.');
+  return runtime.slice(start + startMarker.length, end).trim();
+}
+
+function editableRuntimeBlock(slot: EditableV2SlotPlan, baseConfig: WatchFaceConfig): string {
+  const optionalTypes = slot.variants.map((variant) => `{
+                        type: ${variant.typeId},
+                        preview: '${variant.previewPath}',
+                        title_sc: '${variant.title}',
+                        title_tc: '${variant.title}',
+                        title_en: '${variant.title}'
+                    }`).join(',\n                    ');
+  const branches = slot.variants.map((variant) => {
+    const variantBackground = variant.elements.find((element) => (
+      element.type === 'IMG'
+      && element.bounds.x === 0
+      && element.bounds.y === 0
+      && element.bounds.width === baseConfig.resolution.width
+      && element.bounds.height === baseConfig.resolution.height
+    ));
+    const variantConfig: WatchFaceConfig = {
+      name: variant.title,
+      watchModel: baseConfig.watchModel,
+      resolution: baseConfig.resolution,
+      background: {
+        src: variantBackground?.src ?? 'background.png',
+        format: 'TGA-P',
+      },
+      elements: variant.elements,
+      aodElements: [],
+    };
+    let widgetCode = extractNormalComposition(
+      generateWatchFaceCode(variantConfig).watchfaceIndexJs,
+      Boolean(variantBackground),
+    );
+    if (variantBackground?.src) {
+      widgetCode = widgetCode.replace("src: 'background.png'", `src: '${variantBackground.src}'`);
+    }
+    return `case ${variant.typeId}: {
+                        ${widgetCode}
+                        break;
+                    }`;
+  }).join('\n                    ');
+
+  return `
+                // ========== SYSTEM B EDITABLE V2 SLOT ==========
+                const editableGroup_${slot.editId} = hmUI.createWidget(hmUI.widget.WATCHFACE_EDIT_GROUP, {
+                    edit_id: ${slot.editId},
+                    x: px(${slot.bounds.x}),
+                    y: px(${slot.bounds.y}),
+                    w: px(${slot.bounds.width}),
+                    h: px(${slot.bounds.height}),
+                    select_image: '${slot.maskPath}',
+                    un_select_image: '${slot.maskPath}',
+                    default_type: ${slot.defaultTypeId},
+                    optional_types: [
+                    ${optionalTypes}
+                    ],
+                    count: ${slot.variants.length},
+                    tips_BG: '${slot.maskPath}',
+                    tips_x: 0,
+                    tips_y: 0,
+                    tips_width: px(${Math.max(1, slot.bounds.width)})
+                });
+                const editableType_${slot.editId} = editableGroup_${slot.editId}.getProperty(hmUI.prop.CURRENT_TYPE);
+                switch (editableType_${slot.editId}) {
+                    ${branches}
+                }
+                hmUI.createWidget(hmUI.widget.WATCHFACE_EDIT_MASK, {
+                    x: px(0),
+                    y: px(0),
+                    w: px(__SYSTEM_B_WIDTH__),
+                    h: px(__SYSTEM_B_HEIGHT__),
+                    src: '${slot.maskPath}',
+                    show_level: hmUI.show_level.ONLY_EDIT
+                });
+`;
+}
+
+function injectEditableBlock(runtime: string, block: string, width: number, height: number): string {
+  const marker = '// ========== NORMAL MODE WIDGETS ==========';
+  const index = runtime.indexOf(marker);
+  if (index < 0) throw new Error('Current V2 runtime marker is missing.');
+  const insertionPoint = index + marker.length;
+  return `${runtime.slice(0, insertionPoint)}
+${block
+  .replaceAll('__SYSTEM_B_WIDTH__', String(width))
+  .replaceAll('__SYSTEM_B_HEIGHT__', String(height))}
+${runtime.slice(insertionPoint)}`;
+}
+
+export function compileEditableV2Plan(project: FvwcProjectV1): EditableV2Plan {
+  const errors = validateComposerProject(project).filter((issue) => issue.severity === 'ERROR');
+  if (errors.length > 0) throw new Error(errors.map((issue) => issue.message).join(' '));
+  if (project.slots.length !== 1) {
+    throw new Error('The first editable V2 slice requires exactly one slot.');
+  }
+  const baseSource = project.sourceBuilds.find((source) => source.id === project.baseBuildId);
+  if (!baseSource) throw new Error('The base source is missing.');
+  const slot = project.slots[0];
+  if (slot.variants.length < 2 || slot.variants.length > 3) {
+    throw new Error('The first editable V2 slice requires two or three variants.');
+  }
+
+  const ownedBaseLayerIds = new Set(
+    slot.variants.flatMap((variant) => {
+      const group = project.componentGroups.find((item) => item.id === variant.componentGroupId);
+      return group?.sourceBuildId === baseSource.id ? group.layerIds : [];
+    }),
+  );
+  const rawBaseConfig: WatchFaceConfig = {
+    ...structuredClone(baseSource.artifact.watchFaceConfig),
+    name: `${project.name} Editable`,
+    elements: baseSource.artifact.watchFaceConfig.elements
+      .filter((element) => !ownedBaseLayerIds.has(element.id)),
+  };
+
+  const assets: EditableAssetSource[] = [];
+  const fixedMain = namespaceVariantElements(
+    assignGeneratedDigitPaths(rawBaseConfig.elements, 'editable/fixed_base/generated'),
+    'fixed_base',
+  );
+  assets.push(...fixedMain.assets);
+  const fixedAod = namespaceVariantElements(
+    assignGeneratedDigitPaths(rawBaseConfig.aodElements ?? [], 'editable/fixed_aod/generated'),
+    'fixed_aod',
+  );
+  assets.push(...fixedAod.assets);
+  const baseConfig: WatchFaceConfig = {
+    ...rawBaseConfig,
+    elements: fixedMain.elements,
+    aodElements: rawBaseConfig.aodElements ? fixedAod.elements : rawBaseConfig.aodElements,
+  };
+  const variants: EditableV2VariantPlan[] = slot.variants.map((variant, index) => {
+    const group = project.componentGroups.find((item) => item.id === variant.componentGroupId);
+    const source = project.sourceBuilds.find((item) => item.id === variant.sourceBuildId);
+    if (!group || !source) throw new Error(`${variant.name} has a broken source group.`);
+    const originalElements = hydrateVariantBackground(
+      source.artifact.watchFaceConfig.elements
+        .filter((element) => group.layerIds.includes(element.id)),
+      source.artifact,
+    );
+    const unsupported = originalElements.filter((element) => !SUPPORTED_FIRST_SLICE_TYPES.has(element.type));
+    if (unsupported.length > 0) {
+      throw new Error(`${variant.name} contains unsupported first-slice types: ${unsupported.map((element) => element.type).join(', ')}.`);
+    }
+    const namespaced = namespaceVariantElements(
+      assignGeneratedDigitPaths(originalElements, `editable/${safeSegment(variant.id)}/generated`),
+      variant.id,
+    );
+    assets.push(...namespaced.assets);
+    const previewDataUrl = source.artifact.backgroundImage;
+    if (!previewDataUrl?.startsWith('data:')) {
+      throw new Error(`${variant.name} requires an embedded FVWF preview/background for its edit preview.`);
+    }
+    const previewPath = `editable/${safeSegment(variant.id)}/preview.png`;
+    assets.push({ path: previewPath, dataUrl: previewDataUrl });
+    return {
+      id: variant.id,
+      typeId: FIRST_CUSTOM_EDIT_TYPE + index,
+      title: variant.name,
+      previewPath,
+      elements: namespaced.elements,
+    };
+  });
+  const slotPlan: EditableV2SlotPlan = {
+    id: slot.id,
+    editId: deterministicNumber(slot.id, 100, 9000),
+    defaultTypeId: FIRST_CUSTOM_EDIT_TYPE + Math.max(0, slot.variants.findIndex((variant) => variant.id === slot.defaultVariantId)),
+    bounds: slot.bounds,
+    maskPath: `editable/${safeSegment(slot.id)}/edit_mask.png`,
+    variants,
+  };
+  const normalCode = generateWatchFaceCode(baseConfig);
+  const appJson = JSON.parse(normalCode.appJson) as {
+    module?: { watchface?: { editable?: number } };
+  };
+  if (!appJson.module?.watchface) throw new Error('Current V2 watchface manifest is missing.');
+  appJson.module.watchface.editable = 1;
+  const block = editableRuntimeBlock(slotPlan, baseConfig);
+  const watchfaceIndexJs = injectEditableBlock(
+    normalCode.watchfaceIndexJs,
+    block,
+    baseConfig.resolution.width,
+    baseConfig.resolution.height,
+  );
+  const packagingElements = [
+    ...baseConfig.elements,
+    ...variants.flatMap((variant) => variant.elements),
+  ];
+  return {
+    projectId: project.id,
+    name: baseConfig.name,
+    baseConfig,
+    packagingConfig: { ...baseConfig, elements: packagingElements },
+    slot: slotPlan,
+    assets,
+    generatedCode: {
+      ...normalCode,
+      appJson: JSON.stringify(appJson, null, 2),
+      watchfaceIndexJs,
+    },
+  };
+}

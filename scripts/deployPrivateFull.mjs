@@ -21,7 +21,7 @@
  */
 
 import { execSync, spawnSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { cpSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -71,6 +71,23 @@ function run(cmd, label) {
   }
 }
 
+function stageEditableWatchfacesRoute() {
+  const source = path.join(appRoot, 'system-b-editable', 'dist');
+  const destinations = [
+    path.join(appRoot, 'editable-watchfaces'),
+    path.join(appRoot, 'docs', 'editable-watchfaces'),
+  ];
+  const html = readFileSync(path.join(source, 'index.html'), 'utf8');
+  if (!html.includes('/Watch-Faces/editable-watchfaces/assets/')) {
+    throw new Error('System B bundle has the wrong production base path.');
+  }
+  for (const destination of destinations) {
+    rmSync(destination, { recursive: true, force: true });
+    mkdirSync(destination, { recursive: true });
+    cpSync(source, destination, { recursive: true });
+  }
+}
+
 async function main() {
   // ── Step 1: Build private ─────────────────────────────────────────────────
   run('npm run build:private', 'Building private bundle…');
@@ -80,6 +97,14 @@ async function main() {
     'node scripts/deployDistToDocs.mjs --target=private --mirror-root',
     'Writing private bundle to docs/ and root…',
   );
+
+  // ── Step 2b: Build and stage standalone System B route ─────────────────
+  run(
+    'npm --prefix system-b-editable run build:private-pages',
+    'Building standalone editable-watchfaces bundle…',
+  );
+  stageEditableWatchfacesRoute();
+  console.log('Standalone route staged at /Watch-Faces/editable-watchfaces/.');
 
   // deployDistToDocs --mirror-root copies assets to root/assets/ and writes root HTML,
   // then RESTORES root HTML to dev shell. Working tree stays clean for Vite.
