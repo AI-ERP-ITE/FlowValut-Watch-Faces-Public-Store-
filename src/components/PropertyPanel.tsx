@@ -2179,6 +2179,22 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
       )}
 
       {/* Digit size — digit widgets */}
+      {(element.type === 'IMG_WEEK' || (element.type === 'IMG_DATE' && element.subtype === 'month')) && (
+        <Section label="Watch Compatibility">
+          <div className="flex items-center justify-between gap-3 rounded border border-white/10 bg-white/5 px-3 py-2">
+            <div>
+              <p className="text-[11px] font-medium text-white/80">Watch-safe text edges</p>
+              <p className="mt-0.5 text-[9px] text-white/40">Export only · preview stays smooth</p>
+            </div>
+            <Switch
+              id={`watch-safe-text-edges-${element.id}`}
+              checked={element.watchSafeTextEdges === true}
+              onCheckedChange={(checked) => update({ watchSafeTextEdges: checked === true })}
+            />
+          </div>
+        </Section>
+      )}
+
       {element.type === 'TEXT_IMG' && (
         <Section label="Alignment">
           <div className="grid grid-cols-3 gap-1">

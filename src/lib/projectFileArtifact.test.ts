@@ -26,5 +26,22 @@ describe('projectFileArtifact', () => {
       watchFaceConfig: config,
     });
   });
-});
 
+  it('round-trips the export-only watch-safe label toggle', () => {
+    const watchSafeConfig = structuredClone(config);
+    watchSafeConfig.elements = [{
+      id: 'month',
+      type: 'IMG_DATE',
+      subtype: 'month',
+      name: 'Month',
+      bounds: { x: 10, y: 20, width: 60, height: 21 },
+      visible: true,
+      zIndex: 1,
+      watchSafeTextEdges: true,
+    }];
+    const restored = parseProjectFileArtifact(
+      serializeProjectFileArtifact(createProjectFileArtifact(watchSafeConfig, null)),
+    );
+    expect(restored.watchFaceConfig.elements[0].watchSafeTextEdges).toBe(true);
+  });
+});

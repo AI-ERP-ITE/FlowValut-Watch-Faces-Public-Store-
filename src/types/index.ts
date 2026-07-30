@@ -96,6 +96,11 @@ export interface WatchFaceElement {
 
   // IMG_DATE month specific
   monthFormat?: 'full' | 'short' | 'initial';
+  /**
+   * Export-only compatibility mask for baked weekday/month labels.
+   * Missing/false preserves the browser-antialiased legacy output.
+   */
+  watchSafeTextEdges?: boolean;
   // IMG_DATE day mode. Missing values preserve the compact legacy numeric mode.
   dayImageMode?: 'digits' | 'complete';
 

@@ -511,7 +511,7 @@ function readSrc(rel) {
   if (
     generatorSrc.includes("const clean = src.replace(/^assets\\//, '').trim();")
     && generatorSrc.includes('return clean;')
-    && generatorSrc.includes('const coverSrc = toAssetPath(element.coverSrc);')
+    && generatorSrc.includes('const coverSrc = toHandPath(element.coverSrc);')
   ) {
     ok('TIME_POINTER generator: paths normalized to runtime filenames and cover remains optional');
   } else {
@@ -641,8 +641,7 @@ section('8. IMG_DATE Dual-Mode Centering');
   const modeSrc = readSrc('lib/dateImageMode.ts');
   const studioSrc = readSrc('StudioApp.tsx');
   const panelSrc = readSrc('components/PropertyPanel.tsx');
-  const v2Src = readSrc('lib/jsCodeGeneratorV2.ts');
-  const v3Src = readSrc('lib/jsCodeGenerator.ts');
+  const generatorSrc = readSrc('lib/jsCodeGenerator.ts');
 
   if (typesSrc.includes("dayImageMode?: 'digits' | 'complete'") && modeSrc.includes("value === 'complete' ? 'complete' : 'digits'")) {
     ok('Spec 118: persisted day mode defaults legacy files to compact digits');
@@ -662,7 +661,7 @@ section('8. IMG_DATE Dual-Mode Centering');
     fail('Spec 118 complete image generation', '31-frame scoped generation loop is missing');
   }
 
-  const generatorsSupportBothModes = [v2Src, v3Src].every(source =>
+  const generatorsSupportBothModes = [generatorSrc].every(source =>
     source.includes('getCenteredNumericDayStartX')
     && source.includes('day_is_character: ${completeMode}')
     && source.includes('const expectedCount = completeMode ? 31 : 10')
@@ -695,8 +694,7 @@ section('9. Project Canvas Coordinate Authority');
   const geometrySrc = readSrc('lib/projectCanvasGeometry.ts');
   const rasterGeometrySrc = readSrc('lib/projectRasterGeometry.ts');
   const zpkSrc = readSrc('lib/zpkBuilder.ts');
-  const v2Src = readSrc('lib/jsCodeGeneratorV2.ts');
-  const v3Src = readSrc('lib/jsCodeGenerator.ts');
+  const generatorSrc = readSrc('lib/jsCodeGenerator.ts');
 
   if (
     studioSrc.includes('state.watchFaceConfig?.resolution?.width ?? _resolvedResolution.w')
@@ -738,7 +736,7 @@ section('9. Project Canvas Coordinate Authority');
     fail('Spec 119 FVWF mismatch UX', 'Mismatch choices or cloned keep path is missing');
   }
 
-  if ([v2Src, v3Src].every(source => source.includes('isProjectBackgroundElement(element, resolution)'))) {
+  if ([generatorSrc].every(source => source.includes('isProjectBackgroundElement(element, resolution)'))) {
     ok('Spec 119: V2/V3 background recognition uses project resolution');
   } else {
     fail('Spec 119 generator background parity', 'V2 or V3 still lacks project-resolution background recognition');
@@ -758,6 +756,49 @@ section('9. Project Canvas Coordinate Authority');
 
 // ─── SUMMARY ─────────────────────────────────────────────────────────────────
 console.log(`\n═══════════════════════════════════════════════`);
+// --- 10. SPEC 130 WATCH-SAFE WEEK/MONTH EXPORT --------------------------
+section('10. Watch-Safe Week/Month Export');
+
+{
+  const typesSrc = readSrc('types/index.ts');
+  const studioSrc = readSrc('StudioApp.tsx');
+  const panelSrc = readSrc('components/PropertyPanel.tsx');
+  const alphaSrc = readSrc('lib/watchSafeTextAlpha.ts');
+
+  if (
+    typesSrc.includes('watchSafeTextEdges?: boolean')
+    && panelSrc.includes("element.type === 'IMG_WEEK'")
+    && panelSrc.includes("element.type === 'IMG_DATE' && element.subtype === 'month'")
+    && panelSrc.includes('checked={element.watchSafeTextEdges === true}')
+  ) {
+    ok('Spec 130: persisted opt-in control is restricted to weekday/month layers');
+  } else {
+    fail('Spec 130 toggle contract', 'Persisted field or weekday/month-only property control is missing');
+  }
+
+  if (
+    studioSrc.includes('finalizeWatchSafeTextAlpha(image.data, w, h)')
+    && studioSrc.includes('el.watchSafeTextEdges === true')
+    && studioSrc.includes("el.type === 'IMG_WEEK'")
+    && studioSrc.includes("el.type === 'IMG_DATE' && el.subtype === 'month'")
+  ) {
+    ok('Spec 130: finalizer runs only in opted-in weekday/month label export');
+  } else {
+    fail('Spec 130 export integration', 'Opt-in label export finalization is missing or disconnected');
+  }
+
+  if (
+    alphaSrc.includes('Math.round(source.coverage)')
+    && alphaSrc.includes('pixel.alpha < 255')
+    && alphaSrc.includes('output[offset + 3] = 255')
+    && alphaSrc.includes('new Uint8ClampedArray(sourceData)')
+  ) {
+    ok('Spec 130: deterministic binary mask preserves coverage intent, opaque cores, and source immutability');
+  } else {
+    fail('Spec 130 alpha finalizer', 'One or more binary-alpha invariants are missing');
+  }
+}
+
 console.log(`Results: ${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.log(`\n⚠️  Open .verify-output/ to inspect generated PNGs visually.`);

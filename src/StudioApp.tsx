@@ -84,6 +84,7 @@ import {
 } from '@/lib/elementDataRules';
 import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering'; // @deprecated by Spec 114
 import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
+import { finalizeWatchSafeTextAlpha } from '@/lib/watchSafeTextAlpha';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
 import { buildProjectFileConfig } from '@/lib/projectFileConfig';
 import { createProjectFileArtifact, createProjectFileBlob, parseProjectFileArtifact } from '@/lib/projectFileArtifact';
@@ -1345,7 +1346,15 @@ function regenerateDigitFilesFromElements(
     return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, { tabular });
   }
 
-  function makeLabelCanvas(label: string, color: string, fontFamily: string, fontWeight: string, w: number, h: number): string {
+  function makeLabelCanvas(
+    label: string,
+    color: string,
+    fontFamily: string,
+    fontWeight: string,
+    w: number,
+    h: number,
+    watchSafeTextEdges: boolean,
+  ): string {
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d')!;
@@ -1361,6 +1370,11 @@ function regenerateDigitFilesFromElements(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, w / 2, h / 2);
+    if (watchSafeTextEdges) {
+      const image = ctx.getImageData(0, 0, w, h);
+      image.data.set(finalizeWatchSafeTextAlpha(image.data, w, h).data);
+      ctx.putImageData(image, 0, 0);
+    }
     return canvas.toDataURL('image/png');
   }
 
@@ -1461,7 +1475,10 @@ function regenerateDigitFilesFromElements(
       for (let i = 0; i < 7; i++) {
         const filename = `${prefix}_${i}.png`;
         scopedWeekImages.push(filename);
-        results.push({ filename, dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h) });
+        results.push({
+          filename,
+          dataUrl: makeLabelCanvas(days[i], color, fontFamily, fontWeight, w, h, el.watchSafeTextEdges === true),
+        });
       }
       elementUpdates.set(el.id, { images: scopedWeekImages });
     } else if (el.type === 'IMG_DATE' && el.subtype === 'month') {
@@ -1477,7 +1494,10 @@ function regenerateDigitFilesFromElements(
       for (let i = 0; i < 12; i++) {
         const filename = `${prefix}_${i}.png`;
         scopedMonthImages.push(filename);
-        results.push({ filename, dataUrl: makeLabelCanvas(monthNames[i], color, fontFamily, fontWeight, w, h) });
+        results.push({
+          filename,
+          dataUrl: makeLabelCanvas(monthNames[i], color, fontFamily, fontWeight, w, h, el.watchSafeTextEdges === true),
+        });
       }
       elementUpdates.set(el.id, { images: scopedMonthImages });
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
