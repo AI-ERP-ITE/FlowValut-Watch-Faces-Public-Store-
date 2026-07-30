@@ -7,4 +7,4 @@
 - [x] T005 Connect finalizer only to week/month label export.
 - [x] T006 Add and run regression tests.
 - [x] T007 Run private production build.
-- [ ] T008 Deploy private bundle and verify live routes/assets.
+- [x] T008 Deploy private bundle and verify live routes/assets.
