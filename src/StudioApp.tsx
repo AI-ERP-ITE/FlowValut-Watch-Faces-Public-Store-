@@ -1371,8 +1371,10 @@ function regenerateDigitFilesFromElements(
     ctx.textBaseline = 'middle';
     ctx.fillText(label, w / 2, h / 2);
     if (watchSafeTextEdges) {
-      const image = ctx.getImageData(0, 0, w, h);
-      image.data.set(finalizeWatchSafeTextAlpha(image.data, w, h).data);
+      const rasterWidth = canvas.width;
+      const rasterHeight = canvas.height;
+      const image = ctx.getImageData(0, 0, rasterWidth, rasterHeight);
+      image.data.set(finalizeWatchSafeTextAlpha(image.data, rasterWidth, rasterHeight).data);
       ctx.putImageData(image, 0, 0);
     }
     return canvas.toDataURL('image/png');

@@ -777,7 +777,9 @@ section('10. Watch-Safe Week/Month Export');
   }
 
   if (
-    studioSrc.includes('finalizeWatchSafeTextAlpha(image.data, w, h)')
+    studioSrc.includes('const rasterWidth = canvas.width')
+    && studioSrc.includes('const rasterHeight = canvas.height')
+    && studioSrc.includes('finalizeWatchSafeTextAlpha(image.data, rasterWidth, rasterHeight)')
     && studioSrc.includes('el.watchSafeTextEdges === true')
     && studioSrc.includes("el.type === 'IMG_WEEK'")
     && studioSrc.includes("el.type === 'IMG_DATE' && el.subtype === 'month'")
