@@ -801,6 +801,31 @@ section('10. Watch-Safe Week/Month Export');
   }
 }
 
+section('11. Custom Image Switcher Export Readiness');
+
+{
+  const studioSrc = readSrc('StudioApp.tsx');
+  if (
+    studioSrc.includes('const [switcherAssetsLoading, setSwitcherAssetsLoading] = useState(true)')
+    && studioSrc.includes("'Loading custom image sets…'")
+    && studioSrc.includes('disabled={switcherAssetsLoading}')
+  ) {
+    ok('Custom switcher sync visibly blocks generation until existing loading completes');
+  } else {
+    fail('Custom switcher loading gate', 'Loading message or Generate-button gate is missing');
+  }
+
+  if (
+    studioSrc.includes('const missingSlots = def.ranges.filter((slot) => !slot.dataUrl)')
+    && studioSrc.includes('selected custom image set is not loaded')
+    && studioSrc.includes('const linkedSwitcherNames = new Set')
+  ) {
+    ok('Linked custom switchers fail closed and replace stale same-name export assets');
+  } else {
+    fail('Custom switcher export safety', 'Missing frames can still silently fall back to standard assets');
+  }
+}
+
 console.log(`Results: ${passed} passed, ${failed} failed`);
 if (failed > 0) {
   console.log(`\n⚠️  Open .verify-output/ to inspect generated PNGs visually.`);

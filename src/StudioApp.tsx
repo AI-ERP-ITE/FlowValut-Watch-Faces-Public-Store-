@@ -2068,6 +2068,7 @@ function StudioApp() {
   const [customHandStyles, setCustomHandStyles] = useState<CustomHandRecord[]>([]);
   const [customGaugePointers, setCustomGaugePointers] = useState<CustomGaugePointerRecord[]>([]);
   const [switcherDefinitions, setSwitcherDefinitions] = useState<ImageSwitcherDefinition[]>([]);
+  const [switcherAssetsLoading, setSwitcherAssetsLoading] = useState(true);
   const [addElDataType, setAddElDataType] = useState('HEART');
   const [addElSubtype, setAddElSubtype] = useState<string>('');
   const [addElShapeType, setAddElShapeType] = useState<'circle' | 'fill_rect' | 'stroke_rect' | 'rounded_rect'>('circle');
@@ -2413,8 +2414,18 @@ function StudioApp() {
       if (settled) return;
       settled = true;
       unsubscribe();
-      if (!user) return; // not signed in — local load above is sufficient
-      // Firestore pull in background; re-load local IDB after to pick up synced data
+      if (!user) {
+        setSwitcherAssetsLoading(false);
+        return; // not signed in — local load above is sufficient
+      }
+      // Load switcher frames independently so the Generate button is not blocked
+      // by the larger icon/font/hand library sync.
+      pullSwitcherDefinitions()
+        .catch(err => console.warn('[StudioApp] switcher pull failed:', err))
+        .then(() => applyLocalAssets())
+        .finally(() => setSwitcherAssetsLoading(false));
+
+      // Pull the remaining cloud libraries in the background.
       pullLabAssetsFromFirestore()
         .then(() => {
           backfillIconsToFirestore().catch(err =>
@@ -2426,10 +2437,6 @@ function StudioApp() {
           backfillHandsToFirestore().catch(err =>
             console.warn('[StudioApp] hand backfill failed:', err)
           );
-          // Await switcher pull so slot PNGs are in IDB before applyLocalAssets reads them
-          return pullSwitcherDefinitions()
-            .catch(err => console.warn('[StudioApp] switcher pull failed:', err))
-            .then(() => applyLocalAssets());
         })
         .catch(err => console.warn('[StudioApp] Firestore pull on startup failed:', err));
     });
@@ -3749,6 +3756,11 @@ function StudioApp() {
     setLatestUploadResult(null);
     setWorkshopSaveError(null);
 
+    if (switcherAssetsLoading) {
+      toast.error('Custom image sets are still loading. Please wait for loading to finish.');
+      return;
+    }
+
     // Deselect any selected element so the selection rectangle doesn't appear in the preview
     setSelectedElementId(null);
     setExtraSelectedIds([]);
@@ -3885,24 +3897,31 @@ function StudioApp() {
       for (const el of allExportElements) {
         if (el.type === 'IMG_LEVEL' && el.imageSwitcherDefinitionId) {
           const def = await getSwitcherDefinition(el.imageSwitcherDefinitionId);
-          if (def) {
-            def.ranges.forEach((slot, i) => {
-              if (slot.dataUrl) {
-                const slotName = `switcher_${el.id}_slot_${String(i).padStart(2, '0')}.png`;
-                if (!state.elementImages.some(img => img.name === slotName)) {
-                  switcherSlotImages.push({
-                    name: slotName,
-                    dataUrl: slot.dataUrl!,
-                    bounds: { x: 0, y: 0, width: el.bounds.width, height: el.bounds.height },
-                    type: 'IMG_LEVEL',
-                  });
-                }
-              }
-            });
+          if (!def) {
+            throw new Error(`${el.name}: selected custom image set is not loaded.`);
           }
+          const missingSlots = def.ranges.filter((slot) => !slot.dataUrl);
+          if (missingSlots.length > 0) {
+            throw new Error(
+              `${el.name}: custom image set "${def.name}" is missing ${missingSlots.length} loaded frame(s). Wait for custom image sets to finish loading.`
+            );
+          }
+          def.ranges.forEach((slot, i) => {
+            const slotName = `switcher_${el.id}_slot_${String(i).padStart(2, '0')}.png`;
+            switcherSlotImages.push({
+              name: slotName,
+              dataUrl: slot.dataUrl!,
+              bounds: { x: 0, y: 0, width: el.bounds.width, height: el.bounds.height },
+              type: 'IMG_LEVEL',
+            });
+          });
         }
       }
-      const allElementImages = [...state.elementImages, ...switcherSlotImages];
+      const linkedSwitcherNames = new Set(switcherSlotImages.map((image) => image.name));
+      const allElementImages = [
+        ...state.elementImages.filter((image) => !linkedSwitcherNames.has(image.name)),
+        ...switcherSlotImages,
+      ];
 
       // 1. Generate transparent ticks PNGs for ARC_PROGRESS widgets
       const tickFiles: Array<{ src: string; file: File }> = [];
@@ -4786,7 +4805,7 @@ function StudioApp() {
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId, workshopBuildId, watchModels]);
+  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId, workshopBuildId, watchModels, switcherAssetsLoading]);
 
   const retryWorkshopSave = useCallback(async () => {
     if (!pendingWorkshopSave || retryingWorkshopSave) return;
@@ -5865,10 +5884,15 @@ function StudioApp() {
               </Button>
               <Button
                 onClick={handleGenerateClick}
+                disabled={switcherAssetsLoading}
                 className="flex-1 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold"
               >
                 <Sparkles className="h-5 w-5 mr-2" />
-                {storeArchitectureFlags.workshop ? 'Create Watch Test' : 'Generate ZPK & Upload'}
+                {switcherAssetsLoading
+                  ? 'Loading custom image sets…'
+                  : storeArchitectureFlags.workshop
+                    ? 'Create Watch Test'
+                    : 'Generate ZPK & Upload'}
               </Button>
               <Button
                 onClick={runPointerParityVerification}
