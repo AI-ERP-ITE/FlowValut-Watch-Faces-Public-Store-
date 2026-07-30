@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench, Database, Star, FlaskConical, FolderOpen, Download, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -80,6 +80,8 @@ export function AdminOpsPage() {
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const [patching, setPatching] = useState(false);
   const [uploadingConfig, setUploadingConfig] = useState(false);
+  const [uploadingLocalModels, setUploadingLocalModels] = useState(false);
+  const localModelsInputRef = useRef<HTMLInputElement>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [catalogOptions, setCatalogOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [featuredFaceId, setFeaturedFaceId] = useState<string>('');
@@ -323,7 +325,63 @@ export function AdminOpsPage() {
     } finally {
       setUploadingConfig(false);
     }
-  }  async function loadAdminSkus() {
+  }
+
+  async function handleUploadLocalModels(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!canRun) {
+      toast.error('Configure Firebase auth/backend first.');
+      return;
+    }
+
+    setUploadingLocalModels(true);
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('models.json must contain a JSON object.');
+      }
+
+      const models = parsed as Record<string, unknown>;
+      const entries = Object.entries(models);
+      if (entries.length === 0) {
+        throw new Error('models.json cannot be empty.');
+      }
+
+      for (const [modelId, value] of entries) {
+        if (!modelId.trim() || !value || typeof value !== 'object' || Array.isArray(value)) {
+          throw new Error(`Invalid model entry: ${modelId || '(empty key)'}.`);
+        }
+        const model = value as Record<string, unknown>;
+        if (typeof model.name !== 'string' || !model.name.trim()) {
+          throw new Error(`Model "${modelId}" is missing a valid name.`);
+        }
+        if (typeof model.brand !== 'string' || !model.brand.trim()) {
+          throw new Error(`Model "${modelId}" is missing a valid brand.`);
+        }
+        if (typeof model.specGroup !== 'string' || !model.specGroup.trim()) {
+          throw new Error(`Model "${modelId}" is missing a valid specGroup.`);
+        }
+        if (
+          !Array.isArray(model.deviceSources)
+          || model.deviceSources.length === 0
+          || model.deviceSources.some((source) => !Number.isInteger(source) || Number(source) <= 0)
+        ) {
+          throw new Error(`Model "${modelId}" must have at least one positive integer deviceSource.`);
+        }
+      }
+
+      await adminUpdateConfigInFirebase({ file: 'models', data: models });
+      toast.success(`Uploaded ${entries.length} models. Firebase Storage config/models.json was overwritten.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Local models.json upload failed');
+    } finally {
+      setUploadingLocalModels(false);
+    }
+  }
+
+  async function loadAdminSkus() {
     if (!canRun) return;
 
     setLoadingAdminSkus(true);
@@ -622,11 +680,30 @@ export function AdminOpsPage() {
           </p>
           <Button
             onClick={handleUploadConfig}
-            disabled={!canRun || uploadingConfig}
+            disabled={!canRun || uploadingConfig || uploadingLocalModels}
             className="h-10 bg-[#1d2736] hover:bg-[#263448] text-[#ecf2ff] border border-[#3b4d68]"
           >
             {uploadingConfig ? 'Uploading Config...' : 'Upload Config to Storage'}
           </Button>
+          <input
+            ref={localModelsInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleUploadLocalModels}
+          />
+          <Button
+            onClick={() => localModelsInputRef.current?.click()}
+            disabled={!canRun || uploadingConfig || uploadingLocalModels}
+            variant="outline"
+            className="h-10 border-[#3b4d68] text-[#ecf2ff] hover:bg-[#263448]"
+          >
+            <FolderOpen className="h-4 w-4 mr-2" />
+            {uploadingLocalModels ? 'Uploading Local models.json...' : 'Upload Local models.json'}
+          </Button>
+          <p className="text-[11px] text-[#758196]">
+            Selects a local JSON file, validates every model entry, and overwrites <code>config/models.json</code> in Firebase Storage.
+          </p>
         </div>
 
         <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">
