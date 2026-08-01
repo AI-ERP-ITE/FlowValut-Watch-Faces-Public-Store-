@@ -3,7 +3,7 @@
 export interface WatchFaceElement {
   id: string;
   version?: number;
-  type: 'TIME_POINTER' | 'GAUGE_POINTER' | 'IMG_LEVEL' | 'TEXT' | 'IMG' | 'ARC_PROGRESS' | 'CIRCLE' | 'TEXT_IMG' | 'BUTTON' | 'IMG_STATUS' | 'IMG_TIME' | 'IMG_DATE' | 'IMG_WEEK' | 'FILL_RECT' | 'STROKE_RECT' | 'IMG_ANIM' | 'IMG_PROGRESS' | 'DATE_POINTER' | 'IMG_CLICK' | 'image_layer';
+  type: 'TIME_POINTER' | 'TIME_READING' | 'GAUGE_POINTER' | 'IMG_LEVEL' | 'TEXT' | 'IMG' | 'ARC_PROGRESS' | 'CIRCLE' | 'TEXT_IMG' | 'BUTTON' | 'IMG_STATUS' | 'IMG_TIME' | 'IMG_DATE' | 'IMG_WEEK' | 'FILL_RECT' | 'STROKE_RECT' | 'IMG_ANIM' | 'IMG_PROGRESS' | 'DATE_POINTER' | 'IMG_CLICK' | 'image_layer';
   subtype?: string;
   name: string;
   displayName?: string;
@@ -22,6 +22,12 @@ export interface WatchFaceElement {
   /** Original asset filename — preserved even when src is overwritten with data URL for preview */
   assetFilename?: string;
   dataType?: string;
+  /** TIME_READING presentation. T016 intentionally supports Digital only. */
+  timeReadingDisplay?: 'DIGITAL';
+  /** Exported separator bitmap used by digital TIME_READING HH:MM values. */
+  colonImage?: string;
+  /** Non-destructive compatibility notice attached during FVWF migration. */
+  compatibilityWarning?: string;
   images?: string[];
   // IMG_LEVEL count policy metadata (038)
   imageSwitcherFrameCount?: number;
@@ -109,6 +115,14 @@ export interface WatchFaceElement {
 
   // TEXT_IMG specific
   fontArray?: string[];
+  /** Exported TEXT_IMG negative-sign bitmap (used by Current Temperature). */
+  negativeImage?: string;
+  /** Exported shared degree-sign bitmap for metric and imperial temperature units. */
+  degreeImage?: string;
+  /** Exported percent-sign bitmap for percentage-valued TEXT_IMG widgets. */
+  percentImage?: string;
+  /** Exported decimal-point bitmap (`dont_path` in Zepp TEXT_IMG) for Distance. */
+  decimalImage?: string;
   /** Generated common PNG cell width for fixed two-digit IMG_TIME components. */
   timeDigitCellWidth?: number;
   /** Generated common PNG cell width for zero-padded numeric IMG_DATE day values. */

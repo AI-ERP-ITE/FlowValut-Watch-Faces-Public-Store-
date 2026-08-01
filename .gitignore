@@ -37,6 +37,7 @@ temp/
 temp_validation_*/
 temp_zpk*/
 .verify-output/spec117/
+specs/129-alpha-pipeline-boundary-diagnostics/evidence/official-zepp/npm-cache/
 
 # Large reference docs (not source code, kept locally only)
 PIPELINE_FULL_SPEC.md

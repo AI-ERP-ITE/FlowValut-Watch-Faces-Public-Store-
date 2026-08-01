@@ -6,12 +6,19 @@ import type { WatchFaceConfig, WatchFaceElement, GeneratedCode } from '@/types';
 import modelsData from '../../models.json';
 import { getFontStyle } from '@/lib/fontLibrary';
 import { gaugePointerAssetName, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
-import { getTextImgPrefixForDataType } from '@/lib/elementDataRules';
+import { getTextImgPrefixForDataType, normalizeDataAlias } from '@/lib/elementDataRules';
 import { dropShadowPaddingForBake } from '@/lib/effectNormalization';
 import { normalizeHorizontalDigitAlign } from '@/lib/digitAlignment';
 import { getCenteredTimeStartX } from '@/lib/timeDigitGeometry';
 import { getCenteredNumericDayStartX, isCompleteDayImageMode } from '@/lib/dateImageMode';
 import { isProjectBackgroundElement } from '@/lib/projectCanvasGeometry';
+import {
+  TEMPERATURE_DEGREE_FALLBACK,
+  TEMPERATURE_NEGATIVE_FALLBACK,
+  isTemperatureDataType,
+} from '@/lib/temperatureNumericContract';
+import { HUMIDITY_PERCENT_FALLBACK } from '@/lib/humidityNumericContract';
+import { DISTANCE_DECIMAL_FALLBACK } from '@/lib/distanceNumericContract';
 
 function _safeAssetId(id?: string): string {
   return (id || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -697,6 +704,10 @@ function generateWidgetCode(
   resolution = { width: 480, height: 480 },
 ): string {
   console.log(`[JSGen] generateWidgetCode: element=${element.name}, type=${element.type}, src=${element.src}`);
+  const canonicalDataType = normalizeDataAlias(element.dataType);
+  if (canonicalDataType && canonicalDataType !== element.dataType) {
+    element = { ...element, dataType: canonicalDataType };
+  }
   
   // Skip background element - already handled.
   // Exception: gauge pair siblings (gaugePairId set) must never be skipped even if they
@@ -721,6 +732,8 @@ function generateWidgetCode(
       return generateArcProgressWidget(element, widgetIndex, showLevel);
     case 'TEXT_IMG':
       return generateTextImgWidget(element, widgetIndex, showLevel);
+    case 'TIME_READING':
+      return generateTimeReadingWidget(element, widgetIndex, showLevel);
     case 'TIME_POINTER':
       return generateTimePointerWidget(element, widgetIndex, showLevel);
     case 'GAUGE_POINTER':
@@ -932,6 +945,29 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
 
   const hSpace = element.hSpace ?? 1;
   const alignH = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
+  const temperatureResources = isTemperatureDataType(element.dataType)
+    ? `
+                    negative_image: '${element.negativeImage ?? TEMPERATURE_NEGATIVE_FALLBACK}',
+                    unit_sc: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',
+                    unit_en: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',
+                    unit_tc: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',
+                    imperial_unit_sc: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',
+                    imperial_unit_en: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',
+                    imperial_unit_tc: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',`
+    : '';
+  const humidityResources = element.dataType === 'HUMIDITY'
+    ? `
+                    unit_sc: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',
+                    unit_en: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',
+                    unit_tc: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',
+                    imperial_unit_sc: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',
+                    imperial_unit_en: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',
+                    imperial_unit_tc: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',`
+    : '';
+  const distanceResources = element.dataType === 'DISTANCE'
+    ? `
+                    dont_path: '${element.decimalImage ?? DISTANCE_DECIMAL_FALLBACK}',`
+    : '';
 
   return `
                 // ${element.name} - TEXT_IMG Widget
@@ -940,8 +976,35 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
                     y: px(${element.bounds.y}),
                     w: px(${element.bounds.width || 100}),
                     h: px(${element.bounds.height || 40}),
-                    font_array: ${fontArrayStr},${typeParam}
+                    font_array: ${fontArrayStr},${typeParam}${temperatureResources}${humidityResources}${distanceResources}
                     h_space: ${hSpace},
+                    align_h: hmUI.align.${alignH},
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+}
+
+// Digital Sunrise/Sunset. Zepp formats these data types as HH:MM; TEXT_IMG's
+// separator resource supplies the bitmap used for the formatted time separator.
+function generateTimeReadingWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  const fontImages = element.fontArray || element.images || [];
+  const prefix = getTextImgPrefixForDataType(element.dataType) || 'time_reading_digit';
+  const fontArray = fontImages.length >= 10
+    ? fontImages.slice(0, 10)
+    : Array.from({ length: 10 }, (_, index) => `${prefix}_${index}.png`);
+  const dataType = element.dataType === 'SUN_SET' ? 'SUN_SET' : 'SUN_RISE';
+  const alignH = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
+
+  return `
+                // ${element.name} - Digital Time Reading (HH:MM)
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    w: px(${element.bounds.width || 200}),
+                    h: px(${element.bounds.height || 80}),
+                    font_array: [${fontArray.map((asset) => `'${asset}'`).join(', ')}],
+                    type: hmUI.data_type.${dataType},
+                    dont_path: '${element.colonImage || 'time_reading_colon.png'}',
+                    h_space: ${element.hSpace ?? 1},
                     align_h: hmUI.align.${alignH},
                     show_level: hmUI.show_level.${showLevel}
                 });`;

@@ -87,7 +87,7 @@ function inferDataTypeFromValue(val: string): string {
     UVI: 'UVI', UV: 'UVI',
     AQI: 'AQI',
     WEATHER: 'WEATHER_CURRENT', WEATHER_CURRENT: 'WEATHER_CURRENT', TEMP: 'WEATHER_CURRENT',
-    PAI: 'PAI',
+    PAI: 'PAI_DAILY',
     MOON: 'MOON',
     WIND: 'WIND',
     ALARM: 'ALARM',

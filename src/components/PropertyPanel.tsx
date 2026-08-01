@@ -10,6 +10,7 @@ import type { IconEntry } from '@/lib/iconLibrary';
 import { cn } from '@/lib/utils';
 import { FONT_STYLES, getCustomFontStyles, getFontStyle } from '@/lib/fontLibrary';
 import { WEATHER_STYLES, generateWeatherSet } from '@/lib/weatherIconSets';
+import { ZEP_WEATHER_CONDITION_CODES } from '@/lib/dataRepresentationAuthority';
 import type { WeatherStyle } from '@/lib/weatherIconSets';
 import { HAND_STYLES } from '@/lib/handStyles';
 import { getCustomHandSourceKind, type CustomHandRecord } from '@/lib/customHandStore';
@@ -22,6 +23,9 @@ import {
   resolveImageSwitcherFrameCount,
   normalizeDataTypeForElement,
   imageSwitcherDataTypesMatch,
+  getEditableImageSwitcherDataTypes,
+  isNewImageSwitcherDataType,
+  hasUnprovenLegacyRepresentation,
 } from '@/lib/elementDataRules';
 import { DEFAULT_GAUGE_POINTER_FILENAME, normalizeGaugePivot } from '@/lib/gaugePointerDefaults';
 import { renderHtmlToDataUrl, renderSvgToDataUrl } from '@/lib/customIconStore';
@@ -61,7 +65,7 @@ export interface PropertyPanelProps {
 }
 
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
-  'ARC_PROGRESS', 'TIME_POINTER', 'GAUGE_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
+  'ARC_PROGRESS', 'TIME_POINTER', 'TIME_READING', 'GAUGE_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
   'TEXT_IMG', 'IMG', 'TEXT',
   'IMG_LEVEL', 'IMG_STATUS', 'CIRCLE', 'BUTTON',
 ];
@@ -85,6 +89,7 @@ const APP_SHORTCUTS = [
 const TYPE_LABELS: Record<string, string> = {
   ARC_PROGRESS: 'Arc Progress',
   TIME_POINTER: 'Clock Hands',
+  TIME_READING: 'Time Readings',
   GAUGE_POINTER: 'Gauge Pointer',
   TEXT_IMG: 'Text Image',
   IMG: 'Image',
@@ -192,7 +197,9 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
   }, [iconLibraryKey]);
 
   const allowedDataTypes = element
-    ? getAllowedDataTypesForElement(element.type, element.subtype)
+    ? element.type === 'IMG_LEVEL'
+      ? getEditableImageSwitcherDataTypes(element.dataType)
+      : getAllowedDataTypesForElement(element.type, element.subtype)
     : [];
   const imageSwitcherExplicitCount = element?.type === 'IMG_LEVEL'
     ? (element.imageSwitcherFrameCount ?? (Array.isArray(element.images) ? element.images.length : null))
@@ -828,6 +835,11 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
         </span>
         <span className="text-xs text-white/40 truncate max-w-[100px]">{element.name}</span>
       </div>
+      {element.compatibilityWarning && (
+        <div className="rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[10px] leading-relaxed text-amber-200">
+          {element.compatibilityWarning}
+        </div>
+      )}
       {/* Copy / Paste Style */}
       <div className="flex gap-1.5">
         <button
@@ -1128,6 +1140,16 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
       {/* DataType — shown only when current element accepts data bindings */}
       {allowedDataTypes.length > 0 && (
         <Section label="Data Type">
+          {hasUnprovenLegacyRepresentation(element.type, element.dataType) && (
+            <p className="mb-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
+              Legacy representation preserved. This data source does not have a proven contract for this display method, so it is unavailable for new widgets. Keep it unchanged or choose a supported data type.
+            </p>
+          )}
+          {element.type === 'IMG_LEVEL' && element.dataType && !isNewImageSwitcherDataType(element.dataType) && (
+            <p className="mb-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
+              Legacy switcher preserved. Its custom thresholds affect editor preview but are not proven to control watch output. Keep it unchanged or switch to Humidity, BioCharge, Weather Condition, or Moon Phase.
+            </p>
+          )}
           <Select value={element.dataType ?? '__none__'} onValueChange={v => {
             const nextDataType = v === '__none__' ? undefined : v;
             const linkedDefinition = switcherDefinitions.find(def => def.id === element.imageSwitcherDefinitionId);
@@ -1182,6 +1204,15 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
               )}
             </div>
           )}
+        </Section>
+      )}
+
+      {element.type === 'TIME_READING' && (
+        <Section label="Display Mode">
+          <div className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-1.5 text-[11px] text-cyan-200">
+            Digital (HH:MM)
+          </div>
+          <p className="mt-1 text-[9px] text-white/40">Analog remains unavailable until Zepp runtime support is proven.</p>
         </Section>
       )}
 
@@ -2632,7 +2663,7 @@ function WeatherPreviewStrip({ style }: { style: WeatherStyle }) {
   return (
     <div className="flex gap-1 flex-wrap">
       {dataUrls.map((url, i) => (
-        <img key={i} src={url} alt={`weather_${PREVIEW_CODES[i]}`} className="w-7 h-7 rounded" />
+        <img key={i} src={url} alt={ZEP_WEATHER_CONDITION_CODES[PREVIEW_CODES[i]]?.label ?? `Weather code ${PREVIEW_CODES[i]}`} className="w-7 h-7 rounded" />
       ))}
     </div>
   );

@@ -15,6 +15,7 @@ import {
   IMAGE_SWITCHER_FIXED_SLOT_COUNTS,
   IMAGE_SWITCHER_MOON_FRAME_COUNTS,
 } from '@/lib/elementDataRules';
+import { ZEP_WEATHER_CONDITION_CODES } from '@/lib/dataRepresentationAuthority';
 
 // ── Heart-rate zones (Karvonen method) ────────────────────────────────────────
 
@@ -97,23 +98,115 @@ export function resolveSlot(
 
 // ── Default slot builder ──────────────────────────────────────────────────────
 
-const WEATHER_CODE_LABELS: Record<number, string> = {
-  0: 'Cloudy', 1: 'Shower Rain', 2: 'Snow', 3: 'Thunder', 4: 'Sleet',
-  5: 'Light Rain', 6: 'Light Snow', 7: 'Moderate Rain', 8: 'Moderate Snow',
-  9: 'Heavy Rain', 10: 'Heavy Snow', 11: 'Sand Storm', 12: 'Fog',
-  13: 'Haze', 14: 'Windy', 15: 'Sunny', 16: 'Clear Night', 17: 'Overcast',
-  18: 'Mostly Sunny', 19: 'Mostly Clear Night', 20: 'Mostly Cloudy',
-  21: 'Partly Cloudy', 22: 'Partly Clear Night', 23: 'Light Rain Night',
-  24: 'Thunder Night', 25: 'Sleet Night', 26: 'Shower Night',
-  27: 'Heavy Rain Night', 28: 'Sand Storm Night',
-};
-
 function buildWeatherSlots(count: number): RangeSlot[] {
   return Array.from({ length: count }, (_, i) => ({
     slotIndex: i,
-    label: WEATHER_CODE_LABELS[i] ?? `Code ${i}`,
+    label: ZEP_WEATHER_CONDITION_CODES[i]?.label ?? `Code ${i}`,
     code: i,
   }));
+}
+
+/**
+ * Expands inclusive integer ranges into an IMG_LEVEL array indexed by the live
+ * data value. Repeated filenames do not duplicate PNG bytes in the package.
+ */
+export function expandAbsoluteRangeFrames(
+  frames: readonly string[],
+  ranges: readonly RangeSlot[],
+  domainMin: number,
+  domainMax: number,
+): string[] {
+  if (frames.length !== ranges.length) {
+    throw new Error(`Range frame count ${frames.length} does not match slot count ${ranges.length}.`);
+  }
+  const expanded: string[] = [];
+  for (let value = domainMin; value <= domainMax; value += 1) {
+    const slotIndex = ranges.findIndex((slot) =>
+      value >= (slot.min ?? Number.POSITIVE_INFINITY)
+      && value <= (slot.max ?? Number.NEGATIVE_INFINITY));
+    if (slotIndex < 0) throw new Error(`No image-switcher range covers value ${value}.`);
+    expanded.push(frames[slotIndex]);
+  }
+  return expanded;
+}
+
+export interface HumidityRangeRepairProposal {
+  issues: string[];
+  changes: string[];
+  ranges: RangeSlot[];
+}
+
+export type HundredRangeRepairProposal = HumidityRangeRepairProposal;
+
+function auditHundredRanges(ranges: readonly RangeSlot[], label: string): string[] {
+  const issues: string[] = [];
+  if (ranges.length < 2) issues.push(`${label} requires at least two ranges.`);
+  ranges.forEach((slot, index) => {
+    if (!Number.isInteger(slot.min) || !Number.isInteger(slot.max)) {
+      issues.push(`Slot ${index + 1} must use integer min/max values.`);
+    } else if (slot.min! < 0 || slot.max! > 100 || slot.min! > slot.max!) {
+      issues.push(`Slot ${index + 1} must stay within 0–100 and min must not exceed max.`);
+    }
+    if (index > 0 && Number.isFinite(slot.min) && Number.isFinite(ranges[index - 1].max)) {
+      const expected = ranges[index - 1].max! + 1;
+      if (slot.min !== expected) {
+        issues.push(slot.min! < expected
+          ? `Slots ${index} and ${index + 1} overlap.`
+          : `Gap before slot ${index + 1}: expected min ${expected}, got ${slot.min}.`);
+      }
+    }
+  });
+  if (ranges[0]?.min !== 0) issues.push(`${label} ranges must start at 0.`);
+  if (ranges[ranges.length - 1]?.max !== 100) issues.push(`${label} ranges must end at 100.`);
+  return issues;
+}
+
+/** Audits Humidity's complete integer domain without mutating stored slots. */
+export function auditHumidityRanges(ranges: readonly RangeSlot[]): string[] {
+  return auditHundredRanges(ranges, 'Humidity');
+}
+
+export function auditBioChargeRanges(ranges: readonly RangeSlot[]): string[] {
+  return auditHundredRanges(ranges, 'HybridCharge / BioCharge');
+}
+
+/**
+ * Produces an explicit, minimal boundary repair. It never changes slot order or
+ * non-boundary fields and returns the original slot objects when already valid.
+ */
+export function proposeHumidityRangeRepair(ranges: readonly RangeSlot[]): HumidityRangeRepairProposal {
+  return proposeHundredRangeRepair(ranges, 'Humidity');
+}
+
+export function proposeBioChargeRangeRepair(ranges: readonly RangeSlot[]): HundredRangeRepairProposal {
+  return proposeHundredRangeRepair(ranges, 'HybridCharge / BioCharge');
+}
+
+function proposeHundredRangeRepair(ranges: readonly RangeSlot[], label: string): HundredRangeRepairProposal {
+  const issues = auditHundredRanges(ranges, label);
+  if (issues.length === 0) return { issues, changes: [], ranges: ranges as RangeSlot[] };
+  if (ranges.length < 2 || ranges.length > 101) {
+    return { issues, changes: ['Automatic repair unavailable for this slot count.'], ranges: [...ranges] };
+  }
+
+  const repaired: RangeSlot[] = [];
+  const changes: string[] = [];
+  let cursor = 0;
+  ranges.forEach((slot, index) => {
+    const remaining = ranges.length - index - 1;
+    const maxAllowed = 100 - remaining;
+    const rawMax = Number.isFinite(slot.max) ? Math.round(slot.max!) : cursor;
+    const max = index === ranges.length - 1
+      ? 100
+      : Math.min(maxAllowed, Math.max(cursor, rawMax));
+    const next = { ...slot, slotIndex: index, min: cursor, max };
+    if (slot.slotIndex !== next.slotIndex || slot.min !== next.min || slot.max !== next.max) {
+      changes.push(`Slot ${index + 1}: ${slot.min ?? '?'}–${slot.max ?? '?'} → ${next.min}–${next.max}`);
+    }
+    repaired.push(next);
+    cursor = max + 1;
+  });
+  return { issues, changes, ranges: repaired };
 }
 
 function buildMoonSlots(count: number): RangeSlot[] {
@@ -160,10 +253,11 @@ function buildAbsoluteSlots(dataType: string): RangeSlot[] {
     AQI:      [['Good', 0, 50], ['Moderate', 51, 100], ['Unhealthy', 101, 200], ['Hazardous', 201, 500]],
     UVI:      [['Low', 0, 2], ['Moderate', 3, 5], ['High', 6, 7], ['Very High', 8, 10], ['Extreme', 11, 16]],
     HUMIDITY: [['Dry', 0, 30], ['Comfortable', 31, 60], ['Humid', 61, 100]],
+    BIO_CHARGE: [['Low', 0, 30], ['Balanced', 31, 70], ['High', 71, 100]],
     STAND:    [['Low', 0, 7], ['Medium', 8, 14], ['High', 15, 24]],
-    PAI:      [['Inactive', 0, 24], ['Active', 25, 99], ['Fit', 100, 300]],
+    PAI_DAILY: [['Inactive', 0, 24], ['Active', 25, 49], ['Fit', 50, 75]],
     PAI_WEEKLY: [['Low', 0, 49], ['Medium', 50, 99], ['High', 100, 300]],
-    FAT_BURN: [['Low', 0, 49], ['Medium', 50, 99], ['High', 100, 200]],
+    FAT_BURNING: [['Low', 0, 49], ['Medium', 50, 99], ['High', 100, 999]],
   };
   const entries = presets[dataType] ?? [['Low', 0, 49], ['Medium', 50, 74], ['High', 75, 100]];
   return entries.map(([label, min, max], i) => ({ slotIndex: i, label, min, max }));
@@ -175,7 +269,7 @@ function buildAbsoluteSlots(dataType: string): RangeSlot[] {
  */
 export function buildDefaultSlots(dataType: string, profile?: UserProfile, slotCount?: number): RangeSlot[] {
   const fixedCount = IMAGE_SWITCHER_FIXED_SLOT_COUNTS[dataType];
-  if (dataType === 'WEATHER_CURRENT' || dataType === 'WEATHER_STATUS') {
+  if (dataType === 'WEATHER_STATUS') {
     return buildWeatherSlots(fixedCount ?? 29);
   }
   if (dataType === 'MOON') {
@@ -256,6 +350,14 @@ export function validateDefinition(def: ImageSwitcherDefinition): string[] {
         }
       }
     }
+    if (def.dataType === 'WEATHER_STATUS') {
+      for (const condition of ZEP_WEATHER_CONDITION_CODES) {
+        const slot = ranges.find(item => item.code === condition.code);
+        if (slot && slot.label !== condition.label) {
+          errors.push(`Weather code ${condition.code} must be labeled "${condition.label}".`);
+        }
+      }
+    }
   } else if (policyType === 'PERCENT_RANGES') {
     if (ranges.length < 2) errors.push('At least 2 slots required for percent ranges.');
     for (const s of ranges) {
@@ -290,6 +392,8 @@ export function validateDefinition(def: ImageSwitcherDefinition): string[] {
         errors.push(`Slot "${ranges[i].label}" overlaps with previous slot.`);
       }
     }
+    if (def.dataType === 'HUMIDITY') errors.push(...auditHumidityRanges(ranges));
+    if (def.dataType === 'BIO_CHARGE') errors.push(...auditBioChargeRanges(ranges));
   }
 
   return errors;

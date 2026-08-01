@@ -4,7 +4,7 @@
  */
 
 import type { ImageSwitcherDefinition } from '@/types/imageSwitcher';
-import { normalizeDataAlias } from './elementDataRules';
+import { normalizeImageSwitcherDataType } from './elementDataRules';
 
 const DB_NAME = 'zepp-studio-switchers';
 const DB_VERSION = 1;
@@ -81,6 +81,6 @@ export async function replaceSwitcherDefinitions(defs: ImageSwitcherDefinition[]
 }
 
 function normalizeDefinition(def: ImageSwitcherDefinition): ImageSwitcherDefinition {
-  const dataType = normalizeDataAlias(def.dataType) ?? def.dataType;
+  const dataType = normalizeImageSwitcherDataType(def.dataType) ?? def.dataType;
   return dataType === def.dataType ? def : { ...def, dataType };
 }

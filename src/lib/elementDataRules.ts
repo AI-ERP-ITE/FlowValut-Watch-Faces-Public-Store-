@@ -1,10 +1,16 @@
 import type { WatchFaceElement } from '@/types';
+import {
+  filterLegacyCompatibleDataTypes,
+  isLegacyRepresentationAllowed,
+  type DataRepresentation,
+} from '@/lib/dataRepresentationAuthority';
 
 export type RuleElementKey =
   | 'TEXT'
   | 'DIGITAL_HOURS'
   | 'DIGITAL_MINUTES'
   | 'DIGITAL_SECONDS'
+  | 'TIME_READING'
   | 'GAUGE_POINTER'
   | 'ARC_PROGRESS'
   | 'NUMERIC_DISPLAY'
@@ -23,23 +29,26 @@ export const DATA_TYPE_LABELS: Record<string, string> = {
   DISTANCE: 'Distance',
   DIST: 'Distance (legacy)',
   STAND: 'Stand',
-  PAI: 'PAI',
+  PAI_DAILY: 'PAI (Daily)',
   PAI_WEEKLY: 'PAI (Weekly)',
-  FAT_BURN: 'Fat Burn',
+  FAT_BURNING: 'Fat Burning Time',
   HEART: 'Heart Rate',
   STRESS: 'Stress Level',
   SPO2: 'Blood Oxygen',
   HUMIDITY: 'Humidity',
-  WIND: 'Wind',
+  WIND: 'Wind Level',
   UVI: 'UV Index',
   AQI: 'Air Quality',
   SLEEP: 'Sleep Duration',
   SUN_RISE: 'Sunrise Time',
   SUN_SET: 'Sunset Time',
-  ALTIMETER: 'Altitude',
+  ALTIMETER: 'Air Pressure',
   VO2MAX: 'VO2 Max',
   TRAINING_LOAD: 'Training Load',
-  WEATHER_CURRENT: 'Weather Current',
+  BIO_CHARGE: 'HybridCharge / BioCharge',
+  WEATHER_CURRENT: 'Current Temperature',
+  WEATHER_LOW: 'Low Temperature',
+  WEATHER_HIGH: 'High Temperature',
   WEATHER_STATUS: 'Weather Status',
   MOON: 'Moon Phase',
 };
@@ -50,8 +59,8 @@ const PRIMARY_DATA_TYPES = [
   'CAL',
   'DISTANCE',
   'STAND',
-  'PAI',
-  'FAT_BURN',
+  'PAI_DAILY',
+  'FAT_BURNING',
   'HEART',
   'STRESS',
   'SPO2',
@@ -60,8 +69,6 @@ const PRIMARY_DATA_TYPES = [
   'UVI',
   'AQI',
   'SLEEP',
-  'SUN_RISE',
-  'SUN_SET',
   'ALTIMETER',
   'VO2MAX',
   'TRAINING_LOAD',
@@ -73,18 +80,19 @@ const PROGRESS_DATA_TYPES = [
   'CAL',
   'DISTANCE',
   'STAND',
-  'PAI',
+  'PAI_DAILY',
   'PAI_WEEKLY',
-  'FAT_BURN',
+  'FAT_BURNING',
   'HEART',
   'STRESS',
   'SPO2',
   'HUMIDITY',
+  'WIND',
   'UVI',
   'AQI',
   'ALTIMETER',
   'VO2MAX',
-  'TRAINING_LOAD',
+  'BIO_CHARGE',
 ] as const;
 
 export const TEXT_IMG_DATA_TYPE_PREFIXES: Record<string, string> = {
@@ -95,11 +103,11 @@ export const TEXT_IMG_DATA_TYPE_PREFIXES: Record<string, string> = {
   CAL: 'cal_digit',
   DISTANCE: 'dist_digit',
   STRESS: 'stress_digit',
-  PAI: 'pai_digit',
+  PAI_DAILY: 'pai_digit',
   PAI_WEEKLY: 'pai_digit',
   SLEEP: 'sleep_digit',
   STAND: 'stand_digit',
-  FAT_BURN: 'fatburn_digit',
+  FAT_BURNING: 'fatburn_digit',
   UVI: 'uvi_digit',
   AQI: 'aqi_digit',
   HUMIDITY: 'humid_digit',
@@ -107,9 +115,12 @@ export const TEXT_IMG_DATA_TYPE_PREFIXES: Record<string, string> = {
   ALTIMETER: 'alt_digit',
   VO2MAX: 'vo2_digit',
   TRAINING_LOAD: 'training_digit',
+  BIO_CHARGE: 'bio_charge_digit',
   SUN_RISE: 'sunrise_digit',
   SUN_SET: 'sunset_digit',
   WEATHER_CURRENT: 'temp_digit',
+  WEATHER_LOW: 'temp_low_digit',
+  WEATHER_HIGH: 'temp_high_digit',
 };
 
 // Final authority: ELEMENT -> allowed DATA TYPE values.
@@ -117,15 +128,16 @@ export const ELEMENT_TO_DATA: Record<RuleElementKey, readonly string[]> = {
   DIGITAL_HOURS: [],
   DIGITAL_MINUTES: [],
   DIGITAL_SECONDS: [],
+  TIME_READING: ['SUN_RISE', 'SUN_SET'],
   ANALOG_CLOCK: [],
   // IMG_POINTER capability completion: bounded/progress sensor and weather metrics only.
   // Rotation is handled by Zepp runtime via start_angle/end_angle normalization.
-  GAUGE_POINTER: ['BATTERY', 'STEP', 'CAL', 'DISTANCE', 'STAND', 'PAI', 'FAT_BURN', 'STRESS', 'SPO2', 'HUMIDITY', 'UVI', 'AQI', 'HEART'],
+  GAUGE_POINTER: ['BATTERY', 'STEP', 'CAL', 'DISTANCE', 'STAND', 'PAI_DAILY', 'FAT_BURNING', 'STRESS', 'SPO2', 'HUMIDITY', 'WIND', 'UVI', 'AQI', 'HEART', 'BIO_CHARGE'],
   DATE_DIGIT: [],
   WEEKDAY_NAME: [],
 
-  TEXT: [...PRIMARY_DATA_TYPES, 'WEATHER_CURRENT', 'PAI_WEEKLY'],
-  NUMERIC_DISPLAY: [...PRIMARY_DATA_TYPES, 'WEATHER_CURRENT', 'PAI_WEEKLY'],
+  TEXT: [...PRIMARY_DATA_TYPES, 'PAI_WEEKLY'],
+  NUMERIC_DISPLAY: [...PRIMARY_DATA_TYPES, 'WEATHER_CURRENT', 'WEATHER_LOW', 'WEATHER_HIGH', 'PAI_WEEKLY', 'BIO_CHARGE'],
   ARC_PROGRESS: [...PROGRESS_DATA_TYPES],
 
   IMAGE_SWITCHER: [
@@ -134,16 +146,16 @@ export const ELEMENT_TO_DATA: Record<RuleElementKey, readonly string[]> = {
     'CAL',
     'DISTANCE',
     'STAND',
-    'PAI',
+    'PAI_DAILY',
     'PAI_WEEKLY',
-    'FAT_BURN',
+    'FAT_BURNING',
     'HEART',
     'STRESS',
     'SPO2',
     'HUMIDITY',
+    'BIO_CHARGE',
     'UVI',
     'AQI',
-    'WEATHER_CURRENT',
     'WEATHER_STATUS',
     'MOON',
   ],
@@ -169,7 +181,8 @@ const DATA_ALIASES: Record<string, string> = {
   CALORIE: 'CAL',
   CALORIES: 'CAL',
   DIST: 'DISTANCE',
-  PAI_DAILY: 'PAI',
+  PAI: 'PAI_DAILY',
+  FAT_BURN: 'FAT_BURNING',
 };
 
 export function normalizeDataAlias(dataType: string | undefined): string | undefined {
@@ -178,20 +191,49 @@ export function normalizeDataAlias(dataType: string | undefined): string | undef
   return DATA_ALIASES[normalized] ?? normalized;
 }
 
-/** The single creator/editor/runtime authority for supported IMG_LEVEL bindings. */
+/** Legacy compatibility inventory. Existing elements/definitions must remain loadable. */
 export const IMAGE_SWITCHER_DATA_TYPES = ELEMENT_TO_DATA.IMAGE_SWITCHER;
+
+/** Truthful new-creation choices: fixed contracts or custom ranges proven to reach device output. */
+export const IMAGE_SWITCHER_NEW_DATA_TYPES = Object.freeze([
+  'HUMIDITY',
+  'BIO_CHARGE',
+  'WEATHER_STATUS',
+  'MOON',
+] as const);
+
+export function isNewImageSwitcherDataType(dataType: string | undefined): boolean {
+  const normalized = normalizeImageSwitcherDataType(dataType);
+  return !!normalized && IMAGE_SWITCHER_NEW_DATA_TYPES.includes(
+    normalized as (typeof IMAGE_SWITCHER_NEW_DATA_TYPES)[number],
+  );
+}
+
+/** New choices plus the current legacy value, so editing never silently converts saved work. */
+export function getEditableImageSwitcherDataTypes(currentDataType?: string): readonly string[] {
+  const normalized = normalizeImageSwitcherDataType(currentDataType);
+  if (!normalized || isNewImageSwitcherDataType(normalized)) return IMAGE_SWITCHER_NEW_DATA_TYPES;
+  return [normalized, ...IMAGE_SWITCHER_NEW_DATA_TYPES];
+}
 
 export function imageSwitcherDataTypesMatch(
   left: string | undefined,
   right: string | undefined,
 ): boolean {
-  const normalizedLeft = normalizeDataAlias(left);
-  const normalizedRight = normalizeDataAlias(right);
+  const normalizedLeft = normalizeImageSwitcherDataType(left);
+  const normalizedRight = normalizeImageSwitcherDataType(right);
   return !!normalizedLeft && normalizedLeft === normalizedRight;
+}
+
+/** Canonicalizes only the retired condition-icon alias; numeric temperature remains unchanged. */
+export function normalizeImageSwitcherDataType(dataType: string | undefined): string | undefined {
+  const normalized = normalizeDataAlias(dataType);
+  return normalized === 'WEATHER_CURRENT' ? 'WEATHER_STATUS' : normalized;
 }
 
 export function toRuleElementKey(type: WatchFaceElement['type'], subtype?: string): RuleElementKey | null {
   if (type === 'TEXT') return 'TEXT';
+  if (type === 'TIME_READING') return 'TIME_READING';
   if (type === 'IMG_TIME') {
     if (subtype === 'hours') return 'DIGITAL_HOURS';
     if (subtype === 'minutes') return 'DIGITAL_MINUTES';
@@ -211,16 +253,59 @@ export function toRuleElementKey(type: WatchFaceElement['type'], subtype?: strin
   return null;
 }
 
+function ruleElementRepresentation(key: RuleElementKey): DataRepresentation | null {
+  if (key === 'TEXT' || key === 'NUMERIC_DISPLAY') return 'NUMERIC_VALUE';
+  if (key === 'ARC_PROGRESS') return 'ARC_PROGRESS';
+  if (key === 'GAUGE_POINTER') return 'GAUGE_POINTER';
+  if (key === 'IMAGE_SWITCHER') return 'IMAGE_SWITCHER';
+  if (key === 'TIME_READING') return 'TIME_READING';
+  return null;
+}
+
 export function getAllowedDataTypesForElement(type: WatchFaceElement['type'], subtype?: string): readonly string[] {
   const key = toRuleElementKey(type, subtype);
   if (!key) return [];
   if (key === 'STATUS_INDICATOR') return [];
-  return ELEMENT_TO_DATA[key] ?? [];
+  return filterLegacyCompatibleDataTypes(
+    ELEMENT_TO_DATA[key] ?? [],
+    ruleElementRepresentation(key),
+  );
+}
+
+const NEW_NUMERIC_EXCLUSIONS = new Set(['SLEEP']);
+const NEW_BOUNDED_EXCLUSIONS = new Set(['STEP', 'CAL', 'DISTANCE', 'HEART']);
+
+/** New-element authority; legacy allow-lists remain unchanged so saved work is never rewritten. */
+export function getNewElementAllowedDataTypes(
+  type: WatchFaceElement['type'],
+  subtype?: string,
+): readonly string[] {
+  if (type === 'IMG_LEVEL') return IMAGE_SWITCHER_NEW_DATA_TYPES;
+  const allowed = getAllowedDataTypesForElement(type, subtype);
+  if (type === 'TEXT' || type === 'TEXT_IMG') {
+    return allowed.filter(dataType => !NEW_NUMERIC_EXCLUSIONS.has(dataType));
+  }
+  if (type === 'ARC_PROGRESS' || type === 'GAUGE_POINTER') {
+    return allowed.filter(dataType => !NEW_BOUNDED_EXCLUSIONS.has(dataType));
+  }
+  return allowed;
+}
+
+export function hasUnprovenLegacyRepresentation(
+  type: WatchFaceElement['type'],
+  dataType: string | undefined,
+): boolean {
+  const normalized = normalizeDataAlias(dataType);
+  if (!normalized) return false;
+  if ((type === 'TEXT' || type === 'TEXT_IMG') && NEW_NUMERIC_EXCLUSIONS.has(normalized)) return true;
+  return (type === 'ARC_PROGRESS' || type === 'GAUGE_POINTER') && NEW_BOUNDED_EXCLUSIONS.has(normalized);
 }
 
 export function getAllowedElementsForData(dataType: string): RuleElementKey[] {
   const normalized = normalizeDataAlias(dataType) ?? dataType;
-  return DATA_TO_ELEMENT[normalized] ?? [];
+  return (DATA_TO_ELEMENT[normalized] ?? []).filter((key) =>
+    isLegacyRepresentationAllowed(normalized, ruleElementRepresentation(key)),
+  );
 }
 
 export function normalizeDataTypeForElement(
@@ -261,7 +346,6 @@ export const IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT = 7;
 import type { PolicyType } from '@/types/imageSwitcher';
 
 export const IMAGE_SWITCHER_POLICY: Record<string, PolicyType> = {
-  WEATHER_CURRENT: 'FIXED_CODES',
   WEATHER_STATUS:  'FIXED_CODES',
   MOON:            'LUNAR_CYCLE',
   BATTERY:         'PERCENT_RANGES',
@@ -270,18 +354,18 @@ export const IMAGE_SWITCHER_POLICY: Record<string, PolicyType> = {
   CAL:             'ABSOLUTE_RANGES',
   DISTANCE:        'ABSOLUTE_RANGES',
   STAND:           'ABSOLUTE_RANGES',
-  PAI:             'ABSOLUTE_RANGES',
+  PAI_DAILY:       'ABSOLUTE_RANGES',
   PAI_WEEKLY:      'ABSOLUTE_RANGES',
-  FAT_BURN:        'ABSOLUTE_RANGES',
+  FAT_BURNING:     'ABSOLUTE_RANGES',
   STRESS:          'ABSOLUTE_RANGES',
   SPO2:            'ABSOLUTE_RANGES',
   UVI:             'ABSOLUTE_RANGES',
   AQI:             'ABSOLUTE_RANGES',
   HUMIDITY:        'ABSOLUTE_RANGES',
+  BIO_CHARGE:      'ABSOLUTE_RANGES',
 };
 
 export const IMAGE_SWITCHER_FIXED_SLOT_COUNTS: Record<string, number> = {
-  WEATHER_CURRENT: 29,
   WEATHER_STATUS:  29,
 };
 
@@ -311,7 +395,7 @@ export function resolveImageSwitcherFrameCount(
     };
   }
 
-  if (normalized === 'WEATHER_CURRENT' || normalized === 'WEATHER_STATUS') {
+  if (normalized === 'WEATHER_STATUS') {
     return {
       expectedCount: IMAGE_SWITCHER_WEATHER_FRAME_COUNT,
       minCount: IMAGE_SWITCHER_WEATHER_FRAME_COUNT,

@@ -3,7 +3,7 @@
  * Full Image Switcher editor — create / edit definitions, upload slot PNGs, save to IDB + cloud.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ImageSwitcherDefinition, RangeSlot, UserProfile } from '@/types/imageSwitcher';
@@ -16,10 +16,13 @@ import {
   buildDefaultSlots,
   buildHeartZones,
   validateDefinition,
+  proposeHumidityRangeRepair,
+  proposeBioChargeRangeRepair,
 } from '@/lib/imageSwitcherResolver';
 import {
   IMAGE_SWITCHER_POLICY,
-  IMAGE_SWITCHER_DATA_TYPES,
+  getEditableImageSwitcherDataTypes,
+  isNewImageSwitcherDataType,
   IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT,
   IMAGE_SWITCHER_MOON_FRAME_COUNTS,
   getDataTypeLabel,
@@ -66,7 +69,7 @@ export default function ImageSwitcherLab() {
 
   // Editor state
   const [name, setName] = useState('');
-  const [dataType, setDataType] = useState('BATTERY');
+  const [dataType, setDataType] = useState('HUMIDITY');
   const [slots, setSlots] = useState<RangeSlot[]>([]);
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [errors, setErrors] = useState<string[]>([]);
@@ -85,7 +88,7 @@ export default function ImageSwitcherLab() {
   const resetEditor = useCallback(() => {
     setEditingId(null);
     setName('');
-    setDataType('BATTERY');
+    setDataType('HUMIDITY');
     setSlots(buildDefaultSlots('BATTERY'));
     setProfile(DEFAULT_PROFILE);
     setErrors([]);
@@ -104,6 +107,14 @@ export default function ImageSwitcherLab() {
   const isMoon = policyType === 'LUNAR_CYCLE';
   const isFixed = policyType === 'FIXED_CODES' || isMoon;
   const isHeart = policyType === 'DYNAMIC_RANGES';
+  const boundedHundredRepair = useMemo(
+    () => dataType === 'HUMIDITY'
+      ? proposeHumidityRangeRepair(slots)
+      : dataType === 'BIO_CHARGE'
+        ? proposeBioChargeRangeRepair(slots)
+        : null,
+    [dataType, slots],
+  );
 
   // Slot manipulation
   const updateSlot = (i: number, patch: Partial<RangeSlot>) => {
@@ -314,7 +325,7 @@ export default function ImageSwitcherLab() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {IMAGE_SWITCHER_DATA_TYPES.map((dt) => (
+                {getEditableImageSwitcherDataTypes(editingId ? dataType : undefined).map((dt) => (
                   <SelectItem key={dt} value={dt}>{getDataTypeLabel(dt)}</SelectItem>
                 ))}
               </SelectContent>
@@ -326,6 +337,40 @@ export default function ImageSwitcherLab() {
         <p className="text-[10px] text-white/35">
           Policy: <span className="text-white/55">{policyLabel(policyType)}</span>
         </p>
+
+        {editingId && !isNewImageSwitcherDataType(dataType) && (
+          <p className="rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
+            Legacy definition preserved for compatibility. These custom thresholds are preview-only and are not proven to control watch output. New definitions are limited to proven range or fixed-set contracts.
+          </p>
+        )}
+
+        {boundedHundredRepair && boundedHundredRepair.issues.length > 0 && (
+          <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2 space-y-1.5">
+            <p className="text-[10px] font-medium text-amber-200">{getDataTypeLabel(dataType)} range audit</p>
+            {boundedHundredRepair.issues.map((issue, index) => (
+              <p key={index} className="text-[9px] text-amber-200/80">• {issue}</p>
+            ))}
+            {boundedHundredRepair.changes.length > 0 && (
+              <>
+                <p className="text-[9px] text-white/45">Proposed boundary-only repair:</p>
+                {boundedHundredRepair.changes.map((change, index) => (
+                  <p key={index} className="text-[9px] font-mono text-white/60">{change}</p>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSlots(boundedHundredRepair.ranges.map(slot => ({ ...slot })));
+                    setErrors([]);
+                    setSaveMsg('Repair applied locally — review ranges, then Save');
+                  }}
+                  className="rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] text-amber-100 hover:bg-amber-400/20"
+                >
+                  Apply boundary repair
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {isMoon && (
           <div className="rounded border border-white/8 bg-black/20 p-2 space-y-1.5">

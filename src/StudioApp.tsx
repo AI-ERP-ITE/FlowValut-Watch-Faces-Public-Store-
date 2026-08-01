@@ -76,16 +76,17 @@ import {
 import { detectGauge } from '@/lib/gaugeDetector';
 import { renderGaugeAssets } from '@/lib/gaugeRenderer';
 import {
-  getAllowedDataTypesForElement,
   getDataTypeLabel,
   getTextImgPrefixForDataType,
+  getNewElementAllowedDataTypes,
   resolveImageSwitcherFrameCount,
-  normalizeDataTypeForElement,
 } from '@/lib/elementDataRules';
 import { drawOpticallyCenteredDigit, trimHorizontalTransparentPadding } from '@/lib/digitOpticalCentering'; // @deprecated by Spec 114
 import { generateOptimizedDigitBitmaps } from '@/lib/digitBitmapGeometry';
 import { finalizeWatchSafeTextAlpha } from '@/lib/watchSafeTextAlpha';
 import { computeDigitBitmapLayout, getDigitPreviewValue, type DigitBitmapMetrics } from '@/lib/digitLayoutEngine';
+import { getNumericPreviewValue } from '@/lib/numericFitPolicy';
+import { getMissingDistanceAssets } from '@/lib/distanceNumericContract';
 import { buildProjectFileConfig } from '@/lib/projectFileConfig';
 import { createProjectFileArtifact, createProjectFileBlob, parseProjectFileArtifact } from '@/lib/projectFileArtifact';
 import { createWorkshopBuild, createWorkshopProject, dataUrlToBlob, fetchWorkshopProjectFile } from '@/lib/workshopApi';
@@ -98,6 +99,13 @@ import {
   type CanvasResolution,
 } from '@/lib/projectCanvasGeometry';
 import { completeDayAssetNames, isCompleteDayImageMode } from '@/lib/dateImageMode';
+import { expandAbsoluteRangeFrames } from '@/lib/imageSwitcherResolver';
+import {
+  getMissingTemperatureAssets,
+  isTemperatureDataType,
+  temperatureDigitFilenames,
+} from '@/lib/temperatureNumericContract';
+import { getMissingHumidityAssets } from '@/lib/humidityNumericContract';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -182,10 +190,6 @@ function normalizeBackgroundTransform(input?: BackgroundTransform | null): Backg
     flipH: !!input?.flipH,
     flipV: !!input?.flipV,
   };
-}
-
-function weatherTempDigitFilenames(): string[] {
-  return Array.from({ length: 10 }, (_, i) => `temp_digit_${i}.png`);
 }
 
 function isWeatherImgLevelDataType(dataType: string | undefined): boolean {
@@ -1502,6 +1506,42 @@ function regenerateDigitFilesFromElements(
         });
       }
       elementUpdates.set(el.id, { images: scopedMonthImages });
+    } else if (el.type === 'TIME_READING' && (el.dataType === 'SUN_RISE' || el.dataType === 'SUN_SET')) {
+      const prefix = getTextImgPrefixForDataType(el.dataType) || 'time_reading_digit';
+      const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 40, 12);
+      const family = makeDigitFamily(color, fontFamily, fontWeight, h, true);
+      const scopedDigits: string[] = [];
+      for (let i = 0; i < 10; i++) {
+        const filename = `${prefix}_${scope}_${safeId}_${i}.png`;
+        scopedDigits.push(filename);
+        results.push({ filename, dataUrl: family[i].dataUrl });
+      }
+      const measureCanvas = document.createElement('canvas');
+      const measureContext = measureCanvas.getContext('2d')!;
+      measureContext.font = `${fontWeight} ${Math.floor(h * 0.8)}px ${fontFamily}`;
+      const colonWidth = Math.max(2, Math.ceil(measureContext.measureText(':').width + 2));
+      const colonImage = `time_reading_colon_${scope}_${safeId}.png`;
+      results.push({
+        filename: colonImage,
+        dataUrl: makeLabelCanvas(':', color, fontFamily, fontWeight, colonWidth, h, el.watchSafeTextEdges === true),
+      });
+      const layout = computeDigitBitmapLayout({
+        widgetType: 'TEXT_IMG',
+        bounds: { x: el.bounds.x, y: el.bounds.y, width: el.bounds.width, height: h },
+        value: '00:00',
+        alignH: el.alignH,
+        hSpace: Number(el.hSpace) || 0,
+        bitmaps: [
+          ...family.map((digit) => ({ char: digit.char, width: digit.width, height: digit.height })),
+          { char: ':', width: colonWidth, height: h },
+        ],
+      });
+      elementUpdates.set(el.id, {
+        fontArray: scopedDigits,
+        colonImage,
+        layoutStartX: layout.startX,
+        compatibilityWarning: undefined,
+      });
     } else if (el.type === 'TEXT_IMG' && el.dataType) {
       const prefix = getTextImgPrefixForDataType(el.dataType);
       if (prefix) {
@@ -1513,7 +1553,61 @@ function regenerateDigitFilesFromElements(
           scopedDigits.push(filename);
           results.push({ filename, dataUrl: family[i].dataUrl });
         }
-        const textImgBitmaps: DigitBitmapMetrics[] = family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height }));
+        let temperatureResources: Partial<WatchFaceElement> = {};
+        const temperatureBitmapMetrics: DigitBitmapMetrics[] = [];
+        if (isTemperatureDataType(el.dataType)) {
+          const negativeImage = `${prefix}_${scope}_${safeId}_negative.png`;
+          const degreeImage = `${prefix}_${scope}_${safeId}_degree.png`;
+          const symbolWidth = (symbol: string) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d')!;
+            ctx.font = `${fontWeight} ${Math.floor(h * 0.8)}px ${fontFamily}`;
+            return Math.max(2, Math.ceil(ctx.measureText(symbol).width + 2));
+          };
+          results.push({
+            filename: negativeImage,
+            dataUrl: makeLabelCanvas('-', color, fontFamily, fontWeight, symbolWidth('-'), h, el.watchSafeTextEdges === true),
+          });
+          results.push({
+            filename: degreeImage,
+            dataUrl: makeLabelCanvas('°', color, fontFamily, fontWeight, symbolWidth('°'), h, el.watchSafeTextEdges === true),
+          });
+          temperatureBitmapMetrics.push(
+            { char: '-', width: symbolWidth('-'), height: h },
+            { char: '°', width: symbolWidth('°'), height: h },
+          );
+          temperatureResources = { negativeImage, degreeImage };
+        }
+        if (el.dataType === 'HUMIDITY') {
+          const percentImage = `${prefix}_${scope}_${safeId}_percent.png`;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d')!;
+          ctx.font = `${fontWeight} ${Math.floor(h * 0.8)}px ${fontFamily}`;
+          const percentWidth = Math.max(2, Math.ceil(ctx.measureText('%').width + 2));
+          results.push({
+            filename: percentImage,
+            dataUrl: makeLabelCanvas('%', color, fontFamily, fontWeight, percentWidth, h, el.watchSafeTextEdges === true),
+          });
+          temperatureBitmapMetrics.push({ char: '%', width: percentWidth, height: h });
+          temperatureResources = { ...temperatureResources, percentImage };
+        }
+        if (el.dataType === 'DISTANCE') {
+          const decimalImage = `${prefix}_${scope}_${safeId}_decimal.png`;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d')!;
+          ctx.font = `${fontWeight} ${Math.floor(h * 0.8)}px ${fontFamily}`;
+          const decimalWidth = Math.max(2, Math.ceil(ctx.measureText('.').width + 2));
+          results.push({
+            filename: decimalImage,
+            dataUrl: makeLabelCanvas('.', color, fontFamily, fontWeight, decimalWidth, h, el.watchSafeTextEdges === true),
+          });
+          temperatureBitmapMetrics.push({ char: '.', width: decimalWidth, height: h });
+          temperatureResources = { ...temperatureResources, decimalImage };
+        }
+        const textImgBitmaps: DigitBitmapMetrics[] = [
+          ...family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height })),
+          ...temperatureBitmapMetrics,
+        ];
         const textImgLayout = computeDigitBitmapLayout({
           widgetType: 'TEXT_IMG',
           bounds: { x: el.bounds.x, y: el.bounds.y, width: el.bounds.width, height: h },
@@ -1522,7 +1616,11 @@ function regenerateDigitFilesFromElements(
           hSpace: Number(el.hSpace) || 0,
           bitmaps: textImgBitmaps,
         });
-        elementUpdates.set(el.id, { fontArray: scopedDigits, layoutStartX: textImgLayout.startX });
+        elementUpdates.set(el.id, {
+          fontArray: scopedDigits,
+          layoutStartX: textImgLayout.startX,
+          ...temperatureResources,
+        });
       }
     }
   }
@@ -2350,7 +2448,7 @@ function StudioApp() {
   }, [mainBackgroundTransform, state.watchFaceConfig]);
 
   const addAllowedDataTypes = useMemo(
-    () => getAllowedDataTypesForElement(addElType, addElSubtype),
+    () => getNewElementAllowedDataTypes(addElType, addElSubtype),
     [addElType, addElSubtype]
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -2602,6 +2700,7 @@ function StudioApp() {
     // Default sizes per type
     const defaults: Partial<Record<WatchFaceElement['type'], { w: number; h: number }>> = {
       TEXT: { w: 160, h: 50 },
+      TIME_READING: { w: 200, h: 80 },
       ARC_PROGRESS: { w: 400, h: 400 },
       GAUGE_POINTER: { w: 40, h: 120 },
       TEXT_IMG: { w: 160, h: 50 },
@@ -2624,11 +2723,18 @@ function StudioApp() {
         if (addElType === 'IMG_TIME') return addElSubtype === 'minutes' || addElSubtype === 'seconds' ? '58' : '10';
         if (addElType === 'IMG_WEEK') return 'WED';
         if (addElType === 'IMG_DATE') return '31';
+        if (addElType === 'TIME_READING') return '00:00';
         if (addElType !== 'TEXT_IMG') return null;
         switch (addElDataType) {
           case 'STEP': return '88888';
-          case 'BATTERY': case 'HEART': case 'SPO2': case 'STRESS': case 'HUMIDITY': case 'PAI_WEEKLY': case 'AQI': case 'TRAINING_LOAD': case 'WIND': case 'WEATHER_CURRENT': return '888';
-          case 'CAL': case 'ALTIMETER': return '8888';
+          case 'WEATHER_CURRENT': case 'WEATHER_LOW': case 'WEATHER_HIGH': return getNumericPreviewValue(addElDataType);
+          case 'HUMIDITY': return getNumericPreviewValue('HUMIDITY');
+          case 'WIND': return getNumericPreviewValue('WIND');
+          case 'BIO_CHARGE': return getNumericPreviewValue('BIO_CHARGE');
+          case 'BATTERY': case 'HEART': case 'SPO2': case 'STRESS': case 'PAI_WEEKLY': case 'FAT_BURNING': case 'AQI': case 'TRAINING_LOAD': return '888';
+          case 'PAI_DAILY': return '75';
+          case 'CAL': return '8888';
+          case 'ALTIMETER': return '1200';
           case 'VO2MAX': return '65';
           case 'UVI': return '5';
           case 'SLEEP': case 'SUN_RISE': case 'SUN_SET': return '00:00';
@@ -2643,9 +2749,9 @@ function StudioApp() {
     const needsDataType = addAllowedDataTypes.length > 0;
     const isStatus = addElType === 'IMG_STATUS';
     const isArc = addElType === 'ARC_PROGRESS';
-    const normalizedAddDataType = normalizeDataTypeForElement(addElType, addElSubtype, addElDataType, {
-      fillDefaultWhenEmpty: true,
-    });
+    const normalizedAddDataType = addAllowedDataTypes.includes(addElDataType)
+      ? addElDataType
+      : addAllowedDataTypes[0];
     const newEl: WatchFaceElement = {
       id: generateId(),
       type: addElType,
@@ -2675,6 +2781,15 @@ function StudioApp() {
           }
         : {}),
       ...(addElType === 'TEXT' ? { text: 'Text', fontSize: 36, color: '#FFFFFF' } : {}),
+      ...(['TEXT_IMG', 'ARC_PROGRESS', 'GAUGE_POINTER', 'IMG_LEVEL'].includes(addElType) && addElDataType === 'BIO_CHARGE'
+        ? { compatibilityWarning: 'HybridCharge / BioCharge requires a compatible watch and firmware (reported Zepp OS API level 4.2+).' }
+        : {}),
+      ...(['TEXT_IMG', 'ARC_PROGRESS', 'GAUGE_POINTER'].includes(addElType) && addElDataType === 'AQI'
+        ? { compatibilityWarning: 'Air Quality data is documented by Zepp as available only in mainland China.' }
+        : {}),
+      ...(addElType === 'TIME_READING'
+        ? { timeReadingDisplay: 'DIGITAL', fontSize: 48, color: '#FFFFFF' }
+        : {}),
       ...(addElType === 'CIRCLE' ? { shapeType: addElShapeType, color: '0xFFFFFF', ...(addElShapeType === 'rounded_rect' ? { shapeCornerRadius: 12 } : {}) } : {}),
     };
     addActiveElement(newEl);
@@ -2684,14 +2799,10 @@ function StudioApp() {
   };
 
   useEffect(() => {
-    const normalized = normalizeDataTypeForElement(addElType, addElSubtype, addElDataType, {
-      fillDefaultWhenEmpty: true,
-    });
-
-    if (normalized && normalized !== addElDataType) {
-      setAddElDataType(normalized);
+    if (addAllowedDataTypes.length > 0 && !addAllowedDataTypes.includes(addElDataType)) {
+      setAddElDataType(addAllowedDataTypes[0]);
     }
-  }, [addElDataType, addElSubtype, addElType]);
+  }, [addAllowedDataTypes, addElDataType]);
 
   const handleAddFrame = (parent: WatchFaceElement) => {
     if (!state.watchFaceConfig) return;
@@ -3890,6 +4001,7 @@ function StudioApp() {
 
       // Resolve imageSwitcherDefinitionId slots → extra ElementImages before building elementFiles
       const switcherSlotImages: ElementImage[] = [];
+      const exportSwitcherDefinitions = new Map<string, ImageSwitcherDefinition>();
       const allExportElements = [
         ...mainEditorElements,
         ...(aodEditorElements ?? []),
@@ -3900,6 +4012,7 @@ function StudioApp() {
           if (!def) {
             throw new Error(`${el.name}: selected custom image set is not loaded.`);
           }
+          exportSwitcherDefinitions.set(el.id, def);
           const missingSlots = def.ranges.filter((slot) => !slot.dataUrl);
           if (missingSlots.length > 0) {
             throw new Error(
@@ -4087,7 +4200,15 @@ function StudioApp() {
           elementFiles.push({ src: frameName, file: new File([bytes], frameName, { type: 'image/png' }) });
         }
 
-        resolvedImgLevelFrames.set(scopedElementKey(elementScope, el.id), normalizedFrames);
+        const runtimeFrames = (el.dataType === 'HUMIDITY' || el.dataType === 'BIO_CHARGE') && el.imageSwitcherDefinitionId
+          ? expandAbsoluteRangeFrames(
+              normalizedFrames,
+              exportSwitcherDefinitions.get(el.id)?.ranges ?? [],
+              0,
+              100,
+            )
+          : normalizedFrames;
+        resolvedImgLevelFrames.set(scopedElementKey(elementScope, el.id), runtimeFrames);
       }
 
       // Pre-warm Tabler icon cache so getIconByKey works synchronously for tabler:* keys
@@ -4284,8 +4405,8 @@ function StudioApp() {
             el.images = [...resolvedFrames];
           }
         }
-        if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT' && (!el.fontArray || el.fontArray.length === 0)) {
-          el.fontArray = weatherTempDigitFilenames();
+        if (el.type === 'TEXT_IMG' && isTemperatureDataType(el.dataType) && (!el.fontArray || el.fontArray.length === 0)) {
+          el.fontArray = temperatureDigitFilenames();
         }
       }
       if (exportAodElements) {
@@ -4296,8 +4417,8 @@ function StudioApp() {
               el.images = [...resolvedFrames];
             }
           }
-          if (el.type === 'TEXT_IMG' && el.dataType === 'WEATHER_CURRENT' && (!el.fontArray || el.fontArray.length === 0)) {
-            el.fontArray = weatherTempDigitFilenames();
+          if (el.type === 'TEXT_IMG' && isTemperatureDataType(el.dataType) && (!el.fontArray || el.fontArray.length === 0)) {
+            el.fontArray = temperatureDigitFilenames();
           }
         }
       }
@@ -4592,6 +4713,26 @@ function StudioApp() {
       }
 
       // Inject Custom Fonts from IndexedDB
+      const temperatureAssetNames = new Set(elementFiles.map((file) => file.src));
+      for (const element of exportCombinedElements) {
+        const missing = [
+          ...getMissingTemperatureAssets(element, temperatureAssetNames),
+          ...getMissingHumidityAssets(element, temperatureAssetNames),
+          ...getMissingDistanceAssets(element, temperatureAssetNames),
+        ];
+        if (element.type === 'TIME_READING') {
+          const timeReadingAssets = [...(element.fontArray || []).slice(0, 10), element.colonImage]
+            .filter((asset): asset is string => Boolean(asset));
+          if ((element.fontArray?.length || 0) < 10 || !element.colonImage) {
+            missing.push('TIME_READING requires ten digit assets and one colon asset');
+          }
+          missing.push(...timeReadingAssets.filter((asset) => !temperatureAssetNames.has(asset)));
+        }
+        if (missing.length > 0) {
+          throw new Error(`Generated widget assets missing before build (${element.id}): ${[...new Set(missing)].join(', ')}`);
+        }
+      }
+
       const fontKeysInUse = new Set<string>();
       for (const el of [...(configForBuild.elements || []), ...(configForBuild.aodElements || [])]) {
         if (el.type === 'TEXT' && el.fontStyle && el.fontStyle.startsWith('custom-font:')) {
@@ -5707,6 +5848,7 @@ function StudioApp() {
                               { type: 'IMG' as const, label: 'Static Image', icon: '🖼️', desc: 'A static image or icon from your library' },
                               { type: 'CIRCLE' as const, label: 'Shape', icon: '⚪', desc: 'Circle, filled rect, stroke rect or rounded rect shape' },
                               { type: 'TIME_POINTER' as const, label: 'Analog Clock', icon: '🕐', desc: 'Analog clock with rotating hour, minute and second hands' },
+                              { type: 'TIME_READING' as const, label: 'Time Readings', icon: '🌅', desc: 'Digital Sunrise or Sunset time (HH:MM), isolated from the current clock' },
                               { type: 'GAUGE_POINTER' as const, label: 'Gauge Pointer', icon: '📍', desc: 'Data-driven rotating needle (Zepp IMG_POINTER) for bounded metrics like battery, steps, heart, stress and weather indices' },
                             ] as { type: WatchFaceElement['type']; label: string; icon: string; sub?: string; desc: string }[]
                           ).map((opt) => {

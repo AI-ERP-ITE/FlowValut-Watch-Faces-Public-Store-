@@ -22,6 +22,7 @@ import {
   createDefaultGaugePointerDataUrl,
   normalizeGaugePivot,
 } from '@/lib/gaugePointerDefaults';
+import { normalizeBoundedDataValue } from '@/lib/boundedGaugeRange';
 
 // Default fallbacks when no model props are supplied (keeps all existing behaviour).
 const CANVAS_SIZE = 480;
@@ -1405,6 +1406,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'IMG_DATE':
       case 'IMG_WEEK':
       case 'TEXT_IMG':
+      case 'TIME_READING':
         ctx.save();
         applyShadow(ctx, el);
         drawDigitElement(ctx, el, digitCache, onIconLoaded, digitAssets);
@@ -1772,14 +1774,19 @@ export function getMaxDigitMock(dataType: string | undefined, type: WatchFaceEle
     case 'DISTANCE':        return '99.9';  // 4 chars
     case 'SPO2':            return '100';   // 3 digits
     case 'STRESS':          return '100';   // 3 digits
-    case 'HUMIDITY':        return '100';   // 3 digits
+    case 'HUMIDITY':        return '100%';
     case 'PAI_WEEKLY':      return '525';   // 3 digits
+    case 'PAI_DAILY':       return '75';    // official 0-75
+    case 'FAT_BURNING':     return '888';   // official 0-999
     case 'AQI':             return '888';   // 3 digits
     case 'ALTIMETER':       return '1200';  // 4 digits
     case 'VO2MAX':          return '65';    // 2 digits
     case 'TRAINING_LOAD':   return '888';   // 3 digits
-    case 'WIND':            return '888';   // 3 digits
-    case 'WEATHER_CURRENT': return '-20';   // 3 chars (negative temp)
+    case 'BIO_CHARGE':      return '100';   // fixed 0-100
+    case 'WIND':            return '12';
+    case 'WEATHER_CURRENT': return '-20°';
+    case 'WEATHER_LOW':     return '-25°';
+    case 'WEATHER_HIGH':    return '104°';
     case 'UVI':             return '5';     // 1 digit
     case 'SLEEP':           return '8:88';  // HH:MM
     case 'SUN_RISE':
@@ -1816,7 +1823,7 @@ function drawDigitElement(
 
   // If digit images available, draw them
   const images = el.images ?? el.fontArray;
-  if (images && images.length > 0 && digitCache && (el.type === 'IMG_DATE' || el.type === 'IMG_TIME' || el.type === 'TEXT_IMG')) {
+  if (images && images.length > 0 && digitCache && (el.type === 'IMG_DATE' || el.type === 'IMG_TIME' || el.type === 'TEXT_IMG' || el.type === 'TIME_READING')) {
     const sampleText = getPlaceholderText(el);
     if (el.type === 'IMG_DATE' && el.subtype !== 'month' && isCompleteDayImageMode(el) && images.length >= 31) {
       const day = Math.min(31, Math.max(1, Number.parseInt(sampleText, 10) || 31));
@@ -1834,11 +1841,11 @@ function drawDigitElement(
     let allDigitsMapped = chars.length > 0;
 
     for (const char of chars) {
-      if (!/^\d$/.test(char)) {
-        allDigitsMapped = false;
-        continue;
-      }
-      const src = images[Number(char)];
+      const src = /^\d$/.test(char)
+        ? images[Number(char)]
+        : char === ':' && el.type === 'TIME_READING'
+          ? el.colonImage
+          : undefined;
       if (!src) {
         allDigitsMapped = false;
         continue;
@@ -1865,7 +1872,7 @@ function drawDigitElement(
       // After layout, reposition using totalWidth for correct alignment.
       const effectiveW = Math.max(w, renderH * 10);
       const layout = computeDigitBitmapLayout({
-        widgetType: el.type,
+        widgetType: el.type === 'TIME_READING' ? 'TEXT_IMG' : el.type,
         bounds: { x, y: y + renderOffsetY, width: effectiveW, height: renderH },
         value: sampleText,
         alignH,
@@ -2298,6 +2305,8 @@ function gaugeProgress(el: WatchFaceElement): number {
     case 'HEART': return 0.44;
     case 'SPO2': return 0.91;
     case 'STRESS': return 0.38;
+    case 'WIND': return normalizeBoundedDataValue('WIND', 6);
+    case 'BIO_CHARGE': return normalizeBoundedDataValue('BIO_CHARGE', 50);
     default: return 0.65;
   }
 }

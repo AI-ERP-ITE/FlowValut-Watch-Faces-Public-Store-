@@ -44,7 +44,7 @@ Schema:
       "lineWidth": number,
       "fontSize": number,
       "fontFamily": "sans-serif" | "serif" | "monospace" | "digital" | "rounded",
-      "dataType": "BATTERY" | "STEP" | "HEART" | "SPO2" | "CAL" | "DISTANCE" | "STRESS" | "PAI" | "SLEEP" | "STAND" | "FAT_BURN" | "UVI" | "AQI" | "HUMIDITY" | "WEATHER_CURRENT" | "SUN_RISE" | "SUN_SET" | "WIND" | "ALARM" | "NOTIFICATION" | "MOON"
+      "dataType": "BATTERY" | "STEP" | "HEART" | "SPO2" | "CAL" | "DISTANCE" | "STRESS" | "PAI_DAILY" | "SLEEP" | "STAND" | "FAT_BURNING" | "UVI" | "AQI" | "HUMIDITY" | "WEATHER_CURRENT" | "SUN_RISE" | "SUN_SET" | "WIND" | "ALARM" | "NOTIFICATION" | "MOON"
     }
   ]
 }
@@ -64,7 +64,7 @@ Field definitions:
 - "distance": Distance traveled
 - "weather": Weather icon or temperature
 - "stress": Stress level indicator
-- "pai": PAI (Personal Activity Intelligence) / Bio Charge / vitality score
+- "pai": daily PAI (Personal Activity Intelligence), using PAI_DAILY; BioCharge is a separate BIO_CHARGE source
 - "sleep": Sleep data or sleep quality
 - "stand": Standing / idle alerts counter
 - "fat_burn": Fat burn / active minutes
@@ -73,7 +73,7 @@ Field definitions:
 - "humidity": Humidity percentage
 - "sunrise": Sunrise time
 - "sunset": Sunset time
-- "wind": Wind speed
+- "wind": Wind force level (0–12), not wind speed
 - "alarm": Alarm / next alarm time
 - "notification": Notification count / icon
 - "moon": Moon phase
@@ -151,7 +151,7 @@ Field definitions:
 - Omit for non-text elements
 
 "dataType" — Zepp OS data binding type (when the element displays live sensor data):
-- Map from element type: battery→BATTERY, steps→STEP, heart_rate→HEART, spo2→SPO2, calories→CAL, distance→DISTANCE, stress→STRESS, pai→PAI, sleep→SLEEP, stand→STAND, fat_burn→FAT_BURN, uvi→UVI, aqi→AQI, humidity→HUMIDITY, weather→WEATHER_CURRENT, sunrise→SUN_RISE, sunset→SUN_SET, wind→WIND, alarm→ALARM, notification→NOTIFICATION, moon→MOON
+- Map from element type: battery→BATTERY, steps→STEP, heart_rate→HEART, spo2→SPO2, calories→CAL, distance→DISTANCE, stress→STRESS, pai→PAI_DAILY, sleep→SLEEP, stand→STAND, fat_burn→FAT_BURNING, uvi→UVI, aqi→AQI, humidity→HUMIDITY, weather→WEATHER_CURRENT, sunrise→SUN_RISE, sunset→SUN_SET, wind→WIND, alarm→ALARM, notification→NOTIFICATION, moon→MOON
 - Omit for time, date, weekday, month, arc, text (no live binding)
 
 EXAMPLES:
@@ -269,7 +269,7 @@ export const AI_RESPONSE_SCHEMA = {
           lineWidth:  { type: 'number' as const },
           fontSize:   { type: 'number' as const },
           fontFamily: { type: 'string' as const, enum: ['sans-serif', 'serif', 'monospace', 'digital', 'rounded'] },
-          dataType:   { type: 'string' as const, enum: ['BATTERY', 'STEP', 'HEART', 'SPO2', 'CAL', 'DISTANCE', 'STRESS', 'PAI', 'SLEEP', 'STAND', 'FAT_BURN', 'UVI', 'AQI', 'HUMIDITY', 'WEATHER_CURRENT', 'SUN_RISE', 'SUN_SET', 'WIND', 'ALARM', 'NOTIFICATION', 'MOON'] },
+          dataType:   { type: 'string' as const, enum: ['BATTERY', 'STEP', 'HEART', 'SPO2', 'CAL', 'DISTANCE', 'STRESS', 'PAI_DAILY', 'SLEEP', 'STAND', 'FAT_BURNING', 'UVI', 'AQI', 'HUMIDITY', 'WEATHER_CURRENT', 'SUN_RISE', 'SUN_SET', 'WIND', 'ALARM', 'NOTIFICATION', 'MOON'] },
         },
         required: ['id', 'type', 'representation', 'layout', 'group', 'bounds', 'color'],
       },
