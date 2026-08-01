@@ -59,6 +59,8 @@ approves that exact task; then stop and report before continuing.
 - [x] **T027 Private deployment:** Used only `npm run deploy:full:private` after explicit approval. Deployment commit `4dbba314` published System A `index-DL69yRev.js` / `index-wLIbbYR0.css` and rebuilt System B `index-CyynwCBB.js` / `index-jiNJ2ex5.css` to private `origin/main`. Root, Studio query, parametric query, System B HTML, and all referenced assets returned HTTP 200 with no development entrypoint. Physical-watch verification remains user-operated.
 - [x] **T028 Restore established chooser inventory:** Reversed the unapproved T025C/T025D creation filters. New and edited Image Switchers again expose every established source; Numeric again exposes Sleep; Arc/Gauge again expose Steps, Calories, Distance, and Heart Rate. Approved naming, mappings, BioCharge, Weather Status, Moon, Humidity, and Time Reading work remains unchanged.
 - [x] **T029 Time Reading hardware format and raster-effect parity:** Replaced the single raw Sunrise/Sunset `TEXT_IMG` with Weather-sensor-backed, zero-padded `HH` + colon IMG + `MM` runtime widgets. Audited existing raster effect controls and fixed custom Gauge Pointer export to resolve the exact custom-library source used by canvas before deterministic effect baking.
+- [x] **T030 Sleep Duration runtime format:** Kept Sleep in Numeric Values but replaced the raw number binding with the official sleep-sensor total-minutes read and an image-font `H:MM` renderer with a required baked colon asset.
+- [x] **T031 Time Reading shadow export:** Bake the configured shadow into every Sunrise/Sunset digit and colon PNG, include padding in layout geometry, and preserve the canvas position in generated watch code.
 
 ## Next verification
 
