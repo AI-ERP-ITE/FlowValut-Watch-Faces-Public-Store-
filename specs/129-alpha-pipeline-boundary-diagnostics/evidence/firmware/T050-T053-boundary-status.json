@@ -1,0 +1,27 @@
+{
+  "tasks": ["T050", "T051", "T052", "T053"],
+  "testOnly": true,
+  "localInstallControls": {
+    "status": "PASS",
+    "count": 4,
+    "manifest": "T050-install-control-manifest.json"
+  },
+  "officialInstallQr": {
+    "status": "BLOCKED",
+    "reason": "Zeus login status is no login; simulator is disconnected; authenticated preview signing/upload cannot run."
+  },
+  "privateGitHubHosting": {
+    "status": "BLOCKED",
+    "httpStatus": 401,
+    "remoteWritesCreated": false,
+    "reason": "Configured GITHUB_TOKEN was rejected before file lookup/upload."
+  },
+  "firmwareCapture": {
+    "status": "BLOCKED",
+    "reason": "No connected simulator, Developer Bridge, or programmatic watch screenshot route. Existing screenshot is not associated with P9/P10 package hashes."
+  },
+  "measurement": {
+    "status": "BLOCKED",
+    "reason": "No exact-package digital screenshots exist."
+  }
+}

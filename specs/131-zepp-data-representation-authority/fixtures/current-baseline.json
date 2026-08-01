@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-31",
+  "officialWeatherCodes": [
+    "Cloudy",
+    "Showers",
+    "Snow Showers",
+    "Sunny",
+    "Overcast",
+    "Light Rain",
+    "Light Snow",
+    "Moderate Rain",
+    "Moderate Snow",
+    "Heavy Snow",
+    "Heavy Rain",
+    "Sandstorm",
+    "Rain and Snow",
+    "Fog",
+    "Haze",
+    "Thunderstorm",
+    "Snowstorm",
+    "Floating Dust",
+    "Extreme Rainstorm",
+    "Rain and Hail",
+    "Thunderstorm and Hail",
+    "Heavy Rainstorm",
+    "Dust",
+    "Heavy Sandstorm",
+    "Rainstorm",
+    "Unknown",
+    "Cloudy Night",
+    "Showers Night",
+    "Clear Night"
+  ],
+  "observedSwitcherLabels": {
+    "0": "Cloudy",
+    "1": "Shower Rain",
+    "2": "Snow",
+    "3": "Thunder",
+    "15": "Sunny",
+    "28": "Sand Storm Night"
+  },
+  "observedBuiltInWeatherComments": {
+    "0": "Sunny",
+    "1": "Mostly Sunny",
+    "2": "Partly Cloudy",
+    "3": "Mostly Cloudy",
+    "4": "Cloudy"
+  },
+  "observedRules": {
+    "weatherCurrentIsNumeric": true,
+    "weatherCurrentIsImageSwitcher": true,
+    "weatherStatusIsImageSwitcher": true,
+    "trainingLoadIsArcProgress": true,
+    "windNumericPreview": "888"
+  },
+  "observedGenerator": {
+    "weatherConditionType": "hmUI.data_type.WEATHER",
+    "temperatureHasNegativeImage": false,
+    "temperatureHasDegreeUnit": false
+  }
+}

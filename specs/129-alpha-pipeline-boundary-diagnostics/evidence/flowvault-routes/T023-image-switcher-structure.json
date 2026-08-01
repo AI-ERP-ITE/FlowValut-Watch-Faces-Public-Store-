@@ -1,0 +1,44 @@
+{
+  "result": "PASS",
+  "element": {
+    "id": "spec129-alpha-switcher",
+    "name": "Spec 129 Alpha Fixture",
+    "type": "IMG_LEVEL",
+    "dataType": "BATTERY",
+    "imageSwitcherDefinitionId": "spec129-definition",
+    "bounds": {
+      "x": 17,
+      "y": 23,
+      "width": 466,
+      "height": 466
+    }
+  },
+  "slotNames": [
+    "switcher_spec129-alpha-switcher_slot_00.png",
+    "switcher_spec129-alpha-switcher_slot_01.png",
+    "switcher_spec129-alpha-switcher_slot_02.png",
+    "switcher_spec129-alpha-switcher_slot_03.png"
+  ],
+  "configuredFrames": [
+    "data:image/png;base64,SLOT_0",
+    "data:image/png;base64,SLOT_1",
+    "data:image/png;base64,SLOT_2",
+    "data:image/png;base64,SLOT_3"
+  ],
+  "expectedCount": 4,
+  "generatedNames": [
+    "imglvl_spec_129_alpha_fixture_0.png",
+    "imglvl_spec_129_alpha_fixture_1.png",
+    "imglvl_spec_129_alpha_fixture_2.png",
+    "imglvl_spec_129_alpha_fixture_3.png"
+  ],
+  "checks": {
+    "slotCount": true,
+    "slotNames": true,
+    "slotBounds": true,
+    "linkedDefinitionFilterIsolation": true,
+    "lexicographicOrderPreservesSlotOrder": true,
+    "expectedCount": true,
+    "generatedNames": true
+  }
+}

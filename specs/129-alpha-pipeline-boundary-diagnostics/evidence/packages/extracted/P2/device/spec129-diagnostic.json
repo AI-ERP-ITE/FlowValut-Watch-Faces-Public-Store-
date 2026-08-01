@@ -1,0 +1,17 @@
+{
+  "task": "T030",
+  "packageId": "P2",
+  "name": "static-img-pass-through",
+  "testOnly": true,
+  "widgetKind": "IMG",
+  "offscreenIsolation": true,
+  "productionCodeModified": false,
+  "assets": [
+    {
+      "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T021-inline-static-pass-through.png",
+      "target": "assets/spec129_p2_static_pass.png",
+      "byteLength": 8710,
+      "sha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e"
+    }
+  ]
+}

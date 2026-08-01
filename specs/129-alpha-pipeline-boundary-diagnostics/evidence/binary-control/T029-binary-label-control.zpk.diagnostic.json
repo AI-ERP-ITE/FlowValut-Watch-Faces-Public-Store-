@@ -1,0 +1,220 @@
+{
+  "inputPath": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\ZPK for tests\\test for fonts .zpk",
+  "outputPath": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\binary-control\\T029-binary-label-control.zpk",
+  "transformedAssetCount": 19,
+  "untouchedOuterEntriesVerified": 5,
+  "untouchedDeviceEntriesVerified": 138,
+  "maxAbsoluteCoverageErrorPixels": 0.48627450980369247,
+  "maxCentroidShiftPixels": 0.008761031075949206,
+  "assets": [
+    {
+      "name": "assets/month_main_hkap2qmwbjr_0.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 111.61568627450988,
+      "binaryCoverage": 112,
+      "coverageError": 0.38431372549011655,
+      "centroidShift": 0.00695355040750744,
+      "sourcePartialAlphaPixels": 160,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_1.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 131.15686274509812,
+      "binaryCoverage": 131,
+      "coverageError": -0.15686274509812392,
+      "centroidShift": 0.00344485773070366,
+      "sourcePartialAlphaPixels": 149,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_10.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 126.61176470588255,
+      "binaryCoverage": 127,
+      "coverageError": 0.3882352941174503,
+      "centroidShift": 0.005339678081962206,
+      "sourcePartialAlphaPixels": 178,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_11.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 129.91372549019624,
+      "binaryCoverage": 130,
+      "coverageError": 0.08627450980375784,
+      "centroidShift": 0.00220580860514991,
+      "sourcePartialAlphaPixels": 167,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_2.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 156.87058823529424,
+      "binaryCoverage": 157,
+      "coverageError": 0.12941176470576465,
+      "centroidShift": 0.004333461699414277,
+      "sourcePartialAlphaPixels": 199,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_3.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 132.3450980392158,
+      "binaryCoverage": 132,
+      "coverageError": -0.34509803921579874,
+      "centroidShift": 0.008523847461916237,
+      "sourcePartialAlphaPixels": 154,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_4.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 144.17647058823547,
+      "binaryCoverage": 144,
+      "coverageError": -0.17647058823547468,
+      "centroidShift": 0.0024827071893705646,
+      "sourcePartialAlphaPixels": 192,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_5.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 107.88235294117659,
+      "binaryCoverage": 108,
+      "coverageError": 0.1176470588234082,
+      "centroidShift": 0.003004450085784532,
+      "sourcePartialAlphaPixels": 159,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_6.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 93.26666666666668,
+      "binaryCoverage": 93,
+      "coverageError": -0.26666666666667993,
+      "centroidShift": 0.003506696402978163,
+      "sourcePartialAlphaPixels": 123,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_7.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 124.6549019607844,
+      "binaryCoverage": 125,
+      "coverageError": 0.3450980392155998,
+      "centroidShift": 0.0013642197178366008,
+      "sourcePartialAlphaPixels": 159,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_8.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 120.76470588235303,
+      "binaryCoverage": 121,
+      "coverageError": 0.23529411764697272,
+      "centroidShift": 0.0036590015137933055,
+      "sourcePartialAlphaPixels": 141,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/month_main_hkap2qmwbjr_9.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 114.56470588235302,
+      "binaryCoverage": 115,
+      "coverageError": 0.43529411764697556,
+      "centroidShift": 0.002292006623551004,
+      "sourcePartialAlphaPixels": 149,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/week_main_0jsjisxv1nvn_0.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 157.03137254901972,
+      "binaryCoverage": 157,
+      "coverageError": -0.03137254901972142,
+      "centroidShift": 0.0037871668076757754,
+      "sourcePartialAlphaPixels": 233,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/week_main_0jsjisxv1nvn_1.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 113.47843137254914,
+      "binaryCoverage": 113,
+      "coverageError": -0.4784313725491387,
+      "centroidShift": 0.008761031075949206,
+      "sourcePartialAlphaPixels": 144,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/week_main_0jsjisxv1nvn_2.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 153.92156862745108,
+      "binaryCoverage": 154,
+      "coverageError": 0.07843137254891985,
+      "centroidShift": 0.007577896356924834,
+      "sourcePartialAlphaPixels": 189,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/week_main_0jsjisxv1nvn_3.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 124.52941176470604,
+      "binaryCoverage": 125,
+      "coverageError": 0.47058823529395966,
+      "centroidShift": 0.007884830374660904,
+      "sourcePartialAlphaPixels": 164,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/week_main_0jsjisxv1nvn_4.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 109.4313725490197,
+      "binaryCoverage": 109,
+      "coverageError": -0.4313725490196987,
+      "centroidShift": 0.0015516903509117089,
+      "sourcePartialAlphaPixels": 132,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/week_main_0jsjisxv1nvn_5.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 110.63921568627457,
+      "binaryCoverage": 111,
+      "coverageError": 0.36078431372543207,
+      "centroidShift": 0.0027498261268849135,
+      "sourcePartialAlphaPixels": 146,
+      "resultPartialAlphaPixels": 0
+    },
+    {
+      "name": "assets/week_main_0jsjisxv1nvn_6.png",
+      "size": "63x21",
+      "rgb": "230,154,90",
+      "sourceCoverage": 120.51372549019631,
+      "binaryCoverage": 121,
+      "coverageError": 0.48627450980369247,
+      "centroidShift": 0.005062721229083729,
+      "sourcePartialAlphaPixels": 172,
+      "resultPartialAlphaPixels": 0
+    }
+  ]
+}

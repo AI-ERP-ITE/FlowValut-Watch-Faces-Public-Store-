@@ -1,0 +1,1 @@
+{"configVersion":"v2","zpks":[{"name":"514a743b27ad2b49eb0b3f12d1520b94.zpk","version":{"code":1,"name":"1.0.0"},"appType":"watchface","platforms":[{"screenType":"round","screenResolution":"480x480","cpuPlatform":"NXP"}],"md5":"514a743b27ad2b49eb0b3f12d1520b94"}],"bundleInfo":{"zpm":"3.4.2","timeStamp":1785358268,"csc":".ip-package"}}

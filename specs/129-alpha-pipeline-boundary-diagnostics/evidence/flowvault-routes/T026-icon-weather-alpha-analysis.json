@@ -1,0 +1,287 @@
+{
+  "result": "FAIL",
+  "liveAlphaMatchesEncodedPng": true,
+  "icon": {
+    "alphaInvariantAcrossNeutralAndColorizedOutputs": true,
+    "byColor": {
+      "neutral": {
+        "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+        "coverage": 52574.74509801917,
+        "partialAlphaPixels": 74234,
+        "uniqueAlphaValueCount": 161
+      },
+      "orange": {
+        "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+        "coverage": 52574.74509801917,
+        "partialAlphaPixels": 74234,
+        "uniqueAlphaValueCount": 161
+      },
+      "black": {
+        "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+        "coverage": 52574.74509801917,
+        "partialAlphaPixels": 74234,
+        "uniqueAlphaValueCount": 161
+      },
+      "teal": {
+        "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+        "coverage": 52574.74509801917,
+        "partialAlphaPixels": 74234,
+        "uniqueAlphaValueCount": 161
+      }
+    }
+  },
+  "weatherShape": {
+    "alphaInvariantAcrossColors": true,
+    "byColor": {
+      "orange": {
+        "alphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+        "coverage": 665.674509803922,
+        "partialAlphaPixels": 188,
+        "uniqueAlphaValueCount": 66
+      },
+      "black": {
+        "alphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+        "coverage": 665.674509803922,
+        "partialAlphaPixels": 188,
+        "uniqueAlphaValueCount": 66
+      },
+      "teal": {
+        "alphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+        "coverage": 665.674509803922,
+        "partialAlphaPixels": 188,
+        "uniqueAlphaValueCount": 66
+      }
+    },
+    "orangeVsBlackCoveragePercent": 0,
+    "tealVsBlackCoveragePercent": 0
+  },
+  "weatherText": {
+    "alphaInvariantAcrossColors": false,
+    "byColor": {
+      "orange": {
+        "alphaSha256": "e9aa28218fc7c9709ee612638a56caf4e9cbe14c4ce657b172f3a7b54d4efc0e",
+        "coverage": 276.627450980392,
+        "partialAlphaPixels": 109,
+        "uniqueAlphaValueCount": 80
+      },
+      "black": {
+        "alphaSha256": "d999e9474dbf27d3c1f5185767813bb66dd3b44c97b751d88e36227d71391fea",
+        "coverage": 272.8509803921567,
+        "partialAlphaPixels": 109,
+        "uniqueAlphaValueCount": 77
+      },
+      "teal": {
+        "alphaSha256": "8fd06732aae91d72be68f46f6561a726b18e582e3c2817c3b3dbed71121fafa4",
+        "coverage": 275.22745098039206,
+        "partialAlphaPixels": 109,
+        "uniqueAlphaValueCount": 78
+      }
+    },
+    "orangeVsBlackCoveragePercent": 1.3840780717765844,
+    "tealVsBlackCoveragePercent": 0.8709774781896495
+  },
+  "images": [
+    {
+      "id": "icon-neutral",
+      "route": "icon",
+      "colorId": "neutral",
+      "color": null,
+      "width": 480,
+      "height": 480,
+      "filename": "icon-neutral.png",
+      "encodedBytes": 13523,
+      "browserRawAlphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "encodedSha256": "59e0b820fd30a75edf565ea146e427d330e52a4951812e4d981934f92470b54e",
+      "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 161,
+      "transparentPixels": 139580,
+      "partialAlphaPixels": 74234,
+      "opaquePixels": 16586,
+      "totalAlphaCoveragePixels": 52574.74509801917
+    },
+    {
+      "id": "icon-colorize-orange",
+      "route": "icon",
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "width": 480,
+      "height": 480,
+      "filename": "icon-colorize-orange.png",
+      "encodedBytes": 14535,
+      "browserRawAlphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "encodedSha256": "b345fa9df32d90af8ac91fb0e3110dddbc980457c8a92c753b7746546f15b692",
+      "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 161,
+      "transparentPixels": 139580,
+      "partialAlphaPixels": 74234,
+      "opaquePixels": 16586,
+      "totalAlphaCoveragePixels": 52574.74509801917
+    },
+    {
+      "id": "weather-flat-sun-orange",
+      "route": "weather-shape",
+      "weatherStyle": "flat",
+      "weatherCode": 0,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "width": 60,
+      "height": 60,
+      "filename": "weather-flat-sun-orange.png",
+      "encodedBytes": 1310,
+      "browserRawAlphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+      "encodedSha256": "08bd8083afe66f30b79eed7ff96d284660c0d7881420a5dc95ca2381b16d10ef",
+      "alphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 66,
+      "transparentPixels": 2847,
+      "partialAlphaPixels": 188,
+      "opaquePixels": 565,
+      "totalAlphaCoveragePixels": 665.674509803922
+    },
+    {
+      "id": "weather-flat-snow-orange",
+      "route": "weather-text",
+      "weatherStyle": "flat",
+      "weatherCode": 11,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "width": 60,
+      "height": 60,
+      "filename": "weather-flat-snow-orange.png",
+      "encodedBytes": 1019,
+      "browserRawAlphaSha256": "e9aa28218fc7c9709ee612638a56caf4e9cbe14c4ce657b172f3a7b54d4efc0e",
+      "encodedSha256": "fd0a9489488154b30c60e12228e97157e7a33126bc2114195299c359cb6f3cb3",
+      "alphaSha256": "e9aa28218fc7c9709ee612638a56caf4e9cbe14c4ce657b172f3a7b54d4efc0e",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 80,
+      "transparentPixels": 3271,
+      "partialAlphaPixels": 109,
+      "opaquePixels": 220,
+      "totalAlphaCoveragePixels": 276.627450980392
+    },
+    {
+      "id": "icon-colorize-black",
+      "route": "icon",
+      "colorId": "black",
+      "color": "#000000",
+      "width": 480,
+      "height": 480,
+      "filename": "icon-colorize-black.png",
+      "encodedBytes": 12800,
+      "browserRawAlphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "encodedSha256": "010e908026c2a54eb4db1362ef9933f116d292a4a5db12fdbc6e7d75a6e7a6c1",
+      "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 161,
+      "transparentPixels": 139580,
+      "partialAlphaPixels": 74234,
+      "opaquePixels": 16586,
+      "totalAlphaCoveragePixels": 52574.74509801917
+    },
+    {
+      "id": "weather-flat-sun-black",
+      "route": "weather-shape",
+      "weatherStyle": "flat",
+      "weatherCode": 0,
+      "colorId": "black",
+      "color": "#000000",
+      "width": 60,
+      "height": 60,
+      "filename": "weather-flat-sun-black.png",
+      "encodedBytes": 1014,
+      "browserRawAlphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+      "encodedSha256": "ad1d74d8b6b2274aec691d335e3fdc12bd3921c1ea3cc5084ab371544be956f9",
+      "alphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 66,
+      "transparentPixels": 2847,
+      "partialAlphaPixels": 188,
+      "opaquePixels": 565,
+      "totalAlphaCoveragePixels": 665.674509803922
+    },
+    {
+      "id": "weather-flat-snow-black",
+      "route": "weather-text",
+      "weatherStyle": "flat",
+      "weatherCode": 11,
+      "colorId": "black",
+      "color": "#000000",
+      "width": 60,
+      "height": 60,
+      "filename": "weather-flat-snow-black.png",
+      "encodedBytes": 793,
+      "browserRawAlphaSha256": "d999e9474dbf27d3c1f5185767813bb66dd3b44c97b751d88e36227d71391fea",
+      "encodedSha256": "bd1ab749bb7bb7e1b0191689e075fe79e8cc2c97dcf0d5e8664d26426fad2cc8",
+      "alphaSha256": "d999e9474dbf27d3c1f5185767813bb66dd3b44c97b751d88e36227d71391fea",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 77,
+      "transparentPixels": 3271,
+      "partialAlphaPixels": 109,
+      "opaquePixels": 220,
+      "totalAlphaCoveragePixels": 272.8509803921567
+    },
+    {
+      "id": "icon-colorize-teal",
+      "route": "icon",
+      "colorId": "teal",
+      "color": "#00a887",
+      "width": 480,
+      "height": 480,
+      "filename": "icon-colorize-teal.png",
+      "encodedBytes": 14042,
+      "browserRawAlphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "encodedSha256": "a0d5066c54511e84ca41931ac049d957fbf6b4a57866bb2e97e6beaeed58553d",
+      "alphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 161,
+      "transparentPixels": 139580,
+      "partialAlphaPixels": 74234,
+      "opaquePixels": 16586,
+      "totalAlphaCoveragePixels": 52574.74509801917
+    },
+    {
+      "id": "weather-flat-sun-teal",
+      "route": "weather-shape",
+      "weatherStyle": "flat",
+      "weatherCode": 0,
+      "colorId": "teal",
+      "color": "#00a887",
+      "width": 60,
+      "height": 60,
+      "filename": "weather-flat-sun-teal.png",
+      "encodedBytes": 1234,
+      "browserRawAlphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+      "encodedSha256": "d63f94b649cfb05bfd82face3a225855f7967affec432877e40c4bc89e23aa44",
+      "alphaSha256": "eed88d7cc196c5777f6942c73e7475612e56081a3750ab840a7c1510235eddf1",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 66,
+      "transparentPixels": 2847,
+      "partialAlphaPixels": 188,
+      "opaquePixels": 565,
+      "totalAlphaCoveragePixels": 665.674509803922
+    },
+    {
+      "id": "weather-flat-snow-teal",
+      "route": "weather-text",
+      "weatherStyle": "flat",
+      "weatherCode": 11,
+      "colorId": "teal",
+      "color": "#00a887",
+      "width": 60,
+      "height": 60,
+      "filename": "weather-flat-snow-teal.png",
+      "encodedBytes": 946,
+      "browserRawAlphaSha256": "8fd06732aae91d72be68f46f6561a726b18e582e3c2817c3b3dbed71121fafa4",
+      "encodedSha256": "831c02a581f320c2cd89b631eb4ece96606636e52916bebcfe151b839ecc4545",
+      "alphaSha256": "8fd06732aae91d72be68f46f6561a726b18e582e3c2817c3b3dbed71121fafa4",
+      "browserRawAlphaMatchesEncodedPng": true,
+      "uniqueAlphaValueCount": 78,
+      "transparentPixels": 3271,
+      "partialAlphaPixels": 109,
+      "opaquePixels": 220,
+      "totalAlphaCoveragePixels": 275.22745098039206
+    }
+  ]
+}

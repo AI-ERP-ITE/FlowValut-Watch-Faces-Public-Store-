@@ -1,0 +1,2036 @@
+{
+  "inputPath": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\fixture\\alpha-fixture.png",
+  "encodedSha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e",
+  "encodedBytes": 8710,
+  "ihdr": {
+    "width": 480,
+    "height": 480,
+    "bitDepth": 8,
+    "colorType": 6,
+    "compressionMethod": 0,
+    "filterMethod": 0,
+    "interlaceMethod": 0
+  },
+  "chunks": [
+    {
+      "type": "IHDR",
+      "length": 13
+    },
+    {
+      "type": "IDAT",
+      "length": 8653
+    },
+    {
+      "type": "IEND",
+      "length": 0
+    }
+  ],
+  "decoded": {
+    "width": 480,
+    "height": 480,
+    "pixelCount": 230400,
+    "uniqueAlphaValueCount": 161,
+    "uniqueAlphaValues": [
+      {
+        "alpha": 0,
+        "count": 139580
+      },
+      {
+        "alpha": 1,
+        "count": 64
+      },
+      {
+        "alpha": 2,
+        "count": 8
+      },
+      {
+        "alpha": 3,
+        "count": 64
+      },
+      {
+        "alpha": 4,
+        "count": 88
+      },
+      {
+        "alpha": 6,
+        "count": 72
+      },
+      {
+        "alpha": 7,
+        "count": 64
+      },
+      {
+        "alpha": 8,
+        "count": 72
+      },
+      {
+        "alpha": 10,
+        "count": 72
+      },
+      {
+        "alpha": 11,
+        "count": 64
+      },
+      {
+        "alpha": 12,
+        "count": 24
+      },
+      {
+        "alpha": 13,
+        "count": 64
+      },
+      {
+        "alpha": 14,
+        "count": 64
+      },
+      {
+        "alpha": 15,
+        "count": 64
+      },
+      {
+        "alpha": 16,
+        "count": 4
+      },
+      {
+        "alpha": 17,
+        "count": 64
+      },
+      {
+        "alpha": 18,
+        "count": 72
+      },
+      {
+        "alpha": 20,
+        "count": 72
+      },
+      {
+        "alpha": 21,
+        "count": 64
+      },
+      {
+        "alpha": 22,
+        "count": 72
+      },
+      {
+        "alpha": 24,
+        "count": 256
+      },
+      {
+        "alpha": 25,
+        "count": 64
+      },
+      {
+        "alpha": 26,
+        "count": 72
+      },
+      {
+        "alpha": 28,
+        "count": 72
+      },
+      {
+        "alpha": 29,
+        "count": 64
+      },
+      {
+        "alpha": 30,
+        "count": 8
+      },
+      {
+        "alpha": 31,
+        "count": 64
+      },
+      {
+        "alpha": 32,
+        "count": 7920
+      },
+      {
+        "alpha": 33,
+        "count": 64
+      },
+      {
+        "alpha": 34,
+        "count": 8
+      },
+      {
+        "alpha": 35,
+        "count": 64
+      },
+      {
+        "alpha": 36,
+        "count": 64
+      },
+      {
+        "alpha": 37,
+        "count": 64
+      },
+      {
+        "alpha": 38,
+        "count": 8
+      },
+      {
+        "alpha": 39,
+        "count": 64
+      },
+      {
+        "alpha": 40,
+        "count": 104
+      },
+      {
+        "alpha": 42,
+        "count": 64
+      },
+      {
+        "alpha": 43,
+        "count": 64
+      },
+      {
+        "alpha": 44,
+        "count": 64
+      },
+      {
+        "alpha": 46,
+        "count": 64
+      },
+      {
+        "alpha": 47,
+        "count": 64
+      },
+      {
+        "alpha": 48,
+        "count": 88
+      },
+      {
+        "alpha": 50,
+        "count": 64
+      },
+      {
+        "alpha": 51,
+        "count": 64
+      },
+      {
+        "alpha": 52,
+        "count": 72
+      },
+      {
+        "alpha": 54,
+        "count": 72
+      },
+      {
+        "alpha": 55,
+        "count": 64
+      },
+      {
+        "alpha": 56,
+        "count": 64
+      },
+      {
+        "alpha": 57,
+        "count": 64
+      },
+      {
+        "alpha": 59,
+        "count": 64
+      },
+      {
+        "alpha": 60,
+        "count": 80
+      },
+      {
+        "alpha": 61,
+        "count": 64
+      },
+      {
+        "alpha": 63,
+        "count": 64
+      },
+      {
+        "alpha": 64,
+        "count": 7964
+      },
+      {
+        "alpha": 65,
+        "count": 64
+      },
+      {
+        "alpha": 66,
+        "count": 16
+      },
+      {
+        "alpha": 67,
+        "count": 64
+      },
+      {
+        "alpha": 68,
+        "count": 64
+      },
+      {
+        "alpha": 69,
+        "count": 64
+      },
+      {
+        "alpha": 70,
+        "count": 64
+      },
+      {
+        "alpha": 72,
+        "count": 64
+      },
+      {
+        "alpha": 73,
+        "count": 64
+      },
+      {
+        "alpha": 74,
+        "count": 64
+      },
+      {
+        "alpha": 75,
+        "count": 64
+      },
+      {
+        "alpha": 77,
+        "count": 64
+      },
+      {
+        "alpha": 78,
+        "count": 64
+      },
+      {
+        "alpha": 79,
+        "count": 64
+      },
+      {
+        "alpha": 80,
+        "count": 64
+      },
+      {
+        "alpha": 81,
+        "count": 64
+      },
+      {
+        "alpha": 83,
+        "count": 64
+      },
+      {
+        "alpha": 84,
+        "count": 72
+      },
+      {
+        "alpha": 85,
+        "count": 64
+      },
+      {
+        "alpha": 86,
+        "count": 72
+      },
+      {
+        "alpha": 87,
+        "count": 64
+      },
+      {
+        "alpha": 88,
+        "count": 8
+      },
+      {
+        "alpha": 89,
+        "count": 64
+      },
+      {
+        "alpha": 90,
+        "count": 72
+      },
+      {
+        "alpha": 91,
+        "count": 64
+      },
+      {
+        "alpha": 92,
+        "count": 64
+      },
+      {
+        "alpha": 93,
+        "count": 64
+      },
+      {
+        "alpha": 94,
+        "count": 72
+      },
+      {
+        "alpha": 95,
+        "count": 64
+      },
+      {
+        "alpha": 96,
+        "count": 7856
+      },
+      {
+        "alpha": 97,
+        "count": 64
+      },
+      {
+        "alpha": 98,
+        "count": 64
+      },
+      {
+        "alpha": 99,
+        "count": 64
+      },
+      {
+        "alpha": 100,
+        "count": 72
+      },
+      {
+        "alpha": 101,
+        "count": 64
+      },
+      {
+        "alpha": 102,
+        "count": 64
+      },
+      {
+        "alpha": 103,
+        "count": 64
+      },
+      {
+        "alpha": 104,
+        "count": 64
+      },
+      {
+        "alpha": 105,
+        "count": 64
+      },
+      {
+        "alpha": 106,
+        "count": 64
+      },
+      {
+        "alpha": 107,
+        "count": 64
+      },
+      {
+        "alpha": 108,
+        "count": 104
+      },
+      {
+        "alpha": 109,
+        "count": 64
+      },
+      {
+        "alpha": 110,
+        "count": 72
+      },
+      {
+        "alpha": 111,
+        "count": 64
+      },
+      {
+        "alpha": 112,
+        "count": 272
+      },
+      {
+        "alpha": 113,
+        "count": 64
+      },
+      {
+        "alpha": 114,
+        "count": 64
+      },
+      {
+        "alpha": 115,
+        "count": 64
+      },
+      {
+        "alpha": 116,
+        "count": 72
+      },
+      {
+        "alpha": 117,
+        "count": 64
+      },
+      {
+        "alpha": 118,
+        "count": 64
+      },
+      {
+        "alpha": 119,
+        "count": 64
+      },
+      {
+        "alpha": 120,
+        "count": 88
+      },
+      {
+        "alpha": 121,
+        "count": 64
+      },
+      {
+        "alpha": 122,
+        "count": 72
+      },
+      {
+        "alpha": 123,
+        "count": 64
+      },
+      {
+        "alpha": 124,
+        "count": 64
+      },
+      {
+        "alpha": 125,
+        "count": 128
+      },
+      {
+        "alpha": 126,
+        "count": 92
+      },
+      {
+        "alpha": 127,
+        "count": 64
+      },
+      {
+        "alpha": 128,
+        "count": 14536
+      },
+      {
+        "alpha": 129,
+        "count": 64
+      },
+      {
+        "alpha": 130,
+        "count": 64
+      },
+      {
+        "alpha": 131,
+        "count": 128
+      },
+      {
+        "alpha": 132,
+        "count": 64
+      },
+      {
+        "alpha": 133,
+        "count": 64
+      },
+      {
+        "alpha": 134,
+        "count": 128
+      },
+      {
+        "alpha": 135,
+        "count": 64
+      },
+      {
+        "alpha": 136,
+        "count": 64
+      },
+      {
+        "alpha": 137,
+        "count": 128
+      },
+      {
+        "alpha": 138,
+        "count": 64
+      },
+      {
+        "alpha": 139,
+        "count": 128
+      },
+      {
+        "alpha": 140,
+        "count": 64
+      },
+      {
+        "alpha": 141,
+        "count": 128
+      },
+      {
+        "alpha": 142,
+        "count": 64
+      },
+      {
+        "alpha": 143,
+        "count": 148
+      },
+      {
+        "alpha": 144,
+        "count": 64
+      },
+      {
+        "alpha": 145,
+        "count": 128
+      },
+      {
+        "alpha": 146,
+        "count": 128
+      },
+      {
+        "alpha": 147,
+        "count": 128
+      },
+      {
+        "alpha": 148,
+        "count": 64
+      },
+      {
+        "alpha": 149,
+        "count": 128
+      },
+      {
+        "alpha": 150,
+        "count": 128
+      },
+      {
+        "alpha": 151,
+        "count": 192
+      },
+      {
+        "alpha": 152,
+        "count": 128
+      },
+      {
+        "alpha": 153,
+        "count": 128
+      },
+      {
+        "alpha": 154,
+        "count": 192
+      },
+      {
+        "alpha": 155,
+        "count": 200
+      },
+      {
+        "alpha": 156,
+        "count": 192
+      },
+      {
+        "alpha": 157,
+        "count": 256
+      },
+      {
+        "alpha": 158,
+        "count": 256
+      },
+      {
+        "alpha": 159,
+        "count": 456
+      },
+      {
+        "alpha": 160,
+        "count": 8416
+      },
+      {
+        "alpha": 175,
+        "count": 16
+      },
+      {
+        "alpha": 179,
+        "count": 8
+      },
+      {
+        "alpha": 183,
+        "count": 8
+      },
+      {
+        "alpha": 192,
+        "count": 7840
+      },
+      {
+        "alpha": 199,
+        "count": 8
+      },
+      {
+        "alpha": 215,
+        "count": 186
+      },
+      {
+        "alpha": 219,
+        "count": 8
+      },
+      {
+        "alpha": 224,
+        "count": 7840
+      },
+      {
+        "alpha": 227,
+        "count": 8
+      },
+      {
+        "alpha": 239,
+        "count": 8
+      },
+      {
+        "alpha": 243,
+        "count": 16
+      },
+      {
+        "alpha": 247,
+        "count": 24
+      },
+      {
+        "alpha": 251,
+        "count": 24
+      },
+      {
+        "alpha": 255,
+        "count": 16586
+      }
+    ],
+    "transparentPixels": 139580,
+    "partialAlphaPixels": 74234,
+    "opaquePixels": 16586,
+    "transparentNonzeroRgbPixels": 7984,
+    "totalAlphaCoveragePixels": 52574.74509801917,
+    "alphaCentroid": {
+      "x": 236.54454945943738,
+      "y": 203.65949236799332
+    },
+    "nonzeroAlphaBounds": {
+      "minX": 21,
+      "minY": 20,
+      "maxX": 421,
+      "maxY": 436
+    },
+    "premultiplicationIndicators": {
+      "partialRgbExceedsAlphaPixels": 61282,
+      "partialRgbWithinAlphaPixels": 12952,
+      "interpretation": "Indicators only: RGB<=alpha is compatible with premultiplied storage but is not proof."
+    }
+  },
+  "manifest": {
+    "path": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\fixture\\alpha-fixture.manifest.json",
+    "fixtureId": "spec129-rgba-alpha-v1",
+    "declaredPngSha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e",
+    "encodedHashMatches": true,
+    "sampleCount": 73,
+    "samplePassCount": 73,
+    "sampleFailCount": 0,
+    "samples": [
+      {
+        "id": "grid.white.a0",
+        "x": 40,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          0
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a32",
+        "x": 82,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          32
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a64",
+        "x": 124,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          64
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a96",
+        "x": 166,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          96
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a128",
+        "x": 208,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          128
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a160",
+        "x": 250,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          160
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a192",
+        "x": 292,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          192
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a224",
+        "x": 334,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          224
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.white.a255",
+        "x": 376,
+        "y": 33,
+        "expectedRgba": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "actualRgba": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a0",
+        "x": 40,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a32",
+        "x": 82,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          32
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a64",
+        "x": 124,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          64
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a96",
+        "x": 166,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          96
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a128",
+        "x": 208,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          128
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a160",
+        "x": 250,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          160
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a192",
+        "x": 292,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          192
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a224",
+        "x": 334,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          224
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.black.a255",
+        "x": 376,
+        "y": 62,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          255
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a0",
+        "x": 40,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          0
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a32",
+        "x": 82,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          32
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a64",
+        "x": 124,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          64
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a96",
+        "x": 166,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          96
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a128",
+        "x": 208,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          128
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a160",
+        "x": 250,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          160
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a192",
+        "x": 292,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          192
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a224",
+        "x": 334,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          224
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.red.a255",
+        "x": 376,
+        "y": 91,
+        "expectedRgba": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "actualRgba": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a0",
+        "x": 40,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          0
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a32",
+        "x": 82,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          32
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a64",
+        "x": 124,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          64
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a96",
+        "x": 166,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          96
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a128",
+        "x": 208,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          128
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a160",
+        "x": 250,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          160
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a192",
+        "x": 292,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          192
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a224",
+        "x": 334,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          224
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.green.a255",
+        "x": 376,
+        "y": 120,
+        "expectedRgba": [
+          0,
+          255,
+          0,
+          255
+        ],
+        "actualRgba": [
+          0,
+          255,
+          0,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a0",
+        "x": 40,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          0
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a32",
+        "x": 82,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          32
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a64",
+        "x": 124,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          64
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a96",
+        "x": 166,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          96
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a128",
+        "x": 208,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          128
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a160",
+        "x": 250,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          160
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a192",
+        "x": 292,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          192
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a224",
+        "x": 334,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          224
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.blue.a255",
+        "x": 376,
+        "y": 149,
+        "expectedRgba": [
+          0,
+          0,
+          255,
+          255
+        ],
+        "actualRgba": [
+          0,
+          0,
+          255,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a0",
+        "x": 40,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          0
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a32",
+        "x": 82,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          32
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a64",
+        "x": 124,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          64
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a96",
+        "x": 166,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          96
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a128",
+        "x": 208,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          128
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a160",
+        "x": 250,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          160
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a192",
+        "x": 292,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          192
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a224",
+        "x": 334,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          224
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "grid.orange.a255",
+        "x": 376,
+        "y": 178,
+        "expectedRgba": [
+          230,
+          154,
+          90,
+          255
+        ],
+        "actualRgba": [
+          230,
+          154,
+          90,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a0",
+        "x": 40,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          0
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a0",
+        "x": 40,
+        "y": 244,
+        "expectedRgba": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "actualRgba": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a32",
+        "x": 82,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          32
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a32",
+        "x": 82,
+        "y": 244,
+        "expectedRgba": [
+          32,
+          16,
+          4,
+          32
+        ],
+        "actualRgba": [
+          32,
+          16,
+          4,
+          32
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a64",
+        "x": 124,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          64
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a64",
+        "x": 124,
+        "y": 244,
+        "expectedRgba": [
+          64,
+          32,
+          8,
+          64
+        ],
+        "actualRgba": [
+          64,
+          32,
+          8,
+          64
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a96",
+        "x": 166,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          96
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a96",
+        "x": 166,
+        "y": 244,
+        "expectedRgba": [
+          96,
+          48,
+          12,
+          96
+        ],
+        "actualRgba": [
+          96,
+          48,
+          12,
+          96
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a128",
+        "x": 208,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          128
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a128",
+        "x": 208,
+        "y": 244,
+        "expectedRgba": [
+          128,
+          64,
+          16,
+          128
+        ],
+        "actualRgba": [
+          128,
+          64,
+          16,
+          128
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a160",
+        "x": 250,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          160
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a160",
+        "x": 250,
+        "y": 244,
+        "expectedRgba": [
+          160,
+          80,
+          20,
+          160
+        ],
+        "actualRgba": [
+          160,
+          80,
+          20,
+          160
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a192",
+        "x": 292,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          192
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a192",
+        "x": 292,
+        "y": 244,
+        "expectedRgba": [
+          192,
+          96,
+          24,
+          192
+        ],
+        "actualRgba": [
+          192,
+          96,
+          24,
+          192
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a224",
+        "x": 334,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          224
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a224",
+        "x": 334,
+        "y": 244,
+        "expectedRgba": [
+          224,
+          112,
+          28,
+          224
+        ],
+        "actualRgba": [
+          224,
+          112,
+          28,
+          224
+        ],
+        "pass": true
+      },
+      {
+        "id": "straight.a255",
+        "x": 376,
+        "y": 220,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          255
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "premultiplied-rgb.a255",
+        "x": 376,
+        "y": 244,
+        "expectedRgba": [
+          255,
+          128,
+          32,
+          255
+        ],
+        "actualRgba": [
+          255,
+          128,
+          32,
+          255
+        ],
+        "pass": true
+      },
+      {
+        "id": "transparent-nonzero-rgb",
+        "x": 430,
+        "y": 421,
+        "expectedRgba": [
+          255,
+          0,
+          255,
+          0
+        ],
+        "actualRgba": [
+          255,
+          0,
+          255,
+          0
+        ],
+        "pass": true
+      }
+    ]
+  },
+  "composites": {
+    "black": {
+      "decodedRgbaSha256": "58066cff806a5bce05fb24054af09cde641ba898848e4e3e3351d17389eedd7d"
+    },
+    "white": {
+      "decodedRgbaSha256": "c90f9a5378400a0771065c4fc47512c5c992bbcef317a9965331b3f704d8cf5a"
+    },
+    "checker": {
+      "decodedRgbaSha256": "a83075e2644bbb1d34f5941202545c6618c4ff7174c42d6513bf25f39a4be789"
+    }
+  }
+}

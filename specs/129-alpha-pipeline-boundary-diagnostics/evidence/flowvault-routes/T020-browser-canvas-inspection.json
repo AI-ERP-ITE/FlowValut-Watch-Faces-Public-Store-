@@ -1,0 +1,728 @@
+{
+  "inputPath": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\flowvault-routes\\T020-browser-canvas-roundtrip.png",
+  "encodedSha256": "59e0b820fd30a75edf565ea146e427d330e52a4951812e4d981934f92470b54e",
+  "encodedBytes": 13523,
+  "ihdr": {
+    "width": 480,
+    "height": 480,
+    "bitDepth": 8,
+    "colorType": 6,
+    "compressionMethod": 0,
+    "filterMethod": 0,
+    "interlaceMethod": 0
+  },
+  "chunks": [
+    {
+      "type": "IHDR",
+      "length": 13
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 1124
+    },
+    {
+      "type": "IDAT",
+      "length": 6
+    },
+    {
+      "type": "IEND",
+      "length": 0
+    }
+  ],
+  "decoded": {
+    "width": 480,
+    "height": 480,
+    "pixelCount": 230400,
+    "uniqueAlphaValueCount": 161,
+    "uniqueAlphaValues": [
+      {
+        "alpha": 0,
+        "count": 139580
+      },
+      {
+        "alpha": 1,
+        "count": 64
+      },
+      {
+        "alpha": 2,
+        "count": 8
+      },
+      {
+        "alpha": 3,
+        "count": 64
+      },
+      {
+        "alpha": 4,
+        "count": 88
+      },
+      {
+        "alpha": 6,
+        "count": 72
+      },
+      {
+        "alpha": 7,
+        "count": 64
+      },
+      {
+        "alpha": 8,
+        "count": 72
+      },
+      {
+        "alpha": 10,
+        "count": 72
+      },
+      {
+        "alpha": 11,
+        "count": 64
+      },
+      {
+        "alpha": 12,
+        "count": 24
+      },
+      {
+        "alpha": 13,
+        "count": 64
+      },
+      {
+        "alpha": 14,
+        "count": 64
+      },
+      {
+        "alpha": 15,
+        "count": 64
+      },
+      {
+        "alpha": 16,
+        "count": 4
+      },
+      {
+        "alpha": 17,
+        "count": 64
+      },
+      {
+        "alpha": 18,
+        "count": 72
+      },
+      {
+        "alpha": 20,
+        "count": 72
+      },
+      {
+        "alpha": 21,
+        "count": 64
+      },
+      {
+        "alpha": 22,
+        "count": 72
+      },
+      {
+        "alpha": 24,
+        "count": 256
+      },
+      {
+        "alpha": 25,
+        "count": 64
+      },
+      {
+        "alpha": 26,
+        "count": 72
+      },
+      {
+        "alpha": 28,
+        "count": 72
+      },
+      {
+        "alpha": 29,
+        "count": 64
+      },
+      {
+        "alpha": 30,
+        "count": 8
+      },
+      {
+        "alpha": 31,
+        "count": 64
+      },
+      {
+        "alpha": 32,
+        "count": 7920
+      },
+      {
+        "alpha": 33,
+        "count": 64
+      },
+      {
+        "alpha": 34,
+        "count": 8
+      },
+      {
+        "alpha": 35,
+        "count": 64
+      },
+      {
+        "alpha": 36,
+        "count": 64
+      },
+      {
+        "alpha": 37,
+        "count": 64
+      },
+      {
+        "alpha": 38,
+        "count": 8
+      },
+      {
+        "alpha": 39,
+        "count": 64
+      },
+      {
+        "alpha": 40,
+        "count": 104
+      },
+      {
+        "alpha": 42,
+        "count": 64
+      },
+      {
+        "alpha": 43,
+        "count": 64
+      },
+      {
+        "alpha": 44,
+        "count": 64
+      },
+      {
+        "alpha": 46,
+        "count": 64
+      },
+      {
+        "alpha": 47,
+        "count": 64
+      },
+      {
+        "alpha": 48,
+        "count": 88
+      },
+      {
+        "alpha": 50,
+        "count": 64
+      },
+      {
+        "alpha": 51,
+        "count": 64
+      },
+      {
+        "alpha": 52,
+        "count": 72
+      },
+      {
+        "alpha": 54,
+        "count": 72
+      },
+      {
+        "alpha": 55,
+        "count": 64
+      },
+      {
+        "alpha": 56,
+        "count": 64
+      },
+      {
+        "alpha": 57,
+        "count": 64
+      },
+      {
+        "alpha": 59,
+        "count": 64
+      },
+      {
+        "alpha": 60,
+        "count": 80
+      },
+      {
+        "alpha": 61,
+        "count": 64
+      },
+      {
+        "alpha": 63,
+        "count": 64
+      },
+      {
+        "alpha": 64,
+        "count": 7964
+      },
+      {
+        "alpha": 65,
+        "count": 64
+      },
+      {
+        "alpha": 66,
+        "count": 16
+      },
+      {
+        "alpha": 67,
+        "count": 64
+      },
+      {
+        "alpha": 68,
+        "count": 64
+      },
+      {
+        "alpha": 69,
+        "count": 64
+      },
+      {
+        "alpha": 70,
+        "count": 64
+      },
+      {
+        "alpha": 72,
+        "count": 64
+      },
+      {
+        "alpha": 73,
+        "count": 64
+      },
+      {
+        "alpha": 74,
+        "count": 64
+      },
+      {
+        "alpha": 75,
+        "count": 64
+      },
+      {
+        "alpha": 77,
+        "count": 64
+      },
+      {
+        "alpha": 78,
+        "count": 64
+      },
+      {
+        "alpha": 79,
+        "count": 64
+      },
+      {
+        "alpha": 80,
+        "count": 64
+      },
+      {
+        "alpha": 81,
+        "count": 64
+      },
+      {
+        "alpha": 83,
+        "count": 64
+      },
+      {
+        "alpha": 84,
+        "count": 72
+      },
+      {
+        "alpha": 85,
+        "count": 64
+      },
+      {
+        "alpha": 86,
+        "count": 72
+      },
+      {
+        "alpha": 87,
+        "count": 64
+      },
+      {
+        "alpha": 88,
+        "count": 8
+      },
+      {
+        "alpha": 89,
+        "count": 64
+      },
+      {
+        "alpha": 90,
+        "count": 72
+      },
+      {
+        "alpha": 91,
+        "count": 64
+      },
+      {
+        "alpha": 92,
+        "count": 64
+      },
+      {
+        "alpha": 93,
+        "count": 64
+      },
+      {
+        "alpha": 94,
+        "count": 72
+      },
+      {
+        "alpha": 95,
+        "count": 64
+      },
+      {
+        "alpha": 96,
+        "count": 7856
+      },
+      {
+        "alpha": 97,
+        "count": 64
+      },
+      {
+        "alpha": 98,
+        "count": 64
+      },
+      {
+        "alpha": 99,
+        "count": 64
+      },
+      {
+        "alpha": 100,
+        "count": 72
+      },
+      {
+        "alpha": 101,
+        "count": 64
+      },
+      {
+        "alpha": 102,
+        "count": 64
+      },
+      {
+        "alpha": 103,
+        "count": 64
+      },
+      {
+        "alpha": 104,
+        "count": 64
+      },
+      {
+        "alpha": 105,
+        "count": 64
+      },
+      {
+        "alpha": 106,
+        "count": 64
+      },
+      {
+        "alpha": 107,
+        "count": 64
+      },
+      {
+        "alpha": 108,
+        "count": 104
+      },
+      {
+        "alpha": 109,
+        "count": 64
+      },
+      {
+        "alpha": 110,
+        "count": 72
+      },
+      {
+        "alpha": 111,
+        "count": 64
+      },
+      {
+        "alpha": 112,
+        "count": 272
+      },
+      {
+        "alpha": 113,
+        "count": 64
+      },
+      {
+        "alpha": 114,
+        "count": 64
+      },
+      {
+        "alpha": 115,
+        "count": 64
+      },
+      {
+        "alpha": 116,
+        "count": 72
+      },
+      {
+        "alpha": 117,
+        "count": 64
+      },
+      {
+        "alpha": 118,
+        "count": 64
+      },
+      {
+        "alpha": 119,
+        "count": 64
+      },
+      {
+        "alpha": 120,
+        "count": 88
+      },
+      {
+        "alpha": 121,
+        "count": 64
+      },
+      {
+        "alpha": 122,
+        "count": 72
+      },
+      {
+        "alpha": 123,
+        "count": 64
+      },
+      {
+        "alpha": 124,
+        "count": 64
+      },
+      {
+        "alpha": 125,
+        "count": 128
+      },
+      {
+        "alpha": 126,
+        "count": 92
+      },
+      {
+        "alpha": 127,
+        "count": 64
+      },
+      {
+        "alpha": 128,
+        "count": 14536
+      },
+      {
+        "alpha": 129,
+        "count": 64
+      },
+      {
+        "alpha": 130,
+        "count": 64
+      },
+      {
+        "alpha": 131,
+        "count": 128
+      },
+      {
+        "alpha": 132,
+        "count": 64
+      },
+      {
+        "alpha": 133,
+        "count": 64
+      },
+      {
+        "alpha": 134,
+        "count": 128
+      },
+      {
+        "alpha": 135,
+        "count": 64
+      },
+      {
+        "alpha": 136,
+        "count": 64
+      },
+      {
+        "alpha": 137,
+        "count": 128
+      },
+      {
+        "alpha": 138,
+        "count": 64
+      },
+      {
+        "alpha": 139,
+        "count": 128
+      },
+      {
+        "alpha": 140,
+        "count": 64
+      },
+      {
+        "alpha": 141,
+        "count": 128
+      },
+      {
+        "alpha": 142,
+        "count": 64
+      },
+      {
+        "alpha": 143,
+        "count": 148
+      },
+      {
+        "alpha": 144,
+        "count": 64
+      },
+      {
+        "alpha": 145,
+        "count": 128
+      },
+      {
+        "alpha": 146,
+        "count": 128
+      },
+      {
+        "alpha": 147,
+        "count": 128
+      },
+      {
+        "alpha": 148,
+        "count": 64
+      },
+      {
+        "alpha": 149,
+        "count": 128
+      },
+      {
+        "alpha": 150,
+        "count": 128
+      },
+      {
+        "alpha": 151,
+        "count": 192
+      },
+      {
+        "alpha": 152,
+        "count": 128
+      },
+      {
+        "alpha": 153,
+        "count": 128
+      },
+      {
+        "alpha": 154,
+        "count": 192
+      },
+      {
+        "alpha": 155,
+        "count": 200
+      },
+      {
+        "alpha": 156,
+        "count": 192
+      },
+      {
+        "alpha": 157,
+        "count": 256
+      },
+      {
+        "alpha": 158,
+        "count": 256
+      },
+      {
+        "alpha": 159,
+        "count": 456
+      },
+      {
+        "alpha": 160,
+        "count": 8416
+      },
+      {
+        "alpha": 175,
+        "count": 16
+      },
+      {
+        "alpha": 179,
+        "count": 8
+      },
+      {
+        "alpha": 183,
+        "count": 8
+      },
+      {
+        "alpha": 192,
+        "count": 7840
+      },
+      {
+        "alpha": 199,
+        "count": 8
+      },
+      {
+        "alpha": 215,
+        "count": 186
+      },
+      {
+        "alpha": 219,
+        "count": 8
+      },
+      {
+        "alpha": 224,
+        "count": 7840
+      },
+      {
+        "alpha": 227,
+        "count": 8
+      },
+      {
+        "alpha": 239,
+        "count": 8
+      },
+      {
+        "alpha": 243,
+        "count": 16
+      },
+      {
+        "alpha": 247,
+        "count": 24
+      },
+      {
+        "alpha": 251,
+        "count": 24
+      },
+      {
+        "alpha": 255,
+        "count": 16586
+      }
+    ],
+    "transparentPixels": 139580,
+    "partialAlphaPixels": 74234,
+    "opaquePixels": 16586,
+    "transparentNonzeroRgbPixels": 0,
+    "totalAlphaCoveragePixels": 52574.74509801917,
+    "alphaCentroid": {
+      "x": 236.54454945943738,
+      "y": 203.65949236799332
+    },
+    "nonzeroAlphaBounds": {
+      "minX": 21,
+      "minY": 20,
+      "maxX": 421,
+      "maxY": 436
+    },
+    "premultiplicationIndicators": {
+      "partialRgbExceedsAlphaPixels": 62082,
+      "partialRgbWithinAlphaPixels": 12152,
+      "interpretation": "Indicators only: RGB<=alpha is compatible with premultiplied storage but is not proof."
+    }
+  },
+  "manifest": null,
+  "composites": {
+    "black": {
+      "decodedRgbaSha256": "58066cff806a5bce05fb24054af09cde641ba898848e4e3e3351d17389eedd7d"
+    },
+    "white": {
+      "decodedRgbaSha256": "c90f9a5378400a0771065c4fc47512c5c992bbcef317a9965331b3f704d8cf5a"
+    },
+    "checker": {
+      "decodedRgbaSha256": "558a47d395f0369cc2d2b19eaa010d276f09867716d993249f91d0d31b6a6321"
+    }
+  }
+}

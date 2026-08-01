@@ -1,0 +1,7 @@
+{
+  "name": "spec129-official-zepp-tool-env",
+  "private": true,
+  "_moduleAliases": {
+    "zeppos-app-utils": "node_modules/zeppos-app-utils"
+  }
+}

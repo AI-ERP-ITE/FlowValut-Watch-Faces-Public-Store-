@@ -1,0 +1,997 @@
+{
+  "task": "T043",
+  "testOnly": true,
+  "decoder": "Measured Zepp SOMH 8-bit indexed RGBA format: 64-byte header + 256×RGBA palette + indices",
+  "packages": [
+    {
+      "id": "P9",
+      "compiledAsset": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/official-zepp/extracted/P9/device/assets/alpha-fixture.png",
+      "compiledEncodedBytes": 231488,
+      "compiledEncodedSha256": "a8c5f42a07ef8f88db6c52700e6d526336eab51bec2d4d85a29042a3cb288382",
+      "format": {
+        "magic": "SOMH",
+        "width": 480,
+        "height": 480,
+        "bitsPerPixel": 8,
+        "paletteEntries": 256
+      },
+      "decodedComparison": {
+        "orientation": "normal",
+        "orientationScores": [
+          {
+            "orientation": "normal",
+            "sampledAbsoluteError": 308757
+          },
+          {
+            "orientation": "flipX",
+            "sampledAbsoluteError": 747942
+          },
+          {
+            "orientation": "flipX+flipY",
+            "sampledAbsoluteError": 1089930
+          },
+          {
+            "orientation": "flipY",
+            "sampledAbsoluteError": 1119802
+          }
+        ],
+        "mismatchedPixels": 86324,
+        "mismatchedAlphaPixels": 11163,
+        "maxChannelDelta": 255,
+        "maxChannelDeltaPerChannel": [
+          255,
+          255,
+          255,
+          97
+        ],
+        "meanAbsoluteChannelError": [
+          34.29800347222222,
+          27.9919140625,
+          26.8986328125,
+          0.16539496527777778
+        ]
+      },
+      "alpha": {
+        "referenceUniqueValues": [
+          {
+            "alpha": 0,
+            "count": 139580
+          },
+          {
+            "alpha": 1,
+            "count": 64
+          },
+          {
+            "alpha": 2,
+            "count": 8
+          },
+          {
+            "alpha": 3,
+            "count": 64
+          },
+          {
+            "alpha": 4,
+            "count": 88
+          },
+          {
+            "alpha": 6,
+            "count": 72
+          },
+          {
+            "alpha": 7,
+            "count": 64
+          },
+          {
+            "alpha": 8,
+            "count": 72
+          },
+          {
+            "alpha": 10,
+            "count": 72
+          },
+          {
+            "alpha": 11,
+            "count": 64
+          },
+          {
+            "alpha": 12,
+            "count": 24
+          },
+          {
+            "alpha": 13,
+            "count": 64
+          },
+          {
+            "alpha": 14,
+            "count": 64
+          },
+          {
+            "alpha": 15,
+            "count": 64
+          },
+          {
+            "alpha": 16,
+            "count": 4
+          },
+          {
+            "alpha": 17,
+            "count": 64
+          },
+          {
+            "alpha": 18,
+            "count": 72
+          },
+          {
+            "alpha": 20,
+            "count": 72
+          },
+          {
+            "alpha": 21,
+            "count": 64
+          },
+          {
+            "alpha": 22,
+            "count": 72
+          },
+          {
+            "alpha": 24,
+            "count": 256
+          },
+          {
+            "alpha": 25,
+            "count": 64
+          },
+          {
+            "alpha": 26,
+            "count": 72
+          },
+          {
+            "alpha": 28,
+            "count": 72
+          },
+          {
+            "alpha": 29,
+            "count": 64
+          },
+          {
+            "alpha": 30,
+            "count": 8
+          },
+          {
+            "alpha": 31,
+            "count": 64
+          },
+          {
+            "alpha": 32,
+            "count": 7920
+          },
+          {
+            "alpha": 33,
+            "count": 64
+          },
+          {
+            "alpha": 34,
+            "count": 8
+          },
+          {
+            "alpha": 35,
+            "count": 64
+          },
+          {
+            "alpha": 36,
+            "count": 64
+          },
+          {
+            "alpha": 37,
+            "count": 64
+          },
+          {
+            "alpha": 38,
+            "count": 8
+          },
+          {
+            "alpha": 39,
+            "count": 64
+          },
+          {
+            "alpha": 40,
+            "count": 104
+          },
+          {
+            "alpha": 42,
+            "count": 64
+          },
+          {
+            "alpha": 43,
+            "count": 64
+          },
+          {
+            "alpha": 44,
+            "count": 64
+          },
+          {
+            "alpha": 46,
+            "count": 64
+          },
+          {
+            "alpha": 47,
+            "count": 64
+          },
+          {
+            "alpha": 48,
+            "count": 88
+          },
+          {
+            "alpha": 50,
+            "count": 64
+          },
+          {
+            "alpha": 51,
+            "count": 64
+          },
+          {
+            "alpha": 52,
+            "count": 72
+          },
+          {
+            "alpha": 54,
+            "count": 72
+          },
+          {
+            "alpha": 55,
+            "count": 64
+          },
+          {
+            "alpha": 56,
+            "count": 64
+          },
+          {
+            "alpha": 57,
+            "count": 64
+          },
+          {
+            "alpha": 59,
+            "count": 64
+          },
+          {
+            "alpha": 60,
+            "count": 80
+          },
+          {
+            "alpha": 61,
+            "count": 64
+          },
+          {
+            "alpha": 63,
+            "count": 64
+          },
+          {
+            "alpha": 64,
+            "count": 7964
+          },
+          {
+            "alpha": 65,
+            "count": 64
+          },
+          {
+            "alpha": 66,
+            "count": 16
+          },
+          {
+            "alpha": 67,
+            "count": 64
+          },
+          {
+            "alpha": 68,
+            "count": 64
+          },
+          {
+            "alpha": 69,
+            "count": 64
+          },
+          {
+            "alpha": 70,
+            "count": 64
+          },
+          {
+            "alpha": 72,
+            "count": 64
+          },
+          {
+            "alpha": 73,
+            "count": 64
+          },
+          {
+            "alpha": 74,
+            "count": 64
+          },
+          {
+            "alpha": 75,
+            "count": 64
+          },
+          {
+            "alpha": 77,
+            "count": 64
+          },
+          {
+            "alpha": 78,
+            "count": 64
+          },
+          {
+            "alpha": 79,
+            "count": 64
+          },
+          {
+            "alpha": 80,
+            "count": 64
+          },
+          {
+            "alpha": 81,
+            "count": 64
+          },
+          {
+            "alpha": 83,
+            "count": 64
+          },
+          {
+            "alpha": 84,
+            "count": 72
+          },
+          {
+            "alpha": 85,
+            "count": 64
+          },
+          {
+            "alpha": 86,
+            "count": 72
+          },
+          {
+            "alpha": 87,
+            "count": 64
+          },
+          {
+            "alpha": 88,
+            "count": 8
+          },
+          {
+            "alpha": 89,
+            "count": 64
+          },
+          {
+            "alpha": 90,
+            "count": 72
+          },
+          {
+            "alpha": 91,
+            "count": 64
+          },
+          {
+            "alpha": 92,
+            "count": 64
+          },
+          {
+            "alpha": 93,
+            "count": 64
+          },
+          {
+            "alpha": 94,
+            "count": 72
+          },
+          {
+            "alpha": 95,
+            "count": 64
+          },
+          {
+            "alpha": 96,
+            "count": 7856
+          },
+          {
+            "alpha": 97,
+            "count": 64
+          },
+          {
+            "alpha": 98,
+            "count": 64
+          },
+          {
+            "alpha": 99,
+            "count": 64
+          },
+          {
+            "alpha": 100,
+            "count": 72
+          },
+          {
+            "alpha": 101,
+            "count": 64
+          },
+          {
+            "alpha": 102,
+            "count": 64
+          },
+          {
+            "alpha": 103,
+            "count": 64
+          },
+          {
+            "alpha": 104,
+            "count": 64
+          },
+          {
+            "alpha": 105,
+            "count": 64
+          },
+          {
+            "alpha": 106,
+            "count": 64
+          },
+          {
+            "alpha": 107,
+            "count": 64
+          },
+          {
+            "alpha": 108,
+            "count": 104
+          },
+          {
+            "alpha": 109,
+            "count": 64
+          },
+          {
+            "alpha": 110,
+            "count": 72
+          },
+          {
+            "alpha": 111,
+            "count": 64
+          },
+          {
+            "alpha": 112,
+            "count": 272
+          },
+          {
+            "alpha": 113,
+            "count": 64
+          },
+          {
+            "alpha": 114,
+            "count": 64
+          },
+          {
+            "alpha": 115,
+            "count": 64
+          },
+          {
+            "alpha": 116,
+            "count": 72
+          },
+          {
+            "alpha": 117,
+            "count": 64
+          },
+          {
+            "alpha": 118,
+            "count": 64
+          },
+          {
+            "alpha": 119,
+            "count": 64
+          },
+          {
+            "alpha": 120,
+            "count": 88
+          },
+          {
+            "alpha": 121,
+            "count": 64
+          },
+          {
+            "alpha": 122,
+            "count": 72
+          },
+          {
+            "alpha": 123,
+            "count": 64
+          },
+          {
+            "alpha": 124,
+            "count": 64
+          },
+          {
+            "alpha": 125,
+            "count": 128
+          },
+          {
+            "alpha": 126,
+            "count": 92
+          },
+          {
+            "alpha": 127,
+            "count": 64
+          },
+          {
+            "alpha": 128,
+            "count": 14536
+          },
+          {
+            "alpha": 129,
+            "count": 64
+          },
+          {
+            "alpha": 130,
+            "count": 64
+          },
+          {
+            "alpha": 131,
+            "count": 128
+          },
+          {
+            "alpha": 132,
+            "count": 64
+          },
+          {
+            "alpha": 133,
+            "count": 64
+          },
+          {
+            "alpha": 134,
+            "count": 128
+          },
+          {
+            "alpha": 135,
+            "count": 64
+          },
+          {
+            "alpha": 136,
+            "count": 64
+          },
+          {
+            "alpha": 137,
+            "count": 128
+          },
+          {
+            "alpha": 138,
+            "count": 64
+          },
+          {
+            "alpha": 139,
+            "count": 128
+          },
+          {
+            "alpha": 140,
+            "count": 64
+          },
+          {
+            "alpha": 141,
+            "count": 128
+          },
+          {
+            "alpha": 142,
+            "count": 64
+          },
+          {
+            "alpha": 143,
+            "count": 148
+          },
+          {
+            "alpha": 144,
+            "count": 64
+          },
+          {
+            "alpha": 145,
+            "count": 128
+          },
+          {
+            "alpha": 146,
+            "count": 128
+          },
+          {
+            "alpha": 147,
+            "count": 128
+          },
+          {
+            "alpha": 148,
+            "count": 64
+          },
+          {
+            "alpha": 149,
+            "count": 128
+          },
+          {
+            "alpha": 150,
+            "count": 128
+          },
+          {
+            "alpha": 151,
+            "count": 192
+          },
+          {
+            "alpha": 152,
+            "count": 128
+          },
+          {
+            "alpha": 153,
+            "count": 128
+          },
+          {
+            "alpha": 154,
+            "count": 192
+          },
+          {
+            "alpha": 155,
+            "count": 200
+          },
+          {
+            "alpha": 156,
+            "count": 192
+          },
+          {
+            "alpha": 157,
+            "count": 256
+          },
+          {
+            "alpha": 158,
+            "count": 256
+          },
+          {
+            "alpha": 159,
+            "count": 456
+          },
+          {
+            "alpha": 160,
+            "count": 8416
+          },
+          {
+            "alpha": 175,
+            "count": 16
+          },
+          {
+            "alpha": 179,
+            "count": 8
+          },
+          {
+            "alpha": 183,
+            "count": 8
+          },
+          {
+            "alpha": 192,
+            "count": 7840
+          },
+          {
+            "alpha": 199,
+            "count": 8
+          },
+          {
+            "alpha": 215,
+            "count": 186
+          },
+          {
+            "alpha": 219,
+            "count": 8
+          },
+          {
+            "alpha": 224,
+            "count": 7840
+          },
+          {
+            "alpha": 227,
+            "count": 8
+          },
+          {
+            "alpha": 239,
+            "count": 8
+          },
+          {
+            "alpha": 243,
+            "count": 16
+          },
+          {
+            "alpha": 247,
+            "count": 24
+          },
+          {
+            "alpha": 251,
+            "count": 24
+          },
+          {
+            "alpha": 255,
+            "count": 16586
+          }
+        ],
+        "compiledUniqueValues": [
+          {
+            "alpha": 0,
+            "count": 139643
+          },
+          {
+            "alpha": 7,
+            "count": 580
+          },
+          {
+            "alpha": 20,
+            "count": 609
+          },
+          {
+            "alpha": 24,
+            "count": 173
+          },
+          {
+            "alpha": 30,
+            "count": 1086
+          },
+          {
+            "alpha": 32,
+            "count": 7381
+          },
+          {
+            "alpha": 43,
+            "count": 546
+          },
+          {
+            "alpha": 46,
+            "count": 46
+          },
+          {
+            "alpha": 52,
+            "count": 9
+          },
+          {
+            "alpha": 55,
+            "count": 540
+          },
+          {
+            "alpha": 64,
+            "count": 8235
+          },
+          {
+            "alpha": 68,
+            "count": 475
+          },
+          {
+            "alpha": 82,
+            "count": 737
+          },
+          {
+            "alpha": 95,
+            "count": 437
+          },
+          {
+            "alpha": 96,
+            "count": 8146
+          },
+          {
+            "alpha": 106,
+            "count": 637
+          },
+          {
+            "alpha": 110,
+            "count": 212
+          },
+          {
+            "alpha": 112,
+            "count": 21
+          },
+          {
+            "alpha": 115,
+            "count": 602
+          },
+          {
+            "alpha": 124,
+            "count": 471
+          },
+          {
+            "alpha": 128,
+            "count": 14941
+          },
+          {
+            "alpha": 135,
+            "count": 512
+          },
+          {
+            "alpha": 140,
+            "count": 384
+          },
+          {
+            "alpha": 144,
+            "count": 384
+          },
+          {
+            "alpha": 145,
+            "count": 16
+          },
+          {
+            "alpha": 147,
+            "count": 320
+          },
+          {
+            "alpha": 151,
+            "count": 585
+          },
+          {
+            "alpha": 154,
+            "count": 320
+          },
+          {
+            "alpha": 156,
+            "count": 640
+          },
+          {
+            "alpha": 159,
+            "count": 704
+          },
+          {
+            "alpha": 160,
+            "count": 8424
+          },
+          {
+            "alpha": 173,
+            "count": 16
+          },
+          {
+            "alpha": 179,
+            "count": 14
+          },
+          {
+            "alpha": 192,
+            "count": 7850
+          },
+          {
+            "alpha": 210,
+            "count": 8
+          },
+          {
+            "alpha": 217,
+            "count": 16
+          },
+          {
+            "alpha": 224,
+            "count": 7848
+          },
+          {
+            "alpha": 235,
+            "count": 31
+          },
+          {
+            "alpha": 240,
+            "count": 427
+          },
+          {
+            "alpha": 245,
+            "count": 105
+          },
+          {
+            "alpha": 255,
+            "count": 16269
+          }
+        ],
+        "coverageDelta": -2.443137253372697,
+        "centroidDelta": {
+          "x": 0.004748661312731883,
+          "y": 0.025833469434644485
+        },
+        "boundsEqual": true
+      },
+      "compositeHashes": {
+        "black": {
+          "referenceSha256": "58066cff806a5bce05fb24054af09cde641ba898848e4e3e3351d17389eedd7d",
+          "compiledSha256": "a9f3837fa26e6d9131cbc6ae28f8082efe9cf37e9ec8d9a3480f5ce324055e0d",
+          "exact": false,
+          "mismatchedPixels": 78340,
+          "maxChannelDelta": 83,
+          "meanAbsoluteChannelError": 7.149866536458333
+        },
+        "white": {
+          "referenceSha256": "c90f9a5378400a0771065c4fc47512c5c992bbcef317a9965331b3f704d8cf5a",
+          "compiledSha256": "3cc78a3b149e448d7cc36d84eff467e4724d4084081aed089e1dd918872c4f8e",
+          "exact": false,
+          "mismatchedPixels": 78277,
+          "maxChannelDelta": 77,
+          "meanAbsoluteChannelError": 7.145891927083333
+        },
+        "checker": {
+          "referenceSha256": "a83075e2644bbb1d34f5941202545c6618c4ff7174c42d6513bf25f39a4be789",
+          "compiledSha256": "18dae1d1796da5d3695e48df6913f9cd07b5824e8aa7dcfbd00c30b02cde66c2",
+          "exact": false,
+          "mismatchedPixels": 78309,
+          "maxChannelDelta": 68,
+          "meanAbsoluteChannelError": 7.139840494791667
+        }
+      }
+    },
+    {
+      "id": "P10",
+      "compiledAsset": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/official-zepp/extracted/P10/device/assets/alpha-fixture-opaque.png",
+      "compiledEncodedBytes": 231488,
+      "compiledEncodedSha256": "93e16641341c1e99f0d7017c59c5a04fdc39e2b30ba013cacfb79f108ca59089",
+      "format": {
+        "magic": "SOMH",
+        "width": 480,
+        "height": 480,
+        "bitsPerPixel": 8,
+        "paletteEntries": 256
+      },
+      "decodedComparison": {
+        "orientation": "normal",
+        "orientationScores": [
+          {
+            "orientation": "normal",
+            "sampledAbsoluteError": 735
+          },
+          {
+            "orientation": "flipX",
+            "sampledAbsoluteError": 439679
+          },
+          {
+            "orientation": "flipY",
+            "sampledAbsoluteError": 1044343
+          },
+          {
+            "orientation": "flipX+flipY",
+            "sampledAbsoluteError": 1102450
+          }
+        ],
+        "mismatchedPixels": 30723,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 2,
+        "maxChannelDeltaPerChannel": [
+          2,
+          1,
+          1,
+          0
+        ],
+        "meanAbsoluteChannelError": [
+          0.09255208333333333,
+          0.08820746527777777,
+          0.041666666666666664,
+          0
+        ]
+      },
+      "alpha": {
+        "referenceUniqueValues": [
+          {
+            "alpha": 255,
+            "count": 230400
+          }
+        ],
+        "compiledUniqueValues": [
+          {
+            "alpha": 255,
+            "count": 230400
+          }
+        ],
+        "coverageDelta": 0,
+        "centroidDelta": {
+          "x": 0,
+          "y": 0
+        },
+        "boundsEqual": true
+      },
+      "compositeHashes": {
+        "black": {
+          "referenceSha256": "7fa807857e5e2570f6da2bb222bc9411faaa45a8a62b26b7a297475afe525a7f",
+          "compiledSha256": "0dd68f3d808660125deda4eb4361038167bbba8e10198dfe1ba737e783bf8a5d",
+          "exact": false,
+          "mismatchedPixels": 30723,
+          "maxChannelDelta": 2,
+          "meanAbsoluteChannelError": 0.055606553819444446
+        },
+        "white": {
+          "referenceSha256": "7fa807857e5e2570f6da2bb222bc9411faaa45a8a62b26b7a297475afe525a7f",
+          "compiledSha256": "0dd68f3d808660125deda4eb4361038167bbba8e10198dfe1ba737e783bf8a5d",
+          "exact": false,
+          "mismatchedPixels": 30723,
+          "maxChannelDelta": 2,
+          "meanAbsoluteChannelError": 0.055606553819444446
+        },
+        "checker": {
+          "referenceSha256": "7fa807857e5e2570f6da2bb222bc9411faaa45a8a62b26b7a297475afe525a7f",
+          "compiledSha256": "0dd68f3d808660125deda4eb4361038167bbba8e10198dfe1ba737e783bf8a5d",
+          "exact": false,
+          "mismatchedPixels": 30723,
+          "maxChannelDelta": 2,
+          "meanAbsoluteChannelError": 0.055606553819444446
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,3366 @@
+{
+  "executable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "browserStderr": "",
+  "outputs": [
+    {
+      "id": "digit-0-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-0-h21-natural-orange.png",
+      "encodedBytes": 338,
+      "browserRawAlphaSha256": "fe0918057c077c5c4be53a199fae469bf3506a74cd419b0b25212172cbe79e70"
+    },
+    {
+      "id": "digit-1-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 7,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 60,
+          "top": 24,
+          "right": 66,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-1-h21-natural-orange.png",
+      "encodedBytes": 224,
+      "browserRawAlphaSha256": "ba308f0810c4cdeb3d7ef36c8b52138d9f03c4ec474a9aba7dfc02bbad44dafa"
+    },
+    {
+      "id": "digit-2-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-2-h21-natural-orange.png",
+      "encodedBytes": 337,
+      "browserRawAlphaSha256": "583d99eea7ffe48dd3c8fbe77b2458d50208d20281d98ea32aeec503dc926805"
+    },
+    {
+      "id": "digit-3-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-3-h21-natural-orange.png",
+      "encodedBytes": 363,
+      "browserRawAlphaSha256": "0345c1ae1762bfe37bb7b7c65fa5c82288249cfe33cee374c273ced73ffef4a2"
+    },
+    {
+      "id": "digit-4-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-4-h21-natural-orange.png",
+      "encodedBytes": 297,
+      "browserRawAlphaSha256": "7cdb460e18eba4763f7d74aba2645bdf7ef15721b7d40f80b5923790ac74f7e4"
+    },
+    {
+      "id": "digit-5-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-5-h21-natural-orange.png",
+      "encodedBytes": 374,
+      "browserRawAlphaSha256": "06b8bd4f04f67468fb1e5ed1230423ad35886e397f3e3fc08839f1d398ef5a5c"
+    },
+    {
+      "id": "digit-6-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-6-h21-natural-orange.png",
+      "encodedBytes": 374,
+      "browserRawAlphaSha256": "656a49c07bdb7f293227501d91c2ae9584a6ab0df9193697b3042acfc64f0397"
+    },
+    {
+      "id": "digit-7-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-7-h21-natural-orange.png",
+      "encodedBytes": 332,
+      "browserRawAlphaSha256": "629a42edfc56773bafbfb3b5a9551941d2a54bea44cbd29c38ace7388e48d32b"
+    },
+    {
+      "id": "digit-8-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-8-h21-natural-orange.png",
+      "encodedBytes": 384,
+      "browserRawAlphaSha256": "9c654c2060563583910964c16d02dc3f661b9f114c6cac6bd7a10a3e744de6dd"
+    },
+    {
+      "id": "digit-9-h21-natural-orange",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-9-h21-natural-orange.png",
+      "encodedBytes": 366,
+      "browserRawAlphaSha256": "b9274ee450f10e9e151e6f61b016ded170fec5ce8ba9d3b3ebf4e8b592c99338"
+    },
+    {
+      "id": "digit-0-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-0-h21-natural-black.png",
+      "encodedBytes": 277,
+      "browserRawAlphaSha256": "59975f0d709af388e6e68abd9721869cd4d98c47b0eae02b7963c4d09b65683f"
+    },
+    {
+      "id": "digit-1-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 7,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 60,
+          "top": 24,
+          "right": 66,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-1-h21-natural-black.png",
+      "encodedBytes": 192,
+      "browserRawAlphaSha256": "2de2cc7533bd81466e832dd28f61540d5f87b7f2da37140de1665502a8bd872a"
+    },
+    {
+      "id": "digit-2-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-2-h21-natural-black.png",
+      "encodedBytes": 285,
+      "browserRawAlphaSha256": "94205745ba11bb9703c27b8273f4601ab208d3f96be55bc10bfe3d405317c15a"
+    },
+    {
+      "id": "digit-3-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-3-h21-natural-black.png",
+      "encodedBytes": 293,
+      "browserRawAlphaSha256": "bace1b24b76585fd1106e097ac79f142c1ca0524a978893b68c37825b6641026"
+    },
+    {
+      "id": "digit-4-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-4-h21-natural-black.png",
+      "encodedBytes": 250,
+      "browserRawAlphaSha256": "507857bef55fa8fc353824fc0e7cc4b1c97213e6044daa463a142a062562b3ea"
+    },
+    {
+      "id": "digit-5-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-5-h21-natural-black.png",
+      "encodedBytes": 295,
+      "browserRawAlphaSha256": "46d73e51262e9d4685760cf74653940c790a81db6f3e089fbf0f76b6a9d7c171"
+    },
+    {
+      "id": "digit-6-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-6-h21-natural-black.png",
+      "encodedBytes": 308,
+      "browserRawAlphaSha256": "1e338cc9e8919719cb6e89bd840553ab95e6fc3cc1453898ce768fa17e74cbf8"
+    },
+    {
+      "id": "digit-7-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-7-h21-natural-black.png",
+      "encodedBytes": 261,
+      "browserRawAlphaSha256": "e7ee6aa18ea0a78460378d2231940a214a363b1c59762fdafda7dd118bfd665c"
+    },
+    {
+      "id": "digit-8-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-8-h21-natural-black.png",
+      "encodedBytes": 308,
+      "browserRawAlphaSha256": "fb4be56e023b29446a9801116336c285190a9daae3f161c78d511fa8235f8a8a"
+    },
+    {
+      "id": "digit-9-h21-natural-black",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-9-h21-natural-black.png",
+      "encodedBytes": 304,
+      "browserRawAlphaSha256": "f062b5004f8c235b4c38940d9dad9a8564f245bfab43220b6d3cd8a9ff800b60"
+    },
+    {
+      "id": "digit-0-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-0-h21-natural-teal.png",
+      "encodedBytes": 325,
+      "browserRawAlphaSha256": "3afbd4a141aed1d9b64b05af5ae81dc88e8a406c11c9964bbaa426fafe48b0d1"
+    },
+    {
+      "id": "digit-1-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 7,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 60,
+          "top": 24,
+          "right": 66,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-1-h21-natural-teal.png",
+      "encodedBytes": 213,
+      "browserRawAlphaSha256": "7f1596760d1440d6fe591188401b296996d1969018dcda373e5b926d176a4442"
+    },
+    {
+      "id": "digit-2-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-2-h21-natural-teal.png",
+      "encodedBytes": 320,
+      "browserRawAlphaSha256": "df83fd85ee9850c9b695517a52aad44e27640ce860cc2b598934eba199cc8383"
+    },
+    {
+      "id": "digit-3-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-3-h21-natural-teal.png",
+      "encodedBytes": 342,
+      "browserRawAlphaSha256": "6c7fa04d0be2604beff8eaeef80bb36dd4f2fb05961a089282462254184ac074"
+    },
+    {
+      "id": "digit-4-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-4-h21-natural-teal.png",
+      "encodedBytes": 291,
+      "browserRawAlphaSha256": "92e3a36e9fe96e740bf44e01c1c1f68a709af7e0fecb34790dc1f40b12085583"
+    },
+    {
+      "id": "digit-5-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-5-h21-natural-teal.png",
+      "encodedBytes": 336,
+      "browserRawAlphaSha256": "a1f8fa9688f6b8d3496046b25f4ecec6515d019e1503bfd65c718dd0d3971313"
+    },
+    {
+      "id": "digit-6-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-6-h21-natural-teal.png",
+      "encodedBytes": 357,
+      "browserRawAlphaSha256": "a353852f77b4bf70afa9c1258aa73c2044fb117593535da470b13ff058c1ebce"
+    },
+    {
+      "id": "digit-7-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-7-h21-natural-teal.png",
+      "encodedBytes": 300,
+      "browserRawAlphaSha256": "83a27ec3b0b739d61f69103ac909a3dded116356c9dc455799252dcfa3d290d5"
+    },
+    {
+      "id": "digit-8-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-8-h21-natural-teal.png",
+      "encodedBytes": 348,
+      "browserRawAlphaSha256": "195175f19f363e54a37d11ddd2a6cfdd3b9bab8e324b55f7a37953bae29653d3"
+    },
+    {
+      "id": "digit-9-h21-natural-teal",
+      "targetHeight": 21,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-9-h21-natural-teal.png",
+      "encodedBytes": 343,
+      "browserRawAlphaSha256": "0265cda53115237706b96b561aec9881c2b21ad133c7bc102252c98dfe53839d"
+    },
+    {
+      "id": "digit-0-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-0-h21-tabular-orange.png",
+      "encodedBytes": 338,
+      "browserRawAlphaSha256": "fe0918057c077c5c4be53a199fae469bf3506a74cd419b0b25212172cbe79e70"
+    },
+    {
+      "id": "digit-1-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 7,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 60,
+          "top": 24,
+          "right": 66,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-1-h21-tabular-orange.png",
+      "encodedBytes": 224,
+      "browserRawAlphaSha256": "ba308f0810c4cdeb3d7ef36c8b52138d9f03c4ec474a9aba7dfc02bbad44dafa"
+    },
+    {
+      "id": "digit-2-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-2-h21-tabular-orange.png",
+      "encodedBytes": 337,
+      "browserRawAlphaSha256": "583d99eea7ffe48dd3c8fbe77b2458d50208d20281d98ea32aeec503dc926805"
+    },
+    {
+      "id": "digit-3-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-3-h21-tabular-orange.png",
+      "encodedBytes": 363,
+      "browserRawAlphaSha256": "0345c1ae1762bfe37bb7b7c65fa5c82288249cfe33cee374c273ced73ffef4a2"
+    },
+    {
+      "id": "digit-4-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-4-h21-tabular-orange.png",
+      "encodedBytes": 297,
+      "browserRawAlphaSha256": "7cdb460e18eba4763f7d74aba2645bdf7ef15721b7d40f80b5923790ac74f7e4"
+    },
+    {
+      "id": "digit-5-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-5-h21-tabular-orange.png",
+      "encodedBytes": 374,
+      "browserRawAlphaSha256": "06b8bd4f04f67468fb1e5ed1230423ad35886e397f3e3fc08839f1d398ef5a5c"
+    },
+    {
+      "id": "digit-6-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-6-h21-tabular-orange.png",
+      "encodedBytes": 374,
+      "browserRawAlphaSha256": "656a49c07bdb7f293227501d91c2ae9584a6ab0df9193697b3042acfc64f0397"
+    },
+    {
+      "id": "digit-7-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-7-h21-tabular-orange.png",
+      "encodedBytes": 332,
+      "browserRawAlphaSha256": "629a42edfc56773bafbfb3b5a9551941d2a54bea44cbd29c38ace7388e48d32b"
+    },
+    {
+      "id": "digit-8-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-8-h21-tabular-orange.png",
+      "encodedBytes": 384,
+      "browserRawAlphaSha256": "9c654c2060563583910964c16d02dc3f661b9f114c6cac6bd7a10a3e744de6dd"
+    },
+    {
+      "id": "digit-9-h21-tabular-orange",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-9-h21-tabular-orange.png",
+      "encodedBytes": 366,
+      "browserRawAlphaSha256": "b9274ee450f10e9e151e6f61b016ded170fec5ce8ba9d3b3ebf4e8b592c99338"
+    },
+    {
+      "id": "digit-0-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-0-h21-tabular-black.png",
+      "encodedBytes": 277,
+      "browserRawAlphaSha256": "59975f0d709af388e6e68abd9721869cd4d98c47b0eae02b7963c4d09b65683f"
+    },
+    {
+      "id": "digit-1-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 7,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 60,
+          "top": 24,
+          "right": 66,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-1-h21-tabular-black.png",
+      "encodedBytes": 192,
+      "browserRawAlphaSha256": "2de2cc7533bd81466e832dd28f61540d5f87b7f2da37140de1665502a8bd872a"
+    },
+    {
+      "id": "digit-2-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-2-h21-tabular-black.png",
+      "encodedBytes": 285,
+      "browserRawAlphaSha256": "94205745ba11bb9703c27b8273f4601ab208d3f96be55bc10bfe3d405317c15a"
+    },
+    {
+      "id": "digit-3-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-3-h21-tabular-black.png",
+      "encodedBytes": 293,
+      "browserRawAlphaSha256": "bace1b24b76585fd1106e097ac79f142c1ca0524a978893b68c37825b6641026"
+    },
+    {
+      "id": "digit-4-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-4-h21-tabular-black.png",
+      "encodedBytes": 250,
+      "browserRawAlphaSha256": "507857bef55fa8fc353824fc0e7cc4b1c97213e6044daa463a142a062562b3ea"
+    },
+    {
+      "id": "digit-5-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-5-h21-tabular-black.png",
+      "encodedBytes": 295,
+      "browserRawAlphaSha256": "46d73e51262e9d4685760cf74653940c790a81db6f3e089fbf0f76b6a9d7c171"
+    },
+    {
+      "id": "digit-6-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-6-h21-tabular-black.png",
+      "encodedBytes": 308,
+      "browserRawAlphaSha256": "1e338cc9e8919719cb6e89bd840553ab95e6fc3cc1453898ce768fa17e74cbf8"
+    },
+    {
+      "id": "digit-7-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-7-h21-tabular-black.png",
+      "encodedBytes": 261,
+      "browserRawAlphaSha256": "e7ee6aa18ea0a78460378d2231940a214a363b1c59762fdafda7dd118bfd665c"
+    },
+    {
+      "id": "digit-8-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-8-h21-tabular-black.png",
+      "encodedBytes": 308,
+      "browserRawAlphaSha256": "fb4be56e023b29446a9801116336c285190a9daae3f161c78d511fa8235f8a8a"
+    },
+    {
+      "id": "digit-9-h21-tabular-black",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-9-h21-tabular-black.png",
+      "encodedBytes": 304,
+      "browserRawAlphaSha256": "f062b5004f8c235b4c38940d9dad9a8564f245bfab43220b6d3cd8a9ff800b60"
+    },
+    {
+      "id": "digit-0-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-0-h21-tabular-teal.png",
+      "encodedBytes": 325,
+      "browserRawAlphaSha256": "3afbd4a141aed1d9b64b05af5ae81dc88e8a406c11c9964bbaa426fafe48b0d1"
+    },
+    {
+      "id": "digit-1-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 7,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 60,
+          "top": 24,
+          "right": 66,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-1-h21-tabular-teal.png",
+      "encodedBytes": 213,
+      "browserRawAlphaSha256": "7f1596760d1440d6fe591188401b296996d1969018dcda373e5b926d176a4442"
+    },
+    {
+      "id": "digit-2-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-2-h21-tabular-teal.png",
+      "encodedBytes": 320,
+      "browserRawAlphaSha256": "df83fd85ee9850c9b695517a52aad44e27640ce860cc2b598934eba199cc8383"
+    },
+    {
+      "id": "digit-3-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-3-h21-tabular-teal.png",
+      "encodedBytes": 342,
+      "browserRawAlphaSha256": "6c7fa04d0be2604beff8eaeef80bb36dd4f2fb05961a089282462254184ac074"
+    },
+    {
+      "id": "digit-4-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-4-h21-tabular-teal.png",
+      "encodedBytes": 291,
+      "browserRawAlphaSha256": "92e3a36e9fe96e740bf44e01c1c1f68a709af7e0fecb34790dc1f40b12085583"
+    },
+    {
+      "id": "digit-5-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 10,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 68,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-5-h21-tabular-teal.png",
+      "encodedBytes": 336,
+      "browserRawAlphaSha256": "a1f8fa9688f6b8d3496046b25f4ecec6515d019e1503bfd65c718dd0d3971313"
+    },
+    {
+      "id": "digit-6-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-6-h21-tabular-teal.png",
+      "encodedBytes": 357,
+      "browserRawAlphaSha256": "a353852f77b4bf70afa9c1258aa73c2044fb117593535da470b13ff058c1ebce"
+    },
+    {
+      "id": "digit-7-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-7-h21-tabular-teal.png",
+      "encodedBytes": 300,
+      "browserRawAlphaSha256": "83a27ec3b0b739d61f69103ac909a3dded116356c9dc455799252dcfa3d290d5"
+    },
+    {
+      "id": "digit-8-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-8-h21-tabular-teal.png",
+      "encodedBytes": 348,
+      "browserRawAlphaSha256": "195175f19f363e54a37d11ddd2a6cfdd3b9bab8e324b55f7a37953bae29653d3"
+    },
+    {
+      "id": "digit-9-h21-tabular-teal",
+      "targetHeight": 21,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 9,
+      "bitmapH": 21,
+      "fontSize": 16,
+      "font": "bold 16px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 9,
+        "visibleHeight": 12,
+        "visibleBBox": {
+          "left": 59,
+          "top": 24,
+          "right": 67,
+          "bottom": 35
+        }
+      },
+      "filename": "digit-9-h21-tabular-teal.png",
+      "encodedBytes": 343,
+      "browserRawAlphaSha256": "0265cda53115237706b96b561aec9881c2b21ad133c7bc102252c98dfe53839d"
+    },
+    {
+      "id": "digit-0-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-0-h40-natural-orange.png",
+      "encodedBytes": 820,
+      "browserRawAlphaSha256": "5b6724be1e59e316b03a24cdb2fc5b8c674b3e790f7c022877db17cecb4ca6ca"
+    },
+    {
+      "id": "digit-1-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 11,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 121,
+          "top": 50,
+          "right": 131,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-1-h40-natural-orange.png",
+      "encodedBytes": 379,
+      "browserRawAlphaSha256": "cbb1a585d9f6a826035eea5472abae65e160037e06f1ad3529ec7984f49110e1"
+    },
+    {
+      "id": "digit-2-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-2-h40-natural-orange.png",
+      "encodedBytes": 769,
+      "browserRawAlphaSha256": "9b0d8bde649de3b7e8ad10a823f8dcb67474ddb4a987a905e7cc7d1a8f9d1968"
+    },
+    {
+      "id": "digit-3-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-3-h40-natural-orange.png",
+      "encodedBytes": 935,
+      "browserRawAlphaSha256": "a16da378a5de9a4d1e6e31746a27b32b5054d2dfe539e5d0bf95e887fafc6671"
+    },
+    {
+      "id": "digit-4-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 18,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 136,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-4-h40-natural-orange.png",
+      "encodedBytes": 527,
+      "browserRawAlphaSha256": "e4df12467ffe62f9ab6f22de1898314c14c0b0c55fe80137c3a10d791267d255"
+    },
+    {
+      "id": "digit-5-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-5-h40-natural-orange.png",
+      "encodedBytes": 807,
+      "browserRawAlphaSha256": "95519f1750d5f29a292a9c0d34d0ee9705fbdfd9f73540e3494f712be7a5cb81"
+    },
+    {
+      "id": "digit-6-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-6-h40-natural-orange.png",
+      "encodedBytes": 896,
+      "browserRawAlphaSha256": "17a118c0fd637d2e0057a983203fb4efa7ed479d176eb09bd054a90a9bbbe123"
+    },
+    {
+      "id": "digit-7-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-7-h40-natural-orange.png",
+      "encodedBytes": 604,
+      "browserRawAlphaSha256": "91bd9f4120454f9765de8aa47a8581ec024f7d613b06ce358e19b59673648358"
+    },
+    {
+      "id": "digit-8-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-8-h40-natural-orange.png",
+      "encodedBytes": 999,
+      "browserRawAlphaSha256": "90b4e2bd49bc94815c02c8e3501398cf447969435c474c943c74ca823257b49b"
+    },
+    {
+      "id": "digit-9-h40-natural-orange",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-9-h40-natural-orange.png",
+      "encodedBytes": 964,
+      "browserRawAlphaSha256": "4cddb6fb52082df33bf9fc6ea740e120f8c8951368f2c3d36fa77b7f55e01d11"
+    },
+    {
+      "id": "digit-0-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-0-h40-natural-black.png",
+      "encodedBytes": 606,
+      "browserRawAlphaSha256": "79c6bd6316bc32500c0ba1423b9eb43e5fc4b7f572df23b32b290cd93c5da8c3"
+    },
+    {
+      "id": "digit-1-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 11,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 121,
+          "top": 50,
+          "right": 131,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-1-h40-natural-black.png",
+      "encodedBytes": 305,
+      "browserRawAlphaSha256": "3d96ced493ea698ab89e459fad437422de6a60e27c3800f53916edb2effa87ba"
+    },
+    {
+      "id": "digit-2-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-2-h40-natural-black.png",
+      "encodedBytes": 579,
+      "browserRawAlphaSha256": "6c576e8d62271ff0b106a3a2f4d7e1b6e1ee664fa10096140ffa74eb2b0b67b0"
+    },
+    {
+      "id": "digit-3-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-3-h40-natural-black.png",
+      "encodedBytes": 659,
+      "browserRawAlphaSha256": "7f6628a93059c439f46e3f44eb60e32dca4fd83abcbb31e172ad7916140e5928"
+    },
+    {
+      "id": "digit-4-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 18,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 136,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-4-h40-natural-black.png",
+      "encodedBytes": 403,
+      "browserRawAlphaSha256": "6de2e2355574528c7d16f634ba634fb4b47287221c341159fd55fba5540163ab"
+    },
+    {
+      "id": "digit-5-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-5-h40-natural-black.png",
+      "encodedBytes": 599,
+      "browserRawAlphaSha256": "8a7ff81167db19554813da5ed5a1a046221fccafe51ecdd4c007583bed739374"
+    },
+    {
+      "id": "digit-6-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-6-h40-natural-black.png",
+      "encodedBytes": 647,
+      "browserRawAlphaSha256": "ed933cd0c5f72265322c2c6240552dd4f56880521bd61ece3454a8eb0dc788af"
+    },
+    {
+      "id": "digit-7-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-7-h40-natural-black.png",
+      "encodedBytes": 461,
+      "browserRawAlphaSha256": "c0345f4e1447f9e32438acd5f3833f6c7ba3cf763bb3c394d7893c92ee9fa7f9"
+    },
+    {
+      "id": "digit-8-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-8-h40-natural-black.png",
+      "encodedBytes": 715,
+      "browserRawAlphaSha256": "80d341cd78e54d643996b9ad8365db77838ba999f0900281ef82871bb60e2a93"
+    },
+    {
+      "id": "digit-9-h40-natural-black",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-9-h40-natural-black.png",
+      "encodedBytes": 674,
+      "browserRawAlphaSha256": "0a07e0f43dfabdfcd99a4b0e98821a4f30f496276f16d7451b43a52b093716b3"
+    },
+    {
+      "id": "digit-0-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-0-h40-natural-teal.png",
+      "encodedBytes": 758,
+      "browserRawAlphaSha256": "a5bebf1c9e9278518b284b9f9228717bec433107d1b38f31fd04b2946541dfa2"
+    },
+    {
+      "id": "digit-1-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 11,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 121,
+          "top": 50,
+          "right": 131,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-1-h40-natural-teal.png",
+      "encodedBytes": 360,
+      "browserRawAlphaSha256": "426983746c16151188b9880cec4c3417e0d45acff0ea22ee5a9ed30f841f2fe3"
+    },
+    {
+      "id": "digit-2-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-2-h40-natural-teal.png",
+      "encodedBytes": 725,
+      "browserRawAlphaSha256": "fcaa095afce8ef55cdf7faf63f189d306ac94a9ae62a7cd7902cec7fefc1aab5"
+    },
+    {
+      "id": "digit-3-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-3-h40-natural-teal.png",
+      "encodedBytes": 885,
+      "browserRawAlphaSha256": "bf7fd2ddb8e86db0e6554d1a0140cb58d5b9fa05f923e1d95c653566b548bb40"
+    },
+    {
+      "id": "digit-4-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 18,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 136,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-4-h40-natural-teal.png",
+      "encodedBytes": 494,
+      "browserRawAlphaSha256": "58f899af706b410034c01b7963b37a38f719e6d2387a18a7c435887848fd250d"
+    },
+    {
+      "id": "digit-5-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-5-h40-natural-teal.png",
+      "encodedBytes": 763,
+      "browserRawAlphaSha256": "b08c256e27b8262cc673f8eff3f187ce624d0424c4f0dc3ae4de9eb5604ec345"
+    },
+    {
+      "id": "digit-6-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-6-h40-natural-teal.png",
+      "encodedBytes": 837,
+      "browserRawAlphaSha256": "ec491a39a18cad111d90e0292730a2d86b25bc77a8347f2a329480f779009782"
+    },
+    {
+      "id": "digit-7-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-7-h40-natural-teal.png",
+      "encodedBytes": 576,
+      "browserRawAlphaSha256": "d6d79ad098b979ae044c8dbe8df784d578264c669d4e048a19c8f1d75ec7bf19"
+    },
+    {
+      "id": "digit-8-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-8-h40-natural-teal.png",
+      "encodedBytes": 935,
+      "browserRawAlphaSha256": "5eef7193bbf0e34050fbabef2bb4a624a82788dafeb6fa294d33bba1507fab82"
+    },
+    {
+      "id": "digit-9-h40-natural-teal",
+      "targetHeight": 40,
+      "tabular": false,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-9-h40-natural-teal.png",
+      "encodedBytes": 876,
+      "browserRawAlphaSha256": "64c346a7a0b85aa5236741c81813c257010e460a19b1921d8de308bdb1d6f693"
+    },
+    {
+      "id": "digit-0-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-0-h40-tabular-orange.png",
+      "encodedBytes": 820,
+      "browserRawAlphaSha256": "5b6724be1e59e316b03a24cdb2fc5b8c674b3e790f7c022877db17cecb4ca6ca"
+    },
+    {
+      "id": "digit-1-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 11,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 121,
+          "top": 50,
+          "right": 131,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-1-h40-tabular-orange.png",
+      "encodedBytes": 379,
+      "browserRawAlphaSha256": "cbb1a585d9f6a826035eea5472abae65e160037e06f1ad3529ec7984f49110e1"
+    },
+    {
+      "id": "digit-2-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-2-h40-tabular-orange.png",
+      "encodedBytes": 769,
+      "browserRawAlphaSha256": "9b0d8bde649de3b7e8ad10a823f8dcb67474ddb4a987a905e7cc7d1a8f9d1968"
+    },
+    {
+      "id": "digit-3-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-3-h40-tabular-orange.png",
+      "encodedBytes": 935,
+      "browserRawAlphaSha256": "a16da378a5de9a4d1e6e31746a27b32b5054d2dfe539e5d0bf95e887fafc6671"
+    },
+    {
+      "id": "digit-4-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 18,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 136,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-4-h40-tabular-orange.png",
+      "encodedBytes": 527,
+      "browserRawAlphaSha256": "e4df12467ffe62f9ab6f22de1898314c14c0b0c55fe80137c3a10d791267d255"
+    },
+    {
+      "id": "digit-5-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-5-h40-tabular-orange.png",
+      "encodedBytes": 807,
+      "browserRawAlphaSha256": "95519f1750d5f29a292a9c0d34d0ee9705fbdfd9f73540e3494f712be7a5cb81"
+    },
+    {
+      "id": "digit-6-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-6-h40-tabular-orange.png",
+      "encodedBytes": 896,
+      "browserRawAlphaSha256": "17a118c0fd637d2e0057a983203fb4efa7ed479d176eb09bd054a90a9bbbe123"
+    },
+    {
+      "id": "digit-7-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-7-h40-tabular-orange.png",
+      "encodedBytes": 604,
+      "browserRawAlphaSha256": "91bd9f4120454f9765de8aa47a8581ec024f7d613b06ce358e19b59673648358"
+    },
+    {
+      "id": "digit-8-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-8-h40-tabular-orange.png",
+      "encodedBytes": 999,
+      "browserRawAlphaSha256": "90b4e2bd49bc94815c02c8e3501398cf447969435c474c943c74ca823257b49b"
+    },
+    {
+      "id": "digit-9-h40-tabular-orange",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "orange",
+      "color": "#e69a5a",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-9-h40-tabular-orange.png",
+      "encodedBytes": 964,
+      "browserRawAlphaSha256": "4cddb6fb52082df33bf9fc6ea740e120f8c8951368f2c3d36fa77b7f55e01d11"
+    },
+    {
+      "id": "digit-0-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-0-h40-tabular-black.png",
+      "encodedBytes": 606,
+      "browserRawAlphaSha256": "79c6bd6316bc32500c0ba1423b9eb43e5fc4b7f572df23b32b290cd93c5da8c3"
+    },
+    {
+      "id": "digit-1-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 11,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 121,
+          "top": 50,
+          "right": 131,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-1-h40-tabular-black.png",
+      "encodedBytes": 305,
+      "browserRawAlphaSha256": "3d96ced493ea698ab89e459fad437422de6a60e27c3800f53916edb2effa87ba"
+    },
+    {
+      "id": "digit-2-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-2-h40-tabular-black.png",
+      "encodedBytes": 579,
+      "browserRawAlphaSha256": "6c576e8d62271ff0b106a3a2f4d7e1b6e1ee664fa10096140ffa74eb2b0b67b0"
+    },
+    {
+      "id": "digit-3-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-3-h40-tabular-black.png",
+      "encodedBytes": 659,
+      "browserRawAlphaSha256": "7f6628a93059c439f46e3f44eb60e32dca4fd83abcbb31e172ad7916140e5928"
+    },
+    {
+      "id": "digit-4-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 18,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 136,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-4-h40-tabular-black.png",
+      "encodedBytes": 403,
+      "browserRawAlphaSha256": "6de2e2355574528c7d16f634ba634fb4b47287221c341159fd55fba5540163ab"
+    },
+    {
+      "id": "digit-5-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-5-h40-tabular-black.png",
+      "encodedBytes": 599,
+      "browserRawAlphaSha256": "8a7ff81167db19554813da5ed5a1a046221fccafe51ecdd4c007583bed739374"
+    },
+    {
+      "id": "digit-6-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-6-h40-tabular-black.png",
+      "encodedBytes": 647,
+      "browserRawAlphaSha256": "ed933cd0c5f72265322c2c6240552dd4f56880521bd61ece3454a8eb0dc788af"
+    },
+    {
+      "id": "digit-7-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-7-h40-tabular-black.png",
+      "encodedBytes": 461,
+      "browserRawAlphaSha256": "c0345f4e1447f9e32438acd5f3833f6c7ba3cf763bb3c394d7893c92ee9fa7f9"
+    },
+    {
+      "id": "digit-8-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-8-h40-tabular-black.png",
+      "encodedBytes": 715,
+      "browserRawAlphaSha256": "80d341cd78e54d643996b9ad8365db77838ba999f0900281ef82871bb60e2a93"
+    },
+    {
+      "id": "digit-9-h40-tabular-black",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "black",
+      "color": "#000000",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-9-h40-tabular-black.png",
+      "encodedBytes": 674,
+      "browserRawAlphaSha256": "0a07e0f43dfabdfcd99a4b0e98821a4f30f496276f16d7451b43a52b093716b3"
+    },
+    {
+      "id": "digit-0-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "0",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "0",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-0-h40-tabular-teal.png",
+      "encodedBytes": 758,
+      "browserRawAlphaSha256": "a5bebf1c9e9278518b284b9f9228717bec433107d1b38f31fd04b2946541dfa2"
+    },
+    {
+      "id": "digit-1-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "1",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "1",
+        "visibleWidth": 11,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 121,
+          "top": 50,
+          "right": 131,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-1-h40-tabular-teal.png",
+      "encodedBytes": 360,
+      "browserRawAlphaSha256": "426983746c16151188b9880cec4c3417e0d45acff0ea22ee5a9ed30f841f2fe3"
+    },
+    {
+      "id": "digit-2-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "2",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "2",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-2-h40-tabular-teal.png",
+      "encodedBytes": 725,
+      "browserRawAlphaSha256": "fcaa095afce8ef55cdf7faf63f189d306ac94a9ae62a7cd7902cec7fefc1aab5"
+    },
+    {
+      "id": "digit-3-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "3",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "3",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-3-h40-tabular-teal.png",
+      "encodedBytes": 885,
+      "browserRawAlphaSha256": "bf7fd2ddb8e86db0e6554d1a0140cb58d5b9fa05f923e1d95c653566b548bb40"
+    },
+    {
+      "id": "digit-4-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "4",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "4",
+        "visibleWidth": 18,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 136,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-4-h40-tabular-teal.png",
+      "encodedBytes": 494,
+      "browserRawAlphaSha256": "58f899af706b410034c01b7963b37a38f719e6d2387a18a7c435887848fd250d"
+    },
+    {
+      "id": "digit-5-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "5",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "5",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-5-h40-tabular-teal.png",
+      "encodedBytes": 763,
+      "browserRawAlphaSha256": "b08c256e27b8262cc673f8eff3f187ce624d0424c4f0dc3ae4de9eb5604ec345"
+    },
+    {
+      "id": "digit-6-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "6",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "6",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-6-h40-tabular-teal.png",
+      "encodedBytes": 837,
+      "browserRawAlphaSha256": "ec491a39a18cad111d90e0292730a2d86b25bc77a8347f2a329480f779009782"
+    },
+    {
+      "id": "digit-7-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "7",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "7",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-7-h40-tabular-teal.png",
+      "encodedBytes": 576,
+      "browserRawAlphaSha256": "d6d79ad098b979ae044c8dbe8df784d578264c669d4e048a19c8f1d75ec7bf19"
+    },
+    {
+      "id": "digit-8-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "8",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "8",
+        "visibleWidth": 16,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 120,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-8-h40-tabular-teal.png",
+      "encodedBytes": 935,
+      "browserRawAlphaSha256": "5eef7193bbf0e34050fbabef2bb4a624a82788dafeb6fa294d33bba1507fab82"
+    },
+    {
+      "id": "digit-9-h40-tabular-teal",
+      "targetHeight": 40,
+      "tabular": true,
+      "colorId": "teal",
+      "color": "#00a887",
+      "fontFamily": "Arial",
+      "fontWeight": "bold",
+      "digit": "9",
+      "bitmapW": 18,
+      "bitmapH": 40,
+      "fontSize": 32,
+      "font": "bold 32px Arial",
+      "measurement": {
+        "char": "9",
+        "visibleWidth": 17,
+        "visibleHeight": 23,
+        "visibleBBox": {
+          "left": 119,
+          "top": 50,
+          "right": 135,
+          "bottom": 72
+        }
+      },
+      "filename": "digit-9-h40-tabular-teal.png",
+      "encodedBytes": 876,
+      "browserRawAlphaSha256": "64c346a7a0b85aa5236741c81813c257010e460a19b1921d8de308bdb1d6f693"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "executable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "browserStderr": "",
+  "outputs": [
+    {
+      "id": "neutral",
+      "expectedAlphaBehavior": "baseline",
+      "width": 128,
+      "height": 128,
+      "filename": "neutral.png",
+      "encodedBytes": 4471,
+      "browserRawAlphaSha256": "922a5ebc31c1ea6fe2232e2da86cb03c8c89efd09504e3a4285380146b4ea936"
+    },
+    {
+      "id": "opacity-50",
+      "expectedAlphaBehavior": "alpha=round(baseline*0.5)",
+      "width": 128,
+      "height": 128,
+      "filename": "opacity-50.png",
+      "encodedBytes": 4388,
+      "browserRawAlphaSha256": "557eee68097d82b4b4b773beaed7f392a1889ea78ed7fb188473fa50df9e4c56"
+    },
+    {
+      "id": "exposure-brightness-contrast",
+      "expectedAlphaBehavior": "preserve",
+      "width": 128,
+      "height": 128,
+      "filename": "exposure-brightness-contrast.png",
+      "encodedBytes": 4417,
+      "browserRawAlphaSha256": "922a5ebc31c1ea6fe2232e2da86cb03c8c89efd09504e3a4285380146b4ea936"
+    },
+    {
+      "id": "tonal-pixel-edits",
+      "expectedAlphaBehavior": "preserve",
+      "width": 128,
+      "height": 128,
+      "filename": "tonal-pixel-edits.png",
+      "encodedBytes": 5190,
+      "browserRawAlphaSha256": "922a5ebc31c1ea6fe2232e2da86cb03c8c89efd09504e3a4285380146b4ea936"
+    },
+    {
+      "id": "sharpness-50",
+      "expectedAlphaBehavior": "preserve",
+      "width": 128,
+      "height": 128,
+      "filename": "sharpness-50.png",
+      "encodedBytes": 5379,
+      "browserRawAlphaSha256": "922a5ebc31c1ea6fe2232e2da86cb03c8c89efd09504e3a4285380146b4ea936"
+    },
+    {
+      "id": "vignette-50",
+      "expectedAlphaBehavior": "generated-overlay-alpha",
+      "width": 128,
+      "height": 128,
+      "filename": "vignette-50.png",
+      "encodedBytes": 18294,
+      "browserRawAlphaSha256": "8d88968ab0da2194ab62cec6786cdd86a2a5adbec2b99d26c99d952792b865d6"
+    }
+  ]
+}

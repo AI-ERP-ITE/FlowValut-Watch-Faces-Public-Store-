@@ -1,0 +1,23 @@
+{
+  "task": "T030",
+  "packageId": "P5",
+  "name": "week-month-labels",
+  "testOnly": true,
+  "widgetKind": "IMG_WEEK+IMG_DATE",
+  "offscreenIsolation": true,
+  "productionCodeModified": false,
+  "assets": [
+    {
+      "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T024-label-baker/wed-21-orange.png",
+      "target": "assets/spec129_p5_week.png",
+      "byteLength": 810,
+      "sha256": "b8edeee68389beaa5775cc1dc18bee9c490c6834729a5021a848178767b372d6"
+    },
+    {
+      "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T024-label-baker/jul-21-orange.png",
+      "target": "assets/spec129_p5_month.png",
+      "byteLength": 459,
+      "sha256": "2b326a957317dd0712cfe2cba67dd7d494c87efd5b2a03f9115a6e6148aa80be"
+    }
+  ]
+}

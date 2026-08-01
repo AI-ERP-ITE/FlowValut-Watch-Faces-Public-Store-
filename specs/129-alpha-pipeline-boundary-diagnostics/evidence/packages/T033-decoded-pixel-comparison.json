@@ -1,0 +1,3369 @@
+{
+  "task": "T033",
+  "testOnly": true,
+  "decoder": "pngjs",
+  "totalAssets": 36,
+  "exactAssets": 36,
+  "differingAssets": 0,
+  "maxMismatchedPixels": 0,
+  "maxMismatchedAlphaPixels": 0,
+  "maxChannelDelta": 0,
+  "maxAbsoluteCoverageDelta": 0,
+  "maxAbsoluteCentroidDelta": 0,
+  "allBoundsEqual": true,
+  "allHistogramsEqual": true,
+  "allCompositesEqual": true,
+  "packages": [
+    {
+      "id": "P2",
+      "assetCount": 1,
+      "exactCount": 1,
+      "differingCount": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "P3",
+      "assetCount": 1,
+      "exactCount": 1,
+      "differingCount": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "P4",
+      "assetCount": 1,
+      "exactCount": 1,
+      "differingCount": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "P5",
+      "assetCount": 2,
+      "exactCount": 2,
+      "differingCount": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "P6",
+      "assetCount": 10,
+      "exactCount": 10,
+      "differingCount": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "P7",
+      "assetCount": 1,
+      "exactCount": 1,
+      "differingCount": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "P8",
+      "assetCount": 1,
+      "exactCount": 1,
+      "differingCount": 0,
+      "result": "PASS"
+    },
+    {
+      "id": "P11",
+      "assetCount": 19,
+      "exactCount": 19,
+      "differingCount": 0,
+      "result": "PASS"
+    }
+  ],
+  "comparisons": [
+    {
+      "packageId": "P2",
+      "asset": "assets/spec129_p2_static_pass.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 480,
+          "height": 480
+        },
+        "candidate": {
+          "width": 480,
+          "height": 480
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 8653
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 8653
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "c9bd9a00875c3d31f786cf1f82fb8c1c6b7138de83de8dc3c1fa62fba58775b7",
+        "candidateRgbaSha256": "c9bd9a00875c3d31f786cf1f82fb8c1c6b7138de83de8dc3c1fa62fba58775b7",
+        "sourceAlphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+        "candidateAlphaSha256": "332326de61a6e6a28f31a70217d0fa2c718410685bf2ba69d35483b8f67f536a",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "58066cff806a5bce05fb24054af09cde641ba898848e4e3e3351d17389eedd7d",
+          "candidateSha256": "58066cff806a5bce05fb24054af09cde641ba898848e4e3e3351d17389eedd7d",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "c90f9a5378400a0771065c4fc47512c5c992bbcef317a9965331b3f704d8cf5a",
+          "candidateSha256": "c90f9a5378400a0771065c4fc47512c5c992bbcef317a9965331b3f704d8cf5a",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "a83075e2644bbb1d34f5941202545c6618c4ff7174c42d6513bf25f39a4be789",
+          "candidateSha256": "a83075e2644bbb1d34f5941202545c6618c4ff7174c42d6513bf25f39a4be789",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P3",
+      "asset": "assets/spec129_p3_static_466.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 466,
+          "height": 466
+        },
+        "candidate": {
+          "width": 466,
+          "height": 466
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 681
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 681
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "679e232c9414e47bc7d38058bb4c0d2fabb506c231c42ab957eb408ac4ba860a",
+        "candidateRgbaSha256": "679e232c9414e47bc7d38058bb4c0d2fabb506c231c42ab957eb408ac4ba860a",
+        "sourceAlphaSha256": "08064974bb6afc6203a92df248708077925060338851128607b2d9bc4a7880d6",
+        "candidateAlphaSha256": "08064974bb6afc6203a92df248708077925060338851128607b2d9bc4a7880d6",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "ee1e1a7a8da1d04f3f59927b923b29ec9f38e8f69925b852a023b60ca82324c2",
+          "candidateSha256": "ee1e1a7a8da1d04f3f59927b923b29ec9f38e8f69925b852a023b60ca82324c2",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "7013ff7123aade2fc1cbbf394082434ccba6fb312c999fc41891faba5ab7d7c7",
+          "candidateSha256": "7013ff7123aade2fc1cbbf394082434ccba6fb312c999fc41891faba5ab7d7c7",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "98b10f690a25b1963d0463c84d14429cba6a2798c054b0ec0d4eef0f3addf565",
+          "candidateSha256": "98b10f690a25b1963d0463c84d14429cba6a2798c054b0ec0d4eef0f3addf565",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P4",
+      "asset": "assets/spec129_p4_switcher_466.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 466,
+          "height": 466
+        },
+        "candidate": {
+          "width": 466,
+          "height": 466
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 681
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 681
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "679e232c9414e47bc7d38058bb4c0d2fabb506c231c42ab957eb408ac4ba860a",
+        "candidateRgbaSha256": "679e232c9414e47bc7d38058bb4c0d2fabb506c231c42ab957eb408ac4ba860a",
+        "sourceAlphaSha256": "08064974bb6afc6203a92df248708077925060338851128607b2d9bc4a7880d6",
+        "candidateAlphaSha256": "08064974bb6afc6203a92df248708077925060338851128607b2d9bc4a7880d6",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "ee1e1a7a8da1d04f3f59927b923b29ec9f38e8f69925b852a023b60ca82324c2",
+          "candidateSha256": "ee1e1a7a8da1d04f3f59927b923b29ec9f38e8f69925b852a023b60ca82324c2",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "7013ff7123aade2fc1cbbf394082434ccba6fb312c999fc41891faba5ab7d7c7",
+          "candidateSha256": "7013ff7123aade2fc1cbbf394082434ccba6fb312c999fc41891faba5ab7d7c7",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "98b10f690a25b1963d0463c84d14429cba6a2798c054b0ec0d4eef0f3addf565",
+          "candidateSha256": "98b10f690a25b1963d0463c84d14429cba6a2798c054b0ec0d4eef0f3addf565",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P5",
+      "asset": "assets/spec129_p5_week.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 60,
+          "height": 21
+        },
+        "candidate": {
+          "width": 60,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 735
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 735
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "3ce107dd931a377ab81ddd1c5035d65765eb9efeb8bcae5e4ab7e67f5b0384cd",
+        "candidateRgbaSha256": "3ce107dd931a377ab81ddd1c5035d65765eb9efeb8bcae5e4ab7e67f5b0384cd",
+        "sourceAlphaSha256": "415698365cd47b9be9e58bf1efe20573adce6224865c41a06bbd39a4dddfbc73",
+        "candidateAlphaSha256": "415698365cd47b9be9e58bf1efe20573adce6224865c41a06bbd39a4dddfbc73",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "ad72aeb6d103bbe4049ee220f1261f5ff7800b70c476990a673ca5806472c9a8",
+          "candidateSha256": "ad72aeb6d103bbe4049ee220f1261f5ff7800b70c476990a673ca5806472c9a8",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "fb1855aec46c5090cd292c738e215978763a7e7b876bc6ff739c7349dff20041",
+          "candidateSha256": "fb1855aec46c5090cd292c738e215978763a7e7b876bc6ff739c7349dff20041",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "43f262dc00be038676585bc5c51262afb2da58d13ae4d46641a0c6523b7bb13e",
+          "candidateSha256": "43f262dc00be038676585bc5c51262afb2da58d13ae4d46641a0c6523b7bb13e",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P5",
+      "asset": "assets/spec129_p5_month.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 60,
+          "height": 21
+        },
+        "candidate": {
+          "width": 60,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 384
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 384
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "92ebd04387c14c9438e8a1a453b8e1666c0839ad7767b37f3c0e7fc5fc578ffc",
+        "candidateRgbaSha256": "92ebd04387c14c9438e8a1a453b8e1666c0839ad7767b37f3c0e7fc5fc578ffc",
+        "sourceAlphaSha256": "4cddc278f302e43641d98748bf0fa2b58c95761e3b2833b0be89becbbcf83a2d",
+        "candidateAlphaSha256": "4cddc278f302e43641d98748bf0fa2b58c95761e3b2833b0be89becbbcf83a2d",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "42be63c52da907f33a8bdc3b0c1e5b3e8242af4b64f7520fd7ad9257375ba4e0",
+          "candidateSha256": "42be63c52da907f33a8bdc3b0c1e5b3e8242af4b64f7520fd7ad9257375ba4e0",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "77434743df597f634c5f15aab926fb0bb435a485b471fda7b7beb5251a35189c",
+          "candidateSha256": "77434743df597f634c5f15aab926fb0bb435a485b471fda7b7beb5251a35189c",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "e8cdf8424de8520a3638d547ff1bdc5803f59c6da01a9ba1ccb57d9af5c496b2",
+          "candidateSha256": "e8cdf8424de8520a3638d547ff1bdc5803f59c6da01a9ba1ccb57d9af5c496b2",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_0.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 263
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 263
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "72dec270c53e9d762e2052657b2af36eaf72041ba5e9f6556558616d20bb26de",
+        "candidateRgbaSha256": "72dec270c53e9d762e2052657b2af36eaf72041ba5e9f6556558616d20bb26de",
+        "sourceAlphaSha256": "fe0918057c077c5c4be53a199fae469bf3506a74cd419b0b25212172cbe79e70",
+        "candidateAlphaSha256": "fe0918057c077c5c4be53a199fae469bf3506a74cd419b0b25212172cbe79e70",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "3f74cb036059466e0c8379946ea0f3a096bddde9bdb977c72a9dca1e929e9ccd",
+          "candidateSha256": "3f74cb036059466e0c8379946ea0f3a096bddde9bdb977c72a9dca1e929e9ccd",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "afdfda65e5e9c4f2a7d73a24c80dd60f1f59183cdbfa9f63ec667fdef53c13ca",
+          "candidateSha256": "afdfda65e5e9c4f2a7d73a24c80dd60f1f59183cdbfa9f63ec667fdef53c13ca",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "f6326a41f46f39ead27ff59298f6a73ea814b447271a54840fe9a634a0aae9ab",
+          "candidateSha256": "f6326a41f46f39ead27ff59298f6a73ea814b447271a54840fe9a634a0aae9ab",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_1.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 149
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 149
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "79f42df5fed44d96bf697131610aef5bfdc2cd2c2e4464642b0ea6515908a68a",
+        "candidateRgbaSha256": "79f42df5fed44d96bf697131610aef5bfdc2cd2c2e4464642b0ea6515908a68a",
+        "sourceAlphaSha256": "ba308f0810c4cdeb3d7ef36c8b52138d9f03c4ec474a9aba7dfc02bbad44dafa",
+        "candidateAlphaSha256": "ba308f0810c4cdeb3d7ef36c8b52138d9f03c4ec474a9aba7dfc02bbad44dafa",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "6d1f2f54ad1d3a0e36d58f1fb9b5ee728095246254e91542474eba60028756b7",
+          "candidateSha256": "6d1f2f54ad1d3a0e36d58f1fb9b5ee728095246254e91542474eba60028756b7",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "f5400434a1abea9c425ebf751865e94d2fb9a3fa8b1c790088de9f32931c0914",
+          "candidateSha256": "f5400434a1abea9c425ebf751865e94d2fb9a3fa8b1c790088de9f32931c0914",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "fe8366fb60f4243ca22a3a07f2fb06b6457df8a7bbeafb50517f4871e51e93f0",
+          "candidateSha256": "fe8366fb60f4243ca22a3a07f2fb06b6457df8a7bbeafb50517f4871e51e93f0",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_2.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 262
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 262
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "33a43a36bd0915e265abbed8a441bb5d9a84e7c593daf8602161754d9c746771",
+        "candidateRgbaSha256": "33a43a36bd0915e265abbed8a441bb5d9a84e7c593daf8602161754d9c746771",
+        "sourceAlphaSha256": "583d99eea7ffe48dd3c8fbe77b2458d50208d20281d98ea32aeec503dc926805",
+        "candidateAlphaSha256": "583d99eea7ffe48dd3c8fbe77b2458d50208d20281d98ea32aeec503dc926805",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "a615d61c6f8e4a1fcfe2820be2146e8d7bf113908a277e4e7c2ce151b19610f6",
+          "candidateSha256": "a615d61c6f8e4a1fcfe2820be2146e8d7bf113908a277e4e7c2ce151b19610f6",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "8508197e18677b90d6cd8419042c0793b5a5e19e3a6169ed37efa64bfb1fa9d6",
+          "candidateSha256": "8508197e18677b90d6cd8419042c0793b5a5e19e3a6169ed37efa64bfb1fa9d6",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "9d2c061597c5409a4347f57167f813edd5f3bed31f97446e596589e50c68c2f4",
+          "candidateSha256": "9d2c061597c5409a4347f57167f813edd5f3bed31f97446e596589e50c68c2f4",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_3.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 288
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 288
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "cc17b9aa95d729d04e47a1dafae8371748af7b0f9ae17e4aeb58b9509c200510",
+        "candidateRgbaSha256": "cc17b9aa95d729d04e47a1dafae8371748af7b0f9ae17e4aeb58b9509c200510",
+        "sourceAlphaSha256": "0345c1ae1762bfe37bb7b7c65fa5c82288249cfe33cee374c273ced73ffef4a2",
+        "candidateAlphaSha256": "0345c1ae1762bfe37bb7b7c65fa5c82288249cfe33cee374c273ced73ffef4a2",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "96816c3ff9e19fdbce1e768f7a3c0ef71d5c192522c6ccec9d91779afd92121a",
+          "candidateSha256": "96816c3ff9e19fdbce1e768f7a3c0ef71d5c192522c6ccec9d91779afd92121a",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "da2cc2503078c77ab3d62e163313f6e9a5a64428e000098ef47f3ba784f0a8f0",
+          "candidateSha256": "da2cc2503078c77ab3d62e163313f6e9a5a64428e000098ef47f3ba784f0a8f0",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "e4104150caf4d993c4ac9cba92c8599636ba5b90520cafa00508d1313d85f834",
+          "candidateSha256": "e4104150caf4d993c4ac9cba92c8599636ba5b90520cafa00508d1313d85f834",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_4.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 222
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 222
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "b7988e5350d41d8314a3a5b6f9afbccf4ccf1e58960ba400b377dd0e4156c09a",
+        "candidateRgbaSha256": "b7988e5350d41d8314a3a5b6f9afbccf4ccf1e58960ba400b377dd0e4156c09a",
+        "sourceAlphaSha256": "7cdb460e18eba4763f7d74aba2645bdf7ef15721b7d40f80b5923790ac74f7e4",
+        "candidateAlphaSha256": "7cdb460e18eba4763f7d74aba2645bdf7ef15721b7d40f80b5923790ac74f7e4",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "61416ee62fd625d123294fc1b5d7cfa97643dd0a3706d284de68ce22da2c8199",
+          "candidateSha256": "61416ee62fd625d123294fc1b5d7cfa97643dd0a3706d284de68ce22da2c8199",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "ae787497924d2b400fa31f494cae6efc4f1424790f9c0d56215e09b777dd28b4",
+          "candidateSha256": "ae787497924d2b400fa31f494cae6efc4f1424790f9c0d56215e09b777dd28b4",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "ce5c770152691779c64a3772fa7a7bba2a378a8379d9b5134ea924494dac1ac4",
+          "candidateSha256": "ce5c770152691779c64a3772fa7a7bba2a378a8379d9b5134ea924494dac1ac4",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_5.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 299
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 299
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "31aa568b729365ca32d66921cb09d21f28305a63502f31efc33fbd9bcd4f0c48",
+        "candidateRgbaSha256": "31aa568b729365ca32d66921cb09d21f28305a63502f31efc33fbd9bcd4f0c48",
+        "sourceAlphaSha256": "06b8bd4f04f67468fb1e5ed1230423ad35886e397f3e3fc08839f1d398ef5a5c",
+        "candidateAlphaSha256": "06b8bd4f04f67468fb1e5ed1230423ad35886e397f3e3fc08839f1d398ef5a5c",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "9bc4f2fa704550b325ffa530ec0533ac7ef4df7029c170b1828a08aed873964c",
+          "candidateSha256": "9bc4f2fa704550b325ffa530ec0533ac7ef4df7029c170b1828a08aed873964c",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "c53984105efa8af9a018820b9bb34ae9d6fc9316dafea01fef0efebee29baefc",
+          "candidateSha256": "c53984105efa8af9a018820b9bb34ae9d6fc9316dafea01fef0efebee29baefc",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "cf11d5b8ce570e8e18aaef00b7f0319a62500c2e56f2968145b792dc57468ffa",
+          "candidateSha256": "cf11d5b8ce570e8e18aaef00b7f0319a62500c2e56f2968145b792dc57468ffa",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_6.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 299
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 299
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "197671083e93417ab3796c0fb82d1cde57c6e645e493382370ce7a80a79a6339",
+        "candidateRgbaSha256": "197671083e93417ab3796c0fb82d1cde57c6e645e493382370ce7a80a79a6339",
+        "sourceAlphaSha256": "656a49c07bdb7f293227501d91c2ae9584a6ab0df9193697b3042acfc64f0397",
+        "candidateAlphaSha256": "656a49c07bdb7f293227501d91c2ae9584a6ab0df9193697b3042acfc64f0397",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "5142b86a253a61697a0b0f512d6423ea31b00b827a37919486cf67a8d994f290",
+          "candidateSha256": "5142b86a253a61697a0b0f512d6423ea31b00b827a37919486cf67a8d994f290",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "ad7a5c1f8f4d30fdaeb0d3864eabd35a454c18cf8ca8b1c8892e13a0512b3f39",
+          "candidateSha256": "ad7a5c1f8f4d30fdaeb0d3864eabd35a454c18cf8ca8b1c8892e13a0512b3f39",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "706504d300bbbd778381589f3d74265fe10df22d52d0c2e0e0f73b77160b1345",
+          "candidateSha256": "706504d300bbbd778381589f3d74265fe10df22d52d0c2e0e0f73b77160b1345",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_7.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 257
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 257
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "51f97c2906edd3ce12ab3be4b15a3d539b2391ddec2d7bcec5b1bb910312d14e",
+        "candidateRgbaSha256": "51f97c2906edd3ce12ab3be4b15a3d539b2391ddec2d7bcec5b1bb910312d14e",
+        "sourceAlphaSha256": "629a42edfc56773bafbfb3b5a9551941d2a54bea44cbd29c38ace7388e48d32b",
+        "candidateAlphaSha256": "629a42edfc56773bafbfb3b5a9551941d2a54bea44cbd29c38ace7388e48d32b",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "82eb780436484fa6d6c7171a4fd3f9564de6c37bb704c9b4b23dea02f0eb76da",
+          "candidateSha256": "82eb780436484fa6d6c7171a4fd3f9564de6c37bb704c9b4b23dea02f0eb76da",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "a0cbecf1880ccb3fcadfe32ee7c8d5ad710549520754d984149d0565217f46ea",
+          "candidateSha256": "a0cbecf1880ccb3fcadfe32ee7c8d5ad710549520754d984149d0565217f46ea",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "83e70669ddb12d71aef74c9b7477e5f5591a685da992ed08caeb31db41c0ca99",
+          "candidateSha256": "83e70669ddb12d71aef74c9b7477e5f5591a685da992ed08caeb31db41c0ca99",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_8.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 309
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 309
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "00fe52c41981f080ba26011165e214e7f97d3cd8a0bcc2fea9165d3719879b75",
+        "candidateRgbaSha256": "00fe52c41981f080ba26011165e214e7f97d3cd8a0bcc2fea9165d3719879b75",
+        "sourceAlphaSha256": "9c654c2060563583910964c16d02dc3f661b9f114c6cac6bd7a10a3e744de6dd",
+        "candidateAlphaSha256": "9c654c2060563583910964c16d02dc3f661b9f114c6cac6bd7a10a3e744de6dd",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "cb48a7435437a7191081f85e31c85a7fc77fca2ffaaf85966d4d6963db1987cd",
+          "candidateSha256": "cb48a7435437a7191081f85e31c85a7fc77fca2ffaaf85966d4d6963db1987cd",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "6dd2ae6f9a6c4e132c0a067dc23c2a7faed69b0c30d46673c054d7460b10ce5d",
+          "candidateSha256": "6dd2ae6f9a6c4e132c0a067dc23c2a7faed69b0c30d46673c054d7460b10ce5d",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "ed786aad0e23a3d9fbed14222ce1f46b0afc07d5157f683bf8806a91cfb90833",
+          "candidateSha256": "ed786aad0e23a3d9fbed14222ce1f46b0afc07d5157f683bf8806a91cfb90833",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P6",
+      "asset": "assets/spec129_p6_digit_9.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 9,
+          "height": 21
+        },
+        "candidate": {
+          "width": 9,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 291
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 291
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "7079a31dd3ea4cf774737f0dc4a47ec3039a1160c492e40d5d141abced97eabb",
+        "candidateRgbaSha256": "7079a31dd3ea4cf774737f0dc4a47ec3039a1160c492e40d5d141abced97eabb",
+        "sourceAlphaSha256": "b9274ee450f10e9e151e6f61b016ded170fec5ce8ba9d3b3ebf4e8b592c99338",
+        "candidateAlphaSha256": "b9274ee450f10e9e151e6f61b016ded170fec5ce8ba9d3b3ebf4e8b592c99338",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "7f9d2a199ccad009b3fc791a55e8e30ad9bc792f08052d51b1271c9b37d8a1bb",
+          "candidateSha256": "7f9d2a199ccad009b3fc791a55e8e30ad9bc792f08052d51b1271c9b37d8a1bb",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "2c2a02278749f25134459417046c064c605f650cd8cc1ff633e49e3f88781072",
+          "candidateSha256": "2c2a02278749f25134459417046c064c605f650cd8cc1ff633e49e3f88781072",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "707c75a389facac865c4c49307f7c35a71b6c2c67d0fbb63a74ea800c59ce438",
+          "candidateSha256": "707c75a389facac865c4c49307f7c35a71b6c2c67d0fbb63a74ea800c59ce438",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P7",
+      "asset": "assets/spec129_p7_opacity50.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 128,
+          "height": 128
+        },
+        "candidate": {
+          "width": 128,
+          "height": 128
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 205
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 205
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "79c655f0c209dad489dcd925c4afd51252dafa7ad603d11dcd467fcf5862500a",
+        "candidateRgbaSha256": "79c655f0c209dad489dcd925c4afd51252dafa7ad603d11dcd467fcf5862500a",
+        "sourceAlphaSha256": "557eee68097d82b4b4b773beaed7f392a1889ea78ed7fb188473fa50df9e4c56",
+        "candidateAlphaSha256": "557eee68097d82b4b4b773beaed7f392a1889ea78ed7fb188473fa50df9e4c56",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "d11280b2e511f31334ec565a6ea5860549e493ba6c28ccf23791de84a2688bb9",
+          "candidateSha256": "d11280b2e511f31334ec565a6ea5860549e493ba6c28ccf23791de84a2688bb9",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "f78df6a425442de3ac5b0927a43c60c89fbc6b0f34bbfb7cd3c25cc8c6c990bb",
+          "candidateSha256": "f78df6a425442de3ac5b0927a43c60c89fbc6b0f34bbfb7cd3c25cc8c6c990bb",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "b6ce73daef2a0dce528990b7c65a4f7422c64c6cc146955907e15b8238c5c7c2",
+          "candidateSha256": "b6ce73daef2a0dce528990b7c65a4f7422c64c6cc146955907e15b8238c5c7c2",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P8",
+      "asset": "assets/spec129_p8_pointer_glow.png",
+      "comparisonClass": "route-source-to-extracted-package",
+      "dimensions": {
+        "source": {
+          "width": 66,
+          "height": 184
+        },
+        "candidate": {
+          "width": 66,
+          "height": 184
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 1649
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "IDAT",
+            "length": 4096
+          },
+          {
+            "type": "IDAT",
+            "length": 1649
+          },
+          {
+            "type": "IDAT",
+            "length": 6
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "0dc70687f76c577aefa84090efaed12e707b11d8284aa4b2f49babfc0f4e7ee5",
+        "candidateRgbaSha256": "0dc70687f76c577aefa84090efaed12e707b11d8284aa4b2f49babfc0f4e7ee5",
+        "sourceAlphaSha256": "8b842c0b9cbdda12f8879052b1c4bb21a09993762bd69b24d6823a4408ca7a64",
+        "candidateAlphaSha256": "8b842c0b9cbdda12f8879052b1c4bb21a09993762bd69b24d6823a4408ca7a64",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "056eee2fdca788e5f7707c6f5441b72212b7764d835a756d86ddd2e6534961cc",
+          "candidateSha256": "056eee2fdca788e5f7707c6f5441b72212b7764d835a756d86ddd2e6534961cc",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "e72c96b9db1ad32698ee2e610c7c674992a1b4b56888909c675b28a0e33465d2",
+          "candidateSha256": "e72c96b9db1ad32698ee2e610c7c674992a1b4b56888909c675b28a0e33465d2",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "21322ee9e1481ae854fb07edd2a345bb7c5ffc500498ae9c0728705a8480d955",
+          "candidateSha256": "21322ee9e1481ae854fb07edd2a345bb7c5ffc500498ae9c0728705a8480d955",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_0.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 172
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 172
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "a46a380bd44d15358f8378a8e779e6b8b498c25a723dd318734acc48b84dc75f",
+        "candidateRgbaSha256": "a46a380bd44d15358f8378a8e779e6b8b498c25a723dd318734acc48b84dc75f",
+        "sourceAlphaSha256": "598854e6029fdf14090e109834537e64b821dfbb8dc8aa18da304c03261b245f",
+        "candidateAlphaSha256": "598854e6029fdf14090e109834537e64b821dfbb8dc8aa18da304c03261b245f",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "fc1801b057c1077aeb6d5af304bc3a02ca81d6f9428142e9b43c2f7e294abd99",
+          "candidateSha256": "fc1801b057c1077aeb6d5af304bc3a02ca81d6f9428142e9b43c2f7e294abd99",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "f50b5a64847ba8589a014f84f3221b6a55402820fcbda9911d976e2010738f19",
+          "candidateSha256": "f50b5a64847ba8589a014f84f3221b6a55402820fcbda9911d976e2010738f19",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "6f3f7653c98c0931fd4ab6255627db577ed5c8707483a69ad618080cf27f648c",
+          "candidateSha256": "6f3f7653c98c0931fd4ab6255627db577ed5c8707483a69ad618080cf27f648c",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_1.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 171
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 171
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "2c2b51c26e404c0947cd764bf7461bccacdfce32e79a8bbe5969036b4b42052e",
+        "candidateRgbaSha256": "2c2b51c26e404c0947cd764bf7461bccacdfce32e79a8bbe5969036b4b42052e",
+        "sourceAlphaSha256": "a88223aa98cf5e72b071b1d7822b7b833f1230c6a46c020342335d77375ec729",
+        "candidateAlphaSha256": "a88223aa98cf5e72b071b1d7822b7b833f1230c6a46c020342335d77375ec729",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "5f9ebb15e15f172fcde55718ea9dfe3b66f04ff95759673e7ef0cebdb648217d",
+          "candidateSha256": "5f9ebb15e15f172fcde55718ea9dfe3b66f04ff95759673e7ef0cebdb648217d",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "4380f283f6087a251a3c701aa3587fd45c954230814164d1e7c8c04cb5aa907b",
+          "candidateSha256": "4380f283f6087a251a3c701aa3587fd45c954230814164d1e7c8c04cb5aa907b",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "0cd95e5c9bf5c0bec8756a9592421f3884ca10c07ec621fab5f634ee779f09fb",
+          "candidateSha256": "0cd95e5c9bf5c0bec8756a9592421f3884ca10c07ec621fab5f634ee779f09fb",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_10.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 178
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 178
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "cd8e6b4433560f9de2d7d1f5271cbaa9a800e564e1a5fdc9692d14364b26721f",
+        "candidateRgbaSha256": "cd8e6b4433560f9de2d7d1f5271cbaa9a800e564e1a5fdc9692d14364b26721f",
+        "sourceAlphaSha256": "31f2578b3342d049f167fc442ff324b791383345903aad06f61f519d23f8cd6d",
+        "candidateAlphaSha256": "31f2578b3342d049f167fc442ff324b791383345903aad06f61f519d23f8cd6d",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "788260348701b4e4d5cb530a6460f8679d9b66ee638d7ad766ed4a26ed78c17d",
+          "candidateSha256": "788260348701b4e4d5cb530a6460f8679d9b66ee638d7ad766ed4a26ed78c17d",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "4647a11ffeb2e9db715e35b86b1437209c223bcf38c178965fe11dd57aebde47",
+          "candidateSha256": "4647a11ffeb2e9db715e35b86b1437209c223bcf38c178965fe11dd57aebde47",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "28dba802e6aabe6abce86fb1ef54242f162e5b463171e3e9357bbb5e29644ba1",
+          "candidateSha256": "28dba802e6aabe6abce86fb1ef54242f162e5b463171e3e9357bbb5e29644ba1",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_11.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 175
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 175
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "8178b7e5d8b7b15aee48f556ea2c90c7903d2f580b23e8ff197daa2df6ecf61e",
+        "candidateRgbaSha256": "8178b7e5d8b7b15aee48f556ea2c90c7903d2f580b23e8ff197daa2df6ecf61e",
+        "sourceAlphaSha256": "c5c27730ed60b5bdfb2dbbf2fe15bac3359d621d8676b990023dbb6e38c7c63e",
+        "candidateAlphaSha256": "c5c27730ed60b5bdfb2dbbf2fe15bac3359d621d8676b990023dbb6e38c7c63e",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "e128ba8836c5cf3e66bbbf538da8287fa6e1339fecaf5bd92008be237b8dfd29",
+          "candidateSha256": "e128ba8836c5cf3e66bbbf538da8287fa6e1339fecaf5bd92008be237b8dfd29",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "0d0e7baeef8a00babb5db5dc13477fbc8c6c58b6a53d8857f86078056e1dacf7",
+          "candidateSha256": "0d0e7baeef8a00babb5db5dc13477fbc8c6c58b6a53d8857f86078056e1dacf7",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "14f79120f5f1da314234efa3a8e146bc88ed11ba3865e39e1d15f57983669175",
+          "candidateSha256": "14f79120f5f1da314234efa3a8e146bc88ed11ba3865e39e1d15f57983669175",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_2.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 201
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 201
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "83e04aff90c65280769a6418d416ef9afca11d16fcd96fe424c1b596b6101ec5",
+        "candidateRgbaSha256": "83e04aff90c65280769a6418d416ef9afca11d16fcd96fe424c1b596b6101ec5",
+        "sourceAlphaSha256": "ffbc7838fabe4dd3bfeb0a673149c41fcdf13322fa193de36eec6593cc81e386",
+        "candidateAlphaSha256": "ffbc7838fabe4dd3bfeb0a673149c41fcdf13322fa193de36eec6593cc81e386",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "1bcf4e24567d4403d31df0f3191af444ca17985513e65690723a85563847ad26",
+          "candidateSha256": "1bcf4e24567d4403d31df0f3191af444ca17985513e65690723a85563847ad26",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "cf1b11450d91f615e4a9fc801e7dbecb4a5b1132bf6f6b7527507768aef30099",
+          "candidateSha256": "cf1b11450d91f615e4a9fc801e7dbecb4a5b1132bf6f6b7527507768aef30099",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "1221467faf7d65687a3b049123f6faeb1f75b231cb039ee0b84e489718b8ae07",
+          "candidateSha256": "1221467faf7d65687a3b049123f6faeb1f75b231cb039ee0b84e489718b8ae07",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_3.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 180
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 180
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "26444c0b10681a29ea5642d052c0f16ed0e17c157bb8e2c835cba4d214df82b7",
+        "candidateRgbaSha256": "26444c0b10681a29ea5642d052c0f16ed0e17c157bb8e2c835cba4d214df82b7",
+        "sourceAlphaSha256": "1ef5ea246fddf5c3857350b2ed028b898b1198e5c1115b67444cea864b5adbab",
+        "candidateAlphaSha256": "1ef5ea246fddf5c3857350b2ed028b898b1198e5c1115b67444cea864b5adbab",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "1bb1d72296769407d85ac7b9e111d0790d025fac454cdab99c45ea8fb593c5e4",
+          "candidateSha256": "1bb1d72296769407d85ac7b9e111d0790d025fac454cdab99c45ea8fb593c5e4",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "6f1fd208613929b59c4c9dcea8cfa34e244bc676b2fd211eab7960e63364426f",
+          "candidateSha256": "6f1fd208613929b59c4c9dcea8cfa34e244bc676b2fd211eab7960e63364426f",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "bd2fdf40e2c882cd8047f2dcf3c6fb98967045cae131cec98fe77e0ef2c160f2",
+          "candidateSha256": "bd2fdf40e2c882cd8047f2dcf3c6fb98967045cae131cec98fe77e0ef2c160f2",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_4.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 212
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 212
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "534e9573d4b3f8312c5cf0f6d64894aa5a3e09d3e612f605df636e41f153cea7",
+        "candidateRgbaSha256": "534e9573d4b3f8312c5cf0f6d64894aa5a3e09d3e612f605df636e41f153cea7",
+        "sourceAlphaSha256": "e1536c21c6d40d7b4eee01fb12e47c40df6d327e9f740157d91e26a59a3d797d",
+        "candidateAlphaSha256": "e1536c21c6d40d7b4eee01fb12e47c40df6d327e9f740157d91e26a59a3d797d",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "8bb1390e62a74604a2c1f0b4be8f99abcffc005dbbeed4976c7e7d2d33b6cf58",
+          "candidateSha256": "8bb1390e62a74604a2c1f0b4be8f99abcffc005dbbeed4976c7e7d2d33b6cf58",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "ec8e586ddb8b0b844a3327460d1aa96c8f7e66af8feb67c64071417cd9ccc0a6",
+          "candidateSha256": "ec8e586ddb8b0b844a3327460d1aa96c8f7e66af8feb67c64071417cd9ccc0a6",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "ae3c556cf9f558d64da824968fd8d6f5e98dc7982eccabbb1816629301513818",
+          "candidateSha256": "ae3c556cf9f558d64da824968fd8d6f5e98dc7982eccabbb1816629301513818",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_5.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 158
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 158
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "f56a514f28e1ae499aa14bf1beeec065a1881525f00718b71b2524c6b2753768",
+        "candidateRgbaSha256": "f56a514f28e1ae499aa14bf1beeec065a1881525f00718b71b2524c6b2753768",
+        "sourceAlphaSha256": "e6e34900f4b47832d638d901ae5f825d85d0b53e4c3295ec679dda405a39f3ef",
+        "candidateAlphaSha256": "e6e34900f4b47832d638d901ae5f825d85d0b53e4c3295ec679dda405a39f3ef",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "c6b24f0006f4689562eb9fb55b35c742722de08fd87854f004311a73e3ee7d42",
+          "candidateSha256": "c6b24f0006f4689562eb9fb55b35c742722de08fd87854f004311a73e3ee7d42",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "12e73638cb13939c47d20296d3013cbbd9f2ce661956998a15e99d38efb50341",
+          "candidateSha256": "12e73638cb13939c47d20296d3013cbbd9f2ce661956998a15e99d38efb50341",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "d11a09f51fb41cc8b59588e14397d54f8da379f5acc2bbe538e2bfd53a932cfb",
+          "candidateSha256": "d11a09f51fb41cc8b59588e14397d54f8da379f5acc2bbe538e2bfd53a932cfb",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_6.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 139
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 139
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "a1f7250b21789fa47b231a3f044fe89b8f9f1ee0b53e564547fac54c64ca2dfe",
+        "candidateRgbaSha256": "a1f7250b21789fa47b231a3f044fe89b8f9f1ee0b53e564547fac54c64ca2dfe",
+        "sourceAlphaSha256": "84956b5241c18e95917c4217c618110879aa0bd46505ea74f1ecd2d228f25d3a",
+        "candidateAlphaSha256": "84956b5241c18e95917c4217c618110879aa0bd46505ea74f1ecd2d228f25d3a",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "46c8024754f06c71b63d27bd7c1d24249ae43104a2591d57eba665e6df68fe87",
+          "candidateSha256": "46c8024754f06c71b63d27bd7c1d24249ae43104a2591d57eba665e6df68fe87",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "cf13145b6f76f23e4daaf2c2a171e6ec0c4675e0a5bc1bb2acd9982b41be3ee4",
+          "candidateSha256": "cf13145b6f76f23e4daaf2c2a171e6ec0c4675e0a5bc1bb2acd9982b41be3ee4",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "8b30d062a91b5be13602c38b61f4714c94763997a80b24075967b2977ef773a6",
+          "candidateSha256": "8b30d062a91b5be13602c38b61f4714c94763997a80b24075967b2977ef773a6",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_7.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 196
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 196
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "4c7ed2d97c381edf1c8fbc2e76501704ae078e813d90b1c37748d33c1e78fefd",
+        "candidateRgbaSha256": "4c7ed2d97c381edf1c8fbc2e76501704ae078e813d90b1c37748d33c1e78fefd",
+        "sourceAlphaSha256": "328f3a197fcaa3a726adfb79b33d5b82500cb90c79f6cece05d129c30bfc5f83",
+        "candidateAlphaSha256": "328f3a197fcaa3a726adfb79b33d5b82500cb90c79f6cece05d129c30bfc5f83",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "4650a2bc5a4a5236881588fc5509120fc4316bd39974cfe64d4e72fffec9ab78",
+          "candidateSha256": "4650a2bc5a4a5236881588fc5509120fc4316bd39974cfe64d4e72fffec9ab78",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "24e048c3b15af567cd604de2ffcc46f5f005020560df75f202cdffbf1965a339",
+          "candidateSha256": "24e048c3b15af567cd604de2ffcc46f5f005020560df75f202cdffbf1965a339",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "396d6a58ce7a9c61b49f1f25f948c90bdff25c09b1f37575246a6b75f21d458b",
+          "candidateSha256": "396d6a58ce7a9c61b49f1f25f948c90bdff25c09b1f37575246a6b75f21d458b",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_8.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 180
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 180
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "12f424c0ed340577d1d59e579b39ccdb0158fa4ebbcc7f7be74000a42bd57875",
+        "candidateRgbaSha256": "12f424c0ed340577d1d59e579b39ccdb0158fa4ebbcc7f7be74000a42bd57875",
+        "sourceAlphaSha256": "94e0677880b5ed1aa1ff42ce35bc17bbebdfd41a4615553a2cabf0770cb0ca4e",
+        "candidateAlphaSha256": "94e0677880b5ed1aa1ff42ce35bc17bbebdfd41a4615553a2cabf0770cb0ca4e",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "29c74b012388432a992a90853409e2ebff8f87c0c67ec92c2f1312c253517444",
+          "candidateSha256": "29c74b012388432a992a90853409e2ebff8f87c0c67ec92c2f1312c253517444",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "8d1b86f6f734c22072d17fc04c09159590194008c57e341212672bde070fa997",
+          "candidateSha256": "8d1b86f6f734c22072d17fc04c09159590194008c57e341212672bde070fa997",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "b740bfa15d2def63529335521a22e82a2050242f84e24d5acf9f73351c6b61da",
+          "candidateSha256": "b740bfa15d2def63529335521a22e82a2050242f84e24d5acf9f73351c6b61da",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/month_main_hkap2qmwbjr_9.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 177
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 177
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "7f6017606591d0270515e0cc783187d74e64f37fbe07e2af005390a084f61898",
+        "candidateRgbaSha256": "7f6017606591d0270515e0cc783187d74e64f37fbe07e2af005390a084f61898",
+        "sourceAlphaSha256": "e81fe88203ceba501992c6967532e2cd5a30cad51d275ca0585d5c923a825181",
+        "candidateAlphaSha256": "e81fe88203ceba501992c6967532e2cd5a30cad51d275ca0585d5c923a825181",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "203953f8151b591025e67d9fe3ffbbc9fd08966505b8c3450f0da61ff57be32e",
+          "candidateSha256": "203953f8151b591025e67d9fe3ffbbc9fd08966505b8c3450f0da61ff57be32e",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "5c05de848e150e1e17d4c128d758c7ad8337d941598e96ec8f28934918f41982",
+          "candidateSha256": "5c05de848e150e1e17d4c128d758c7ad8337d941598e96ec8f28934918f41982",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "9ff3571c775043dbe37a21948e0a991b93a35fb66fd5911a0fd4756c388e484c",
+          "candidateSha256": "9ff3571c775043dbe37a21948e0a991b93a35fb66fd5911a0fd4756c388e484c",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/week_main_0jsjisxv1nvn_0.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 187
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 187
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "cd28754b6fa3c656f176341b82db00686a55013d92ff66383a9c7f8707879b9e",
+        "candidateRgbaSha256": "cd28754b6fa3c656f176341b82db00686a55013d92ff66383a9c7f8707879b9e",
+        "sourceAlphaSha256": "738b9840788b7af8d8745853fb6324372db90657dc64ceae9f3fbf9f6046b293",
+        "candidateAlphaSha256": "738b9840788b7af8d8745853fb6324372db90657dc64ceae9f3fbf9f6046b293",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "48d748c7b26c17f716aa1ee6ce96bced3daee5eb3f5c32f43ede5e0b7cc077b2",
+          "candidateSha256": "48d748c7b26c17f716aa1ee6ce96bced3daee5eb3f5c32f43ede5e0b7cc077b2",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "a9024840cabf8e454eeb7006542ce0a5080ae1c5b73b7485aafd665bf0369360",
+          "candidateSha256": "a9024840cabf8e454eeb7006542ce0a5080ae1c5b73b7485aafd665bf0369360",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "8976703888fe160cad7fae7c353f50912c32f16546b130464d9691f35dbe425d",
+          "candidateSha256": "8976703888fe160cad7fae7c353f50912c32f16546b130464d9691f35dbe425d",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/week_main_0jsjisxv1nvn_1.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 159
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 159
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "2c900c2bf5f8bfd21e5ac71174925d39f9f74d3f1b4a8f248d53c3257cc10f4d",
+        "candidateRgbaSha256": "2c900c2bf5f8bfd21e5ac71174925d39f9f74d3f1b4a8f248d53c3257cc10f4d",
+        "sourceAlphaSha256": "0b58bb4fbaa6f6312f5ef14b75b29b73b608e159e989804133842d21c5ac5516",
+        "candidateAlphaSha256": "0b58bb4fbaa6f6312f5ef14b75b29b73b608e159e989804133842d21c5ac5516",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "9da356a81e2525bfa70964924410913103a26b8012d802a0be972270428b00be",
+          "candidateSha256": "9da356a81e2525bfa70964924410913103a26b8012d802a0be972270428b00be",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "56f4896dd2bec156bfd2a01b42f6d378dfdbf9255d40389f7970f9b03e9f7da9",
+          "candidateSha256": "56f4896dd2bec156bfd2a01b42f6d378dfdbf9255d40389f7970f9b03e9f7da9",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "322a6b882fe6a148ee9f7aecf8f531d8d193507ed5ab3d72e62c16ff48fe21f6",
+          "candidateSha256": "322a6b882fe6a148ee9f7aecf8f531d8d193507ed5ab3d72e62c16ff48fe21f6",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/week_main_0jsjisxv1nvn_2.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 187
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 187
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "f11a1672928155f35d16808f4fc8710a85c4f3d98fb2f8f9093242dda849cced",
+        "candidateRgbaSha256": "f11a1672928155f35d16808f4fc8710a85c4f3d98fb2f8f9093242dda849cced",
+        "sourceAlphaSha256": "df3ef0b05c0c9ee490b49ce36e93d2dda185d7915c4e2bedceba18d94d81c638",
+        "candidateAlphaSha256": "df3ef0b05c0c9ee490b49ce36e93d2dda185d7915c4e2bedceba18d94d81c638",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "55ca94255ef34e38526dc2a0315d2dce3be874b4a9f9e8408a54f3854290e1b9",
+          "candidateSha256": "55ca94255ef34e38526dc2a0315d2dce3be874b4a9f9e8408a54f3854290e1b9",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "563047274bf39032f3ed14c8f738b5ee7771926d7c5bd07b7d75c62f4c65de4e",
+          "candidateSha256": "563047274bf39032f3ed14c8f738b5ee7771926d7c5bd07b7d75c62f4c65de4e",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "50b74a87913c08c01dfcef96b4ca2e6b61111ee70fbb8162809878932cfd4686",
+          "candidateSha256": "50b74a87913c08c01dfcef96b4ca2e6b61111ee70fbb8162809878932cfd4686",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/week_main_0jsjisxv1nvn_3.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 153
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 153
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "6d3d1bd1140f520eeea21616f408e50f01e9eba6063ef309f05e14007c96ddbe",
+        "candidateRgbaSha256": "6d3d1bd1140f520eeea21616f408e50f01e9eba6063ef309f05e14007c96ddbe",
+        "sourceAlphaSha256": "2c1d87bede82c94072eadca53ac44a68a9c7c3d5981c4db38d7b06647ddc5e95",
+        "candidateAlphaSha256": "2c1d87bede82c94072eadca53ac44a68a9c7c3d5981c4db38d7b06647ddc5e95",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "3f8b81263f083ab364f2004a4522b943e3146f0979617ba134224b44df968ebb",
+          "candidateSha256": "3f8b81263f083ab364f2004a4522b943e3146f0979617ba134224b44df968ebb",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "fa7c970303660064cab5b1f2aa1561891b6a9446f9ef0bc65f5e2640fc04cb22",
+          "candidateSha256": "fa7c970303660064cab5b1f2aa1561891b6a9446f9ef0bc65f5e2640fc04cb22",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "42304bb2dfa60ee4ef887bcfc3976b4fe0afe562b5cbfb3cd1180929f60986aa",
+          "candidateSha256": "42304bb2dfa60ee4ef887bcfc3976b4fe0afe562b5cbfb3cd1180929f60986aa",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/week_main_0jsjisxv1nvn_4.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 165
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 165
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "7d17ee2017be220a166627788e12719865ae84e898adfbeee7301ddd851e9864",
+        "candidateRgbaSha256": "7d17ee2017be220a166627788e12719865ae84e898adfbeee7301ddd851e9864",
+        "sourceAlphaSha256": "b212f08ede95fa63ca77f4a8629ae98cd77176a1be6efd0729a4379efe365fb1",
+        "candidateAlphaSha256": "b212f08ede95fa63ca77f4a8629ae98cd77176a1be6efd0729a4379efe365fb1",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "4be2edfe46bab3860829fb7af9cf7587f79e76c73bfe0562b1a4d3816ecab3c8",
+          "candidateSha256": "4be2edfe46bab3860829fb7af9cf7587f79e76c73bfe0562b1a4d3816ecab3c8",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "7cee251de6f4ceb9c962409bc4b05bf1d09923610062c3eb6ca77df3348b11f8",
+          "candidateSha256": "7cee251de6f4ceb9c962409bc4b05bf1d09923610062c3eb6ca77df3348b11f8",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "9150c785ee9564f355f748fd320b652e3cf97501c4ee34dfe072cfc473ac1af6",
+          "candidateSha256": "9150c785ee9564f355f748fd320b652e3cf97501c4ee34dfe072cfc473ac1af6",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/week_main_0jsjisxv1nvn_5.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 195
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 195
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "9c99bd406bee971622c9e47db0f198eecf39a4f9f84ce44d094b64182da73312",
+        "candidateRgbaSha256": "9c99bd406bee971622c9e47db0f198eecf39a4f9f84ce44d094b64182da73312",
+        "sourceAlphaSha256": "32a89c414bd892bf3a2c0988ff00725935f649962ec94855f9441edde57e33bf",
+        "candidateAlphaSha256": "32a89c414bd892bf3a2c0988ff00725935f649962ec94855f9441edde57e33bf",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "a9f16a477ccebc2adc9fe6e2fc84d3cfeab3eada9b296a851186e5ac692ec857",
+          "candidateSha256": "a9f16a477ccebc2adc9fe6e2fc84d3cfeab3eada9b296a851186e5ac692ec857",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "74e52a9d2afe83e1cc0f493c06cde245fab96da5ad55360a9b902730a326cd54",
+          "candidateSha256": "74e52a9d2afe83e1cc0f493c06cde245fab96da5ad55360a9b902730a326cd54",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "d3b29905c0499341fcf23b8ecb9e9d8966a9b7956f7472617ec026a275757bb4",
+          "candidateSha256": "d3b29905c0499341fcf23b8ecb9e9d8966a9b7956f7472617ec026a275757bb4",
+          "exact": true
+        }
+      },
+      "exact": true
+    },
+    {
+      "packageId": "P11",
+      "asset": "assets/week_main_0jsjisxv1nvn_6.png",
+      "comparisonClass": "binary-control-source-package-to-extracted-copy",
+      "dimensions": {
+        "source": {
+          "width": 63,
+          "height": 21
+        },
+        "candidate": {
+          "width": 63,
+          "height": 21
+        },
+        "equal": true
+      },
+      "metadata": {
+        "sourceChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 198
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "candidateChunks": [
+          {
+            "type": "IHDR",
+            "length": 13
+          },
+          {
+            "type": "bKGD",
+            "length": 6
+          },
+          {
+            "type": "IDAT",
+            "length": 198
+          },
+          {
+            "type": "IEND",
+            "length": 0
+          }
+        ],
+        "chunksEqual": true
+      },
+      "decoded": {
+        "sourceRgbaSha256": "bd96cf3287223d791571685699b056f4db3e4ce83db597a319244dcafb81b404",
+        "candidateRgbaSha256": "bd96cf3287223d791571685699b056f4db3e4ce83db597a319244dcafb81b404",
+        "sourceAlphaSha256": "34381f1ba1890be3003731b7ab4a03efafcdd37533f07344577196e4d034a9f1",
+        "candidateAlphaSha256": "34381f1ba1890be3003731b7ab4a03efafcdd37533f07344577196e4d034a9f1",
+        "mismatchedPixels": 0,
+        "mismatchedAlphaPixels": 0,
+        "maxChannelDelta": 0
+      },
+      "metricDeltas": {
+        "coverage": 0,
+        "centroidX": 0,
+        "centroidY": 0,
+        "boundsEqual": true,
+        "histogramEqual": true
+      },
+      "composites": {
+        "black": {
+          "sourceSha256": "aba7339aef3c2facb90dedaf099ffce9b29d74edd188ef49b13602d5e32757e0",
+          "candidateSha256": "aba7339aef3c2facb90dedaf099ffce9b29d74edd188ef49b13602d5e32757e0",
+          "exact": true
+        },
+        "white": {
+          "sourceSha256": "159e358c8e4a5b0f3316b59819555c669214ac87cf2931ca0726887af42f0bb5",
+          "candidateSha256": "159e358c8e4a5b0f3316b59819555c669214ac87cf2931ca0726887af42f0bb5",
+          "exact": true
+        },
+        "checker": {
+          "sourceSha256": "944ee5b1cb67ac7b59225c509d0933e68e6b8b8819fb7a6f9caca7ead446a2ee",
+          "candidateSha256": "944ee5b1cb67ac7b59225c509d0933e68e6b8b8819fb7a6f9caca7ead446a2ee",
+          "exact": true
+        }
+      },
+      "exact": true
+    }
+  ],
+  "result": "PASS"
+}

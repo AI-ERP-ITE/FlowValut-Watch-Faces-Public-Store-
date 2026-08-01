@@ -1,0 +1,41 @@
+{
+  "task": "T050",
+  "testOnly": true,
+  "fixtureSha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e",
+  "localInstallControlsReady": true,
+  "qrStatus": "BLOCKED",
+  "qrBlocker": "Official Zeus is not logged in; no simulator or Developer Bridge is connected. Installable preview QR generation requires authenticated Zepp upload/signing.",
+  "controls": [
+    {
+      "id": "P2-visible",
+      "file": "P2-visible-flowvault-fixture.zpk",
+      "kind": "FlowVault ZPK",
+      "byteLength": 2330509,
+      "sha256": "4c99f5807d914059b6136a080b9905e7a92f6c996d4ee6ef7f87f8de9fbcefc9",
+      "fixtureSha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e"
+    },
+    {
+      "id": "P9",
+      "file": "P9-P9-per-pixel-alpha.zab",
+      "kind": "Official Zeus ZAB",
+      "byteLength": 24721,
+      "sha256": "f1e56920e60593636779a8ddaff69aca5895dd79968efe7f08e524d213e720f1",
+      "fixtureSha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e"
+    },
+    {
+      "id": "P10",
+      "file": "P10-P10-widget-opacity.zab",
+      "kind": "Official Zeus ZAB",
+      "byteLength": 23147,
+      "sha256": "ab5255ebefbfcd64ce137c795fd85af60794ded9c39ccc25c8e98ae8b3ebbdcb",
+      "fixtureSha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e"
+    },
+    {
+      "id": "P11",
+      "file": "P11-binary-label-control.zpk",
+      "kind": "FlowVault binary-label compatibility ZPK",
+      "byteLength": 2318711,
+      "sha256": "7c61be73b1b1db0511d7a989be829afaf781a78643293e5e6425841bbc031f42"
+    }
+  ]
+}

@@ -1,0 +1,201 @@
+{
+  "task": "T030",
+  "purpose": "Test-only isolated diagnostic packages; no production exporter changes",
+  "generatedAt": "2026-07-29T17:00:46.842Z",
+  "template": {
+    "path": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\ZPK for tests\\test for fonts .zpk",
+    "sha256": "d072b2b5508d5023043a98415205a3132c450845e0952b9733e367a0ad252191",
+    "deviceZipSha256": "e7b9504b5fe39da6779123d368f38c8150c5eef572bfa55b47749906ccac11a9"
+  },
+  "packages": [
+    {
+      "id": "P2",
+      "name": "static-img-pass-through",
+      "widgetKind": "IMG",
+      "package": "P2-static-img-pass-through.zpk",
+      "sha256": "f45db0bc0cefcc7d3fb6fa284a561d4563b4aabe8abd75968828163457ebb063",
+      "byteLength": 2333360,
+      "deviceZipSha256": "5741984222687850a4fd6b415ee90874c3e2741d08035f2c30be47cb369d4671",
+      "assets": [
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T021-inline-static-pass-through.png",
+          "target": "assets/spec129_p2_static_pass.png",
+          "byteLength": 8710,
+          "sha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e"
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "static-img-normalized",
+      "widgetKind": "IMG",
+      "package": "P3-static-img-normalized.zpk",
+      "sha256": "50f46908f74d6e0e9b8342a259cb76a851b59c0a8b5a3570b7b309e439c4b891",
+      "byteLength": 2347560,
+      "deviceZipSha256": "069e9e7fe504880bbe6f6d900dcda10dfa310fc101b7a198f1202726fd2d2c7f",
+      "assets": [
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T022-static-normalized-466.png",
+          "target": "assets/spec129_p3_static_466.png",
+          "byteLength": 21296,
+          "sha256": "7a29ef939c93843e99862856967217c7862a78401b3f47ccda1c87bfc6d36892"
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "name": "image-switcher",
+      "widgetKind": "IMG_LEVEL",
+      "package": "P4-image-switcher.zpk",
+      "sha256": "8b6c8a5a82b4ae2d20f26654b0c5bc0015e1aec9eede3ac08ca9f444624960d2",
+      "byteLength": 2347594,
+      "deviceZipSha256": "bc982b07738e8009e4310d4eb1c59f2826b4a2ef1645bff0b796ed0f7034c94a",
+      "assets": [
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T023-switcher-normalized-466.png",
+          "target": "assets/spec129_p4_switcher_466.png",
+          "byteLength": 21296,
+          "sha256": "7a29ef939c93843e99862856967217c7862a78401b3f47ccda1c87bfc6d36892"
+        }
+      ]
+    },
+    {
+      "id": "P5",
+      "name": "week-month-labels",
+      "widgetKind": "IMG_WEEK+IMG_DATE",
+      "package": "P5-week-month-labels.zpk",
+      "sha256": "8371d058b7a7a88d3a05bb73c3d7b114892ffd68a20303621bf38ce37739c95b",
+      "byteLength": 2329483,
+      "deviceZipSha256": "94f844ca1b843d7900c1011b80b05d8aa890a8fb949662ee5b51597f70f22a06",
+      "assets": [
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T024-label-baker/wed-21-orange.png",
+          "target": "assets/spec129_p5_week.png",
+          "byteLength": 810,
+          "sha256": "b8edeee68389beaa5775cc1dc18bee9c490c6834729a5021a848178767b372d6"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T024-label-baker/jul-21-orange.png",
+          "target": "assets/spec129_p5_month.png",
+          "byteLength": 459,
+          "sha256": "2b326a957317dd0712cfe2cba67dd7d494c87efd5b2a03f9115a6e6148aa80be"
+        }
+      ]
+    },
+    {
+      "id": "P6",
+      "name": "numeric-glyphs",
+      "widgetKind": "TEXT_IMG",
+      "package": "P6-numeric-glyphs.zpk",
+      "sha256": "a49d149c1887288d9e29f08fcafc390be8997c74fea607c7f84b398389f965aa",
+      "byteLength": 2331698,
+      "deviceZipSha256": "4f6d739742244e12f7e9a806665ea313692cef3d5b164f8128ca766d7f473b87",
+      "assets": [
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-0-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_0.png",
+          "byteLength": 338,
+          "sha256": "d79ddbe192969ba40f1e831782033a629b72924b90c4a232f372586285a5afab"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-1-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_1.png",
+          "byteLength": 224,
+          "sha256": "3d4a33d85014d86a93f7b661525e225fecd5c51dd5a3748131c14394b451e8ec"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-2-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_2.png",
+          "byteLength": 337,
+          "sha256": "944bfa1b886a01289122b32ea00607f2493b810fb0a4651b992dd7bcd96732b1"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-3-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_3.png",
+          "byteLength": 363,
+          "sha256": "5a17bae5e5c53170891e7c0f4464768a2a2fef789637a2dd67dacda4c172d99a"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-4-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_4.png",
+          "byteLength": 297,
+          "sha256": "a5dd231ba0218c098bac4230a02e896a121e5080c3d2b5355bf04418b0fe95b1"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-5-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_5.png",
+          "byteLength": 374,
+          "sha256": "8f67cc5846bde4157ab240dbcea5bb616a7d9fb0e92daeb167b8f4759ec1c26e"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-6-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_6.png",
+          "byteLength": 374,
+          "sha256": "3560108b652e75c39edc4efd217da07cd3b7b95b676595f79f4f3088762a47a7"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-7-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_7.png",
+          "byteLength": 332,
+          "sha256": "b968147f8d26f1cbc97074f73ad29dc475dc2649a0ce9a5cb48e8952959a9e43"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-8-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_8.png",
+          "byteLength": 384,
+          "sha256": "be3324d3519a082f0a104af1f1f9adcc03eebe5368a5fa16491152584d4b8896"
+        },
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T025-numeric-glyphs/digit-9-h21-natural-orange.png",
+          "target": "assets/spec129_p6_digit_9.png",
+          "byteLength": 366,
+          "sha256": "c79ca01c6c68ed5bea2511e3acd0dba27b7c145d29c3a6095ab2f44209448cbe"
+        }
+      ]
+    },
+    {
+      "id": "P7",
+      "name": "effects-photo-edit",
+      "widgetKind": "IMG",
+      "package": "P7-effects-photo-edit.zpk",
+      "sha256": "1bf550f62e3612541aa9d13bbe6eaffc1e45c8ea2f7484f5d53a86d5c6234a64",
+      "byteLength": 2332338,
+      "deviceZipSha256": "dcab4abc4136d2ac2d3797ab4f62f877651e2e406e5c673047702167dea0fc39",
+      "assets": [
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T027-effects-photo-edit/opacity-50.png",
+          "target": "assets/spec129_p7_opacity50.png",
+          "byteLength": 4388,
+          "sha256": "25bd8b9f17d8fc906747f3c7202fe68cd5aa5ff395b781de02bdbbcfb5c114b6"
+        }
+      ]
+    },
+    {
+      "id": "P8",
+      "name": "pointer-hand",
+      "widgetKind": "TIME_POINTER",
+      "package": "P8-pointer-hand.zpk",
+      "sha256": "9d6c0bcd90cb53e59f5190df908bf372cf5303bbeee9672867e30d4c282726a5",
+      "byteLength": 2333870,
+      "deviceZipSha256": "007be55b7a6fbc5b2892d2634689f1fda40667dd7d8993370f53762242dba7b3",
+      "assets": [
+        {
+          "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T028-pointer-hand/glow-50-effected.png",
+          "target": "assets/spec129_p8_pointer_glow.png",
+          "byteLength": 5832,
+          "sha256": "95df3145dade2be0e4676f412f5791fd7c561bddc519abedb78012ef4732fb0e"
+        }
+      ]
+    },
+    {
+      "id": "P11",
+      "name": "binary-alpha-control",
+      "widgetKind": "existing week/month routes",
+      "package": "P11-binary-alpha-control.zpk",
+      "sha256": "7c61be73b1b1db0511d7a989be829afaf781a78643293e5e6425841bbc031f42",
+      "byteLength": 2318711,
+      "exactCopyOf": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/binary-control/T029-binary-label-control.zpk",
+      "exactCopy": true
+    }
+  ]
+}

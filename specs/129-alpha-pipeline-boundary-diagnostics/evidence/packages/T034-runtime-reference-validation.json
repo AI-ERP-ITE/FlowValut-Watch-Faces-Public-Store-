@@ -1,0 +1,180 @@
+{
+  "task": "T034",
+  "testOnly": true,
+  "packageCount": 8,
+  "passedCount": 8,
+  "failedCount": 0,
+  "result": "PASS",
+  "packages": [
+    {
+      "id": "P2",
+      "widgetKind": "IMG",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "testBlockPresent": true,
+        "testOnlyMarkerOccursOnce": true,
+        "correctWidgetKinds": true,
+        "geometryAndBindingTokensPresent": true,
+        "onlyIntendedDiagnosticAssetNames": true,
+        "allIntendedAssetsReferenced": true,
+        "noCrossRouteReferences": true,
+        "originalIndexPreservedOutsideBlock": true,
+        "onlyNormalDisplayLevel": true,
+        "offscreenIsolation": true,
+        "assetFilesExist": true
+      }
+    },
+    {
+      "id": "P3",
+      "widgetKind": "IMG",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "testBlockPresent": true,
+        "testOnlyMarkerOccursOnce": true,
+        "correctWidgetKinds": true,
+        "geometryAndBindingTokensPresent": true,
+        "onlyIntendedDiagnosticAssetNames": true,
+        "allIntendedAssetsReferenced": true,
+        "noCrossRouteReferences": true,
+        "originalIndexPreservedOutsideBlock": true,
+        "onlyNormalDisplayLevel": true,
+        "offscreenIsolation": true,
+        "assetFilesExist": true
+      }
+    },
+    {
+      "id": "P4",
+      "widgetKind": "IMG_LEVEL",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "testBlockPresent": true,
+        "testOnlyMarkerOccursOnce": true,
+        "correctWidgetKinds": true,
+        "geometryAndBindingTokensPresent": true,
+        "onlyIntendedDiagnosticAssetNames": true,
+        "allIntendedAssetsReferenced": true,
+        "noCrossRouteReferences": true,
+        "originalIndexPreservedOutsideBlock": true,
+        "onlyNormalDisplayLevel": true,
+        "offscreenIsolation": true,
+        "assetFilesExist": true
+      }
+    },
+    {
+      "id": "P5",
+      "widgetKind": "IMG_WEEK+IMG_DATE",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "testBlockPresent": true,
+        "testOnlyMarkerOccursOnce": true,
+        "correctWidgetKinds": true,
+        "geometryAndBindingTokensPresent": true,
+        "onlyIntendedDiagnosticAssetNames": true,
+        "allIntendedAssetsReferenced": true,
+        "noCrossRouteReferences": true,
+        "originalIndexPreservedOutsideBlock": true,
+        "onlyNormalDisplayLevel": true,
+        "offscreenIsolation": true,
+        "assetFilesExist": true
+      }
+    },
+    {
+      "id": "P6",
+      "widgetKind": "TEXT_IMG",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "testBlockPresent": true,
+        "testOnlyMarkerOccursOnce": true,
+        "correctWidgetKinds": true,
+        "geometryAndBindingTokensPresent": true,
+        "onlyIntendedDiagnosticAssetNames": true,
+        "allIntendedAssetsReferenced": true,
+        "noCrossRouteReferences": true,
+        "originalIndexPreservedOutsideBlock": true,
+        "onlyNormalDisplayLevel": true,
+        "offscreenIsolation": true,
+        "assetFilesExist": true
+      }
+    },
+    {
+      "id": "P7",
+      "widgetKind": "IMG",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "testBlockPresent": true,
+        "testOnlyMarkerOccursOnce": true,
+        "correctWidgetKinds": true,
+        "geometryAndBindingTokensPresent": true,
+        "onlyIntendedDiagnosticAssetNames": true,
+        "allIntendedAssetsReferenced": true,
+        "noCrossRouteReferences": true,
+        "originalIndexPreservedOutsideBlock": true,
+        "onlyNormalDisplayLevel": true,
+        "offscreenIsolation": true,
+        "assetFilesExist": true
+      }
+    },
+    {
+      "id": "P8",
+      "widgetKind": "TIME_POINTER",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "testBlockPresent": true,
+        "testOnlyMarkerOccursOnce": true,
+        "correctWidgetKinds": true,
+        "geometryAndBindingTokensPresent": true,
+        "onlyIntendedDiagnosticAssetNames": true,
+        "allIntendedAssetsReferenced": true,
+        "noCrossRouteReferences": true,
+        "originalIndexPreservedOutsideBlock": true,
+        "onlyNormalDisplayLevel": true,
+        "offscreenIsolation": true,
+        "assetFilesExist": true
+      }
+    },
+    {
+      "id": "P11",
+      "widgetKind": "existing week/month routes",
+      "result": "PASS",
+      "failedChecks": [],
+      "checks": {
+        "appJsonByteIdenticalToTemplate": true,
+        "appJsonParses": true,
+        "indexPresent": true,
+        "indexByteIdenticalToTemplate": true,
+        "transformedAssetCount": true,
+        "allTransformedAssetsReferenced": true,
+        "allTransformedAssetsExist": true,
+        "packageMatchesT029Hash": true
+      }
+    }
+  ]
+}

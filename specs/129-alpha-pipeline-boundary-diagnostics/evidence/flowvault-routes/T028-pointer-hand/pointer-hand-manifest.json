@@ -1,0 +1,258 @@
+{
+  "executable": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "browserStderr": "",
+  "outputs": [
+    {
+      "id": "neutral-prepared",
+      "role": "prepared-reference",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "neutral-prepared.png",
+      "encodedBytes": 2215,
+      "browserRawAlphaSha256": "87f1596776cb812ee161e2803a3a60ec3c18f092050517c8b2458a289db816c3"
+    },
+    {
+      "id": "neutral-effected",
+      "role": "effected",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "neutral-effected.png",
+      "encodedBytes": 2215,
+      "browserRawAlphaSha256": "87f1596776cb812ee161e2803a3a60ec3c18f092050517c8b2458a289db816c3"
+    },
+    {
+      "id": "opacity-50-prepared",
+      "role": "prepared-reference",
+      "effects": {
+        "opacity": 0.5,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "opacity-50-prepared.png",
+      "encodedBytes": 2215,
+      "browserRawAlphaSha256": "87f1596776cb812ee161e2803a3a60ec3c18f092050517c8b2458a289db816c3"
+    },
+    {
+      "id": "opacity-50-effected",
+      "role": "effected",
+      "effects": {
+        "opacity": 0.5,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "opacity-50-effected.png",
+      "encodedBytes": 2265,
+      "browserRawAlphaSha256": "7f7527ac87aa519651df2b9d0c52b64a002a5b6e0fe33e825c722c1ffa550b8b"
+    },
+    {
+      "id": "shadow-50-prepared",
+      "role": "prepared-reference",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0.5,
+        "glow": 0,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 58,
+      "height": 176,
+      "pad": 18,
+      "pivot": {
+        "x": 29,
+        "y": 136
+      },
+      "filename": "shadow-50-prepared.png",
+      "encodedBytes": 2345,
+      "browserRawAlphaSha256": "fe15b367d90e73de4a53e21e3a64adca44248254ed75af8ed930be7c38ad7f27"
+    },
+    {
+      "id": "shadow-50-effected",
+      "role": "effected",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0.5,
+        "glow": 0,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 58,
+      "height": 176,
+      "pad": 18,
+      "pivot": {
+        "x": 29,
+        "y": 136
+      },
+      "filename": "shadow-50-effected.png",
+      "encodedBytes": 5824,
+      "browserRawAlphaSha256": "64f616154adf722eb7a01a07a0c86a6f4968419756e5ba39ff00e70954927bc5"
+    },
+    {
+      "id": "glow-50-prepared",
+      "role": "prepared-reference",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0.5,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 66,
+      "height": 184,
+      "pad": 22,
+      "pivot": {
+        "x": 33,
+        "y": 140
+      },
+      "filename": "glow-50-prepared.png",
+      "encodedBytes": 2375,
+      "browserRawAlphaSha256": "e954d5ba68d7cd61dae70c9fa256e9a1b4819944dbf6c79ee34896c44b1e995d"
+    },
+    {
+      "id": "glow-50-effected",
+      "role": "effected",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0.5,
+        "trail": 0,
+        "tint": null
+      },
+      "width": 66,
+      "height": 184,
+      "pad": 22,
+      "pivot": {
+        "x": 33,
+        "y": 140
+      },
+      "filename": "glow-50-effected.png",
+      "encodedBytes": 5832,
+      "browserRawAlphaSha256": "8b842c0b9cbdda12f8879052b1c4bb21a09993762bd69b24d6823a4408ca7a64"
+    },
+    {
+      "id": "trail-50-prepared",
+      "role": "prepared-reference",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0.5,
+        "tint": null
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "trail-50-prepared.png",
+      "encodedBytes": 2215,
+      "browserRawAlphaSha256": "87f1596776cb812ee161e2803a3a60ec3c18f092050517c8b2458a289db816c3"
+    },
+    {
+      "id": "trail-50-effected",
+      "role": "effected",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0.5,
+        "tint": null
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "trail-50-effected.png",
+      "encodedBytes": 4239,
+      "browserRawAlphaSha256": "130c145751d6ce518e6630aec0d692034f8f5db0cada8708a1e12a72806dafec"
+    },
+    {
+      "id": "tint-orange-prepared",
+      "role": "prepared-reference",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0,
+        "tint": "#e69a5a"
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "tint-orange-prepared.png",
+      "encodedBytes": 2215,
+      "browserRawAlphaSha256": "87f1596776cb812ee161e2803a3a60ec3c18f092050517c8b2458a289db816c3"
+    },
+    {
+      "id": "tint-orange-effected",
+      "role": "effected",
+      "effects": {
+        "opacity": 1,
+        "shadow": 0,
+        "glow": 0,
+        "trail": 0,
+        "tint": "#e69a5a"
+      },
+      "width": 46,
+      "height": 164,
+      "pad": 12,
+      "pivot": {
+        "x": 23,
+        "y": 130
+      },
+      "filename": "tint-orange-effected.png",
+      "encodedBytes": 2664,
+      "browserRawAlphaSha256": "a1786491f6dc8714f7beaae8d77bd78ce77693ef9f959d08d4fa050cb5335560"
+    }
+  ]
+}

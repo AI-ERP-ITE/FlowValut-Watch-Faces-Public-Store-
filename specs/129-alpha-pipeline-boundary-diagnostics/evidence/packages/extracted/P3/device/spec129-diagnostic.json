@@ -1,0 +1,17 @@
+{
+  "task": "T030",
+  "packageId": "P3",
+  "name": "static-img-normalized",
+  "testOnly": true,
+  "widgetKind": "IMG",
+  "offscreenIsolation": true,
+  "productionCodeModified": false,
+  "assets": [
+    {
+      "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T022-static-normalized-466.png",
+      "target": "assets/spec129_p3_static_466.png",
+      "byteLength": 21296,
+      "sha256": "7a29ef939c93843e99862856967217c7862a78401b3f47ccda1c87bfc6d36892"
+    }
+  ]
+}

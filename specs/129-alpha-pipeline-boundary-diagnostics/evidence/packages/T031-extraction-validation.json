@@ -1,0 +1,83 @@
+{
+  "task": "T031",
+  "testOnly": true,
+  "extractionRoot": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\packages\\extracted",
+  "packageCount": 8,
+  "passedCount": 8,
+  "packages": [
+    {
+      "id": "P2",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 159,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    },
+    {
+      "id": "P3",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 159,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    },
+    {
+      "id": "P4",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 159,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    },
+    {
+      "id": "P5",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 160,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    },
+    {
+      "id": "P6",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 168,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    },
+    {
+      "id": "P7",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 159,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    },
+    {
+      "id": "P8",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 159,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    },
+    {
+      "id": "P11",
+      "packageSha256Matches": true,
+      "outerFileCount": 6,
+      "deviceFileCount": 157,
+      "nestedDeviceWriteVerified": true,
+      "allOuterWritesVerified": true,
+      "allDeviceWritesVerified": true
+    }
+  ],
+  "failedCount": 0,
+  "result": "PASS"
+}

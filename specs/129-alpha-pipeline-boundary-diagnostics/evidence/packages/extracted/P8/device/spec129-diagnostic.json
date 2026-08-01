@@ -1,0 +1,17 @@
+{
+  "task": "T030",
+  "packageId": "P8",
+  "name": "pointer-hand",
+  "testOnly": true,
+  "widgetKind": "TIME_POINTER",
+  "offscreenIsolation": true,
+  "productionCodeModified": false,
+  "assets": [
+    {
+      "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T028-pointer-hand/glow-50-effected.png",
+      "target": "assets/spec129_p8_pointer_glow.png",
+      "byteLength": 5832,
+      "sha256": "95df3145dade2be0e4676f412f5791fd7c561bddc519abedb78012ef4732fb0e"
+    }
+  ]
+}

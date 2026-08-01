@@ -1,0 +1,17 @@
+{
+  "task": "T030",
+  "packageId": "P7",
+  "name": "effects-photo-edit",
+  "testOnly": true,
+  "widgetKind": "IMG",
+  "offscreenIsolation": true,
+  "productionCodeModified": false,
+  "assets": [
+    {
+      "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T027-effects-photo-edit/opacity-50.png",
+      "target": "assets/spec129_p7_opacity50.png",
+      "byteLength": 4388,
+      "sha256": "25bd8b9f17d8fc906747f3c7202fe68cd5aa5ff395b781de02bdbbcfb5c114b6"
+    }
+  ]
+}

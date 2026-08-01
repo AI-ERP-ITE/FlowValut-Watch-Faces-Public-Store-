@@ -1,0 +1,177 @@
+{
+  "task": "T043",
+  "officialCompiler": "@zeppos/zeus-cli 1.9.3 / @zeppos/zpm 3.4.2",
+  "packageCount": 2,
+  "packages": [
+    {
+      "id": "P9",
+      "projectName": "P9-per-pixel-alpha",
+      "zab": {
+        "name": "129009-Spec129_P9-1.0.0-20260729235047.zab",
+        "byteLength": 24721,
+        "sha256": "f1e56920e60593636779a8ddaff69aca5895dd79968efe7f08e524d213e720f1"
+      },
+      "outerFiles": [
+        {
+          "name": ".ip-package",
+          "byteLength": 12042,
+          "sha256": "4ccf49848351d319ecf2d8182d9e18e51e4a46044c1588b9f454d31ee01bb58c"
+        },
+        {
+          "name": "cdb27d397d541a693af29f12bb4a10e8.zpk",
+          "byteLength": 11973,
+          "sha256": "02de8573908f471293ba78323109254af714e0962b0bf906d9f3ecb9ac804de8"
+        },
+        {
+          "name": "manifest.json",
+          "byteLength": 336,
+          "sha256": "2622172a0102f0a76bd4b1231ad5b262c06c4d605729e942346d20ffe3660daa"
+        }
+      ],
+      "zpk": {
+        "name": "cdb27d397d541a693af29f12bb4a10e8.zpk",
+        "byteLength": 11973,
+        "sha256": "02de8573908f471293ba78323109254af714e0962b0bf906d9f3ecb9ac804de8"
+      },
+      "zpkFiles": [
+        {
+          "name": "app-side.zip",
+          "byteLength": 533,
+          "sha256": "a8f04b28b45a61503a47ae150609920502c747ec38fead1a09b77bf7e5c6860f"
+        },
+        {
+          "name": "device.zip",
+          "byteLength": 20882,
+          "sha256": "0293728182c927861fc8a3da41aa680e1b074d1aa0ae213f2eea02edc43893f0"
+        }
+      ],
+      "deviceFiles": [
+        {
+          "name": "app.bin",
+          "byteLength": 877,
+          "sha256": "2670e928fa236870ffd5a33e8c9e0f76b32afa88de155957c53f5aec3b5fb9ec"
+        },
+        {
+          "name": "app.json",
+          "byteLength": 723,
+          "sha256": "212100f1678b57b7bd986fb0c0d94b90f2ec2def84a77cd783ad84de0bed4729"
+        },
+        {
+          "name": "assets/alpha-fixture.png",
+          "byteLength": 231488,
+          "sha256": "a8c5f42a07ef8f88db6c52700e6d526336eab51bec2d4d85a29042a3cb288382"
+        },
+        {
+          "name": "assets/default/alpha-fixture.png",
+          "byteLength": 231488,
+          "sha256": "a8c5f42a07ef8f88db6c52700e6d526336eab51bec2d4d85a29042a3cb288382"
+        },
+        {
+          "name": "assets/default/icon.png",
+          "byteLength": 231488,
+          "sha256": "a8c5f42a07ef8f88db6c52700e6d526336eab51bec2d4d85a29042a3cb288382"
+        },
+        {
+          "name": "assets/icon.png",
+          "byteLength": 109952,
+          "sha256": "0d0515e0f338e3d894435557aad8eca9890fe585b681600d1809bc9c9a88de47"
+        },
+        {
+          "name": "assets/raw/locale/TID.btxt",
+          "byteLength": 4,
+          "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+        },
+        {
+          "name": "watchface/index.bin",
+          "byteLength": 1267,
+          "sha256": "d817bbbeb09ce5ba96126c6bca24219f3b59ed104d5ef95e853616b4bd0c193a"
+        }
+      ]
+    },
+    {
+      "id": "P10",
+      "projectName": "P10-widget-opacity",
+      "zab": {
+        "name": "129010-Spec129_P10-1.0.0-20260729235113.zab",
+        "byteLength": 23147,
+        "sha256": "ab5255ebefbfcd64ce137c795fd85af60794ded9c39ccc25c8e98ae8b3ebbdcb"
+      },
+      "outerFiles": [
+        {
+          "name": ".ip-package",
+          "byteLength": 9188,
+          "sha256": "167c8eeca0e5777edb4b35e167ce156d7b9c88d61f7b7d6b6d9789d56a1d67e3"
+        },
+        {
+          "name": "514a743b27ad2b49eb0b3f12d1520b94.zpk",
+          "byteLength": 13253,
+          "sha256": "d083b690d2a83013525de584ae9738a91385e7839de4b6cd0d444de86c62de72"
+        },
+        {
+          "name": "manifest.json",
+          "byteLength": 336,
+          "sha256": "f1a2835d7ba007abc8e07e4ad8da463f2201776b8a453d18152d83a967014d42"
+        }
+      ],
+      "zpk": {
+        "name": "514a743b27ad2b49eb0b3f12d1520b94.zpk",
+        "byteLength": 13253,
+        "sha256": "d083b690d2a83013525de584ae9738a91385e7839de4b6cd0d444de86c62de72"
+      },
+      "zpkFiles": [
+        {
+          "name": "app-side.zip",
+          "byteLength": 539,
+          "sha256": "e4ecf07fd993310e338f2aa441ef638ce787c366f41115c2852e7ae902689869"
+        },
+        {
+          "name": "device.zip",
+          "byteLength": 16670,
+          "sha256": "01e990ae27b12be9af876fafae67d116bc1b2b9145449fb309cbb0ff1fcd11a5"
+        }
+      ],
+      "deviceFiles": [
+        {
+          "name": "app.bin",
+          "byteLength": 877,
+          "sha256": "e1ef4e708c47cd8bce21801fe186f3a4237983fb238c9d81e274043496c62904"
+        },
+        {
+          "name": "app.json",
+          "byteLength": 733,
+          "sha256": "c963c9cf310839165cca7e5302b6b2edd01415e6d9d443ff844c94af9d5ad3f1"
+        },
+        {
+          "name": "assets/alpha-fixture-opaque.png",
+          "byteLength": 231488,
+          "sha256": "93e16641341c1e99f0d7017c59c5a04fdc39e2b30ba013cacfb79f108ca59089"
+        },
+        {
+          "name": "assets/default/alpha-fixture-opaque.png",
+          "byteLength": 231488,
+          "sha256": "93e16641341c1e99f0d7017c59c5a04fdc39e2b30ba013cacfb79f108ca59089"
+        },
+        {
+          "name": "assets/default/icon.png",
+          "byteLength": 231488,
+          "sha256": "a8c5f42a07ef8f88db6c52700e6d526336eab51bec2d4d85a29042a3cb288382"
+        },
+        {
+          "name": "assets/icon.png",
+          "byteLength": 109952,
+          "sha256": "0d0515e0f338e3d894435557aad8eca9890fe585b681600d1809bc9c9a88de47"
+        },
+        {
+          "name": "assets/raw/locale/TID.btxt",
+          "byteLength": 4,
+          "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+        },
+        {
+          "name": "watchface/index.bin",
+          "byteLength": 1288,
+          "sha256": "06da1f69b3433b4d1eb500bf1fa6345a5c34c81776eb2b5e94771ecc12c0a403"
+        }
+      ]
+    }
+  ]
+}

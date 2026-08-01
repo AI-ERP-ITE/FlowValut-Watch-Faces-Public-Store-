@@ -1,0 +1,40 @@
+{
+  "referencePath": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\fixture\\alpha-fixture.png",
+  "candidatePath": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\flowvault-routes\\T021-inline-static-pass-through.png",
+  "dimensionsMatch": true,
+  "encodedBytesEqual": true,
+  "encodedSha256": {
+    "reference": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e",
+    "candidate": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e"
+  },
+  "decodedRgbaEqual": true,
+  "mismatchedPixels": 0,
+  "mismatchedAlphaPixels": 0,
+  "maxChannelDelta": 0,
+  "meanAbsoluteChannelError": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "compositeComparisons": {
+    "black": {
+      "meanAbsoluteChannelError": 0,
+      "maxChannelDelta": 0,
+      "referenceSha256": "58066cff806a5bce05fb24054af09cde641ba898848e4e3e3351d17389eedd7d",
+      "candidateSha256": "58066cff806a5bce05fb24054af09cde641ba898848e4e3e3351d17389eedd7d"
+    },
+    "white": {
+      "meanAbsoluteChannelError": 0,
+      "maxChannelDelta": 0,
+      "referenceSha256": "c90f9a5378400a0771065c4fc47512c5c992bbcef317a9965331b3f704d8cf5a",
+      "candidateSha256": "c90f9a5378400a0771065c4fc47512c5c992bbcef317a9965331b3f704d8cf5a"
+    },
+    "checker": {
+      "meanAbsoluteChannelError": 0,
+      "maxChannelDelta": 0,
+      "referenceSha256": "a83075e2644bbb1d34f5941202545c6618c4ff7174c42d6513bf25f39a4be789",
+      "candidateSha256": "a83075e2644bbb1d34f5941202545c6618c4ff7174c42d6513bf25f39a4be789"
+    }
+  }
+}

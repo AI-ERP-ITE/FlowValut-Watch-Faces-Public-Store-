@@ -1,0 +1,1040 @@
+{
+  "inputPath": "D:\\Zepp Watchface maker website\\Kimi_Agent_Untitled Chat\\app\\specs\\129-alpha-pipeline-boundary-diagnostics\\evidence\\flowvault-routes\\T022-static-normalized-466.png",
+  "encodedSha256": "7a29ef939c93843e99862856967217c7862a78401b3f47ccda1c87bfc6d36892",
+  "encodedBytes": 21296,
+  "ihdr": {
+    "width": 466,
+    "height": 466,
+    "bitDepth": 8,
+    "colorType": 6,
+    "compressionMethod": 0,
+    "filterMethod": 0,
+    "interlaceMethod": 0
+  },
+  "chunks": [
+    {
+      "type": "IHDR",
+      "length": 13
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 4096
+    },
+    {
+      "type": "IDAT",
+      "length": 681
+    },
+    {
+      "type": "IDAT",
+      "length": 6
+    },
+    {
+      "type": "IEND",
+      "length": 0
+    }
+  ],
+  "decoded": {
+    "width": 466,
+    "height": 466,
+    "pixelCount": 217156,
+    "uniqueAlphaValueCount": 237,
+    "uniqueAlphaValues": [
+      {
+        "alpha": 0,
+        "count": 126767
+      },
+      {
+        "alpha": 1,
+        "count": 107
+      },
+      {
+        "alpha": 2,
+        "count": 325
+      },
+      {
+        "alpha": 3,
+        "count": 107
+      },
+      {
+        "alpha": 4,
+        "count": 168
+      },
+      {
+        "alpha": 5,
+        "count": 61
+      },
+      {
+        "alpha": 6,
+        "count": 214
+      },
+      {
+        "alpha": 7,
+        "count": 108
+      },
+      {
+        "alpha": 8,
+        "count": 221
+      },
+      {
+        "alpha": 9,
+        "count": 85
+      },
+      {
+        "alpha": 10,
+        "count": 248
+      },
+      {
+        "alpha": 11,
+        "count": 92
+      },
+      {
+        "alpha": 12,
+        "count": 226
+      },
+      {
+        "alpha": 13,
+        "count": 111
+      },
+      {
+        "alpha": 14,
+        "count": 190
+      },
+      {
+        "alpha": 15,
+        "count": 162
+      },
+      {
+        "alpha": 16,
+        "count": 143
+      },
+      {
+        "alpha": 17,
+        "count": 81
+      },
+      {
+        "alpha": 18,
+        "count": 90
+      },
+      {
+        "alpha": 19,
+        "count": 60
+      },
+      {
+        "alpha": 20,
+        "count": 411
+      },
+      {
+        "alpha": 21,
+        "count": 109
+      },
+      {
+        "alpha": 22,
+        "count": 128
+      },
+      {
+        "alpha": 23,
+        "count": 44
+      },
+      {
+        "alpha": 24,
+        "count": 405
+      },
+      {
+        "alpha": 25,
+        "count": 79
+      },
+      {
+        "alpha": 26,
+        "count": 308
+      },
+      {
+        "alpha": 27,
+        "count": 50
+      },
+      {
+        "alpha": 28,
+        "count": 376
+      },
+      {
+        "alpha": 29,
+        "count": 45
+      },
+      {
+        "alpha": 30,
+        "count": 159
+      },
+      {
+        "alpha": 31,
+        "count": 118
+      },
+      {
+        "alpha": 32,
+        "count": 7072
+      },
+      {
+        "alpha": 33,
+        "count": 47
+      },
+      {
+        "alpha": 34,
+        "count": 56
+      },
+      {
+        "alpha": 35,
+        "count": 85
+      },
+      {
+        "alpha": 36,
+        "count": 160
+      },
+      {
+        "alpha": 37,
+        "count": 53
+      },
+      {
+        "alpha": 38,
+        "count": 56
+      },
+      {
+        "alpha": 39,
+        "count": 109
+      },
+      {
+        "alpha": 40,
+        "count": 202
+      },
+      {
+        "alpha": 41,
+        "count": 41
+      },
+      {
+        "alpha": 42,
+        "count": 106
+      },
+      {
+        "alpha": 43,
+        "count": 68
+      },
+      {
+        "alpha": 44,
+        "count": 45
+      },
+      {
+        "alpha": 45,
+        "count": 69
+      },
+      {
+        "alpha": 46,
+        "count": 71
+      },
+      {
+        "alpha": 47,
+        "count": 37
+      },
+      {
+        "alpha": 48,
+        "count": 306
+      },
+      {
+        "alpha": 49,
+        "count": 39
+      },
+      {
+        "alpha": 50,
+        "count": 141
+      },
+      {
+        "alpha": 51,
+        "count": 69
+      },
+      {
+        "alpha": 52,
+        "count": 298
+      },
+      {
+        "alpha": 53,
+        "count": 37
+      },
+      {
+        "alpha": 54,
+        "count": 104
+      },
+      {
+        "alpha": 55,
+        "count": 68
+      },
+      {
+        "alpha": 56,
+        "count": 373
+      },
+      {
+        "alpha": 57,
+        "count": 41
+      },
+      {
+        "alpha": 58,
+        "count": 36
+      },
+      {
+        "alpha": 59,
+        "count": 67
+      },
+      {
+        "alpha": 60,
+        "count": 439
+      },
+      {
+        "alpha": 61,
+        "count": 36
+      },
+      {
+        "alpha": 62,
+        "count": 35
+      },
+      {
+        "alpha": 63,
+        "count": 103
+      },
+      {
+        "alpha": 64,
+        "count": 7016
+      },
+      {
+        "alpha": 65,
+        "count": 41
+      },
+      {
+        "alpha": 66,
+        "count": 45
+      },
+      {
+        "alpha": 67,
+        "count": 67
+      },
+      {
+        "alpha": 68,
+        "count": 78
+      },
+      {
+        "alpha": 69,
+        "count": 66
+      },
+      {
+        "alpha": 70,
+        "count": 149
+      },
+      {
+        "alpha": 71,
+        "count": 37
+      },
+      {
+        "alpha": 72,
+        "count": 144
+      },
+      {
+        "alpha": 73,
+        "count": 66
+      },
+      {
+        "alpha": 74,
+        "count": 65
+      },
+      {
+        "alpha": 75,
+        "count": 44
+      },
+      {
+        "alpha": 76,
+        "count": 37
+      },
+      {
+        "alpha": 77,
+        "count": 76
+      },
+      {
+        "alpha": 78,
+        "count": 146
+      },
+      {
+        "alpha": 79,
+        "count": 143
+      },
+      {
+        "alpha": 80,
+        "count": 117
+      },
+      {
+        "alpha": 81,
+        "count": 43
+      },
+      {
+        "alpha": 82,
+        "count": 38
+      },
+      {
+        "alpha": 83,
+        "count": 81
+      },
+      {
+        "alpha": 84,
+        "count": 180
+      },
+      {
+        "alpha": 85,
+        "count": 65
+      },
+      {
+        "alpha": 86,
+        "count": 71
+      },
+      {
+        "alpha": 87,
+        "count": 8
+      },
+      {
+        "alpha": 88,
+        "count": 111
+      },
+      {
+        "alpha": 89,
+        "count": 73
+      },
+      {
+        "alpha": 90,
+        "count": 120
+      },
+      {
+        "alpha": 91,
+        "count": 69
+      },
+      {
+        "alpha": 92,
+        "count": 63
+      },
+      {
+        "alpha": 93,
+        "count": 66
+      },
+      {
+        "alpha": 94,
+        "count": 66
+      },
+      {
+        "alpha": 95,
+        "count": 266
+      },
+      {
+        "alpha": 96,
+        "count": 6998
+      },
+      {
+        "alpha": 97,
+        "count": 65
+      },
+      {
+        "alpha": 98,
+        "count": 108
+      },
+      {
+        "alpha": 99,
+        "count": 76
+      },
+      {
+        "alpha": 100,
+        "count": 104
+      },
+      {
+        "alpha": 101,
+        "count": 79
+      },
+      {
+        "alpha": 102,
+        "count": 70
+      },
+      {
+        "alpha": 103,
+        "count": 74
+      },
+      {
+        "alpha": 104,
+        "count": 141
+      },
+      {
+        "alpha": 105,
+        "count": 52
+      },
+      {
+        "alpha": 106,
+        "count": 81
+      },
+      {
+        "alpha": 107,
+        "count": 66
+      },
+      {
+        "alpha": 108,
+        "count": 123
+      },
+      {
+        "alpha": 109,
+        "count": 79
+      },
+      {
+        "alpha": 110,
+        "count": 304
+      },
+      {
+        "alpha": 111,
+        "count": 144
+      },
+      {
+        "alpha": 112,
+        "count": 128
+      },
+      {
+        "alpha": 113,
+        "count": 81
+      },
+      {
+        "alpha": 114,
+        "count": 72
+      },
+      {
+        "alpha": 115,
+        "count": 92
+      },
+      {
+        "alpha": 116,
+        "count": 83
+      },
+      {
+        "alpha": 117,
+        "count": 85
+      },
+      {
+        "alpha": 118,
+        "count": 84
+      },
+      {
+        "alpha": 119,
+        "count": 115
+      },
+      {
+        "alpha": 120,
+        "count": 150
+      },
+      {
+        "alpha": 121,
+        "count": 78
+      },
+      {
+        "alpha": 122,
+        "count": 72
+      },
+      {
+        "alpha": 123,
+        "count": 82
+      },
+      {
+        "alpha": 124,
+        "count": 76
+      },
+      {
+        "alpha": 125,
+        "count": 119
+      },
+      {
+        "alpha": 126,
+        "count": 123
+      },
+      {
+        "alpha": 127,
+        "count": 292
+      },
+      {
+        "alpha": 128,
+        "count": 13115
+      },
+      {
+        "alpha": 129,
+        "count": 86
+      },
+      {
+        "alpha": 130,
+        "count": 154
+      },
+      {
+        "alpha": 131,
+        "count": 127
+      },
+      {
+        "alpha": 132,
+        "count": 100
+      },
+      {
+        "alpha": 133,
+        "count": 60
+      },
+      {
+        "alpha": 134,
+        "count": 121
+      },
+      {
+        "alpha": 135,
+        "count": 65
+      },
+      {
+        "alpha": 136,
+        "count": 34
+      },
+      {
+        "alpha": 137,
+        "count": 127
+      },
+      {
+        "alpha": 138,
+        "count": 60
+      },
+      {
+        "alpha": 139,
+        "count": 126
+      },
+      {
+        "alpha": 140,
+        "count": 138
+      },
+      {
+        "alpha": 141,
+        "count": 122
+      },
+      {
+        "alpha": 142,
+        "count": 60
+      },
+      {
+        "alpha": 143,
+        "count": 160
+      },
+      {
+        "alpha": 144,
+        "count": 63
+      },
+      {
+        "alpha": 145,
+        "count": 124
+      },
+      {
+        "alpha": 146,
+        "count": 128
+      },
+      {
+        "alpha": 147,
+        "count": 122
+      },
+      {
+        "alpha": 148,
+        "count": 60
+      },
+      {
+        "alpha": 149,
+        "count": 92
+      },
+      {
+        "alpha": 150,
+        "count": 158
+      },
+      {
+        "alpha": 151,
+        "count": 182
+      },
+      {
+        "alpha": 152,
+        "count": 124
+      },
+      {
+        "alpha": 153,
+        "count": 120
+      },
+      {
+        "alpha": 154,
+        "count": 401
+      },
+      {
+        "alpha": 155,
+        "count": 150
+      },
+      {
+        "alpha": 156,
+        "count": 254
+      },
+      {
+        "alpha": 157,
+        "count": 242
+      },
+      {
+        "alpha": 158,
+        "count": 240
+      },
+      {
+        "alpha": 159,
+        "count": 458
+      },
+      {
+        "alpha": 160,
+        "count": 7435
+      },
+      {
+        "alpha": 162,
+        "count": 4
+      },
+      {
+        "alpha": 163,
+        "count": 2
+      },
+      {
+        "alpha": 166,
+        "count": 2
+      },
+      {
+        "alpha": 167,
+        "count": 4
+      },
+      {
+        "alpha": 168,
+        "count": 45
+      },
+      {
+        "alpha": 169,
+        "count": 2
+      },
+      {
+        "alpha": 170,
+        "count": 4
+      },
+      {
+        "alpha": 172,
+        "count": 2
+      },
+      {
+        "alpha": 174,
+        "count": 4
+      },
+      {
+        "alpha": 175,
+        "count": 40
+      },
+      {
+        "alpha": 179,
+        "count": 2
+      },
+      {
+        "alpha": 180,
+        "count": 403
+      },
+      {
+        "alpha": 182,
+        "count": 76
+      },
+      {
+        "alpha": 183,
+        "count": 7
+      },
+      {
+        "alpha": 184,
+        "count": 12
+      },
+      {
+        "alpha": 185,
+        "count": 2
+      },
+      {
+        "alpha": 187,
+        "count": 13
+      },
+      {
+        "alpha": 188,
+        "count": 4
+      },
+      {
+        "alpha": 190,
+        "count": 4
+      },
+      {
+        "alpha": 192,
+        "count": 6772
+      },
+      {
+        "alpha": 193,
+        "count": 15
+      },
+      {
+        "alpha": 194,
+        "count": 2
+      },
+      {
+        "alpha": 195,
+        "count": 6
+      },
+      {
+        "alpha": 196,
+        "count": 38
+      },
+      {
+        "alpha": 198,
+        "count": 2
+      },
+      {
+        "alpha": 199,
+        "count": 3
+      },
+      {
+        "alpha": 200,
+        "count": 4
+      },
+      {
+        "alpha": 201,
+        "count": 14
+      },
+      {
+        "alpha": 204,
+        "count": 1
+      },
+      {
+        "alpha": 205,
+        "count": 2
+      },
+      {
+        "alpha": 206,
+        "count": 3
+      },
+      {
+        "alpha": 207,
+        "count": 78
+      },
+      {
+        "alpha": 208,
+        "count": 2
+      },
+      {
+        "alpha": 209,
+        "count": 7
+      },
+      {
+        "alpha": 210,
+        "count": 44
+      },
+      {
+        "alpha": 211,
+        "count": 14
+      },
+      {
+        "alpha": 213,
+        "count": 4
+      },
+      {
+        "alpha": 215,
+        "count": 12
+      },
+      {
+        "alpha": 216,
+        "count": 5
+      },
+      {
+        "alpha": 217,
+        "count": 6
+      },
+      {
+        "alpha": 218,
+        "count": 2
+      },
+      {
+        "alpha": 219,
+        "count": 4
+      },
+      {
+        "alpha": 220,
+        "count": 9
+      },
+      {
+        "alpha": 221,
+        "count": 9
+      },
+      {
+        "alpha": 222,
+        "count": 2
+      },
+      {
+        "alpha": 223,
+        "count": 53
+      },
+      {
+        "alpha": 224,
+        "count": 6961
+      },
+      {
+        "alpha": 225,
+        "count": 6
+      },
+      {
+        "alpha": 226,
+        "count": 11
+      },
+      {
+        "alpha": 227,
+        "count": 13
+      },
+      {
+        "alpha": 228,
+        "count": 14
+      },
+      {
+        "alpha": 229,
+        "count": 10
+      },
+      {
+        "alpha": 230,
+        "count": 24
+      },
+      {
+        "alpha": 231,
+        "count": 18
+      },
+      {
+        "alpha": 232,
+        "count": 2
+      },
+      {
+        "alpha": 233,
+        "count": 15
+      },
+      {
+        "alpha": 234,
+        "count": 19
+      },
+      {
+        "alpha": 235,
+        "count": 13
+      },
+      {
+        "alpha": 236,
+        "count": 12
+      },
+      {
+        "alpha": 237,
+        "count": 10
+      },
+      {
+        "alpha": 238,
+        "count": 15
+      },
+      {
+        "alpha": 239,
+        "count": 41
+      },
+      {
+        "alpha": 240,
+        "count": 6
+      },
+      {
+        "alpha": 242,
+        "count": 4
+      },
+      {
+        "alpha": 243,
+        "count": 8
+      },
+      {
+        "alpha": 245,
+        "count": 10
+      },
+      {
+        "alpha": 246,
+        "count": 2
+      },
+      {
+        "alpha": 247,
+        "count": 10
+      },
+      {
+        "alpha": 248,
+        "count": 6
+      },
+      {
+        "alpha": 249,
+        "count": 6
+      },
+      {
+        "alpha": 250,
+        "count": 10
+      },
+      {
+        "alpha": 251,
+        "count": 36
+      },
+      {
+        "alpha": 252,
+        "count": 16
+      },
+      {
+        "alpha": 253,
+        "count": 60
+      },
+      {
+        "alpha": 254,
+        "count": 28
+      },
+      {
+        "alpha": 255,
+        "count": 14797
+      }
+    ],
+    "transparentPixels": 126767,
+    "partialAlphaPixels": 75592,
+    "opaquePixels": 14797,
+    "transparentNonzeroRgbPixels": 0,
+    "totalAlphaCoveragePixels": 49530.843137239906,
+    "alphaCentroid": {
+      "x": 229.68134634277519,
+      "y": 197.6413586622996
+    },
+    "nonzeroAlphaBounds": {
+      "minX": 21,
+      "minY": 19,
+      "maxX": 409,
+      "maxY": 424
+    },
+    "premultiplicationIndicators": {
+      "partialRgbExceedsAlphaPixels": 63953,
+      "partialRgbWithinAlphaPixels": 11639,
+      "interpretation": "Indicators only: RGB<=alpha is compatible with premultiplied storage but is not proof."
+    }
+  },
+  "manifest": null,
+  "composites": {
+    "black": {
+      "decodedRgbaSha256": "ee1e1a7a8da1d04f3f59927b923b29ec9f38e8f69925b852a023b60ca82324c2"
+    },
+    "white": {
+      "decodedRgbaSha256": "7013ff7123aade2fc1cbbf394082434ccba6fb312c999fc41891faba5ab7d7c7"
+    },
+    "checker": {
+      "decodedRgbaSha256": "98b10f690a25b1963d0463c84d14429cba6a2798c054b0ec0d4eef0f3addf565"
+    }
+  }
+}

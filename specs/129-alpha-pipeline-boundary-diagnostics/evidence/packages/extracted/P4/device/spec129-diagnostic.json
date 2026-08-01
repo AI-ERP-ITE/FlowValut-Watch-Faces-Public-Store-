@@ -1,0 +1,17 @@
+{
+  "task": "T030",
+  "packageId": "P4",
+  "name": "image-switcher",
+  "testOnly": true,
+  "widgetKind": "IMG_LEVEL",
+  "offscreenIsolation": true,
+  "productionCodeModified": false,
+  "assets": [
+    {
+      "source": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/flowvault-routes/T023-switcher-normalized-466.png",
+      "target": "assets/spec129_p4_switcher_466.png",
+      "byteLength": 21296,
+      "sha256": "7a29ef939c93843e99862856967217c7862a78401b3f47ccda1c87bfc6d36892"
+    }
+  ]
+}

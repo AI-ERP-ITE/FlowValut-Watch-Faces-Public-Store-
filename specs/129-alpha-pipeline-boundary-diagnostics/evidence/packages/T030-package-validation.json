@@ -1,0 +1,156 @@
+{
+  "task": "T030",
+  "testOnly": true,
+  "packageCount": 8,
+  "passedCount": 8,
+  "failedCount": 0,
+  "result": "PASS",
+  "packages": [
+    {
+      "id": "P2",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true,
+        "internalManifestMatches": true,
+        "testMarkerPresent": true,
+        "offscreenIsolationRecorded": true,
+        "allAssetsPresent": true,
+        "allAssetHashesMatch": true,
+        "allAssetsReferenced": true
+      }
+    },
+    {
+      "id": "P3",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true,
+        "internalManifestMatches": true,
+        "testMarkerPresent": true,
+        "offscreenIsolationRecorded": true,
+        "allAssetsPresent": true,
+        "allAssetHashesMatch": true,
+        "allAssetsReferenced": true
+      }
+    },
+    {
+      "id": "P4",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true,
+        "internalManifestMatches": true,
+        "testMarkerPresent": true,
+        "offscreenIsolationRecorded": true,
+        "allAssetsPresent": true,
+        "allAssetHashesMatch": true,
+        "allAssetsReferenced": true
+      }
+    },
+    {
+      "id": "P5",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true,
+        "internalManifestMatches": true,
+        "testMarkerPresent": true,
+        "offscreenIsolationRecorded": true,
+        "allAssetsPresent": true,
+        "allAssetHashesMatch": true,
+        "allAssetsReferenced": true
+      }
+    },
+    {
+      "id": "P6",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true,
+        "internalManifestMatches": true,
+        "testMarkerPresent": true,
+        "offscreenIsolationRecorded": true,
+        "allAssetsPresent": true,
+        "allAssetHashesMatch": true,
+        "allAssetsReferenced": true
+      }
+    },
+    {
+      "id": "P7",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true,
+        "internalManifestMatches": true,
+        "testMarkerPresent": true,
+        "offscreenIsolationRecorded": true,
+        "allAssetsPresent": true,
+        "allAssetHashesMatch": true,
+        "allAssetsReferenced": true
+      }
+    },
+    {
+      "id": "P8",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true,
+        "internalManifestMatches": true,
+        "testMarkerPresent": true,
+        "offscreenIsolationRecorded": true,
+        "allAssetsPresent": true,
+        "allAssetHashesMatch": true,
+        "allAssetsReferenced": true
+      }
+    },
+    {
+      "id": "P11",
+      "passed": true,
+      "checks": {
+        "packageHashMatches": true,
+        "packageSizeMatches": true,
+        "outerReadable": true,
+        "nestedDeviceReadable": true,
+        "indexPresent": true,
+        "appJsonPresent": true,
+        "binaryControlExactCopy": true
+      }
+    }
+  ]
+}

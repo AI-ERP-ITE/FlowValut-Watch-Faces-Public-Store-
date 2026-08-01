@@ -1,0 +1,25 @@
+{
+  "task": "T041-T042",
+  "testOnly": true,
+  "fixture": {
+    "path": "specs/129-alpha-pipeline-boundary-diagnostics/evidence/fixture/alpha-fixture.png",
+    "byteLength": 8710,
+    "sha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e"
+  },
+  "P9": {
+    "route": "official Zeus IMG with untouched per-pixel-alpha PNG",
+    "asset": "assets/default/alpha-fixture.png",
+    "byteLength": 8710,
+    "sha256": "943644b2db678f4257c52ced0417a00f62565a50d637bca6565e4db57d4dc01e",
+    "exactFixtureCopy": true
+  },
+  "P10": {
+    "route": "official Zeus IMG with opaque derivative and widget alpha 128",
+    "asset": "assets/default/alpha-fixture-opaque.png",
+    "byteLength": 4811,
+    "sha256": "6117d3ec9fdc09686dabf7e00957571b8155f0ec957e971dc1e478bc89ee7d25",
+    "sourceRgbPreserved": true,
+    "sourceAlphaForcedTo255": true,
+    "widgetAlpha": 128
+  }
+}
