@@ -463,6 +463,7 @@ try {
         
         // Sensor for weather and system info
         let weatherSensor = null;
+        const timeReadingRefreshers = [];
         __$$module$$__.module = DeviceRuntimeCore.WatchFace({
             init_view() {
                 // Initialize sensors
@@ -504,6 +505,9 @@ ${aodWidgetsCode}
                 const widgetDelegate = hmUI.createWidget(hmUI.widget.WIDGET_DELEGATE, {
                     resume_call() {
                         console.log('resume_call()');
+                        for (let i = 0; i < timeReadingRefreshers.length; i++) {
+                            try { timeReadingRefreshers[i](); } catch (e) { logger.log('Time reading refresh failed:', e); }
+                        }
                         let tipoSchermo = hmSetting.getScreenType();
                         if (tipoSchermo === hmSetting.screen_type.WATCHFACE) {
                             // NORMAL MODE updates
@@ -983,31 +987,92 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
                 });`;
 }
 
-// Digital Sunrise/Sunset. Zepp formats these data types as HH:MM; TEXT_IMG's
-// separator resource supplies the bitmap used for the formatted time separator.
+// Digital Sunrise/Sunset. Read the documented Weather forecast hour/minute
+// fields and render two zero-padded TEXT_IMG pairs around a separator IMG.
 function generateTimeReadingWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
   const fontImages = element.fontArray || element.images || [];
   const prefix = getTextImgPrefixForDataType(element.dataType) || 'time_reading_digit';
   const fontArray = fontImages.length >= 10
     ? fontImages.slice(0, 10)
     : Array.from({ length: 10 }, (_, index) => `${prefix}_${index}.png`);
-  const dataType = element.dataType === 'SUN_SET' ? 'SUN_SET' : 'SUN_RISE';
+  const field = element.dataType === 'SUN_SET' ? 'sunset' : 'sunrise';
   const alignH = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
+  const cellWidth = Math.max(1, Math.round(element.timeReadingDigitWidth || element.bounds.height * 0.5));
+  const colonWidth = Math.max(1, Math.round(element.timeReadingColonWidth || cellWidth * 0.45));
+  const hSpace = Math.max(0, Math.round(element.hSpace ?? 1));
+  const pairWidth = cellWidth * 2 + hSpace;
+  const totalWidth = pairWidth * 2 + colonWidth + hSpace * 2;
+  const startX = typeof element.layoutStartX === 'number'
+    ? element.layoutStartX
+    : alignH === 'RIGHT'
+      ? element.bounds.x + element.bounds.width - totalWidth
+      : alignH === 'LEFT'
+        ? element.bounds.x
+        : Math.round(element.bounds.x + element.bounds.width / 2 - totalWidth / 2);
+  const colonX = startX + pairWidth + hSpace;
+  const minuteX = colonX + colonWidth + hSpace;
+  const fontArraySource = `[${fontArray.map((asset) => `'${asset}'`).join(', ')}]`;
 
   return `
-                // ${element.name} - Digital Time Reading (HH:MM)
-                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
-                    x: px(${element.bounds.x}),
+                // ${element.name} - Digital Time Reading (zero-padded HH:MM)
+                let widget_${widgetIndex}_hour = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
+                    x: px(${startX}),
                     y: px(${element.bounds.y}),
-                    w: px(${element.bounds.width || 200}),
+                    w: px(${pairWidth}),
                     h: px(${element.bounds.height || 80}),
-                    font_array: [${fontArray.map((asset) => `'${asset}'`).join(', ')}],
-                    type: hmUI.data_type.${dataType},
-                    dont_path: '${element.colonImage || 'time_reading_colon.png'}',
-                    h_space: ${element.hSpace ?? 1},
-                    align_h: hmUI.align.${alignH},
+                    font_array: ${fontArraySource},
+                    text: '00',
+                    h_space: ${hSpace},
+                    align_h: hmUI.align.LEFT,
                     show_level: hmUI.show_level.${showLevel}
-                });`;
+                });
+                let widget_${widgetIndex}_colon = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${colonX}),
+                    y: px(${element.bounds.y}),
+                    w: px(${colonWidth}),
+                    h: px(${element.bounds.height || 80}),
+                    src: '${element.colonImage || 'time_reading_colon.png'}',
+                    show_level: hmUI.show_level.${showLevel}
+                });
+                let widget_${widgetIndex}_minute = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
+                    x: px(${minuteX}),
+                    y: px(${element.bounds.y}),
+                    w: px(${pairWidth}),
+                    h: px(${element.bounds.height || 80}),
+                    font_array: ${fontArraySource},
+                    text: '00',
+                    h_space: ${hSpace},
+                    align_h: hmUI.align.LEFT,
+                    show_level: hmUI.show_level.${showLevel}
+                });
+                const refresh_time_reading_${widgetIndex} = function() {
+                    let forecast = weatherSensor;
+                    try {
+                        if (weatherSensor && typeof weatherSensor.getForecastWeather === 'function') {
+                            forecast = weatherSensor.getForecastWeather();
+                        }
+                    } catch (e) { logger.log('Weather forecast read failed:', e); }
+                    let root = forecast && forecast.forecastData ? forecast.forecastData : forecast;
+                    let day = root && root.data && root.data.length ? root.data[0] : root;
+                    let value = day && day.${field} ? day.${field} : (forecast && forecast.${field} ? forecast.${field} : null);
+                    let hour = value && typeof value.hour === 'number' ? value.hour : NaN;
+                    let minute = value && typeof value.minute === 'number' ? value.minute : NaN;
+                    if ((!isFinite(hour) || !isFinite(minute)) && typeof value === 'number') {
+                        hour = Math.floor(value / 100);
+                        minute = value % 100;
+                    }
+                    if ((!isFinite(hour) || !isFinite(minute)) && typeof value === 'string') {
+                        const parts = value.split(':');
+                        if (parts.length >= 2) { hour = Number(parts[0]); minute = Number(parts[1]); }
+                    }
+                    if (!isFinite(hour) || !isFinite(minute)) return;
+                    const hourText = ('0' + Math.max(0, Math.min(23, Math.floor(hour)))).slice(-2);
+                    const minuteText = ('0' + Math.max(0, Math.min(59, Math.floor(minute)))).slice(-2);
+                    widget_${widgetIndex}_hour.setProperty(hmUI.prop.TEXT, hourText);
+                    widget_${widgetIndex}_minute.setProperty(hmUI.prop.TEXT, minuteText);
+                };
+                timeReadingRefreshers.push(refresh_time_reading_${widgetIndex});
+                refresh_time_reading_${widgetIndex}();`;
 }
 
 // ============================================================

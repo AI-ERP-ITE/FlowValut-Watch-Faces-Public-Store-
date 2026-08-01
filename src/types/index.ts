@@ -26,6 +26,10 @@ export interface WatchFaceElement {
   timeReadingDisplay?: 'DIGITAL';
   /** Exported separator bitmap used by digital TIME_READING HH:MM values. */
   colonImage?: string;
+  /** Exported tabular digit width for split HH and MM TIME_READING widgets. */
+  timeReadingDigitWidth?: number;
+  /** Exported separator width for split HH:MM TIME_READING layout. */
+  timeReadingColonWidth?: number;
   /** Non-destructive compatibility notice attached during FVWF migration. */
   compatibilityWarning?: string;
   images?: string[];

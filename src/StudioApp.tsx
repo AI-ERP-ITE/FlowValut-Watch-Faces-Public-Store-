@@ -73,6 +73,7 @@ import {
   gaugePointerAssetName,
   normalizeGaugePivot,
 } from '@/lib/gaugePointerDefaults';
+import { resolveGaugePointerExportSource } from '@/lib/gaugePointerExportSource';
 import { detectGauge } from '@/lib/gaugeDetector';
 import { renderGaugeAssets } from '@/lib/gaugeRenderer';
 import {
@@ -1539,6 +1540,8 @@ function regenerateDigitFilesFromElements(
       elementUpdates.set(el.id, {
         fontArray: scopedDigits,
         colonImage,
+        timeReadingDigitWidth: family[0]?.width ?? 1,
+        timeReadingColonWidth: colonWidth,
         layoutStartX: layout.startX,
         compatibilityWarning: undefined,
       });
@@ -4262,13 +4265,12 @@ function StudioApp() {
       for (const el of allEditorElements) {
         if (el.type !== 'GAUGE_POINTER') continue;
         const filename = gaugePointerAssetName(el);
-        let sourceDataUrl: string | null = null;
-        if (el.src?.startsWith('data:')) {
-          sourceDataUrl = el.src;
-        } else {
-          const existing = state.elementImages.find((img) => img.name === filename);
-          sourceDataUrl = existing?.dataUrl ?? null;
-        }
+        let sourceDataUrl = resolveGaugePointerExportSource(
+          el,
+          filename,
+          state.elementImages,
+          customGaugePointers,
+        );
         if (!sourceDataUrl && filename === DEFAULT_GAUGE_POINTER_FILENAME) {
           sourceDataUrl = createDefaultGaugePointerDataUrl(el.bounds.width || 40, el.bounds.height || 120);
         }
@@ -4301,8 +4303,7 @@ function StudioApp() {
             s => s.type === 'GAUGE_POINTER' && s.gaugePairId === el.gaugePairId
           );
           if (siblingPointer?.handStyle?.startsWith('custom_gauge:')) {
-            const gaugeKey = siblingPointer.handStyle.replace('custom_gauge:', '');
-            const record = customGaugePointers.find(r => r.key === gaugeKey);
+            const record = customGaugePointers.find(r => r.key === siblingPointer.handStyle);
             if (record?.sourceHtml) {
               try {
                 const parsed = detectGauge(record.sourceHtml);

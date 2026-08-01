@@ -12,6 +12,9 @@ function generate(dataType: 'SUN_RISE' | 'SUN_SET') {
     timeReadingDisplay: 'DIGITAL',
     fontArray: Array.from({ length: 10 }, (_, index) => `digit_${index}.png`),
     colonImage: 'colon.png',
+    timeReadingDigitWidth: 20,
+    timeReadingColonWidth: 8,
+    layoutStartX: 52,
     visible: true,
     zIndex: 1,
   };
@@ -26,14 +29,23 @@ function generate(dataType: 'SUN_RISE' | 'SUN_SET') {
 }
 
 describe('TIME_READING runtime export', () => {
-  it.each(['SUN_RISE', 'SUN_SET'] as const)('exports %s as isolated HH:MM TEXT_IMG', (dataType) => {
+  it.each(['SUN_RISE', 'SUN_SET'] as const)('exports %s as split, zero-padded HH:MM', (dataType) => {
     const code = generate(dataType);
     expect(code).toContain('hmUI.widget.TEXT_IMG');
-    expect(code).toContain(`hmUI.data_type.${dataType}`);
-    expect(code).toContain("dont_path: 'colon.png'");
+    expect(code).toContain('hmUI.widget.IMG');
+    expect(code).toContain("text: '00'");
+    expect(code).toContain("src: 'colon.png'");
+    expect(code).toContain(`day.${dataType === 'SUN_RISE' ? 'sunrise' : 'sunset'}`);
+    expect(code).toContain("('0' + Math.max(0, Math.min(23, Math.floor(hour)))).slice(-2)");
+    expect(code).toContain("('0' + Math.max(0, Math.min(59, Math.floor(minute)))).slice(-2)");
+    expect(code).toContain('setProperty(hmUI.prop.TEXT, hourText)');
+    expect(code).toContain('setProperty(hmUI.prop.TEXT, minuteText)');
+    expect(code).not.toContain(`hmUI.data_type.${dataType}`);
+    expect(code).not.toContain('dont_path:');
     expect(code).toContain("'digit_0.png'");
     expect(code).toContain("'digit_9.png'");
     expect(code).not.toContain('hmUI.widget.IMG_TIME');
     expect(code).not.toContain('hmUI.widget.TIME_POINTER');
+    expect(() => new Function(code)).not.toThrow();
   });
 });
