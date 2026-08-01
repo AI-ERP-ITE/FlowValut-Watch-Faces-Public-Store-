@@ -921,3 +921,21 @@ Private index SHA-256: EA9AFC343AB7EF0605BD7CE94BD6B4E05E5FD0C0E068F3DF146F385E5
 ```
 
 No deployment was performed.
+
+## T028 — Established chooser inventory restoration
+
+**Completed:** 2026-08-01
+
+- Restored every established Image Switcher choice for both new creation and
+  editing: Battery, Steps, Calories, Distance, Stand, PAI Daily/Weekly, Fat
+  Burning, Heart Rate, Stress, SpO2, Humidity, BioCharge, UV, AQI, Weather
+  Status, and Moon Phase.
+- Restored Sleep to new Numeric creation.
+- Restored Steps, Calories, Distance, and Heart Rate to new Arc and Gauge
+  creation.
+- Removed the preview-only/unsafe chooser warnings introduced by the withdrawn
+  restriction.
+- Kept all approved canonical names, Weather Status codes, temperature Numeric
+  behavior, BioCharge support, fixed Weather/Moon counts, user-defined range
+  behavior, FVWF migrations, and runtime generation changes.
+- Verified 43 focused tests, TypeScript, and 57/57 headless checks.
