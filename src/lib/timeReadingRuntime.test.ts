@@ -14,6 +14,7 @@ function generate(dataType: 'SUN_RISE' | 'SUN_SET') {
     colonImage: 'colon.png',
     timeReadingDigitWidth: 20,
     timeReadingColonWidth: 8,
+    timeReadingShadowPadding: 6,
     layoutStartX: 52,
     visible: true,
     zIndex: 1,
@@ -35,6 +36,7 @@ describe('TIME_READING runtime export', () => {
     expect(code).toContain('hmUI.widget.IMG');
     expect(code).toContain("text: '00'");
     expect(code).toContain("src: 'colon.png'");
+    expect(code).toContain('y: px(14)');
     expect(code).toContain(`day.${dataType === 'SUN_RISE' ? 'sunrise' : 'sunset'}`);
     expect(code).toContain("('0' + Math.max(0, Math.min(23, Math.floor(hour)))).slice(-2)");
     expect(code).toContain("('0' + Math.max(0, Math.min(59, Math.floor(minute)))).slice(-2)");

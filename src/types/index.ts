@@ -24,12 +24,14 @@ export interface WatchFaceElement {
   dataType?: string;
   /** TIME_READING presentation. T016 intentionally supports Digital only. */
   timeReadingDisplay?: 'DIGITAL';
-  /** Exported separator bitmap used by digital TIME_READING HH:MM values. */
+  /** Exported separator bitmap used by TIME_READING HH:MM and Sleep H:MM values. */
   colonImage?: string;
   /** Exported tabular digit width for split HH and MM TIME_READING widgets. */
   timeReadingDigitWidth?: number;
   /** Exported separator width for split HH:MM TIME_READING layout. */
   timeReadingColonWidth?: number;
+  /** Export padding added around each Time Reading glyph when its shadow is baked. */
+  timeReadingShadowPadding?: number;
   /** Non-destructive compatibility notice attached during FVWF migration. */
   compatibilityWarning?: string;
   images?: string[];

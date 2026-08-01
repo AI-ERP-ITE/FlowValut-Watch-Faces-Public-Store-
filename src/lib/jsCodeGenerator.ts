@@ -463,6 +463,7 @@ try {
         
         // Sensor for weather and system info
         let weatherSensor = null;
+        let sleepSensor = null;
         const timeReadingRefreshers = [];
         __$$module$$__.module = DeviceRuntimeCore.WatchFace({
             init_view() {
@@ -471,6 +472,11 @@ try {
                     weatherSensor = hmSensor.createSensor(hmSensor.id.WEATHER);
                 } catch (e) {
                     logger.log('Weather sensor init failed:', e);
+                }
+                try {
+                    sleepSensor = hmSensor.createSensor(hmSensor.id.SLEEP);
+                } catch (e) {
+                    logger.log('Sleep sensor init failed:', e);
                 }
                 
                 // ========== NORMAL MODE BACKGROUND ==========
@@ -921,6 +927,7 @@ function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: numbe
 // Pattern from Zepp OS v1.0 docs + ZeppPlayer engine
 // ============================================================
 function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  if (element.dataType === 'SLEEP') return generateSleepDurationWidget(element, widgetIndex, showLevel);
   // Build font_array from element.fontArray or element.images
   const fontImages = element.fontArray || element.images || [];
   const hasLegacyWeatherIconFontArray =
@@ -987,6 +994,60 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
                 });`;
 }
 
+function generateSleepDurationWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  const fontImages = element.fontArray || element.images || [];
+  const prefix = getTextImgPrefixForDataType('SLEEP') || 'sleep_digit';
+  const fontArray = fontImages.length >= 10
+    ? fontImages.slice(0, 10)
+    : Array.from({ length: 10 }, (_, index) => `${prefix}_${index}.png`);
+  const cellWidth = Math.max(1, Math.round(element.timeReadingDigitWidth || element.bounds.height * 0.5));
+  const colonWidth = Math.max(1, Math.round(element.timeReadingColonWidth || cellWidth * 0.45));
+  const hSpace = Math.max(0, Math.round(element.hSpace ?? 1));
+  const hourWidth = cellWidth * 2 + hSpace;
+  const minuteWidth = cellWidth * 2 + hSpace;
+  const totalWidth = hourWidth + colonWidth + minuteWidth + hSpace * 2;
+  const alignH = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
+  const startX = alignH === 'RIGHT'
+    ? element.bounds.x + element.bounds.width - totalWidth
+    : alignH === 'LEFT'
+      ? element.bounds.x
+      : Math.round(element.bounds.x + element.bounds.width / 2 - totalWidth / 2);
+  const colonX = startX + hourWidth + hSpace;
+  const minuteX = colonX + colonWidth + hSpace;
+  const fontArraySource = `[${fontArray.map((asset) => `'${asset}'`).join(', ')}]`;
+  return `
+                // ${element.name} - Sleep Duration (H:MM)
+                let widget_${widgetIndex}_sleep_hour = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
+                    x: px(${startX}), y: px(${element.bounds.y}), w: px(${hourWidth}), h: px(${element.bounds.height || 40}),
+                    font_array: ${fontArraySource}, text: '0', h_space: ${hSpace}, align_h: hmUI.align.RIGHT,
+                    show_level: hmUI.show_level.${showLevel}
+                });
+                let widget_${widgetIndex}_sleep_colon = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${colonX}), y: px(${element.bounds.y}), w: px(${colonWidth}), h: px(${element.bounds.height || 40}),
+                    src: '${element.colonImage || 'sleep_digit_colon.png'}', show_level: hmUI.show_level.${showLevel}
+                });
+                let widget_${widgetIndex}_sleep_minute = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
+                    x: px(${minuteX}), y: px(${element.bounds.y}), w: px(${minuteWidth}), h: px(${element.bounds.height || 40}),
+                    font_array: ${fontArraySource}, text: '00', h_space: ${hSpace}, align_h: hmUI.align.LEFT,
+                    show_level: hmUI.show_level.${showLevel}
+                });
+                const refresh_sleep_duration_${widgetIndex} = function() {
+                    if (!sleepSensor) return;
+                    let totalMinutes = NaN;
+                    try {
+                        if (typeof sleepSensor.getTotalTime === 'function') totalMinutes = Number(sleepSensor.getTotalTime());
+                        else if (typeof sleepSensor.getInfo === 'function') totalMinutes = Number(sleepSensor.getInfo().totalTime);
+                    } catch (e) { logger.log('Sleep duration read failed:', e); }
+                    if (!isFinite(totalMinutes) || totalMinutes < 0) return;
+                    const hoursText = String(Math.floor(totalMinutes / 60));
+                    const minutesText = ('0' + String(Math.floor(totalMinutes % 60))).slice(-2);
+                    widget_${widgetIndex}_sleep_hour.setProperty(hmUI.prop.TEXT, hoursText);
+                    widget_${widgetIndex}_sleep_minute.setProperty(hmUI.prop.TEXT, minutesText);
+                };
+                timeReadingRefreshers.push(refresh_sleep_duration_${widgetIndex});
+                refresh_sleep_duration_${widgetIndex}();`;
+}
+
 // Digital Sunrise/Sunset. Read the documented Weather forecast hour/minute
 // fields and render two zero-padded TEXT_IMG pairs around a separator IMG.
 function generateTimeReadingWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
@@ -1011,13 +1072,14 @@ function generateTimeReadingWidget(element: WatchFaceElement, widgetIndex: numbe
         : Math.round(element.bounds.x + element.bounds.width / 2 - totalWidth / 2);
   const colonX = startX + pairWidth + hSpace;
   const minuteX = colonX + colonWidth + hSpace;
+  const renderY = element.bounds.y - (element.timeReadingShadowPadding || 0);
   const fontArraySource = `[${fontArray.map((asset) => `'${asset}'`).join(', ')}]`;
 
   return `
                 // ${element.name} - Digital Time Reading (zero-padded HH:MM)
                 let widget_${widgetIndex}_hour = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
                     x: px(${startX}),
-                    y: px(${element.bounds.y}),
+                    y: px(${renderY}),
                     w: px(${pairWidth}),
                     h: px(${element.bounds.height || 80}),
                     font_array: ${fontArraySource},
@@ -1028,7 +1090,7 @@ function generateTimeReadingWidget(element: WatchFaceElement, widgetIndex: numbe
                 });
                 let widget_${widgetIndex}_colon = hmUI.createWidget(hmUI.widget.IMG, {
                     x: px(${colonX}),
-                    y: px(${element.bounds.y}),
+                    y: px(${renderY}),
                     w: px(${colonWidth}),
                     h: px(${element.bounds.height || 80}),
                     src: '${element.colonImage || 'time_reading_colon.png'}',
@@ -1036,7 +1098,7 @@ function generateTimeReadingWidget(element: WatchFaceElement, widgetIndex: numbe
                 });
                 let widget_${widgetIndex}_minute = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
                     x: px(${minuteX}),
-                    y: px(${element.bounds.y}),
+                    y: px(${renderY}),
                     w: px(${pairWidth}),
                     h: px(${element.bounds.height || 80}),
                     font_array: ${fontArraySource},

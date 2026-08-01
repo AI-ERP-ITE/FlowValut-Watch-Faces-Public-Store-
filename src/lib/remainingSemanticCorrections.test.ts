@@ -22,7 +22,7 @@ function config(elements: WatchFaceElement[], aodElements?: WatchFaceElement[]):
 }
 
 describe('T025D remaining semantic corrections', () => {
-  it('keeps the established Sleep numeric option available', () => {
+  it('renders the established Sleep numeric option as H:MM from total minutes', () => {
     expect(DATA_REPRESENTATION_DESCRIPTORS.SLEEP).toMatchObject({
       semanticKind: 'duration', representations: [],
       legacyRepresentations: ['NUMERIC_VALUE'], requiredSymbols: ['colon'],
@@ -30,6 +30,19 @@ describe('T025D remaining semantic corrections', () => {
     expect(getAllowedDataTypesForElement('TEXT_IMG')).toContain('SLEEP');
     expect(getNewElementAllowedDataTypes('TEXT_IMG')).toContain('SLEEP');
     expect(hasUnprovenLegacyRepresentation('TEXT_IMG', 'SLEEP')).toBe(false);
+    const sleep: WatchFaceElement = {
+      id: 'sleep', name: 'Sleep Duration', type: 'TEXT_IMG', dataType: 'SLEEP',
+      bounds: { x: 20, y: 30, width: 120, height: 40 }, visible: true, zIndex: 1,
+      fontArray: Array.from({ length: 10 }, (_, i) => `sleep_${i}.png`),
+      colonImage: 'sleep_colon.png', timeReadingDigitWidth: 18, timeReadingColonWidth: 8,
+    };
+    const generated = generateWatchFaceCode(config([sleep])).watchfaceIndexJs;
+    expect(generated).toContain('hmSensor.id.SLEEP');
+    expect(generated).toContain("src: 'sleep_colon.png'");
+    expect(generated).toContain('sleepSensor.getTotalTime()');
+    expect(generated).toContain('Math.floor(totalMinutes / 60)');
+    expect(generated).toContain('Math.floor(totalMinutes % 60)');
+    expect(generated).not.toContain('hmUI.data_type.SLEEP');
   });
 
   it.each(['STEP', 'CAL', 'DISTANCE', 'HEART'])('%s retains its established Numeric, Arc, and Gauge choices', dataType => {

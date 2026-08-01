@@ -1343,12 +1343,17 @@ function regenerateDigitFilesFromElements(
   // Skipped wrapper — callers pass w and h directly
   function makeDigitFamily(
     color: string, fontFamily: string, fontWeight: string, targetH: number, tabular = false,
+    dropShadow?: WatchFaceElement['dropShadow'],
   ) {
     // Each digit PNG is rendered at fontSize = targetH × 0.8 (matching the canvas
     // text-fallback) with width = natural font advance per digit. No fill ratio.
     // No shared fixed width. Device advances by naturalWidth → matches canvas exactly.
     const h = Math.max(targetH, 8);
-    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, { tabular });
+    const normalizedShadow = dropShadow ? normalizeDropShadowForBake(dropShadow) : undefined;
+    return generateOptimizedDigitBitmaps(fontFamily, fontWeight, h, color, {
+      tabular,
+      ...(normalizedShadow ? { shadow: { ...normalizedShadow, pad: dropShadowPaddingForBake(normalizedShadow) } } : {}),
+    });
   }
 
   function makeLabelCanvas(
@@ -1359,12 +1364,16 @@ function regenerateDigitFilesFromElements(
     w: number,
     h: number,
     watchSafeTextEdges: boolean,
+    dropShadow?: WatchFaceElement['dropShadow'],
   ): string {
+    const normalizedShadow = dropShadow ? normalizeDropShadowForBake(dropShadow) : undefined;
+    const pad = normalizedShadow ? dropShadowPaddingForBake(normalizedShadow) : 0;
     const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
+    canvas.width = w + pad * 2; canvas.height = h + pad * 2;
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = color;
+    if (normalizedShadow) applyShadowToCtx(ctx, normalizedShadow);
     // Auto-fit: start at 80% of height, reduce until text fits width (prevents clipping on device)
     let fontSize = Math.floor(h * 0.8);
     ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
@@ -1374,7 +1383,7 @@ function regenerateDigitFilesFromElements(
     }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, w / 2, h / 2);
+    ctx.fillText(label, pad + w / 2, pad + h / 2);
     if (watchSafeTextEdges) {
       const rasterWidth = canvas.width;
       const rasterHeight = canvas.height;
@@ -1510,7 +1519,7 @@ function regenerateDigitFilesFromElements(
     } else if (el.type === 'TIME_READING' && (el.dataType === 'SUN_RISE' || el.dataType === 'SUN_SET')) {
       const prefix = getTextImgPrefixForDataType(el.dataType) || 'time_reading_digit';
       const h = Math.max((el.fontSize && el.fontSize > 0 ? el.fontSize : el.bounds.height) || 40, 12);
-      const family = makeDigitFamily(color, fontFamily, fontWeight, h, true);
+      const family = makeDigitFamily(color, fontFamily, fontWeight, h, true, el.dropShadow);
       const scopedDigits: string[] = [];
       for (let i = 0; i < 10; i++) {
         const filename = `${prefix}_${scope}_${safeId}_${i}.png`;
@@ -1524,7 +1533,7 @@ function regenerateDigitFilesFromElements(
       const colonImage = `time_reading_colon_${scope}_${safeId}.png`;
       results.push({
         filename: colonImage,
-        dataUrl: makeLabelCanvas(':', color, fontFamily, fontWeight, colonWidth, h, el.watchSafeTextEdges === true),
+        dataUrl: makeLabelCanvas(':', color, fontFamily, fontWeight, colonWidth, h, el.watchSafeTextEdges === true, el.dropShadow),
       });
       const layout = computeDigitBitmapLayout({
         widgetType: 'TEXT_IMG',
@@ -1534,14 +1543,15 @@ function regenerateDigitFilesFromElements(
         hSpace: Number(el.hSpace) || 0,
         bitmaps: [
           ...family.map((digit) => ({ char: digit.char, width: digit.width, height: digit.height })),
-          { char: ':', width: colonWidth, height: h },
+          { char: ':', width: colonWidth + (el.dropShadow ? shadowPadding(el.dropShadow) * 2 : 0), height: family[0]?.height ?? h },
         ],
       });
       elementUpdates.set(el.id, {
         fontArray: scopedDigits,
         colonImage,
         timeReadingDigitWidth: family[0]?.width ?? 1,
-        timeReadingColonWidth: colonWidth,
+        timeReadingColonWidth: colonWidth + (el.dropShadow ? shadowPadding(el.dropShadow) * 2 : 0),
+        timeReadingShadowPadding: el.dropShadow ? shadowPadding(el.dropShadow) : 0,
         layoutStartX: layout.startX,
         compatibilityWarning: undefined,
       });
@@ -1606,6 +1616,24 @@ function regenerateDigitFilesFromElements(
           });
           temperatureBitmapMetrics.push({ char: '.', width: decimalWidth, height: h });
           temperatureResources = { ...temperatureResources, decimalImage };
+        }
+        if (el.dataType === 'SLEEP') {
+          const colonImage = `${prefix}_${scope}_${safeId}_colon.png`;
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d')!;
+          ctx.font = `${fontWeight} ${Math.floor(h * 0.8)}px ${fontFamily}`;
+          const colonWidth = Math.max(2, Math.ceil(ctx.measureText(':').width + 2));
+          results.push({
+            filename: colonImage,
+            dataUrl: makeLabelCanvas(':', color, fontFamily, fontWeight, colonWidth, h, el.watchSafeTextEdges === true),
+          });
+          temperatureBitmapMetrics.push({ char: ':', width: colonWidth, height: h });
+          temperatureResources = {
+            ...temperatureResources,
+            colonImage,
+            timeReadingDigitWidth: family[0]?.width ?? 1,
+            timeReadingColonWidth: colonWidth,
+          };
         }
         const textImgBitmaps: DigitBitmapMetrics[] = [
           ...family.map(rd => ({ char: rd.char, width: rd.width, height: rd.height })),
@@ -4728,6 +4756,13 @@ function StudioApp() {
             missing.push('TIME_READING requires ten digit assets and one colon asset');
           }
           missing.push(...timeReadingAssets.filter((asset) => !temperatureAssetNames.has(asset)));
+        }
+        if (element.type === 'TEXT_IMG' && element.dataType === 'SLEEP') {
+          if ((element.fontArray?.length || 0) < 10 || !element.colonImage) {
+            missing.push('Sleep Duration requires ten digit assets and one colon asset');
+          } else if (!temperatureAssetNames.has(element.colonImage)) {
+            missing.push(element.colonImage);
+          }
         }
         if (missing.length > 0) {
           throw new Error(`Generated widget assets missing before build (${element.id}): ${[...new Set(missing)].join(', ')}`);

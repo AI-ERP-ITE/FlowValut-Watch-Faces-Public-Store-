@@ -206,7 +206,10 @@ export function generateOptimizedDigitBitmaps(
   fontWeight: string,
   targetHeight: number,
   color: string,
-  options?: { tabular?: boolean },
+  options?: {
+    tabular?: boolean;
+    shadow?: { color: string; opacity: number; blur: number; offsetX: number; offsetY: number; pad: number };
+  },
 ): RenderedDigit[] {
   const bitmapH = Math.max(4, targetHeight);
   // Match the canvas preview font size exactly (InteractiveCanvas fallback uses h * 0.8)
@@ -228,24 +231,38 @@ export function generateOptimizedDigitBitmaps(
     const digit = String(i);
     // Natural advance = what the browser font renderer advances per character.
     // This is exactly what ctx.fillText uses, so canvas and device advances are identical.
-    const bitmapW = options?.tabular ? tabularWidth : naturalWidths[i];
+    const contentW = options?.tabular ? tabularWidth : naturalWidths[i];
+    const shadowPad = options?.shadow?.pad ?? 0;
+    const bitmapW = contentW + shadowPad * 2;
+    const outputH = bitmapH + shadowPad * 2;
 
     const canvas = document.createElement('canvas');
     canvas.width = bitmapW;
-    canvas.height = bitmapH;
+    canvas.height = outputH;
     const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, bitmapW, bitmapH);
+    ctx.clearRect(0, 0, bitmapW, outputH);
+    if (options?.shadow) {
+      const shadow = options.shadow;
+      const hex = shadow.color.replace('#', '');
+      const r = parseInt(hex.slice(0, 2), 16) || 0;
+      const g = parseInt(hex.slice(2, 4), 16) || 0;
+      const b = parseInt(hex.slice(4, 6), 16) || 0;
+      ctx.shadowColor = `rgba(${r},${g},${b},${shadow.opacity})`;
+      ctx.shadowBlur = shadow.blur;
+      ctx.shadowOffsetX = shadow.offsetX;
+      ctx.shadowOffsetY = shadow.offsetY;
+    }
     ctx.fillStyle = color;
     ctx.font = font;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(digit, bitmapW / 2, bitmapH / 2);
+    ctx.fillText(digit, shadowPad + contentW / 2, shadowPad + bitmapH / 2);
 
     return {
       char: digit,
       dataUrl: canvas.toDataURL('image/png'),
       width: bitmapW,
-      height: bitmapH,
+      height: outputH,
       measurement: m,
     };
   });
