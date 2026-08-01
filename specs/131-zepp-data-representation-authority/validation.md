@@ -170,6 +170,30 @@ synchronization is deferred to a later explicitly approved stage.
 
 No deployment was performed.
 
+## T027 — Canonical private deployment
+
+**Completed:** 2026-08-01  
+**Target:** private `origin/main` only
+
+- Ran the required private Firebase environment preflight successfully.
+- Ran only `npm run deploy:full:private`.
+- Built System A successfully with 8,235 transformed modules.
+- Built and staged the standalone System B route successfully with 7,918
+  transformed modules; no System B source implementation was changed.
+- Deployment commit: `4dbba314f546a5721a818a18ab6f27d863577603`.
+- System A production assets: `index-DL69yRev.js` and
+  `index-wLIbbYR0.css`.
+- System B production assets: `index-CyynwCBB.js` and
+  `index-jiNJ2ex5.css`.
+- Committed root, `docs/`, Studio, and parametric HTML all reference the same
+  System A production hashes and contain no `/src/main.tsx` entrypoint.
+- Root and `docs/` System B HTML are byte-identical.
+- Live root, System A JS/CSS, Studio query, parametric query, System B route,
+  and System B JS/CSS all returned HTTP 200 and served the expected hashes.
+- The public remote was not pushed or otherwise modified. Its catalog endpoint
+  remained reachable with HTTP 200.
+- Physical-watch verification remains pending user installation and inspection.
+
 ## T006 — Weather migration
 
 **Completed:** 2026-07-31  

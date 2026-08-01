@@ -56,10 +56,9 @@ approves that exact task; then stop and report before continuing.
 - [x] **T025C Legacy Image Switcher truthfulness:** New creation now offers only proven Humidity/BioCharge range contracts and fixed Weather/Moon contracts. Existing Battery/Steps/Stress/etc. switchers remain loadable and editable without asset loss, show a preview-only warning, and cannot be changed into another unsafe legacy type.
 - [x] **T025D Remaining semantic corrections:** Made Sleep legacy-only pending Duration Readings; made Steps/Calories/Heart/Distance Numeric-only for new widgets while preserving warned legacy bounded elements; added Distance decimal generation/strict packaging; set SpO₂ to 51–100; and added AQI 1–999 plus mainland-China warnings.
 - [x] **T026 Full regression:** Spec 131 passed 104/104 focused tests, TypeScript, 57/57 headless checks, private Firebase/Vite build, FVWF fixtures, and nested-ZPK reference inspection. Full-suite unrelated baseline failures are classified in `t026-regression-report.md`; the physical-watch matrix is prepared and remains pending after T027 deployment.
-- [ ] **T027 Private deployment:** After explicit deployment approval, use only `npm run deploy:full:private`; verify root/Studio/parametric/System B hashes and live assets.
+- [x] **T027 Private deployment:** Used only `npm run deploy:full:private` after explicit approval. Deployment commit `4dbba314` published System A `index-DL69yRev.js` / `index-wLIbbYR0.css` and rebuilt System B `index-CyynwCBB.js` / `index-jiNJ2ex5.css` to private `origin/main`. Root, Studio query, parametric query, System B HTML, and all referenced assets returned HTTP 200 with no development entrypoint. Physical-watch verification remains user-operated.
 
-## Recommended next approval
+## Next verification
 
-Approve **T027 only** to perform the canonical private deployment using
-`npm run deploy:full:private`, then verify root/Studio/parametric/System B hashes
-and begin the physical-watch checklist. Deployment is not yet authorized.
+Run the physical-watch checklist in `t026-regression-report.md` against the
+deployed private build. No further deployment approval is pending.
