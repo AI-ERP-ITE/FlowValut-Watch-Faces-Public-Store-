@@ -22,23 +22,23 @@ function config(elements: WatchFaceElement[], aodElements?: WatchFaceElement[]):
 }
 
 describe('T025D remaining semantic corrections', () => {
-  it('keeps Sleep legacy-readable but removes it from new scalar creation', () => {
+  it('keeps the established Sleep numeric option available', () => {
     expect(DATA_REPRESENTATION_DESCRIPTORS.SLEEP).toMatchObject({
       semanticKind: 'duration', representations: [],
       legacyRepresentations: ['NUMERIC_VALUE'], requiredSymbols: ['colon'],
     });
     expect(getAllowedDataTypesForElement('TEXT_IMG')).toContain('SLEEP');
-    expect(getNewElementAllowedDataTypes('TEXT_IMG')).not.toContain('SLEEP');
-    expect(hasUnprovenLegacyRepresentation('TEXT_IMG', 'SLEEP')).toBe(true);
+    expect(getNewElementAllowedDataTypes('TEXT_IMG')).toContain('SLEEP');
+    expect(hasUnprovenLegacyRepresentation('TEXT_IMG', 'SLEEP')).toBe(false);
   });
 
-  it.each(['STEP', 'CAL', 'DISTANCE', 'HEART'])('%s is Numeric-only for new widgets while legacy bounded elements remain readable', dataType => {
+  it.each(['STEP', 'CAL', 'DISTANCE', 'HEART'])('%s retains its established Numeric, Arc, and Gauge choices', dataType => {
     expect(getNewElementAllowedDataTypes('TEXT_IMG')).toContain(dataType);
-    expect(getNewElementAllowedDataTypes('ARC_PROGRESS')).not.toContain(dataType);
-    expect(getNewElementAllowedDataTypes('GAUGE_POINTER')).not.toContain(dataType);
+    expect(getNewElementAllowedDataTypes('ARC_PROGRESS')).toContain(dataType);
+    expect(getNewElementAllowedDataTypes('GAUGE_POINTER')).toContain(dataType);
     expect(getAllowedDataTypesForElement('ARC_PROGRESS')).toContain(dataType);
     expect(getAllowedDataTypesForElement('GAUGE_POINTER')).toContain(dataType);
-    expect(hasUnprovenLegacyRepresentation('ARC_PROGRESS', dataType)).toBe(true);
+    expect(hasUnprovenLegacyRepresentation('ARC_PROGRESS', dataType)).toBe(false);
   });
 
   it('models SpO2 as 51-100 and AQI as region-gated 1-999', () => {

@@ -194,25 +194,18 @@ export function normalizeDataAlias(dataType: string | undefined): string | undef
 /** Legacy compatibility inventory. Existing elements/definitions must remain loadable. */
 export const IMAGE_SWITCHER_DATA_TYPES = ELEMENT_TO_DATA.IMAGE_SWITCHER;
 
-/** Truthful new-creation choices: fixed contracts or custom ranges proven to reach device output. */
-export const IMAGE_SWITCHER_NEW_DATA_TYPES = Object.freeze([
-  'HUMIDITY',
-  'BIO_CHARGE',
-  'WEATHER_STATUS',
-  'MOON',
-] as const);
+/** New creation retains every established Image Switcher source. */
+export const IMAGE_SWITCHER_NEW_DATA_TYPES = IMAGE_SWITCHER_DATA_TYPES;
 
 export function isNewImageSwitcherDataType(dataType: string | undefined): boolean {
   const normalized = normalizeImageSwitcherDataType(dataType);
-  return !!normalized && IMAGE_SWITCHER_NEW_DATA_TYPES.includes(
-    normalized as (typeof IMAGE_SWITCHER_NEW_DATA_TYPES)[number],
-  );
+  return !!normalized && IMAGE_SWITCHER_NEW_DATA_TYPES.includes(normalized);
 }
 
-/** New choices plus the current legacy value, so editing never silently converts saved work. */
+/** All established choices remain available while editing and creating definitions. */
 export function getEditableImageSwitcherDataTypes(currentDataType?: string): readonly string[] {
   const normalized = normalizeImageSwitcherDataType(currentDataType);
-  if (!normalized || isNewImageSwitcherDataType(normalized)) return IMAGE_SWITCHER_NEW_DATA_TYPES;
+  if (!normalized || isNewImageSwitcherDataType(normalized)) return IMAGE_SWITCHER_DATA_TYPES;
   return [normalized, ...IMAGE_SWITCHER_NEW_DATA_TYPES];
 }
 
@@ -272,33 +265,19 @@ export function getAllowedDataTypesForElement(type: WatchFaceElement['type'], su
   );
 }
 
-const NEW_NUMERIC_EXCLUSIONS = new Set(['SLEEP']);
-const NEW_BOUNDED_EXCLUSIONS = new Set(['STEP', 'CAL', 'DISTANCE', 'HEART']);
-
-/** New-element authority; legacy allow-lists remain unchanged so saved work is never rewritten. */
+/** New widgets retain the established chooser inventory. */
 export function getNewElementAllowedDataTypes(
   type: WatchFaceElement['type'],
   subtype?: string,
 ): readonly string[] {
-  if (type === 'IMG_LEVEL') return IMAGE_SWITCHER_NEW_DATA_TYPES;
-  const allowed = getAllowedDataTypesForElement(type, subtype);
-  if (type === 'TEXT' || type === 'TEXT_IMG') {
-    return allowed.filter(dataType => !NEW_NUMERIC_EXCLUSIONS.has(dataType));
-  }
-  if (type === 'ARC_PROGRESS' || type === 'GAUGE_POINTER') {
-    return allowed.filter(dataType => !NEW_BOUNDED_EXCLUSIONS.has(dataType));
-  }
-  return allowed;
+  return getAllowedDataTypesForElement(type, subtype);
 }
 
 export function hasUnprovenLegacyRepresentation(
-  type: WatchFaceElement['type'],
-  dataType: string | undefined,
+  _type: WatchFaceElement['type'],
+  _dataType: string | undefined,
 ): boolean {
-  const normalized = normalizeDataAlias(dataType);
-  if (!normalized) return false;
-  if ((type === 'TEXT' || type === 'TEXT_IMG') && NEW_NUMERIC_EXCLUSIONS.has(normalized)) return true;
-  return (type === 'ARC_PROGRESS' || type === 'GAUGE_POINTER') && NEW_BOUNDED_EXCLUSIONS.has(normalized);
+  return false;
 }
 
 export function getAllowedElementsForData(dataType: string): RuleElementKey[] {

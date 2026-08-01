@@ -5,36 +5,41 @@ import {
   IMAGE_SWITCHER_NEW_DATA_TYPES,
   getAllowedDataTypesForElement,
   getEditableImageSwitcherDataTypes,
+  getNewElementAllowedDataTypes,
+  hasUnprovenLegacyRepresentation,
   isNewImageSwitcherDataType,
 } from './elementDataRules';
 import { parseProjectFileArtifact } from './projectFileArtifact';
 
-const PROVEN_NEW_CHOICES = ['HUMIDITY', 'BIO_CHARGE', 'WEATHER_STATUS', 'MOON'];
-const LEGACY_PREVIEW_ONLY = [
+const ESTABLISHED_RANGE_CHOICES = [
   'BATTERY', 'STEP', 'CAL', 'DISTANCE', 'STAND', 'PAI_DAILY', 'PAI_WEEKLY',
   'FAT_BURNING', 'HEART', 'STRESS', 'SPO2', 'UVI', 'AQI',
 ];
 
-describe('T025C truthful Image Switcher creation gate', () => {
-  it('offers only runtime-proven contracts for new switchers', () => {
-    expect([...IMAGE_SWITCHER_NEW_DATA_TYPES]).toEqual(PROVEN_NEW_CHOICES);
-    for (const dataType of PROVEN_NEW_CHOICES) expect(isNewImageSwitcherDataType(dataType)).toBe(true);
-    for (const dataType of LEGACY_PREVIEW_ONLY) expect(isNewImageSwitcherDataType(dataType)).toBe(false);
+describe('T025C established widget inventory restoration', () => {
+  it('offers every established and approved Image Switcher source for new definitions', () => {
+    expect(IMAGE_SWITCHER_NEW_DATA_TYPES).toEqual(IMAGE_SWITCHER_DATA_TYPES);
+    for (const dataType of IMAGE_SWITCHER_DATA_TYPES) expect(isNewImageSwitcherDataType(dataType)).toBe(true);
   });
 
-  it('retains the complete legacy inventory for compatibility and validation', () => {
+  it('retains the complete Image Switcher inventory for creation, editing, and validation', () => {
     expect(getAllowedDataTypesForElement('IMG_LEVEL')).toEqual(IMAGE_SWITCHER_DATA_TYPES);
-    for (const dataType of LEGACY_PREVIEW_ONLY) expect(IMAGE_SWITCHER_DATA_TYPES).toContain(dataType);
+    expect(getNewElementAllowedDataTypes('IMG_LEVEL')).toEqual(IMAGE_SWITCHER_DATA_TYPES);
+    expect(getEditableImageSwitcherDataTypes('BATTERY')).toEqual(IMAGE_SWITCHER_DATA_TYPES);
+    expect(getEditableImageSwitcherDataTypes('HUMIDITY')).toEqual(IMAGE_SWITCHER_DATA_TYPES);
+    for (const dataType of ESTABLISHED_RANGE_CHOICES) expect(IMAGE_SWITCHER_DATA_TYPES).toContain(dataType);
   });
 
-  it('lets an existing legacy switcher keep its type but prevents switching to another unsafe type', () => {
-    expect(getEditableImageSwitcherDataTypes('BATTERY')).toEqual([
-      'BATTERY', ...PROVEN_NEW_CHOICES,
-    ]);
-    expect(getEditableImageSwitcherDataTypes('STRESS')).toEqual([
-      'STRESS', ...PROVEN_NEW_CHOICES,
-    ]);
-    expect(getEditableImageSwitcherDataTypes('HUMIDITY')).toEqual(PROVEN_NEW_CHOICES);
+  it('does not subtract established options from other widget choosers', () => {
+    expect(getNewElementAllowedDataTypes('TEXT_IMG')).toEqual(getAllowedDataTypesForElement('TEXT_IMG'));
+    expect(getNewElementAllowedDataTypes('ARC_PROGRESS')).toEqual(getAllowedDataTypesForElement('ARC_PROGRESS'));
+    expect(getNewElementAllowedDataTypes('GAUGE_POINTER')).toEqual(getAllowedDataTypesForElement('GAUGE_POINTER'));
+    expect(getNewElementAllowedDataTypes('TEXT_IMG')).toContain('SLEEP');
+    for (const dataType of ['STEP', 'CAL', 'DISTANCE', 'HEART']) {
+      expect(getNewElementAllowedDataTypes('ARC_PROGRESS')).toContain(dataType);
+      expect(getNewElementAllowedDataTypes('GAUGE_POINTER')).toContain(dataType);
+      expect(hasUnprovenLegacyRepresentation('ARC_PROGRESS', dataType)).toBe(false);
+    }
   });
 
   it('round-trips legacy FVWF elements without changing assets or thresholds', () => {

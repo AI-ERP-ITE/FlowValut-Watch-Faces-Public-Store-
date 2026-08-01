@@ -22,7 +22,6 @@ import {
 import {
   IMAGE_SWITCHER_POLICY,
   getEditableImageSwitcherDataTypes,
-  isNewImageSwitcherDataType,
   IMAGE_SWITCHER_DEFAULT_MOON_FRAME_COUNT,
   IMAGE_SWITCHER_MOON_FRAME_COUNTS,
   getDataTypeLabel,
@@ -337,12 +336,6 @@ export default function ImageSwitcherLab() {
         <p className="text-[10px] text-white/35">
           Policy: <span className="text-white/55">{policyLabel(policyType)}</span>
         </p>
-
-        {editingId && !isNewImageSwitcherDataType(dataType) && (
-          <p className="rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] text-amber-200">
-            Legacy definition preserved for compatibility. These custom thresholds are preview-only and are not proven to control watch output. New definitions are limited to proven range or fixed-set contracts.
-          </p>
-        )}
 
         {boundedHundredRepair && boundedHundredRepair.issues.length > 0 && (
           <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2 space-y-1.5">
