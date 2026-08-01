@@ -939,3 +939,23 @@ No deployment was performed.
   behavior, BioCharge support, fixed Weather/Moon counts, user-defined range
   behavior, FVWF migrations, and runtime generation changes.
 - Verified 43 focused tests, TypeScript, and 57/57 headless checks.
+
+## T029 — Time Reading format and raster-effect export parity
+
+**Completed:** 2026-08-01
+
+- Confirmed from official Zepp documentation that Sunrise/Sunset are `HH:MM`
+  values and Weather forecast entries expose separate hour/minute fields.
+- Replaced the hardware-failing single bound `TEXT_IMG` with two explicitly
+  zero-padded digit pairs and one baked colon image.
+- Added init/resume refresh from the Weather sensor with object, numeric-HHMM,
+  and string-HH:MM compatibility parsing.
+- Persisted digit and separator widths so generated runtime placement matches
+  the canvas `HH:MM` layout.
+- Audited every existing raster adjustment surface in
+  `effect-export-parity-audit.md`.
+- Fixed custom Gauge Pointer export source resolution: exact
+  `custom_gauge:<slug>` library records now feed the same deterministic effects
+  baker used for packaged pointer PNGs.
+- Verified 43 focused tests, generated-code syntax, TypeScript, package
+  inspection, and 57/57 headless checks.
