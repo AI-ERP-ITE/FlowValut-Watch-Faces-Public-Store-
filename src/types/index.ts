@@ -74,11 +74,23 @@ export interface WatchFaceElement {
   pivotY?: number;
   // Optional logical pairing metadata for gauge composition (ARC_PROGRESS + GAUGE_POINTER)
   gaugePairId?: string;
+  // Spec 132: direct layered-PNG gauge composition sources.
+  gaugePngBackgroundSrc?: string;
+  gaugePngForegroundSrc?: string;
+  gaugePngSwitcherFrames?: string[];
   // Spec 091: canvas-only guide arc overlay for calibrating needle arc range (never baked into ZPK)
   guideArcVisible?: boolean;
   // Spec 092: canvas preview draw angle — set once at build time from the needle's natural SVG rotate(N).
   // Changing startAngle/endAngle does NOT update this.
   previewAngle?: number;
+
+  // Spec 132: raster-authored arc mode. Missing mode preserves native ARC_PROGRESS.
+  arcRenderMode?: 'native' | 'png-frames';
+  arcPngTrackSrc?: string;
+  arcPngActiveSrc?: string;
+  arcPngFrameCount?: 11 | 21;
+  arcPngDirection?: 'clockwise' | 'counter-clockwise';
+  arcPngFrames?: string[];
 
   // BUTTON specific
   clickAction?: string;

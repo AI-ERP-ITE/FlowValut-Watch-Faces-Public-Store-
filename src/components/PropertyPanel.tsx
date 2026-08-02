@@ -36,6 +36,8 @@ import { normalizeHorizontalDigitAlign, type HorizontalDigitAlign } from '@/lib/
 import { fitDigitFrameToContent } from '@/lib/digitFrameFit';
 import { measureDigitWidgetContent } from '@/lib/digitFrameMeasurement';
 import { isCompleteDayImageMode } from '@/lib/dateImageMode';
+import { composeLayeredPngGauge } from '@/lib/layeredPngGauge';
+import { estimateDataUrlBytes, generatePngArcFrames } from '@/lib/pngArcFrameGenerator';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -418,6 +420,63 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
     setCreatorStatus(`Gauge pointer built from markup (${extracted.strategy}).`);
     } catch (err) {
       setCreatorStatus(`⚠ Gauge build error: ${(err as Error).message}`);
+    }
+  };
+
+  const readPngFiles = async (files: FileList | null): Promise<string[]> => {
+    if (!files?.length) return [];
+    const selected = Array.from(files);
+    if (selected.some(file => file.type !== 'image/png' && !file.name.toLowerCase().endsWith('.png'))) {
+      throw new Error('Only PNG files are supported');
+    }
+    return Promise.all(selected.map(file => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error(`Unable to read ${file.name}`));
+      reader.readAsDataURL(file);
+    })));
+  };
+
+  const buildGaugeFromPngLayers = () => {
+    if (!element || element.type !== 'GAUGE_POINTER') return;
+    try {
+      const composition = composeLayeredPngGauge(element);
+      if (elements && onRemoveSiblingElements) {
+        const staleIds = elements
+          .filter(candidate => candidate.id !== element.id && composition.staleAssetPrefixes.some(prefix =>
+            prefix.endsWith('.png')
+              ? candidate.assetFilename === prefix
+              : (candidate.assetFilename ?? '').startsWith(prefix)))
+          .map(candidate => candidate.id);
+        if (staleIds.length) onRemoveSiblingElements(staleIds);
+      }
+      update(composition.pointerChanges);
+      for (const sibling of composition.siblings) onAddSiblingElement?.(sibling);
+      setCreatorStatus(`Layered PNG gauge built: ${composition.siblings.length + 1} layer(s).`);
+    } catch (error) {
+      setCreatorStatus(`⚠ ${(error as Error).message}`);
+    }
+  };
+
+  const buildPngArcFrames = async () => {
+    if (!element || element.type !== 'ARC_PROGRESS') return;
+    if (!element.arcPngActiveSrc) {
+      setCreatorStatus('⚠ Upload the fully active arc PNG first.');
+      return;
+    }
+    setCreatorStatus('Generating PNG Arc frames — do not export until complete…');
+    try {
+      const frames = await generatePngArcFrames(element.arcPngActiveSrc, {
+        startAngle: element.startAngle ?? 135,
+        endAngle: element.endAngle ?? 345,
+        direction: element.arcPngDirection ?? 'clockwise',
+        frameCount: element.arcPngFrameCount ?? 11,
+      });
+      update({ arcRenderMode: 'png-frames', arcPngFrames: frames });
+      const kib = estimateDataUrlBytes(frames) / 1024;
+      setCreatorStatus(`PNG Arc ready: ${frames.length} frames, approximately ${kib.toFixed(1)} KiB before packaging.`);
+    } catch (error) {
+      setCreatorStatus(`⚠ PNG Arc generation failed: ${(error as Error).message}`);
     }
   };
 
@@ -1298,9 +1357,84 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
               <NumField label="LW" value={element.lineWidth ?? 8} onChange={v => update({ lineWidth: clamp(v, 1, 40) })} />
             </FieldRow>
             <FieldRow>
-              <NumField label="Sta°" value={element.startAngle ?? 135} onChange={v => update({ startAngle: v })} />
-              <NumField label="End°" value={element.endAngle ?? 345} onChange={v => update({ endAngle: v })} />
+              <NumField label="Sta°" value={element.startAngle ?? 135} onChange={v => update({ startAngle: v, arcPngFrames: undefined })} />
+              <NumField label="End°" value={element.endAngle ?? 345} onChange={v => update({ endAngle: v, arcPngFrames: undefined })} />
             </FieldRow>
+          </Section>
+          <Section label="PNG Arc Mode">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                {(['native', 'png-frames'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => update({ arcRenderMode: mode })}
+                    className={cn(
+                      'h-7 rounded border text-[10px] transition-colors',
+                      (element.arcRenderMode ?? 'native') === mode
+                        ? 'border-cyan-500 bg-cyan-500/20 text-cyan-100'
+                        : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30',
+                    )}
+                  >
+                    {mode === 'native' ? 'Native Arc' : 'PNG Arc'}
+                  </button>
+                ))}
+              </div>
+              {(element.arcRenderMode ?? 'native') === 'png-frames' && (
+                <>
+                  <label className="block text-[10px] text-white/55">
+                    Track / empty arc PNG (optional)
+                    <input
+                      type="file"
+                      accept="image/png,.png"
+                      className="mt-1 block w-full text-[9px] text-white/50 file:mr-2 file:rounded file:border-0 file:bg-cyan-500/15 file:px-2 file:py-1 file:text-cyan-200"
+                      onChange={e => { void readPngFiles(e.target.files).then(([src]) => update({ arcPngTrackSrc: src })).catch(error => setCreatorStatus(`⚠ ${error.message}`)); }}
+                    />
+                  </label>
+                  <label className="block text-[10px] text-white/55">
+                    Fully active arc PNG (required)
+                    <input
+                      type="file"
+                      accept="image/png,.png"
+                      className="mt-1 block w-full text-[9px] text-white/50 file:mr-2 file:rounded file:border-0 file:bg-cyan-500/15 file:px-2 file:py-1 file:text-cyan-200"
+                      onChange={e => { void readPngFiles(e.target.files).then(([src]) => update({ arcPngActiveSrc: src, arcPngFrames: undefined })).catch(error => setCreatorStatus(`⚠ ${error.message}`)); }}
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Select
+                      value={element.arcPngDirection ?? 'clockwise'}
+                      onValueChange={value => update({ arcPngDirection: value as 'clockwise' | 'counter-clockwise', arcPngFrames: undefined })}
+                    >
+                      <SelectTrigger className="h-7 text-[10px] bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="clockwise">Clockwise</SelectItem>
+                        <SelectItem value="counter-clockwise">Counter-clockwise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(element.arcPngFrameCount ?? 11)}
+                      onValueChange={value => update({ arcPngFrameCount: Number(value) as 11 | 21, arcPngFrames: undefined })}
+                    >
+                      <SelectTrigger className="h-7 text-[10px] bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="11">11 frames</SelectItem>
+                        <SelectItem value="21">21 frames</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <button
+                    onClick={() => { void buildPngArcFrames(); }}
+                    className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+                  >
+                    Generate PNG Arc Frames
+                  </button>
+                  <p className="text-[9px] text-white/40">
+                    {element.arcPngFrames?.length
+                      ? `${element.arcPngFrames.length} frames · ~${(estimateDataUrlBytes(element.arcPngFrames) / 1024).toFixed(1)} KiB before packaging`
+                      : 'No generated frames yet.'}
+                  </p>
+                </>
+              )}
+            </div>
           </Section>
           <Section label="Arc Ticks">
             <FieldRow>
@@ -1422,6 +1556,53 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
                 </div>
               </div>
             )}
+            <div className="pt-2 border-t border-white/10 space-y-2">
+              <p className="text-[10px] text-cyan-300/80 uppercase tracking-wider">Layered PNG Gauge Set</p>
+              <p className="text-[9px] text-white/40">Upload separate pixel-perfect layers. They remain independent on the watch.</p>
+              <label className="block text-[10px] text-white/55">
+                Background PNG (optional)
+                <input
+                  type="file"
+                  accept="image/png,.png"
+                  className="mt-1 block w-full text-[9px] text-white/50 file:mr-2 file:rounded file:border-0 file:bg-cyan-500/15 file:px-2 file:py-1 file:text-cyan-200"
+                  onChange={e => { void readPngFiles(e.target.files).then(([src]) => update({ gaugePngBackgroundSrc: src })).catch(error => setCreatorStatus(`⚠ ${error.message}`)); }}
+                />
+              </label>
+              <label className="block text-[10px] text-white/55">
+                Needle PNG (required)
+                <input
+                  type="file"
+                  accept="image/png,.png"
+                  className="mt-1 block w-full text-[9px] text-white/50 file:mr-2 file:rounded file:border-0 file:bg-cyan-500/15 file:px-2 file:py-1 file:text-cyan-200"
+                  onChange={e => { void readPngFiles(e.target.files).then(([src]) => update({ src, assetFilename: undefined })).catch(error => setCreatorStatus(`⚠ ${error.message}`)); }}
+                />
+              </label>
+              <label className="block text-[10px] text-white/55">
+                Switcher PNGs (optional, ordered)
+                <input
+                  type="file"
+                  multiple
+                  accept="image/png,.png"
+                  className="mt-1 block w-full text-[9px] text-white/50 file:mr-2 file:rounded file:border-0 file:bg-cyan-500/15 file:px-2 file:py-1 file:text-cyan-200"
+                  onChange={e => { void readPngFiles(e.target.files).then(frames => update({ gaugePngSwitcherFrames: frames })).catch(error => setCreatorStatus(`⚠ ${error.message}`)); }}
+                />
+              </label>
+              <label className="block text-[10px] text-white/55">
+                Foreground / glass PNG (optional)
+                <input
+                  type="file"
+                  accept="image/png,.png"
+                  className="mt-1 block w-full text-[9px] text-white/50 file:mr-2 file:rounded file:border-0 file:bg-cyan-500/15 file:px-2 file:py-1 file:text-cyan-200"
+                  onChange={e => { void readPngFiles(e.target.files).then(([src]) => update({ gaugePngForegroundSrc: src })).catch(error => setCreatorStatus(`⚠ ${error.message}`)); }}
+                />
+              </label>
+              <button
+                onClick={buildGaugeFromPngLayers}
+                className="w-full h-7 rounded border border-cyan-500/40 bg-cyan-500/15 text-[11px] text-cyan-200 hover:bg-cyan-500/25"
+              >
+                Build Layered PNG Gauge Set
+              </button>
+            </div>
             <div className="pt-2 border-t border-white/10 space-y-2">
               <p className="text-[10px] text-cyan-300/80 uppercase tracking-wider">SVG/HTML Gauge Creator</p>
               <textarea

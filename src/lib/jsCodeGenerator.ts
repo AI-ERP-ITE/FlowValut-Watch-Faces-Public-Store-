@@ -861,6 +861,9 @@ function generateWidgetCode(
 // Pattern from Zepp OS v1.0 docs + ZeppPlayer engine
 // ============================================================
 function generateArcProgressWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  if (element.arcRenderMode === 'png-frames') {
+    return generatePngArcProgressWidget(element, widgetIndex, showLevel);
+  }
   const centerX = element.center?.x ?? (element.bounds.x + (element.bounds.width || 100) / 2);
   const centerY = element.center?.y ?? (element.bounds.y + (element.bounds.height || 100) / 2);
   const radius = element.radius ?? Math.min(element.bounds.width || 100, element.bounds.height || 100) / 2;
@@ -990,6 +993,34 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
                     font_array: ${fontArrayStr},${typeParam}${temperatureResources}${humidityResources}${distanceResources}
                     h_space: ${hSpace},
                     align_h: hmUI.align.${alignH},
+                    show_level: hmUI.show_level.${showLevel}
+                });`;
+}
+
+function generatePngArcProgressWidget(element: WatchFaceElement, widgetIndex: number, showLevel: string): string {
+  const frames = element.arcPngFrames ?? [];
+  const imageArray = `[${frames.map(frame => `'${frame}'`).join(', ')}]`;
+  const typeParam = element.dataType
+    ? `\n                    type: hmUI.data_type.${element.dataType},`
+    : '';
+  const trackCode = element.arcPngTrackSrc
+    ? `
+                // ${element.name} - PNG Arc static track
+                const pngArcTrack_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    src: '${element.arcPngTrackSrc}',
+                    show_level: hmUI.show_level.${showLevel}
+                });`
+    : '';
+
+  return `${trackCode}
+                // ${element.name} - PNG Arc image progress
+                let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_LEVEL, {
+                    x: px(${element.bounds.x}),
+                    y: px(${element.bounds.y}),
+                    image_array: ${imageArray},
+                    image_length: ${frames.length},${typeParam}
                     show_level: hmUI.show_level.${showLevel}
                 });`;
 }

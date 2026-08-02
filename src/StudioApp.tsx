@@ -4070,7 +4070,7 @@ function StudioApp() {
       // 1. Generate transparent ticks PNGs for ARC_PROGRESS widgets
       const tickFiles: Array<{ src: string; file: File }> = [];
       for (const el of allExportElements) {
-        if (el.type === 'ARC_PROGRESS' && el.tickCount && el.tickCount > 0) {
+        if (el.type === 'ARC_PROGRESS' && el.arcRenderMode !== 'png-frames' && el.tickCount && el.tickCount > 0) {
           const ticksDataUrl = generateArcTicksPng(el, activeCanvasW, activeCanvasH);
           if (ticksDataUrl) {
             const ticksName = `ticks_${el.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
@@ -4450,6 +4450,39 @@ function StudioApp() {
             el.fontArray = temperatureDigitFilenames();
           }
         }
+      }
+
+      // Spec 132: package raster-authored Arc assets without mutating the FVWF source.
+      // The angular mask was already applied in the editor; the watch receives ordinary PNGs.
+      const pngArcAodSet = new Set(exportAodElements ?? []);
+      for (const el of exportCombinedElements) {
+        if (el.type !== 'ARC_PROGRESS' || el.arcRenderMode !== 'png-frames') continue;
+        const expected = el.arcPngFrameCount ?? 11;
+        if (!el.arcPngFrames || el.arcPngFrames.length !== expected) {
+          throw new Error(`${el.name}: PNG Arc frames are missing or stale. Generate ${expected} frames before export.`);
+        }
+        const scope = pngArcAodSet.has(el) ? 'aod' : 'main';
+        const safeId = el.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const targetW = Math.max(1, Math.round(el.bounds.width || 1));
+        const targetH = Math.max(1, Math.round(el.bounds.height || 1));
+
+        if (el.arcPngTrackSrc?.startsWith('data:')) {
+          const trackName = `png_arc_track_${scope}_${safeId}.png`;
+          const resizedTrack = await resizeDataUrl(el.arcPngTrackSrc, targetW, targetH);
+          const { bytes } = decodeDataUrlToBytes(resizedTrack, `PNG Arc track ${trackName}`);
+          elementFiles.push({ src: trackName, file: new File([bytes], trackName, { type: 'image/png' }) });
+          el.arcPngTrackSrc = trackName;
+        }
+
+        const runtimeFrames: string[] = [];
+        for (let index = 0; index < el.arcPngFrames.length; index += 1) {
+          const frameName = `png_arc_${scope}_${safeId}_${String(index).padStart(2, '0')}.png`;
+          const resizedFrame = await resizeDataUrl(el.arcPngFrames[index], targetW, targetH);
+          const { bytes } = decodeDataUrlToBytes(resizedFrame, `PNG Arc frame ${frameName}`);
+          elementFiles.push({ src: frameName, file: new File([bytes], frameName, { type: 'image/png' }) });
+          runtimeFrames.push(frameName);
+        }
+        el.arcPngFrames = runtimeFrames;
       }
         const configForBuild: WatchFaceConfig = {
           ...state.watchFaceConfig,

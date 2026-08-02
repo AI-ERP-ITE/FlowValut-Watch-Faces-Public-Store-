@@ -23,6 +23,7 @@ import {
   normalizeGaugePivot,
 } from '@/lib/gaugePointerDefaults';
 import { normalizeBoundedDataValue } from '@/lib/boundedGaugeRange';
+import { selectPngArcFrame } from '@/lib/pngArcFrameGenerator';
 
 // Default fallbacks when no model props are supplied (keeps all existing behaviour).
 const CANVAS_SIZE = 480;
@@ -1392,7 +1393,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
       case 'ARC_PROGRESS':
         ctx.save();
         applyShadow(ctx, el);
-        drawArc(ctx, el);
+        drawArc(ctx, el, iconCache, onIconLoaded);
         clearShadow(ctx);
         ctx.restore();
         break;
@@ -1932,7 +1933,23 @@ function drawDigitElement(
 
 // ─── ARC_PROGRESS ───────────────────────────────────────────────────────────────
 
-function drawArc(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
+function drawArc(
+  ctx: CanvasRenderingContext2D,
+  el: WatchFaceElement,
+  iconCache?: Map<string, HTMLImageElement>,
+  onIconLoaded?: () => void,
+) {
+  if (el.arcRenderMode === 'png-frames') {
+    const { x, y, width, height } = el.bounds;
+    const drawSource = (src: string | undefined) => {
+      if (!src || !iconCache) return;
+      const image = getCachedImage(src, iconCache, onIconLoaded);
+      if (image?.complete && image.naturalWidth > 0) ctx.drawImage(image, x, y, width, height);
+    };
+    drawSource(el.arcPngTrackSrc);
+    drawSource(selectPngArcFrame(el.arcPngFrames, el.dataType ? gaugeProgress(el) : 1));
+    return;
+  }
   const cx = el.center?.x ?? (el.bounds.x + el.bounds.width / 2);
   const cy = el.center?.y ?? (el.bounds.y + el.bounds.height / 2);
   const radius = el.radius ?? 100;
