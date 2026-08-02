@@ -10,4 +10,4 @@
 - [x] T008 Add package inspection and legacy native-Arc regression tests.
 - [x] T009 Run TypeScript, focused tests, verification, and private build.
 - [x] T010 Commit implementation separately from this spec.
-- [ ] T011 Deploy with `npm run deploy:full:private` and verify live hashes/routes.
+- [x] T011 Deploy with `npm run deploy:full:private` and verify live hashes/routes.
