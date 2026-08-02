@@ -5513,7 +5513,7 @@ function StudioApp() {
             {state.backgroundImage && state.watchFaceConfig && (
               <>
                 {/* Interactive canvas + property panel */}
-                <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_minmax(420px,1fr)] gap-6 items-start">
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_minmax(420px,1fr)] 2xl:grid-cols-[minmax(360px,420px)_minmax(1076px,1fr)] gap-6 2xl:gap-4 items-start">
                   <div className="flex flex-col items-center shrink-0 xl:sticky xl:top-4 self-start">
                     <div className="flex items-center justify-between w-full max-w-sm mb-4">
                       <h4 className="text-sm font-medium text-zinc-400">{editorMode} Editor — drag to reposition</h4>
@@ -5946,7 +5946,7 @@ function StudioApp() {
                         onFlipVertical={(mode) => handleFlipSelected('v', mode)}
                       />
                     </div>
-                    <div className="w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] 2xl:w-[640px] 2xl:max-h-[calc(100vh-15rem)]">
+                    <div className="w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] 2xl:sticky 2xl:top-4 2xl:self-start 2xl:w-[640px] 2xl:max-h-[calc(100vh-2rem)]">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
                         <div className="flex items-center gap-2">
@@ -6411,7 +6411,7 @@ function StudioApp() {
     <div className="min-h-screen bg-[#0F0F0F] text-white">
       <Header />
 
-      <main className={`container mx-auto px-4 py-6 ${state.currentStep === 'preview' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
+      <main className={`container mx-auto px-4 py-6 ${state.currentStep === 'preview' ? 'max-w-[1800px]' : 'max-w-4xl'}`}>
         {/* Step indicator */}
         <div className="mb-8">
           <StepIndicator currentStep={state.currentStep} />
