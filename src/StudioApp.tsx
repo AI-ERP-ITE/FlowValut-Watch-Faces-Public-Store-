@@ -290,16 +290,6 @@ async function mockKimiAnalysis(
   const cx = Math.floor(resolution.width / 2);
   const cy = Math.floor(resolution.height / 2);
   const elements: WatchFaceElement[] = [
-    // ===== BACKGROUND =====
-    {
-      id: generateId(),
-      type: 'IMG',
-      name: 'Background',
-      bounds: { x: 0, y: 0, width: resolution.width, height: resolution.height },
-      src: 'background_ed15585c.png',
-      visible: true,
-      zIndex: 0,
-    },
     // ===== TIME (IMG_TIME - name-matched) =====
     {
       id: generateId(),
@@ -974,21 +964,6 @@ async function mockKimiAnalysis(
       type: 'IMG_LEVEL',
     });
   }
-
-  // Generate background image for Background element
-  const bgDataUrl = createCanvasImage(480, 480, (ctx, w, h) => {
-    ctx.fillStyle = '#333333';
-    ctx.fillRect(0, 0, w, h);
-  });
-  elementImages.push({
-    name: 'background_ed15585c.png',
-    dataUrl: bgDataUrl,
-    bounds: { x: 0, y: 0, width: 480, height: 480 },
-    type: 'IMG',
-  });
-  // Update Background element src for preview rendering
-  const bgElement = elements.find(el => el.name === 'Background');
-  if (bgElement) bgElement.src = bgDataUrl;
 
   // Generate static images for any remaining IMG-type elements with src
   elements
@@ -3563,17 +3538,6 @@ function StudioApp() {
   const handleStartBlank = useCallback(() => {
     const res = { width: activeCanvasW, height: activeCanvasH };
     const elements: WatchFaceElement[] = [];
-    if (state.backgroundImage) {
-      elements.push({
-        id: generateId(),
-        type: 'IMG',
-        name: 'Background',
-        bounds: { x: 0, y: 0, width: res.width, height: res.height },
-        src: state.backgroundImage,
-        visible: false,
-        zIndex: 0,
-      });
-    }
     const config: WatchFaceConfig = {
       name: watchFaceName || 'Blank Watch Face',
       watchModel: watchModel || 'Balance 2',
@@ -3588,7 +3552,7 @@ function StudioApp() {
     dispatch(actions.setElementImages([]));
     dispatch(actions.setStep('preview'));
     toast.success('Blank canvas ready — add widgets with the + button');
-  }, [activeCanvasH, activeCanvasW, watchModel, watchFaceName, state.backgroundImage, dispatch]);
+  }, [activeCanvasH, activeCanvasW, watchModel, watchFaceName, dispatch]);
   const handleLoadLayout = useCallback(async () => {
     if (!htmlInput.trim()) return;
     dispatch(actions.setLoading(true));
@@ -3602,36 +3566,20 @@ function StudioApp() {
         return;
       }
 
-      // Background element needed for ZPK generation. Canvas draws bg separately
-      // via backgroundImage prop, so we mark this element hidden for canvas display.
-      const allElements: WatchFaceElement[] = [];
-      if (state.backgroundImage) {
-        allElements.push({
-          id: generateId(),
-          type: 'IMG',
-          name: 'Background',
-          bounds: { x: 0, y: 0, width: 480, height: 480 },
-          src: state.backgroundImage,
-          visible: false,
-          zIndex: 0,
-        });
-      }
-      allElements.push(...elements);
-
       // T022 — Build WatchFaceConfig and feed into generator
       const config: WatchFaceConfig = {
         name: watchFaceName || 'HTML Watch Face',
         watchModel: watchModel || 'Balance 2',
         resolution: { width: 480, height: 480 },
         background: { src: 'background.png', format: 'TGA-P' },
-        elements: allElements,
+        elements,
         aodBackgroundMode: 'USE_MAIN_BACKGROUND',
         aodBackgroundSrc: null,
         aodSolidColor: '#000000',
       };
 
       // Generate digit/asset images from element bounds
-      const resolvedElements = allElements.map(el => ({
+      const resolvedElements = elements.map(el => ({
         widget: el.type,
         dataType: el.dataType,
         x: el.bounds.x,
@@ -3659,7 +3607,7 @@ function StudioApp() {
     } finally {
       dispatch(actions.setLoading(false));
     }
-  }, [htmlInput, state.backgroundImage, watchFaceName, watchModel, dispatch]);
+  }, [htmlInput, watchFaceName, watchModel, dispatch]);
 
   const matchesHtmlTarget = useCallback((el: WatchFaceElement, target: HtmlLibraryTarget): boolean => {
     if (target === 'all') return true;

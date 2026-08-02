@@ -176,7 +176,7 @@ export function ElementList({
         Elements ({elements.length})
       </h4>
       
-      <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 flex flex-col">
+      <div className="space-y-1.5 max-h-64 overflow-y-auto overflow-x-hidden pr-1 flex flex-col">
         {sortedElements.map((element, index) => {
           const warning = elementWarnings?.[element.id];
           const hasWarning = !!warning?.hasFlickerRisk;
@@ -207,7 +207,7 @@ export function ElementList({
                 }
               }}
               className={cn(
-                'group flex items-center gap-3 p-2.5 rounded-lg border transition-all',
+                'group flex w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-lg border p-2 transition-all',
                 isDraggedOver ? 'border-t-2 border-t-cyan-500' : '',
                 element.engraveFrame
                   ? isPrimary
@@ -232,15 +232,15 @@ export function ElementList({
             <span className="text-lg shrink-0">{getElementIcon(element)}</span>
 
             {/* Element info */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
               {isEditing ? (
-                <form onSubmit={saveEditing} className="flex items-center gap-1">
+                <form onSubmit={saveEditing} className="flex min-w-0 items-center gap-1">
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     autoFocus
-                    className="w-full bg-zinc-900 border border-zinc-700 text-white text-xs px-1.5 py-0.5 rounded focus:outline-none focus:border-cyan-500"
+                    className="min-w-0 flex-1 bg-zinc-900 border border-zinc-700 text-white text-xs px-1.5 py-0.5 rounded focus:outline-none focus:border-cyan-500"
                     onClick={(e) => e.stopPropagation()}
                   />
                   <button type="submit" className="text-green-500 hover:text-green-400 shrink-0">
@@ -251,18 +251,20 @@ export function ElementList({
                   </button>
                 </form>
               ) : (
-                <p className="text-sm font-medium text-white truncate flex items-center group/name">
+                <p className="flex min-w-0 items-center text-sm font-medium text-white group/name">
                   {element.engraveFrame && <span className="text-amber-400 mr-1">🔗</span>}
-                  <span className="truncate">[{element.zIndex}] {element.displayName || element.name}</span>
+                  <span className="min-w-0 flex-1 truncate" title={`[${element.zIndex}] ${element.displayName || element.name}`}>
+                    [{element.zIndex}] {element.displayName || element.name}
+                  </span>
                   {hasWarning && (
-                    <span title={warningTitle} className={cn('inline-flex align-middle ml-2 shrink-0', warningColorClass)}>
+                    <span title={warningTitle} className={cn('inline-flex shrink-0', warningColorClass)}>
                       <AlertTriangle className="h-3.5 w-3.5" />
                     </span>
                   )}
                   {onRenameElement && (
                     <button
                       onClick={(e) => startEditing(element, e)}
-                      className="ml-2 text-zinc-500 hover:text-cyan-400 opacity-0 group-hover/name:opacity-100 transition-opacity shrink-0"
+                      className="shrink-0 p-1 text-zinc-500 opacity-0 transition-opacity hover:text-cyan-400 group-hover/name:opacity-100 focus:opacity-100"
                       title="Rename layer"
                     >
                       <Edit2 className="h-3 w-3" />
@@ -270,14 +272,14 @@ export function ElementList({
                   )}
                 </p>
               )}
-              <p className="text-xs text-zinc-500">
+              <p className="truncate text-[11px] text-zinc-500">
                 {element.type}
                 {element.subtype && ` • ${element.subtype}`}
               </p>
             </div>
 
             {/* Position info */}
-            <div className="text-xs text-zinc-600 hidden sm:block shrink-0">
+            <div className="hidden shrink-0 text-[11px] text-zinc-600 2xl:block">
               {element.bounds.x}, {element.bounds.y}
             </div>
 
@@ -286,7 +288,7 @@ export function ElementList({
               <button
                 onClick={(e) => { e.stopPropagation(); onToggleVisibility(element.id); }}
                 className={cn(
-                  'p-1.5 rounded-md transition-colors shrink-0',
+                  'p-1 rounded-md transition-colors shrink-0',
                   element.visible
                     ? 'text-cyan-500 hover:bg-cyan-500/10'
                     : 'text-zinc-600 hover:bg-zinc-800'
@@ -304,7 +306,7 @@ export function ElementList({
             {onDuplicateElement && !isEditing && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }}
-                className="p-1.5 rounded-md text-zinc-600 hover:text-cyan-400 hover:bg-cyan-400/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                className="p-1 rounded-md text-zinc-600 hover:text-cyan-400 hover:bg-cyan-400/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
                 title="Duplicate element"
               >
                 <Copy className="h-3.5 w-3.5" />
@@ -315,7 +317,7 @@ export function ElementList({
             {onDeleteElement && !isEditing && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDeleteElement(element.id); }}
-                className="p-1.5 rounded-md text-zinc-600 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                className="p-1 rounded-md text-zinc-600 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
                 title="Delete element"
               >
                 <Trash2 className="h-3.5 w-3.5" />
