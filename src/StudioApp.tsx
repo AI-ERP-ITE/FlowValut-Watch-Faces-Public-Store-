@@ -5946,7 +5946,7 @@ function StudioApp() {
                         onFlipVertical={(mode) => handleFlipSelected('v', mode)}
                       />
                     </div>
-                    <div className="w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] 2xl:max-h-[calc(100vh-15rem)]">
+                    <div className="w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] 2xl:w-[640px] 2xl:max-h-[calc(100vh-15rem)]">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
                         <div className="flex items-center gap-2">

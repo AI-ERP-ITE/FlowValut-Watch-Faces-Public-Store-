@@ -5,11 +5,9 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>Flowvault</title>
     <script>
-      // GitHub Pages SPA redirect trick.
-      // When GitHub Pages serves a 404 for a deep route (e.g. /Watch-Faces/balance-2),
-      // this page captures the full path and redirects to index.html,
-      // passing the original path as a query string so the SPA can restore it.
-      var segmentCount = 1; // number of path segments in the repo name (1 for /Watch-Faces)
+      // GitHub Pages SPA redirect trick. Project Pages has a one-segment base path,
+      // while the public custom domain is hosted at the domain root.
+      var segmentCount = /\.github\.io$/i.test(window.location.hostname) ? 1 : 0;
       var l = window.location;
       l.replace(
         l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
