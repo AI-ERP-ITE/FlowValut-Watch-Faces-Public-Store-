@@ -2924,6 +2924,7 @@ function StudioApp() {
   // Spec 011 — Background crop tool
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropTarget, setCropTarget] = useState<CropTarget>('MAIN');
+  const replaceMainBackgroundInputRef = useRef<HTMLInputElement>(null);
 
   // Publish flow
   const [uploadedWatchfaceId, setUploadedWatchfaceId] = useState<string>('');
@@ -5668,6 +5669,23 @@ function StudioApp() {
                     {editorMode === 'MAIN' && (
                       <div className="w-full max-w-sm mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 space-y-2">
                         <p className="text-xs text-cyan-200 font-medium">Main Background</p>
+                        <input
+                          ref={replaceMainBackgroundInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) openCropTool(file, 'MAIN');
+                            event.target.value = '';
+                          }}
+                        />
+                        <button
+                          onClick={() => replaceMainBackgroundInputRef.current?.click()}
+                          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25 text-xs font-medium transition-colors"
+                        >
+                          ↻ Replace Main Photo
+                        </button>
                         <button
                           onClick={() => {
                             setPhotoEditorTarget('MAIN');
@@ -5897,7 +5915,7 @@ function StudioApp() {
                       )}
                     </div>
                   </div>
-                  <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(520px,620px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
+                  <div className="flex-1 grid min-w-0 grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(560px,640px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
                     <div className="space-y-4 xl:min-h-0 xl:pr-2">
                       <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
                       <PropertyPanel
@@ -5928,8 +5946,8 @@ function StudioApp() {
                         onFlipVertical={(mode) => handleFlipSelected('v', mode)}
                       />
                     </div>
-                    <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] xl:overflow-y-auto 2xl:max-h-[calc(100vh-15rem)]">
-                      <div className="flex items-center justify-between">
+                    <div className="w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-3 min-h-[22rem] xl:min-h-[30rem] 2xl:max-h-[calc(100vh-15rem)]">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
                         <div className="flex items-center gap-2">
                           <label className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-400/50 rounded px-2 py-1 transition-colors cursor-pointer" title="Add a static image">

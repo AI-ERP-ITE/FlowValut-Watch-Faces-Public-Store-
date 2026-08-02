@@ -181,12 +181,12 @@ export function ElementList({
   const sortedElements = [...elements].sort((a, b) => b.zIndex - a.zIndex);
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('w-full min-w-0 space-y-2', className)}>
       <h4 className="text-sm font-medium text-zinc-400 mb-3">
         Elements ({elements.length})
       </h4>
       
-      <div className="space-y-2 max-h-[32rem] overflow-y-auto overflow-x-hidden pr-1 flex flex-col">
+      <div className="flex w-full min-w-0 max-h-[32rem] flex-col space-y-2 overflow-y-auto overflow-x-hidden pr-1">
         {sortedElements.map((element, index) => {
           const warning = elementWarnings?.[element.id];
           const hasWarning = !!warning?.hasFlickerRisk;
