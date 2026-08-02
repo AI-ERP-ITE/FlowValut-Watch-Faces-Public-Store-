@@ -66,6 +66,16 @@ export function ElementList({
     }
   };
 
+  const getElementLabel = (element: WatchFaceElement) => {
+    const savedName = element.displayName?.trim() || element.name?.trim();
+    if (savedName) return savedName;
+    return element.type
+      .toLowerCase()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  };
+
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -150,7 +160,7 @@ export function ElementList({
   const startEditing = (element: WatchFaceElement, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingId(element.id);
-    setEditName(element.displayName || element.name);
+    setEditName(getElementLabel(element));
   };
 
   const saveEditing = (e: React.MouseEvent | React.FormEvent) => {
@@ -253,8 +263,8 @@ export function ElementList({
               ) : (
                 <p className="flex min-w-0 items-center text-sm font-medium text-white group/name">
                   {element.engraveFrame && <span className="text-amber-400 mr-1">🔗</span>}
-                  <span className="min-w-0 flex-1 truncate" title={`[${element.zIndex}] ${element.displayName || element.name}`}>
-                    [{element.zIndex}] {element.displayName || element.name}
+                  <span className="min-w-0 flex-1 truncate" title={`[${element.zIndex}] ${getElementLabel(element)}`}>
+                    [{element.zIndex}] {getElementLabel(element)}
                   </span>
                   {hasWarning && (
                     <span title={warningTitle} className={cn('inline-flex shrink-0', warningColorClass)}>
@@ -264,7 +274,7 @@ export function ElementList({
                   {onRenameElement && (
                     <button
                       onClick={(e) => startEditing(element, e)}
-                      className="shrink-0 p-1 text-zinc-500 opacity-0 transition-opacity hover:text-cyan-400 group-hover/name:opacity-100 focus:opacity-100"
+                      className="shrink-0 p-1 text-zinc-500 transition-colors hover:text-cyan-400"
                       title="Rename layer"
                     >
                       <Edit2 className="h-3 w-3" />
@@ -276,11 +286,6 @@ export function ElementList({
                 {element.type}
                 {element.subtype && ` • ${element.subtype}`}
               </p>
-            </div>
-
-            {/* Position info */}
-            <div className="hidden shrink-0 text-[11px] text-zinc-600 2xl:block">
-              {element.bounds.x}, {element.bounds.y}
             </div>
 
             {/* Visibility toggle */}
@@ -306,7 +311,7 @@ export function ElementList({
             {onDuplicateElement && !isEditing && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }}
-                className="p-1 rounded-md text-zinc-600 hover:text-cyan-400 hover:bg-cyan-400/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
+                className="p-1 rounded-md text-zinc-600 hover:text-cyan-400 hover:bg-cyan-400/10 transition-all shrink-0"
                 title="Duplicate element"
               >
                 <Copy className="h-3.5 w-3.5" />
@@ -317,7 +322,7 @@ export function ElementList({
             {onDeleteElement && !isEditing && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDeleteElement(element.id); }}
-                className="p-1 rounded-md text-zinc-600 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
+                className="p-1 rounded-md text-zinc-600 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
                 title="Delete element"
               >
                 <Trash2 className="h-3.5 w-3.5" />

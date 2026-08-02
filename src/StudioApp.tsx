@@ -5665,6 +5665,20 @@ function StudioApp() {
                         Refresh Warnings
                       </button>
                     </div>
+                    {editorMode === 'MAIN' && (
+                      <div className="w-full max-w-sm mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3 space-y-2">
+                        <p className="text-xs text-cyan-200 font-medium">Main Background</p>
+                        <button
+                          onClick={() => {
+                            setPhotoEditorTarget('MAIN');
+                            setShowPhotoEditor(true);
+                          }}
+                          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md border border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25 text-xs font-medium transition-colors"
+                        >
+                          ✏ Edit Main Photo
+                        </button>
+                      </div>
+                    )}
                     {editorMode === 'AOD' && aodElements && (
                       <div className="w-full max-w-sm mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
                         <p className="text-xs text-amber-200 font-medium">AOD Background</p>
@@ -5883,7 +5897,7 @@ function StudioApp() {
                       )}
                     </div>
                   </div>
-                  <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(280px,340px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
+                  <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(380px,460px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
                     <div className="space-y-4 xl:min-h-0 xl:pr-2">
                       <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
                       <PropertyPanel

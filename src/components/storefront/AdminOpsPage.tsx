@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Wrench, Database, Star, FlaskConical, FolderOpen, Download, CheckCircle2 } from 'lucide-react';
+import { Wrench, Database, Star, FlaskConical, FolderOpen, Download, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPanel } from '@/components/AdminPanel';
 import {
@@ -14,7 +14,7 @@ import {
   type StorageMaintenanceReport,
   writeStorefrontConfigToFirebase,
 } from '@/lib/studioFirebasePublishApi';
-import { fetchStoreHierarchy, type SkuHierarchyOption } from '@/lib/storeHierarchyApi';
+import { fetchStoreHierarchy, type SkuHierarchyOption, type TechnicalPackageOption } from '@/lib/storeHierarchyApi';
 import { Button } from '@/components/ui/button';
 import { isFirebaseAuthConfigured } from '@/lib/firebaseAuthClient';
 import type { SpecGroup } from '@/context/CatalogContext';
@@ -93,6 +93,9 @@ export function AdminOpsPage() {
   const [maintenanceReport, setMaintenanceReport] = useState<StorageMaintenanceReport | null>(null);
   const [loadingMaintenance, setLoadingMaintenance] = useState(false);
   const [workshopProjects, setWorkshopProjects] = useState<WorkshopProjectSummary[]>([]);
+  const [workshopPackages, setWorkshopPackages] = useState<TechnicalPackageOption[]>([]);
+  const [showCurrentWebsiteBuildOnly, setShowCurrentWebsiteBuildOnly] = useState(false);
+  const [expandedWorkshopProjects, setExpandedWorkshopProjects] = useState<Set<string>>(() => new Set());
   const [loadingWorkshop, setLoadingWorkshop] = useState(false);
   const [workshopBusyId, setWorkshopBusyId] = useState<string | null>(null);
   const [releaseBuild, setReleaseBuild] = useState<{ projectId: string; buildId: string; target?: string; resolution?: { width: number; height: number } } | null>(null);
@@ -109,7 +112,10 @@ export function AdminOpsPage() {
     if (!canRun) return;
     setLoadingWorkshop(true);
     try {
-      setWorkshopProjects(await fetchWorkshopProjects());
+      const [projects, hierarchy] = await Promise.all([fetchWorkshopProjects(), fetchStoreHierarchy()]);
+      setWorkshopProjects(projects);
+      setWorkshopPackages(hierarchy.technicalPackages);
+      setExpandedWorkshopProjects(new Set());
       toast.success('Workshop projects loaded.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load Workshop');
@@ -327,6 +333,15 @@ export function AdminOpsPage() {
     }
   }
 
+  function toggleWorkshopProject(projectId: string) {
+    setExpandedWorkshopProjects((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }
+
   async function handleUploadLocalModels(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -536,20 +551,48 @@ export function AdminOpsPage() {
             <p className="text-xs text-[#8f9aac]">
               Exact editable FVWF snapshots paired with the exact ZPK installed for physical-watch testing. Store metadata is not required here.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={loadWorkshop} disabled={!canRun || loadingWorkshop} variant="outline" className="h-10 border-cyan-900 text-cyan-200 hover:bg-cyan-950/40">
                 <FolderOpen className="h-4 w-4 mr-2" />
                 {loadingWorkshop ? 'Loading Workshop...' : 'Load Workshop'}
               </Button>
+              <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-[#3b4d68] px-3 text-xs text-[#dbe7f7]">
+                <input
+                  type="checkbox"
+                  checked={showCurrentWebsiteBuildOnly}
+                  onChange={(event) => setShowCurrentWebsiteBuildOnly(event.target.checked)}
+                  className="h-4 w-4 accent-cyan-500"
+                />
+                Current build on website
+              </label>
             </div>
             <div className="space-y-3">
-              {workshopProjects.map((project) => (
+              {workshopProjects.map((project) => {
+                const isExpanded = expandedWorkshopProjects.has(project.id);
+                const visibleBuilds = showCurrentWebsiteBuildOnly
+                  ? project.builds.filter((build) => workshopPackages.some((item) =>
+                    item.approvedWorkshopProjectId === project.id &&
+                    item.approvedWorkshopBuildId === build.id &&
+                    item.state === 'CURRENT'))
+                  : project.builds;
+                return (
                 <div key={project.id} className="rounded-lg border border-[#2c3340] bg-[#10151c] p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-[#e9edf5]">{project.workingTitle}</p>
-                      <p className="text-[10px] font-mono text-[#6b7a8d]">{project.id} · {project.buildCount} builds · {(project.storageBytes / 1024 / 1024).toFixed(1)} MB</p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleWorkshopProject(project.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={`workshop-project-${project.id}`}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70"
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="h-4 w-4 shrink-0 text-cyan-400" />
+                        : <ChevronRight className="h-4 w-4 shrink-0 text-[#6b7a8d]" />}
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-[#e9edf5]">{project.workingTitle}</span>
+                        <span className="block truncate text-[10px] font-mono text-[#6b7a8d]">{project.id} · {project.buildCount} builds · {(project.storageBytes / 1024 / 1024).toFixed(1)} MB</span>
+                      </span>
+                    </button>
                     <div className="flex gap-2">
                       <Button onClick={() => editWorkshopProject(project)} disabled={workshopBusyId === project.id} variant="outline" className="h-8 border-[#3b4d68] text-[#dbe7f7]">Edit Project</Button>
                       <Button 
@@ -563,22 +606,29 @@ export function AdminOpsPage() {
                       </Button>
                     </div>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    {project.builds.length === 0 && (
+                  {isExpanded && <div id={`workshop-project-${project.id}`} className="mt-3 space-y-2">
+                    {visibleBuilds.length === 0 && (
                       <div className="rounded border border-amber-900/70 bg-amber-950/20 p-3 text-xs text-amber-200">
-                        <p className="font-medium">No completed Watch Test exists in this project.</p>
-                        <p className="mt-1 text-[10px] text-[#a99b82]">A previous upload may have stopped before its FVWF/ZPK pair was finalized. Return to Studio and retry the saved artifacts; approval and release become available only after a complete build appears here.</p>
+                        <p className="font-medium">{showCurrentWebsiteBuildOnly ? 'This project has no current website build.' : 'No completed Watch Test exists in this project.'}</p>
+                        {!showCurrentWebsiteBuildOnly && <p className="mt-1 text-[10px] text-[#a99b82]">A previous upload may have stopped before its FVWF/ZPK pair was finalized. Return to Studio and retry the saved artifacts; approval and release become available only after a complete build appears here.</p>}
                       </div>
                     )}
-                    {project.builds.map((build) => {
+                    {visibleBuilds.map((build) => {
                       const busy = workshopBusyId === build.id;
+                      const releasePackage = workshopPackages.find((item) =>
+                        item.approvedWorkshopProjectId === project.id && item.approvedWorkshopBuildId === build.id);
+                      const isCurrentWebsiteBuild = releasePackage?.state === 'CURRENT';
                       return (
                         <div key={build.id} className="flex flex-wrap items-center gap-2 rounded border border-[#252d38] px-3 py-2 text-xs">
                           <WorkshopPreviewImage projectId={project.id} buildId={build.id} kind="mainPreview" fallbackLabel="MAIN" />
                           <WorkshopPreviewImage projectId={project.id} buildId={build.id} kind="aodPreview" fallbackLabel="AOD" />
                           <div className="min-w-[180px] flex-1">
                             <p className="text-[#e9edf5]">Build {String(build.buildNumber).padStart(3, '0')} · {build.workshopLabel}</p>
-                            <p className="text-[10px] text-[#738095]">{build.state} · {build.resolution.width}×{build.resolution.height} · {(build.storageBytes / 1024 / 1024).toFixed(1)} MB</p>
+                            <p className="text-[10px] text-[#738095]">
+                              {build.state} · {build.resolution.width}×{build.resolution.height} · {(build.storageBytes / 1024 / 1024).toFixed(1)} MB
+                              {releasePackage ? ` · Revision ${releasePackage.revision}` : ''}
+                            </p>
+                            {isCurrentWebsiteBuild && <p className="mt-0.5 text-[10px] font-semibold text-emerald-300">CURRENT ON WEBSITE</p>}
                           </div>
                           <a
                             href={`${import.meta.env.BASE_URL}${project.tags?.includes('editable-watchface') ? 'editable-watchfaces/' : 'studio'}?workshopProject=${encodeURIComponent(project.id)}&build=${encodeURIComponent(build.id)}`}
@@ -619,10 +669,10 @@ export function AdminOpsPage() {
                         <p className="mt-2 text-[10px] text-[#8f9aac]">This is the QR generated with the build. It installs the exact saved Test ZPK and does not publish it to the store.</p>
                       </div>
                     )}
-                  </div>
-                  {releaseBuild?.projectId === project.id && <div className="mt-3"><ReleaseWizard projectId={releaseBuild.projectId} buildId={releaseBuild.buildId} defaultTarget={releaseBuild.target} buildResolution={releaseBuild.resolution} /></div>}
+                  </div>}
+                  {isExpanded && releaseBuild?.projectId === project.id && <div className="mt-3"><ReleaseWizard projectId={releaseBuild.projectId} buildId={releaseBuild.buildId} defaultTarget={releaseBuild.target} buildResolution={releaseBuild.resolution} /></div>}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}
