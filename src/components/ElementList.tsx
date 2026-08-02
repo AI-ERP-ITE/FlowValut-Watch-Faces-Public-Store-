@@ -186,7 +186,7 @@ export function ElementList({
         Elements ({elements.length})
       </h4>
       
-      <div className="space-y-1.5 max-h-64 overflow-y-auto overflow-x-hidden pr-1 flex flex-col">
+      <div className="space-y-2 max-h-[32rem] overflow-y-auto overflow-x-hidden pr-1 flex flex-col">
         {sortedElements.map((element, index) => {
           const warning = elementWarnings?.[element.id];
           const hasWarning = !!warning?.hasFlickerRisk;
@@ -217,7 +217,7 @@ export function ElementList({
                 }
               }}
               className={cn(
-                'group flex w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-lg border p-2 transition-all',
+                'group flex min-h-14 w-full min-w-0 items-center gap-2 overflow-hidden rounded-lg border px-3 py-2.5 transition-all',
                 isDraggedOver ? 'border-t-2 border-t-cyan-500' : '',
                 element.engraveFrame
                   ? isPrimary
@@ -239,7 +239,7 @@ export function ElementList({
             )}
 
             {/* Element icon */}
-            <span className="text-lg shrink-0">{getElementIcon(element)}</span>
+            <span className="w-7 shrink-0 text-center text-xl leading-none">{getElementIcon(element)}</span>
 
             {/* Element info */}
             <div className="flex-1 min-w-0 overflow-hidden">
@@ -261,7 +261,7 @@ export function ElementList({
                   </button>
                 </form>
               ) : (
-                <p className="flex min-w-0 items-center text-sm font-medium text-white group/name">
+                <p className="flex min-w-0 items-center text-sm font-medium leading-5 text-white group/name">
                   {element.engraveFrame && <span className="text-amber-400 mr-1">🔗</span>}
                   <span className="min-w-0 flex-1 truncate" title={`[${element.zIndex}] ${getElementLabel(element)}`}>
                     [{element.zIndex}] {getElementLabel(element)}
@@ -282,7 +282,7 @@ export function ElementList({
                   )}
                 </p>
               )}
-              <p className="truncate text-[11px] text-zinc-500">
+              <p className="mt-0.5 truncate text-[11px] leading-4 text-zinc-500">
                 {element.type}
                 {element.subtype && ` • ${element.subtype}`}
               </p>

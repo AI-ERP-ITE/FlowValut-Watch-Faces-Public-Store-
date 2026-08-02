@@ -5897,7 +5897,7 @@ function StudioApp() {
                       )}
                     </div>
                   </div>
-                  <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(380px,460px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
+                  <div className="flex-1 grid grid-cols-1 2xl:grid-cols-[minmax(420px,1fr)_minmax(520px,620px)] gap-4 xl:max-h-[calc(100vh-14rem)]">
                     <div className="space-y-4 xl:min-h-0 xl:pr-2">
                       <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
                       <PropertyPanel
