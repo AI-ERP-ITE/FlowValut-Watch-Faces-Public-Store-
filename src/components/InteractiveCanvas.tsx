@@ -1466,7 +1466,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
 
           const cached = iconCache.get(cacheKey);
           if (cached) {
-            ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+            drawImageWithDeterministicIconEffects(ctx, cached, el);
           } else {
             const dataUrls = generateWeatherSet(wStyle);
             const clampedIndex = Math.max(0, Math.min(dataUrls.length - 1, simulatedWeatherCode));
@@ -1493,7 +1493,7 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
             const cacheKey = `__imglvl_${el.id}_f${frameIdx}_${String(frameSrc).length}|${String(frameSrc).slice(0, 60)}`;
             const cached = iconCache.get(cacheKey);
             if (cached) {
-              ctx.drawImage(cached, el.bounds.x, el.bounds.y, el.bounds.width, el.bounds.height);
+              drawImageWithDeterministicIconEffects(ctx, cached, el);
             } else {
               const img = new Image();
               if (frameSrc.startsWith('https://')) img.crossOrigin = 'anonymous';

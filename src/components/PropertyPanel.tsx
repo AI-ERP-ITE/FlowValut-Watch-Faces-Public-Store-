@@ -2187,8 +2187,11 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
         </Section>
       )}
 
-      {/* Icon Effects — for image-like icon widgets supported by deterministic effects pipeline */}
-      {(element.type === 'IMG' || element.type === 'IMG_STATUS') && (element.iconKey || element.src) && (() => {
+      {/* Deterministic photo effects for static/status images and every Image Switcher frame. */}
+      {(
+        ((element.type === 'IMG' || element.type === 'IMG_STATUS') && (element.iconKey || element.src))
+        || element.type === 'IMG_LEVEL'
+      ) && (() => {
         const updateEffect = (patch: Partial<Pick<WatchFaceElement, 'iconHue' | 'iconSaturation' | 'iconColorize' | 'iconColorizeOpacity'>>) =>
           update(patch);
         const hue = element.iconHue ?? 0;
@@ -2197,7 +2200,7 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
         const colorizeOpacity = element.iconColorizeOpacity ?? 0.8;
         const hasEffects = hue !== 0 || sat !== 100 || !!colorize;
         return (
-          <Section label="Icon Effects">
+          <Section label={element.type === 'IMG_LEVEL' ? 'Image Switcher Photo Effects' : 'Icon Effects'}>
             <div className="space-y-2">
               {/* Hue rotate */}
               <div className="flex items-center gap-2">

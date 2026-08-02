@@ -1057,6 +1057,15 @@ async function applyIconEffectsForZPK(
   return canvas.toDataURL('image/png');
 }
 
+function hasDeterministicImageEffects(el: WatchFaceElement): boolean {
+  const photoEdit = el.iconPhotoEdit;
+  const hasPhotoEdit = !!photoEdit && Object.values(photoEdit).some((value) => Number(value ?? 0) !== 0);
+  return (el.iconHue ?? 0) !== 0
+    || (el.iconSaturation ?? 100) !== 100
+    || !!el.iconColorize
+    || hasPhotoEdit;
+}
+
 /**
  * Resize a dataUrl image to targetW × targetH. Returns original if already the right size.
  */
@@ -4168,15 +4177,11 @@ function StudioApp() {
         const policy = resolveImageSwitcherFrameCount(el.dataType, { explicitCount });
         const elementScope: 'main' | 'aod' = aodEditorElementSet.has(el) ? 'aod' : 'main';
 
-        if (policy.expectedCount === null) {
-          resolvedImgLevelFrames.set(scopedElementKey(elementScope, el.id), configuredFrames);
-          continue;
-        }
-
-        const targetCount = policy.expectedCount;
+        const targetCount = policy.expectedCount ?? configuredFrames.length;
         const strictMode = el.imageSwitcherStrict === true;
+        const hasSwitcherEffects = hasDeterministicImageEffects(el);
 
-        if (strictMode && configuredFrames.length !== targetCount) {
+        if (policy.expectedCount !== null && strictMode && configuredFrames.length !== targetCount) {
           throw new Error(
             `${el.name}: expected ${targetCount} IMG_LEVEL frames for ${getDataTypeLabel(el.dataType ?? 'value')} but got ${configuredFrames.length}.`
           );
@@ -4193,7 +4198,10 @@ function StudioApp() {
             const frameW = Math.max(1, el.bounds.width || 1);
             const frameH = Math.max(1, el.bounds.height || 1);
             const resizedFrame = await resizeDataUrl(configuredFrame, frameW, frameH);
-            const { bytes } = decodeDataUrlToBytes(resizedFrame, `IMG_LEVEL inline frame ${el.name}#${i}`);
+            const finalFrame = hasSwitcherEffects
+              ? await applyIconEffectsForZPK(resizedFrame, el, frameW, frameH)
+              : resizedFrame;
+            const { bytes } = decodeDataUrlToBytes(finalFrame, `IMG_LEVEL inline frame ${el.name}#${i}`);
             const existingInline = elementFiles.find((f) => f.src === generatedName);
             if (!existingInline) {
               elementFiles.push({ src: generatedName, file: new File([bytes], generatedName, { type: 'image/png' }) });
@@ -4205,6 +4213,22 @@ function StudioApp() {
           }
 
           if (configuredFrame) {
+            if (hasSwitcherEffects) {
+              const sourceDataUrl = await dataUrlFromElementFile(configuredFrame, elementFiles);
+              if (!sourceDataUrl) {
+                throw new Error(`${el.name}: cannot load Image Switcher frame '${configuredFrame}' for photo-effect baking.`);
+              }
+              const frameW = Math.max(1, el.bounds.width || 1);
+              const frameH = Math.max(1, el.bounds.height || 1);
+              const finalFrame = await applyIconEffectsForZPK(sourceDataUrl, el, frameW, frameH);
+              const { bytes } = decodeDataUrlToBytes(finalFrame, `IMG_LEVEL effected frame ${el.name}#${i}`);
+              const newFile = { src: generatedName, file: new File([bytes], generatedName, { type: 'image/png' }) };
+              const existingIndex = elementFiles.findIndex((file) => file.src === generatedName);
+              if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
+              else elementFiles.push(newFile);
+              normalizedFrames.push(generatedName);
+              continue;
+            }
             normalizedFrames.push(configuredFrame);
             continue;
           }

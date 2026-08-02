@@ -167,7 +167,7 @@ export function bakeDeterministicIconEffects(
       // Lazy-import to avoid circular deps — inline the pixel ops directly
       const ctx = base.getContext('2d');
       if (ctx) {
-        const SIZE = base.width;
+        const W = base.width;
         const { exposure = 0, brightness = 0, contrast = 0,
                 highlights = 0, shadows = 0, temperature = 0, tint = 0,
                 sharpness = 0, vignette = 0 } = pe;
@@ -175,12 +175,12 @@ export function bakeDeterministicIconEffects(
         // Step 1: exposure + brightness + contrast via CSS filter re-draw
         if (exposure !== 0 || brightness !== 0 || contrast !== 0) {
           const tmp = document.createElement('canvas');
-          tmp.width = SIZE; tmp.height = base.height;
+          tmp.width = W; tmp.height = base.height;
           const tmpCtx = tmp.getContext('2d')!;
           tmpCtx.drawImage(base, 0, 0);
           const expBright = Math.pow(2, exposure / 100) * Math.max(0, 1 + brightness / 100);
           const contF = (259 * (contrast + 255)) / (255 * (259 - contrast));
-          ctx.clearRect(0, 0, SIZE, base.height);
+          ctx.clearRect(0, 0, W, base.height);
           ctx.filter = `brightness(${expBright}) contrast(${contF})`;
           ctx.drawImage(tmp, 0, 0);
           ctx.filter = 'none';
@@ -191,7 +191,7 @@ export function bakeDeterministicIconEffects(
         if (highlights !== 0 || shadows !== 0 || temperature !== 0 || tint !== 0) {
           const hlStr = highlights / 100, shStr = shadows / 100;
           const tempSh = (temperature / 100) * 0.8, tintSh = (tint / 100) * 0.4;
-          const imgData = ctx.getImageData(0, 0, SIZE, H);
+          const imgData = ctx.getImageData(0, 0, W, H);
           const d = imgData.data;
           for (let i = 0; i < d.length; i += 4) {
             let r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
@@ -209,31 +209,40 @@ export function bakeDeterministicIconEffects(
 
         // Step 3: sharpness
         if (sharpness > 0) {
-          const src = ctx.getImageData(0, 0, SIZE, H);
-          const dst = ctx.createImageData(SIZE, H);
+          const src = ctx.getImageData(0, 0, W, H);
+          const dst = ctx.createImageData(W, H);
           const sd = src.data, dd = dst.data, amt = sharpness/100;
-          for (let y = 1; y < H-1; y++) for (let x = 1; x < SIZE-1; x++) {
-            const idx = (y*SIZE+x)*4;
+          for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) {
+            const idx = (y*W+x)*4;
             for (let c = 0; c < 3; c++) {
               const center = sd[idx+c];
-              const conv = Math.min(255,Math.max(0,5*center-sd[((y-1)*SIZE+x)*4+c]-sd[((y+1)*SIZE+x)*4+c]-sd[(y*SIZE+x-1)*4+c]-sd[(y*SIZE+x+1)*4+c]));
+              const conv = Math.min(255,Math.max(0,5*center-sd[((y-1)*W+x)*4+c]-sd[((y+1)*W+x)*4+c]-sd[(y*W+x-1)*4+c]-sd[(y*W+x+1)*4+c]));
               dd[idx+c] = Math.round(center+(conv-center)*amt);
             }
             dd[idx+3] = sd[idx+3];
           }
-          for (let i = 0; i < SIZE; i++) { for (const p of [i*4,((H-1)*SIZE+i)*4,(i*SIZE)*4,(i*SIZE+SIZE-1)*4]) { dd[p]=sd[p];dd[p+1]=sd[p+1];dd[p+2]=sd[p+2];dd[p+3]=sd[p+3]; } }
+          for (let x = 0; x < W; x++) {
+            for (const p of [x * 4, ((H - 1) * W + x) * 4]) {
+              dd[p]=sd[p];dd[p+1]=sd[p+1];dd[p+2]=sd[p+2];dd[p+3]=sd[p+3];
+            }
+          }
+          for (let y = 0; y < H; y++) {
+            for (const p of [(y * W) * 4, (y * W + W - 1) * 4]) {
+              dd[p]=sd[p];dd[p+1]=sd[p+1];dd[p+2]=sd[p+2];dd[p+3]=sd[p+3];
+            }
+          }
           ctx.putImageData(dst, 0, 0);
         }
 
         // Step 4: vignette
         if (vignette > 0) {
-          const cx = SIZE/2, cy = H/2, r = Math.min(SIZE,H)/2;
+          const cx = W/2, cy = H/2, r = Math.min(W,H)/2;
           const strength = (vignette/100)*0.85;
           const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
           grad.addColorStop(0,'rgba(0,0,0,0)');
           grad.addColorStop(1,`rgba(0,0,0,${strength.toFixed(3)})`);
           ctx.fillStyle = grad;
-          ctx.fillRect(0,0,SIZE,H);
+          ctx.fillRect(0,0,W,H);
         }
       }
     }
