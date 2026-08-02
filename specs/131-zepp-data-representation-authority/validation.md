@@ -959,3 +959,17 @@ No deployment was performed.
   baker used for packaged pointer PNGs.
 - Verified 43 focused tests, generated-code syntax, TypeScript, package
   inspection, and 57/57 headless checks.
+
+## T031 — App shortcut catalog parity
+
+**Completed:** 2026-08-02
+
+- Replaced the stale 13-entry shortcut list with the current FlowVault data
+  catalog and Zepp's shortcut-only activity destinations.
+- Added `BIO_CHARGE` as a selectable destination for eligible widgets and kept
+  Arc Progress intentionally excluded from the shortcut control.
+- Verified Numeric Values persist `clickAction: BIO_CHARGE` through FVWF and
+  emit an `hmUI.widget.IMG_CLICK` overlay bound to
+  `hmUI.data_type.BIO_CHARGE` in generated watch code.
+- Focused shortcut and BioCharge numeric contracts pass (6/6); private build
+  passes with Firebase environment preflight.

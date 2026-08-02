@@ -42,6 +42,7 @@ approves that exact task; then stop and report before continuing.
 - [x] **T020 BioCharge Numeric:** Added HybridCharge/BioCharge 0–100 to Numeric Values using `BIO_CHARGE`, three-digit fit, generated 0–9 assets, FVWF/ZPK coverage, and a supported-firmware warning. Physical-watch verification remains in T026 because no deployment was authorized.
 - [x] **T021 BioCharge Arc/Gauge:** Added fixed 0–100 Arc and Gauge support with direct `BIO_CHARGE` bindings, compatibility warning, midpoint preview, and exact 0/50/100 normalization/angle tests. Physical-watch verification remains in T026 because no deployment was authorized.
 - [x] **T022 BioCharge Image Switcher:** Added explicit 0–100 range definitions, boundary audit/repair, preview resolution, 101-index runtime expansion, direct `BIO_CHARGE` binding, and package reference reuse through the proven T014/T015 pipeline. Physical-watch verification remains in T026 because no deployment was authorized.
+- [x] **T031 Shortcut catalog parity:** Replaced the stale hardcoded app-shortcut list with the current FlowVault data catalog plus Zepp shortcut-only activity destinations. `BIO_CHARGE` now round-trips as a Numeric Values `clickAction` and emits `IMG_CLICK`; Weather Status is excluded because it is a condition-icon source, and Arc Progress intentionally does not expose shortcuts.
 
 ## Slice G — Moon evidence gate
 
