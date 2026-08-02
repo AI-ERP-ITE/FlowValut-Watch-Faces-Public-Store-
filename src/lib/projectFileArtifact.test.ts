@@ -29,8 +29,27 @@ describe('projectFileArtifact', () => {
     expect(parseProjectFileArtifact(JSON.stringify(config))).toEqual({
       version: 1,
       backgroundImage: null,
+      aodBackgroundImage: null,
       watchFaceConfig: config,
     });
+  });
+
+  it('round-trips an uploaded AOD background while old files default it to null', () => {
+    const artifact = createProjectFileArtifact(
+      config,
+      'data:image/png;base64,main',
+      'data:image/png;base64,aod',
+    );
+    const restored = parseProjectFileArtifact(serializeProjectFileArtifact(artifact));
+    expect(restored.backgroundImage).toBe('data:image/png;base64,main');
+    expect(restored.aodBackgroundImage).toBe('data:image/png;base64,aod');
+
+    const legacy = parseProjectFileArtifact(JSON.stringify({
+      version: 1,
+      backgroundImage: 'data:image/png;base64,main',
+      watchFaceConfig: config,
+    }));
+    expect(legacy.aodBackgroundImage).toBeNull();
   });
 
   it('round-trips the export-only watch-safe label toggle', () => {

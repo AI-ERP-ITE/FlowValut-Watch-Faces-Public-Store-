@@ -113,6 +113,7 @@ import type { PointerParityResult, PointerParityStage } from '@/types';
 interface PendingProjectLoad {
   config: WatchFaceConfig;
   backgroundImage: string | null;
+  aodBackgroundImage: string | null;
   fileName: string;
   restoreBackground: boolean;
   targetResolution: CanvasResolution;
@@ -133,8 +134,12 @@ interface PendingWorkshopSave {
 }
 
 /** Serialize the full watchface config to a .fvwf project file and trigger a browser download. */
-function downloadProjectFile(config: WatchFaceConfig, backgroundImage: string | null): void {
-  const blob = createProjectFileBlob(createProjectFileArtifact(config, backgroundImage));
+function downloadProjectFile(
+  config: WatchFaceConfig,
+  backgroundImage: string | null,
+  aodBackgroundImage: string | null,
+): void {
+  const blob = createProjectFileBlob(createProjectFileArtifact(config, backgroundImage, aodBackgroundImage));
   const url = URL.createObjectURL(blob);
   const date = new Date().toISOString().slice(0, 10);
   const safeName = (config.name || 'watchface').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -2998,6 +3003,94 @@ function StudioApp() {
       .catch(() => setWatchModels({}));
   }, []);
 
+  const canvasModelOptions = useMemo(() => Object.entries(watchModels)
+    .flatMap(([modelId, model]) => {
+      const specGroup = model.specGroup ? specGroups[model.specGroup] : null;
+      const match = specGroup?.resolution?.match(/^(\d+)x(\d+)$/i);
+      if (!model.name || !match) return [];
+      return [{
+        modelId,
+        name: model.name,
+        resolution: { width: Number(match[1]), height: Number(match[2]) },
+      }];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name)), [specGroups, watchModels]);
+
+  const activeCanvasModelId = activeModelTarget?.modelId ?? '';
+
+  const handleCanvasModelChange = useCallback(async (targetModelId: string) => {
+    const config = state.watchFaceConfig;
+    const target = canvasModelOptions.find((option) => option.modelId === targetModelId);
+    if (!config || !target) return;
+    if (
+      config.watchModel === target.name
+      && canvasResolutionsMatch(config.resolution, target.resolution)
+    ) return;
+
+    dispatch(actions.setLoading(true));
+    dispatch(actions.setLoadingMessage(`Converting project to ${target.name}…`));
+    try {
+      const sourceConfig = buildProjectFileConfig(config, {
+        aodElements,
+        backgroundTransform: mainBackgroundTransform,
+        aodBackgroundMode,
+        aodSolidColor,
+        aodBackgroundTransform,
+      });
+      const converted = rearrangeProjectPositions(sourceConfig, target.resolution, target.name);
+      const [nextMainBackground, nextAodBackground] = await Promise.all([
+        state.backgroundImage
+          ? resizeDataUrl(state.backgroundImage, target.resolution.width, target.resolution.height)
+          : Promise.resolve(null),
+        aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND' && aodBackgroundImage
+          ? resizeDataUrl(aodBackgroundImage, target.resolution.width, target.resolution.height)
+          : Promise.resolve(aodBackgroundImage),
+      ]);
+
+      const updateMainBackground = (element: WatchFaceElement): WatchFaceElement =>
+        element.name === 'Background' && nextMainBackground
+          ? { ...element, bounds: { x: 0, y: 0, ...target.resolution }, src: nextMainBackground }
+          : element;
+      converted.elements = converted.elements.map(updateMainBackground);
+      converted.aodElements = converted.aodElements?.map(updateMainBackground) ?? converted.aodElements;
+
+      dispatch(actions.setWatchFaceConfig(converted));
+      setAodElements(converted.aodElements && converted.aodElements.length > 0 ? converted.aodElements : null);
+      setWatchModel(target.name);
+      setSelectedElementId(null);
+      setExtraSelectedIds([]);
+
+      if (nextMainBackground) {
+        dispatch(actions.setBackgroundImage(nextMainBackground));
+        const { mimeType, bytes } = decodeDataUrlToBytes(nextMainBackground, 'Converted main background');
+        dispatch(actions.setBackgroundFile(new File([bytes], 'background.png', { type: mimeType })));
+      }
+      if (aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND') {
+        setAodBackgroundImage(nextAodBackground);
+        if (nextAodBackground) {
+          const { mimeType, bytes } = decodeDataUrlToBytes(nextAodBackground, 'Converted AOD background');
+          setAodBackgroundFile(new File([bytes], 'aod_background.png', { type: mimeType }));
+        }
+      }
+      toast.success(`Converted to ${target.name} (${target.resolution.width}×${target.resolution.height}). Widgets and backgrounds were preserved.`);
+    } catch (error) {
+      toast.error(`Model conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      dispatch(actions.setLoading(false));
+    }
+  }, [
+    aodBackgroundImage,
+    aodBackgroundMode,
+    aodBackgroundTransform,
+    aodElements,
+    aodSolidColor,
+    canvasModelOptions,
+    dispatch,
+    mainBackgroundTransform,
+    state.backgroundImage,
+    state.watchFaceConfig,
+  ]);
+
   useEffect(() => {
     fetchAdminCatalogFromFirebase()
       .then((entries) => {
@@ -3714,6 +3807,7 @@ function StudioApp() {
         .map((el, i) => ({ ...el, zIndex: i }));
     }
     let chosenBackgroundImage = pending.backgroundImage;
+    let chosenAodBackgroundImage = pending.aodBackgroundImage;
 
     if (choice === 'rearrange' && pending.restoreBackground && pending.backgroundImage) {
       chosenBackgroundImage = await resizeDataUrl(
@@ -3733,6 +3827,13 @@ function StudioApp() {
         elements: chosenConfig.elements.map(updateBackgroundElement),
         aodElements: chosenConfig.aodElements?.map(updateBackgroundElement) ?? chosenConfig.aodElements,
       };
+    }
+    if (choice === 'rearrange' && pending.restoreBackground && pending.aodBackgroundImage) {
+      chosenAodBackgroundImage = await resizeDataUrl(
+        pending.aodBackgroundImage,
+        pending.targetResolution.width,
+        pending.targetResolution.height,
+      );
     }
 
     let availableWatchModels = watchModels;
@@ -3760,6 +3861,10 @@ function StudioApp() {
     setPendingProjectLoad(null);
     dispatch(actions.setWatchFaceConfig(chosenConfig));
     setAodElements(chosenConfig.aodElements && chosenConfig.aodElements.length > 0 ? chosenConfig.aodElements : null);
+    setMainBackgroundTransform(normalizeBackgroundTransform(chosenConfig.backgroundTransform));
+    setAodBackgroundTransform(normalizeBackgroundTransform(chosenConfig.aodBackgroundTransform));
+    setAodBackgroundMode((chosenConfig.aodBackgroundMode as AodBackgroundMode | undefined) ?? 'USE_MAIN_BACKGROUND');
+    setAodSolidColor(chosenConfig.aodSolidColor ?? '#000000');
 
     if (pending.restoreBackground && chosenBackgroundImage) {
       dispatch(actions.setBackgroundImage(chosenBackgroundImage));
@@ -3768,6 +3873,18 @@ function StudioApp() {
         const blob = await response.blob();
         dispatch(actions.setBackgroundFile(new File([blob], 'background.png', { type: blob.type || 'image/png' })));
       } catch { /* non-critical: the project can still be edited */ }
+    }
+
+    if (pending.restoreBackground) {
+      setAodBackgroundImage(chosenAodBackgroundImage);
+      setAodBackgroundFile(null);
+      if (chosenAodBackgroundImage) {
+        try {
+          const response = await fetch(chosenAodBackgroundImage);
+          const blob = await response.blob();
+          setAodBackgroundFile(new File([blob], 'aod_background.png', { type: blob.type || 'image/png' }));
+        } catch { /* non-critical: data URL remains available for editing/export */ }
+      }
     }
 
     dispatch(actions.setStep('preview'));
@@ -3819,6 +3936,7 @@ function StudioApp() {
         await requestProjectLoad({
           config: normalizedConfig,
           backgroundImage: bgImage,
+          aodBackgroundImage: parsed.aodBackgroundImage ?? null,
           fileName: effectiveName,
           restoreBackground: true,
         });
@@ -3847,6 +3965,7 @@ function StudioApp() {
         const loaded = await requestProjectLoad({
           config: withNormalizedPointerEffects(artifact.watchFaceConfig),
           backgroundImage: artifact.backgroundImage,
+          aodBackgroundImage: artifact.aodBackgroundImage ?? null,
           fileName: artifact.watchFaceConfig.name || buildId,
           restoreBackground: true,
         });
@@ -3890,6 +4009,7 @@ function StudioApp() {
         await requestProjectLoad({
           config: normalizedConfig,
           backgroundImage: null,
+          aodBackgroundImage: null,
           fileName: file.name,
           restoreBackground: false,
         });
@@ -3979,8 +4099,15 @@ function StudioApp() {
         aodBackgroundTransform,
       });
       const normalizedProjectConfig = withNormalizedPointerEffects(projectFileConfig);
-      workshopProjectBlob = createProjectFileBlob(createProjectFileArtifact(normalizedProjectConfig, state.backgroundImage));
-      downloadProjectFile(normalizedProjectConfig, state.backgroundImage);
+      const persistedAodBackground = aodBackgroundMode === 'UPLOAD_AOD_BACKGROUND'
+        ? aodBackgroundImage
+        : null;
+      workshopProjectBlob = createProjectFileBlob(createProjectFileArtifact(
+        normalizedProjectConfig,
+        state.backgroundImage,
+        persistedAodBackground,
+      ));
+      downloadProjectFile(normalizedProjectConfig, state.backgroundImage, persistedAodBackground);
     } catch (e) {
       console.warn('[App] Project file download failed:', e);
     }
@@ -5475,6 +5602,23 @@ function StudioApp() {
                           <FlaskConical className="h-4 w-4" />
                         </button>
                       </div>
+                    </div>
+                    <div className="w-full max-w-sm mb-3 rounded-lg border border-cyan-500/25 bg-cyan-500/5 p-2.5">
+                      <label className="mb-1 block text-[11px] font-medium text-cyan-200">Convert current project to another watch model</label>
+                      <select
+                        value={activeCanvasModelId}
+                        onChange={(event) => { void handleCanvasModelChange(event.target.value); }}
+                        disabled={canvasModelOptions.length === 0 || state.isLoading}
+                        className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200 disabled:opacity-50"
+                      >
+                        {!activeCanvasModelId && <option value="">Select watch model</option>}
+                        {canvasModelOptions.map((option) => (
+                          <option key={option.modelId} value={option.modelId}>
+                            {option.name} — {option.resolution.width}×{option.resolution.height}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[10px] text-zinc-400">Keeps the loaded FVWF, rescales MAIN and AOD widgets, and resizes both backgrounds in place.</p>
                     </div>
                     <div className="flex items-center gap-2 w-full max-w-sm mb-3">
                       <button

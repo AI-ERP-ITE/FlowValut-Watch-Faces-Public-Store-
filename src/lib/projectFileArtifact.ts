@@ -3,14 +3,17 @@ import type { WatchFaceConfig, WatchFaceElement } from '@/types';
 export interface ProjectFileArtifact {
   version: 1;
   backgroundImage: string | null;
+  /** Embedded uploaded AOD background. Optional for backward compatibility. */
+  aodBackgroundImage?: string | null;
   watchFaceConfig: WatchFaceConfig;
 }
 
 export function createProjectFileArtifact(
   watchFaceConfig: WatchFaceConfig,
   backgroundImage: string | null,
+  aodBackgroundImage: string | null = null,
 ): ProjectFileArtifact {
-  return { version: 1, backgroundImage, watchFaceConfig };
+  return { version: 1, backgroundImage, aodBackgroundImage, watchFaceConfig };
 }
 
 export function serializeProjectFileArtifact(artifact: ProjectFileArtifact): string {
@@ -30,6 +33,7 @@ export function parseProjectFileArtifact(text: string): ProjectFileArtifact {
   return {
     version: 1,
     backgroundImage: parsed.backgroundImage ?? null,
+    aodBackgroundImage: parsed.aodBackgroundImage ?? null,
     watchFaceConfig: annotateAqiCompatibility(
       migrateCanonicalZeppDataTypes(
         migrateTimeReadingElements(
