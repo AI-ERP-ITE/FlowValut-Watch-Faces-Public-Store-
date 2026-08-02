@@ -5513,7 +5513,7 @@ function StudioApp() {
             {state.backgroundImage && state.watchFaceConfig && (
               <>
                 {/* Interactive canvas + property panel */}
-                <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_minmax(420px,1fr)] 2xl:grid-cols-[minmax(360px,420px)_minmax(1076px,1fr)] gap-6 2xl:gap-4 items-start">
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_minmax(420px,1fr)] gap-6 items-start">
                   <div className="flex flex-col items-center shrink-0 xl:sticky xl:top-4 self-start">
                     <div className="flex items-center justify-between w-full max-w-sm mb-4">
                       <h4 className="text-sm font-medium text-zinc-400">{editorMode} Editor — drag to reposition</h4>
@@ -6411,7 +6411,7 @@ function StudioApp() {
     <div className="min-h-screen bg-[#0F0F0F] text-white">
       <Header />
 
-      <main className={`container mx-auto px-4 py-6 ${state.currentStep === 'preview' ? 'max-w-[1800px]' : 'max-w-4xl'}`}>
+      <main className={`container mx-auto px-4 py-6 ${state.currentStep === 'preview' ? 'max-w-[1400px]' : 'max-w-4xl'}`}>
         {/* Step indicator */}
         <div className="mb-8">
           <StepIndicator currentStep={state.currentStep} />
