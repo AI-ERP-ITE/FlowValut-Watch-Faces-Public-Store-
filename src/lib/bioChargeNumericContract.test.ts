@@ -8,6 +8,7 @@ import { createProjectFileArtifact, parseProjectFileArtifact, serializeProjectFi
 const element: WatchFaceElement = {
   id: 'hybrid-charge', type: 'TEXT_IMG', name: 'HybridCharge', dataType: 'BIO_CHARGE',
   bounds: { x: 20, y: 30, width: 120, height: 42 }, visible: true, zIndex: 1,
+  clickAction: 'BIO_CHARGE',
   fontArray: Array.from({ length: 10 }, (_, digit) => `bio_charge_custom_${digit}.png`),
   compatibilityWarning: 'HybridCharge / BioCharge requires a compatible watch and firmware (reported Zepp OS API level 4.2+).',
 };
@@ -36,6 +37,7 @@ describe('T020 BioCharge Numeric contract', () => {
     const code = generateWatchFaceCode(config).watchfaceIndexJs;
     expect(code).toContain('hmUI.widget.TEXT_IMG');
     expect(code).toContain('type: hmUI.data_type.BIO_CHARGE');
+    expect(code).toContain('hmUI.widget.IMG_CLICK');
     expect(code).toContain("'bio_charge_custom_0.png'");
     expect(code).toContain("'bio_charge_custom_9.png'");
   });

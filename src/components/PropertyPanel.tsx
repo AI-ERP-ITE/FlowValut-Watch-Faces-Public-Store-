@@ -38,6 +38,7 @@ import { measureDigitWidgetContent } from '@/lib/digitFrameMeasurement';
 import { isCompleteDayImageMode } from '@/lib/dateImageMode';
 import { composeLayeredPngGauge } from '@/lib/layeredPngGauge';
 import { estimateDataUrlBytes, generatePngArcFrames } from '@/lib/pngArcFrameGenerator';
+import { APP_SHORTCUTS, supportsAppShortcut } from '@/lib/appShortcuts';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -70,22 +71,6 @@ const WIDGET_TYPES: WatchFaceElement['type'][] = [
   'ARC_PROGRESS', 'TIME_POINTER', 'TIME_READING', 'GAUGE_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
   'TEXT_IMG', 'IMG', 'TEXT',
   'IMG_LEVEL', 'IMG_STATUS', 'CIRCLE', 'BUTTON',
-];
-
-const APP_SHORTCUTS = [
-  { value: '', label: '— none —' },
-  { value: 'HEART', label: 'Heart Rate' },
-  { value: 'STEP', label: 'Steps / Activity' },
-  { value: 'BATTERY', label: 'Battery' },
-  { value: 'SPO2', label: 'Blood Oxygen' },
-  { value: 'STRESS', label: 'Stress' },
-  { value: 'SLEEP', label: 'Sleep' },
-  { value: 'CAL', label: 'Calories' },
-  { value: 'DISTANCE', label: 'Distance' },
-  { value: 'WEATHER_CURRENT', label: 'Weather' },
-  { value: 'MOON', label: 'Moon Phase' },
-  { value: 'PAI_WEEKLY', label: 'PAI Weekly' },
-  { value: 'AQI', label: 'Air Quality' },
 ];
 
 const TYPE_LABELS: Record<string, string> = {
@@ -2760,18 +2745,20 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
       )}
 
       {/* App Shortcut */}
-      <Section label="App Shortcut">
-        <Select value={element.clickAction ?? '__none__'} onValueChange={v => update({ clickAction: v === '__none__' ? undefined : v })}>
-          <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
-            <SelectValue placeholder="— none —" />
-          </SelectTrigger>
-          <SelectContent>
-            {APP_SHORTCUTS.map(s => (
-              <SelectItem key={s.value || '__none__'} value={s.value || '__none__'}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Section>
+      {supportsAppShortcut(element) && (
+        <Section label="App Shortcut">
+          <Select value={element.clickAction ?? '__none__'} onValueChange={v => update({ clickAction: v === '__none__' ? undefined : v })}>
+            <SelectTrigger className="w-full h-7 text-xs bg-zinc-800 border-white/10 text-white">
+              <SelectValue placeholder="— none —" />
+            </SelectTrigger>
+            <SelectContent>
+              {APP_SHORTCUTS.map(s => (
+                <SelectItem key={s.value || '__none__'} value={s.value || '__none__'}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Section>
+      )}
 
       {/* Visible + zIndex */}
       <Section label="Layer">
