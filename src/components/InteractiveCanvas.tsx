@@ -257,6 +257,10 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       applyFlickerOverlayWithMask(ctx, sceneFlickerMask);
     }
 
+    // Preview-only interaction affordance. Drawn after image analysis/calibration so
+    // it is included in exported previews without becoming watchface artwork.
+    drawShortcutIndicators(ctx, elements, csShape);
+
     lastFlickerAnalysisEnabledRef.current = !!flickerAnalysisEnabled;
     lastRefreshTokenRef.current = refreshToken ?? 0;
 
@@ -271,7 +275,7 @@ export const InteractiveCanvas = forwardRef<HTMLCanvasElement, InteractiveCanvas
       const xel = elements.find(el => el.id === xid);
       if (xel) drawSecondarySelection(ctx, xel);
     }
-  }, [backgroundTransform, calibrationEnabled, calibrationMode, elements, extraSelectedIds, flickerAnalysisEnabled, flickerOverlayEnabled, onElementWarningsChange, refreshToken, selectedElementId]);
+  }, [backgroundTransform, calibrationEnabled, calibrationMode, csH, csShape, csW, elements, extraSelectedIds, flickerAnalysisEnabled, flickerOverlayEnabled, onElementWarningsChange, refreshToken, selectedElementId]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     // Suppress click after a drag
@@ -1741,6 +1745,87 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
   }
 }
 
+function drawShortcutIndicators(
+  ctx: CanvasRenderingContext2D,
+  elements: WatchFaceElement[],
+  canvasShape: 'round' | 'square',
+) {
+  const size = Math.max(20, Math.min(28, Math.min(ctx.canvas.width, ctx.canvas.height) * 0.06));
+  const radius = size / 2;
+  const edgeInset = radius + 3;
+
+  for (const el of elements) {
+    if (!el.visible || !el.clickAction?.trim()) continue;
+
+    let x = el.bounds.x + el.bounds.width + radius * 0.45;
+    let y = el.bounds.y + el.bounds.height + radius * 0.45;
+    x = Math.max(edgeInset, Math.min(ctx.canvas.width - edgeInset, x));
+    y = Math.max(edgeInset, Math.min(ctx.canvas.height - edgeInset, y));
+
+    if (canvasShape === 'round') {
+      const cx = ctx.canvas.width / 2;
+      const cy = ctx.canvas.height / 2;
+      const maxDistance = Math.max(0, Math.min(ctx.canvas.width, ctx.canvas.height) / 2 - edgeInset);
+      const dx = x - cx;
+      const dy = y - cy;
+      const distance = Math.hypot(dx, dy);
+      if (distance > maxDistance && distance > 0) {
+        const ratio = maxDistance / distance;
+        x = cx + dx * ratio;
+        y = cy + dy * ratio;
+      }
+    }
+
+    drawShortcutFinger(ctx, x, y, size);
+  }
+}
+
+function drawShortcutFinger(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+  const scale = size / 24;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 11, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(9, 9, 11, 0.88)';
+  ctx.fill();
+  ctx.strokeStyle = '#E7BD69';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Tap ripple above the fingertip.
+  ctx.beginPath();
+  ctx.arc(0, -5.5, 3.6, Math.PI * 1.08, Math.PI * 1.92);
+  ctx.strokeStyle = '#E7BD69';
+  ctx.lineWidth = 1.25;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Deterministic vector hand; avoids platform-dependent emoji rendering.
+  ctx.beginPath();
+  ctx.moveTo(-1.4, 7.5);
+  ctx.lineTo(-1.4, -3.8);
+  ctx.bezierCurveTo(-1.4, -5.8, 1.6, -5.8, 1.6, -3.8);
+  ctx.lineTo(1.6, 1.3);
+  ctx.bezierCurveTo(2.1, 0.2, 4.2, 0.5, 4.2, 2.1);
+  ctx.bezierCurveTo(4.8, 1.1, 6.8, 1.6, 6.8, 3.1);
+  ctx.lineTo(6.8, 5.1);
+  ctx.bezierCurveTo(6.8, 8.3, 4.5, 10, 1.1, 10);
+  ctx.bezierCurveTo(-1.2, 10, -2.9, 9.1, -4.1, 7.5);
+  ctx.lineTo(-6.1, 4.8);
+  ctx.bezierCurveTo(-7.2, 3.3, -5.1, 1.6, -3.8, 2.8);
+  ctx.lineTo(-1.4, 5.1);
+  ctx.closePath();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.strokeStyle = '#18181B';
+  ctx.lineWidth = 0.9;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+}
+
 // ─── Engrave / Emboss frame ────────────────────────────────────────────────────
 
 function drawEngraveFrame(ctx: CanvasRenderingContext2D, el: WatchFaceElement) {
@@ -2020,18 +2105,6 @@ function drawArc(
     ctx.stroke();
   }
 
-  if (el.dataType) {
-    const midDeg = (startDeg + endDeg) / 2 - 90;
-    const labelR = radius + 16;
-    const lx = cx + labelR * Math.cos(degToRad(midDeg));
-    const ly = cy + labelR * Math.sin(degToRad(midDeg));
-
-    ctx.font = 'bold 10px monospace';
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(el.dataType, lx, ly);
-  }
   ctx.restore();
 }
 
