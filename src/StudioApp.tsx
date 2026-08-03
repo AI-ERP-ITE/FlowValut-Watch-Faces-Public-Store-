@@ -2708,6 +2708,7 @@ function StudioApp() {
     setExtraSelectedIds([]);
     setAodBackgroundSource('image');
     setAodBackgroundHtml('');
+    setWatchFaceName(state.watchFaceConfig.name ?? '');
   }, [state.watchFaceConfig?.name]);
 
   const handleAddElement = () => {
@@ -4025,6 +4026,12 @@ function StudioApp() {
       toast.error('Missing configuration');
       return;
     }
+
+    const nextBuildName = watchFaceName.trim() || 'Blank Watch Face';
+    const namedWatchFaceConfig: WatchFaceConfig = {
+      ...state.watchFaceConfig,
+      name: nextBuildName,
+    };
     
     if (!state.backgroundFile) {
       console.log('[App] ERROR: Missing backgroundFile');
@@ -4040,7 +4047,7 @@ function StudioApp() {
     // After export pipeline runs, el.src is mutated to filenames (not data: URLs) and the
     // saved JSON would be unloadable. Saving here captures the pristine config.
     try {
-      const projectFileConfig = buildProjectFileConfig(state.watchFaceConfig, {
+      const projectFileConfig = buildProjectFileConfig(namedWatchFaceConfig, {
         aodElements,
         backgroundTransform: mainBackgroundTransform,
         aodBackgroundMode,
@@ -4585,7 +4592,7 @@ function StudioApp() {
         el.arcPngFrames = runtimeFrames;
       }
         const configForBuild: WatchFaceConfig = {
-          ...state.watchFaceConfig,
+          ...namedWatchFaceConfig,
           elements: exportElements,
           backgroundTransform: mainBackgroundTransform,
           aodElements: exportAodElements,
@@ -5033,7 +5040,7 @@ function StudioApp() {
       const isRepublishExisting = normalizedTargetId.length > 0;
       const watchfaceId = isRepublishExisting
         ? normalizedTargetId
-        : `${state.watchFaceConfig.name.replace(/\s+/g, '_').replace(/[^a-z0-9_-]/gi, '').slice(0, 48) || 'watchface'}_${Date.now()}`;
+        : `${nextBuildName.replace(/\s+/g, '_').replace(/[^a-z0-9_-]/gi, '').slice(0, 48) || 'watchface'}_${Date.now()}`;
       setUploadedWatchfaceId(watchfaceId);
       const backendBase = (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
         (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
@@ -5115,7 +5122,7 @@ function StudioApp() {
       investigationRunIdRef.current = null;
       dispatch(actions.setLoading(false));
     }
-  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId, workshopBuildId, watchModels, switcherAssetsLoading]);
+  }, [state.watchFaceConfig, aodElements, aodBackgroundMode, aodBackgroundFile, aodSolidColor, state.backgroundFile, state.backgroundImage, state.elementImages, state.githubRepo, dispatch, capturePointerParitySnapshotFromCanvas, parityCaptureSession, investigationBuildHash, showGrid, republishMode, republishTargetId, workshopProjectId, workshopBuildId, watchModels, switcherAssetsLoading, watchFaceName]);
 
   const retryWorkshopSave = useCallback(async () => {
     if (!pendingWorkshopSave || retryingWorkshopSave) return;
@@ -5515,6 +5522,21 @@ function StudioApp() {
                 {/* Interactive canvas + property panel */}
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,520px)_minmax(420px,1fr)] gap-6 items-start">
                   <div className="flex flex-col items-center shrink-0 xl:sticky xl:top-4 self-start">
+                    <div className="w-full max-w-sm mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
+                      <Label htmlFor="canvas-build-name" className="mb-1.5 block text-xs font-medium text-cyan-200">
+                        Build Name
+                      </Label>
+                      <Input
+                        id="canvas-build-name"
+                        value={watchFaceName}
+                        onChange={(event) => setWatchFaceName(event.target.value)}
+                        placeholder="Blank Watch Face"
+                        className="h-9 border-zinc-700 bg-[#0F0F0F] text-white placeholder:text-zinc-600"
+                      />
+                      <p className="mt-1.5 text-[10px] text-zinc-400">
+                        Applied to the next build. Its project build number continues automatically.
+                      </p>
+                    </div>
                     <div className="flex items-center justify-between w-full max-w-sm mb-4">
                       <h4 className="text-sm font-medium text-zinc-400">{editorMode} Editor — drag to reposition</h4>
                       <div className="flex items-center gap-1">
