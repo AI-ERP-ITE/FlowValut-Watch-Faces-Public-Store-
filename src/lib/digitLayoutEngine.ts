@@ -83,14 +83,17 @@ function fallbackValue(widgetType: DigitWidgetType): string {
 // averageInkWidth removed by Spec 114 — layout now uses bitmap width directly
 
 export function getDigitPreviewValue(element: WatchFaceElement): string {
+  if (element.testDisplayValue && element.testDisplayValue.trim().length > 0) {
+    return element.testDisplayValue.trim();
+  }
+  if (element.previewValue && element.previewValue.trim().length > 0) {
+    return element.previewValue.trim();
+  }
   if (element.type === 'IMG_DATE') return '31';
   if (element.type === 'IMG_TIME') {
     if (element.subtype === 'minutes') return '49';
     if (element.subtype === 'seconds') return '15';
     return '16';
-  }
-  if (element.previewValue && element.previewValue.trim().length > 0) {
-    return element.previewValue.trim();
   }
   if (element.type === 'TEXT_IMG') {
     return getNumericPreviewValue(element.dataType);

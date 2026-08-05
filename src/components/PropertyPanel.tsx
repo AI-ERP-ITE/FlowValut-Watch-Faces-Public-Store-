@@ -2521,13 +2521,19 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
       )}
 
       {/* Preview test values — digit widgets */}
-      {element.type === 'TEXT_IMG' && (
+      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG') && (
         <Section label="Preview Test Value">
           <div className="space-y-2">
             <Input
               value={element.previewValue ?? ''}
               onChange={(e) => update({ previewValue: e.target.value })}
-              placeholder="888"
+              placeholder={
+                element.type === 'IMG_DATE'
+                  ? '31'
+                  : element.type === 'IMG_TIME'
+                    ? element.subtype === 'minutes' ? '49' : element.subtype === 'seconds' ? '15' : '16'
+                    : '888'
+              }
               className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
             />
             <div className="grid grid-cols-5 gap-1">

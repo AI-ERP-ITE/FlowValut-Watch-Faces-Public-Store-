@@ -12,7 +12,7 @@ const widget = (type: WatchFaceElement['type'], subtype?: string): WatchFaceElem
   zIndex: 1,
 });
 
-describe('approved digital preview reference', () => {
+describe('digital preview values', () => {
   it('shows 16:49:15 and day 31', () => {
     expect(getDigitPreviewValue(widget('IMG_TIME', 'hours'))).toBe('16');
     expect(getDigitPreviewValue(widget('IMG_TIME', 'minutes'))).toBe('49');
@@ -20,8 +20,13 @@ describe('approved digital preview reference', () => {
     expect(getDigitPreviewValue(widget('IMG_DATE'))).toBe('31');
   });
 
-  it('keeps date and clock samples automatic even when an old project stored a custom preview', () => {
-    expect(getDigitPreviewValue({ ...widget('IMG_TIME', 'hours'), previewValue: '99' })).toBe('16');
-    expect(getDigitPreviewValue({ ...widget('IMG_DATE'), previewValue: '01' })).toBe('31');
+  it('keeps manual canvas samples authoritative', () => {
+    expect(getDigitPreviewValue({ ...widget('IMG_TIME', 'hours'), previewValue: '88' })).toBe('88');
+    expect(getDigitPreviewValue({ ...widget('IMG_DATE'), previewValue: '88' })).toBe('88');
+  });
+
+  it('uses export-only watch-test values ahead of canvas samples', () => {
+    expect(getDigitPreviewValue({ ...widget('IMG_TIME', 'hours'), previewValue: '88', testDisplayValue: '16' })).toBe('16');
+    expect(getDigitPreviewValue({ ...widget('IMG_DATE'), previewValue: '88', testDisplayValue: '31' })).toBe('31');
   });
 });

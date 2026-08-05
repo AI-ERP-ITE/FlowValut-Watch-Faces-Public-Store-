@@ -1806,9 +1806,9 @@ function getCachedImage(src: string, cache: Map<string, HTMLImageElement>, onLoa
 /** Max-digit mock values — always show widest realistic value so bounding box = tight fit */
 export function getMaxDigitMock(dataType: string | undefined, type: WatchFaceElement['type'], subtype?: string): string {
   if (type === 'IMG_TIME') {
-    if (subtype === 'minutes') return '49';
-    if (subtype === 'seconds') return '15';
-    return '16'; // digital reference; analog hand rendering remains independent
+    if (subtype === 'minutes') return '58';
+    if (subtype === 'seconds') return '58';
+    return '10'; // width-oriented canvas fallback; user previewValue remains authoritative
   }
   if (type === 'IMG_WEEK') return 'WED';
   if (type === 'IMG_DATE') return '31';

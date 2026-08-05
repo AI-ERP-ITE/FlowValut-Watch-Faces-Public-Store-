@@ -110,6 +110,7 @@ import {
 import { getMissingHumidityAssets } from '@/lib/humidityNumericContract';
 import { withoutCanvasOnlyElements } from '@/lib/canvasOnlyElements';
 import { findDuplicateWidgetBindings } from '@/lib/zpkReadiness';
+import { applyWatchTestDisplayValues } from '@/lib/watchTestValues';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -4105,9 +4106,11 @@ function StudioApp() {
     try {
       pointerParityMissingAssetsRef.current = [];
       // Canvas annotations remain in the editable project and store preview, but never enter watch asset/export stages.
-      const mainEditorElements = withoutCanvasOnlyElements(state.watchFaceConfig.elements);
+      const mainEditorElements = applyWatchTestDisplayValues(withoutCanvasOnlyElements(state.watchFaceConfig.elements));
       const storedAodElements = aodElements ?? state.watchFaceConfig.aodElements ?? null;
-      const aodEditorElements = storedAodElements ? withoutCanvasOnlyElements(storedAodElements) : null;
+      const aodEditorElements = storedAodElements
+        ? applyWatchTestDisplayValues(withoutCanvasOnlyElements(storedAodElements))
+        : null;
       const effectiveAodBackgroundMode: AodBackgroundMode = aodEditorElements ? aodBackgroundMode : 'USE_MAIN_BACKGROUND';
       let preparedAodBackgroundFile: File | null = null;
 
