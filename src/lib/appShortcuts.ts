@@ -24,5 +24,5 @@ export const APP_SHORTCUTS = [
 ];
 
 export function supportsAppShortcut(element: WatchFaceElement): boolean {
-  return element.type !== 'ARC_PROGRESS';
+  return element.type !== 'ARC_PROGRESS' && element.type !== 'SHORTCUT_ICON';
 }

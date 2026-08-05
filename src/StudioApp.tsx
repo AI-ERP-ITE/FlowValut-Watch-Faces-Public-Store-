@@ -43,6 +43,7 @@ import { BackgroundCropTool } from '@/components/BackgroundCropTool';
 import { BackgroundPhotoEditor } from '@/components/BackgroundPhotoEditor';
 import { DesignInput } from '@/components/DesignInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { HexColorInput } from '@/components/HexColorInput';
 import { IconLab } from '@/components/IconLab';
 import ImageSwitcherLab from '@/components/ImageSwitcherLab';
 import { loadCustomIcons } from '@/lib/customIconStore';
@@ -107,6 +108,8 @@ import {
   temperatureDigitFilenames,
 } from '@/lib/temperatureNumericContract';
 import { getMissingHumidityAssets } from '@/lib/humidityNumericContract';
+import { withoutCanvasOnlyElements } from '@/lib/canvasOnlyElements';
+import { findDuplicateWidgetBindings } from '@/lib/zpkReadiness';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -1036,6 +1039,24 @@ async function applyIconEffectsForZPK(
   });
   return canvas.toDataURL('image/png');
 }
+
+const BUILD_READINESS_ITEMS = [
+  { key: 'aod', label: 'Have you updated the AOD?' },
+  { key: 'watchSize', label: 'Have you minimized the face to see how it looks on watch?' },
+  { key: 'pointerShadows', label: 'Have you added or reviewed shadows on the pointers?' },
+  { key: 'latestPointer', label: 'Is the Time Pointer the latest widget?' },
+  { key: 'background', label: 'Have you reviewed and adjusted the background if needed?' },
+] as const;
+
+type BuildReadinessKey = typeof BUILD_READINESS_ITEMS[number]['key'];
+type BuildReadinessState = Record<BuildReadinessKey, boolean>;
+const EMPTY_BUILD_READINESS: BuildReadinessState = {
+  aod: false,
+  watchSize: false,
+  pointerShadows: false,
+  latestPointer: false,
+  background: false,
+};
 
 function hasDeterministicImageEffects(el: WatchFaceElement): boolean {
   const photoEdit = el.iconPhotoEdit;
@@ -2178,6 +2199,9 @@ function StudioApp() {
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showAddElement, setShowAddElement] = useState(false);
+  const [showBuildReadiness, setShowBuildReadiness] = useState(false);
+  const [buildReadiness, setBuildReadiness] = useState<BuildReadinessState>({ ...EMPTY_BUILD_READINESS });
+  const [duplicateBindingsAccepted, setDuplicateBindingsAccepted] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
   const [showSwitcherLab, setShowSwitcherLab] = useState(false);
   const [addElType, setAddElType] = useState<WatchFaceElement['type']>('TEXT');
@@ -2212,17 +2236,21 @@ function StudioApp() {
     });
   }, [switcherDefinitions]);
   const canvasElements = useMemo(
-    () => resolveCanvasElements(activeElements),
-    [activeElements, resolveCanvasElements],
+    () => resolveCanvasElements(editorMode === 'AOD' ? withoutCanvasOnlyElements(activeElements) : activeElements),
+    [activeElements, editorMode, resolveCanvasElements],
   );
   const mainCaptureElements = useMemo(
     () => resolveCanvasElements(state.watchFaceConfig?.elements ?? []),
     [resolveCanvasElements, state.watchFaceConfig],
   );
   const aodCaptureElements = useMemo(
-    () => resolveCanvasElements(aodElements ?? []),
+    () => resolveCanvasElements(withoutCanvasOnlyElements(aodElements ?? [])),
     [aodElements, resolveCanvasElements],
   );
+  const duplicateWidgetBindings = useMemo(() => [
+    ...findDuplicateWidgetBindings('MAIN', state.watchFaceConfig?.elements ?? []),
+    ...findDuplicateWidgetBindings('AOD', aodElements ?? []),
+  ], [aodElements, state.watchFaceConfig]);
   const activeResolutionW = state.watchFaceConfig?.resolution?.width ?? 480;
   const activeResolutionH = state.watchFaceConfig?.resolution?.height ?? activeResolutionW;
   const activeResolution = activeResolutionW;
@@ -2459,7 +2487,7 @@ function StudioApp() {
 
   const createAodFromMain = useCallback(() => {
     if (!state.watchFaceConfig) return;
-    setAodElements(structuredClone(state.watchFaceConfig.elements));
+    setAodElements(structuredClone(withoutCanvasOnlyElements(state.watchFaceConfig.elements)));
     setAodBackgroundTransform(mainBackgroundTransform);
     setEditorMode('AOD');
     setSelectedElementId(null);
@@ -2726,6 +2754,7 @@ function StudioApp() {
       GAUGE_POINTER: { w: 40, h: 120 },
       TEXT_IMG: { w: 160, h: 50 },
       IMG: { w: 100, h: 100 },
+      SHORTCUT_ICON: { w: 48, h: 48 },
       IMG_TIME: { w: 200, h: 80 },
       IMG_DATE: { w: 100, h: 50 },
       IMG_WEEK: { w: 120, h: 50 },
@@ -2741,7 +2770,7 @@ function StudioApp() {
       const digitAspect = 0.62; // typical digit width / height ratio
       const digitW = Math.round(h * digitAspect);
       const mock = (() => {
-        if (addElType === 'IMG_TIME') return addElSubtype === 'minutes' || addElSubtype === 'seconds' ? '58' : '10';
+        if (addElType === 'IMG_TIME') return addElSubtype === 'minutes' ? '49' : addElSubtype === 'seconds' ? '15' : '16';
         if (addElType === 'IMG_WEEK') return 'WED';
         if (addElType === 'IMG_DATE') return '31';
         if (addElType === 'TIME_READING') return '00:00';
@@ -2802,6 +2831,7 @@ function StudioApp() {
           }
         : {}),
       ...(addElType === 'TEXT' ? { text: 'Text', fontSize: 36, color: '#FFFFFF' } : {}),
+      ...(addElType === 'SHORTCUT_ICON' ? { name: 'Shortcut Icon' } : {}),
       ...(['TEXT_IMG', 'ARC_PROGRESS', 'GAUGE_POINTER', 'IMG_LEVEL'].includes(addElType) && addElDataType === 'BIO_CHARGE'
         ? { compatibilityWarning: 'HybridCharge / BioCharge requires a compatible watch and firmware (reported Zepp OS API level 4.2+).' }
         : {}),
@@ -4074,8 +4104,10 @@ function StudioApp() {
 
     try {
       pointerParityMissingAssetsRef.current = [];
-      const mainEditorElements = state.watchFaceConfig.elements;
-      const aodEditorElements = aodElements ?? state.watchFaceConfig.aodElements ?? null;
+      // Canvas annotations remain in the editable project and store preview, but never enter watch asset/export stages.
+      const mainEditorElements = withoutCanvasOnlyElements(state.watchFaceConfig.elements);
+      const storedAodElements = aodElements ?? state.watchFaceConfig.aodElements ?? null;
+      const aodEditorElements = storedAodElements ? withoutCanvasOnlyElements(storedAodElements) : null;
       const effectiveAodBackgroundMode: AodBackgroundMode = aodEditorElements ? aodBackgroundMode : 'USE_MAIN_BACKGROUND';
       let preparedAodBackgroundFile: File | null = null;
 
@@ -4501,7 +4533,7 @@ function StudioApp() {
 
       // Build a stable export config snapshot so all bakes/generation use the same element state.
       // This prevents preview/export drift (especially for custom-hand pivots and cover fallback).
-      const prepareExportElements = (inputElements: WatchFaceElement[]) => stampGaugePairIds(inputElements).map(el => ({
+      const prepareExportElements = (inputElements: WatchFaceElement[]) => stampGaugePairIds(withoutCanvasOnlyElements(inputElements)).map(el => ({
         ...el,
         bounds: { ...el.bounds },
         ...(el.type === 'GAUGE_POINTER'
@@ -5165,11 +5197,22 @@ function StudioApp() {
       return;
     }
 
+    setBuildReadiness({ ...EMPTY_BUILD_READINESS });
+    setDuplicateBindingsAccepted(false);
+    setShowBuildReadiness(true);
+  }, [pointerParityRunning, state.currentStep]);
+
+  const readinessComplete = BUILD_READINESS_ITEMS.every((item) => buildReadiness[item.key]);
+  const duplicateDecisionComplete = duplicateWidgetBindings.length === 0 || duplicateBindingsAccepted;
+
+  const confirmGenerate = useCallback(() => {
+    if (!readinessComplete || !duplicateDecisionComplete) return;
+    setShowBuildReadiness(false);
     const now = new Date();
     const stamp = `${now.toLocaleTimeString('en-US', { hour12: false })}.${String(now.getMilliseconds()).padStart(3, '0')}`;
     toast.success(`Deploy started at ${stamp}`);
     void handleGenerate();
-  }, [handleGenerate, pointerParityRunning, state.currentStep]);
+  }, [duplicateDecisionComplete, handleGenerate, readinessComplete]);
 
   // Handle reset
   const handleReset = useCallback(() => {
@@ -5790,10 +5833,9 @@ function StudioApp() {
                               onChange={(e) => setAodSolidColor(e.target.value)}
                               className="h-8 w-12 p-1"
                             />
-                            <Input
-                              type="text"
+                            <HexColorInput
                               value={aodSolidColor}
-                              onChange={(e) => setAodSolidColor(e.target.value || '#000000')}
+                              onChange={setAodSolidColor}
                               className="h-8 text-xs"
                             />
                           </div>
@@ -6061,6 +6103,67 @@ function StudioApp() {
                   </DialogContent>
                 </Dialog>
 
+                <Dialog open={showBuildReadiness} onOpenChange={setShowBuildReadiness}>
+                  <DialogContent className="bg-[#111] border-zinc-800 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="text-white text-base">Watch Test Readiness</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-1">
+                      <p className="text-xs leading-relaxed text-zinc-400">
+                        Confirm the face is ready before FlowVault creates the watch test package.
+                      </p>
+                      <div className="space-y-2">
+                        {BUILD_READINESS_ITEMS.map((item) => (
+                          <label key={item.key} className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-200">
+                            <input
+                              type="checkbox"
+                              checked={buildReadiness[item.key]}
+                              onChange={(event) => setBuildReadiness((current) => ({ ...current, [item.key]: event.target.checked }))}
+                              className="mt-0.5 h-4 w-4 accent-cyan-500"
+                            />
+                            <span>{item.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {duplicateWidgetBindings.length > 0 && (
+                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-amber-300">
+                            <AlertTriangle className="h-4 w-4" /> Duplicate widget bindings detected
+                          </div>
+                          <ul className="space-y-1 text-xs text-amber-100/80">
+                            {duplicateWidgetBindings.map((duplicate) => (
+                              <li key={`${duplicate.mode}-${duplicate.type}-${duplicate.dataType}`}>
+                                {duplicate.mode}: {duplicate.type} / {getDataTypeLabel(duplicate.dataType)} — {duplicate.names.join(', ')}
+                              </li>
+                            ))}
+                          </ul>
+                          <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-amber-100">
+                            <input
+                              type="checkbox"
+                              checked={duplicateBindingsAccepted}
+                              onChange={(event) => setDuplicateBindingsAccepted(event.target.checked)}
+                              className="mt-0.5 h-4 w-4 accent-amber-500"
+                            />
+                            I reviewed these duplicates and want to continue.
+                          </label>
+                        </div>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="outline" onClick={() => setShowBuildReadiness(false)} className="flex-1 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-white">
+                          Back to Revise
+                        </Button>
+                        <Button
+                          onClick={confirmGenerate}
+                          disabled={!readinessComplete || !duplicateDecisionComplete}
+                          className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Create Watch Test
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 {/* Add Element Dialog */}
                 <Dialog open={showAddElement} onOpenChange={setShowAddElement}>
                   <DialogContent className="bg-[#111] border-zinc-800 text-white max-w-sm">
@@ -6085,6 +6188,7 @@ function StudioApp() {
                               { type: 'IMG_LEVEL' as const, label: 'Image Switcher', icon: '📊', desc: 'Swaps between a set of images based on a data value level' },
                               { type: 'IMG_STATUS' as const, label: 'Status Indicator', icon: '🔵', desc: 'Shows/hides an icon based on a system status (Bluetooth, alarm, DND, lock)' },
                               { type: 'IMG' as const, label: 'Static Image', icon: '🖼️', desc: 'A static image or icon from your library' },
+                              ...(editorMode === 'MAIN' ? [{ type: 'SHORTCUT_ICON' as const, label: 'Shortcut Icon', icon: '👆', desc: 'Canvas-only shortcut marker; never included in AOD or watch files' }] : []),
                               { type: 'CIRCLE' as const, label: 'Shape', icon: '⚪', desc: 'Circle, filled rect, stroke rect or rounded rect shape' },
                               { type: 'TIME_POINTER' as const, label: 'Analog Clock', icon: '🕐', desc: 'Analog clock with rotating hour, minute and second hands' },
                               { type: 'TIME_READING' as const, label: 'Time Readings', icon: '🌅', desc: 'Digital Sunrise or Sunset time (HH:MM), isolated from the current clock' },

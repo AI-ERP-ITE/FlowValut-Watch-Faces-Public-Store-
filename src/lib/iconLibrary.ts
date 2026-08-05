@@ -398,49 +398,6 @@ function makeAirplane(ctx: CanvasRenderingContext2D, _s: number) {
   ctx.lineTo(8, 32); ctx.lineTo(6, 28); ctx.lineTo(20, 20); ctx.closePath(); ctx.fill();
 }
 
-function makeShortcut(ctx: CanvasRenderingContext2D, _s: number) {
-  ctx.save();
-  ctx.translate(24, 24);
-  ctx.scale(2, 2);
-
-  ctx.beginPath();
-  ctx.arc(0, 0, 11, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(9, 9, 11, 0.88)';
-  ctx.fill();
-  ctx.strokeStyle = '#E7BD69';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, -5.5, 3.6, Math.PI * 1.08, Math.PI * 1.92);
-  ctx.strokeStyle = '#E7BD69';
-  ctx.lineWidth = 1.25;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-1.4, 7.5);
-  ctx.lineTo(-1.4, -3.8);
-  ctx.bezierCurveTo(-1.4, -5.8, 1.6, -5.8, 1.6, -3.8);
-  ctx.lineTo(1.6, 1.3);
-  ctx.bezierCurveTo(2.1, 0.2, 4.2, 0.5, 4.2, 2.1);
-  ctx.bezierCurveTo(4.8, 1.1, 6.8, 1.6, 6.8, 3.1);
-  ctx.lineTo(6.8, 5.1);
-  ctx.bezierCurveTo(6.8, 8.3, 4.5, 10, 1.1, 10);
-  ctx.bezierCurveTo(-1.2, 10, -2.9, 9.1, -4.1, 7.5);
-  ctx.lineTo(-6.1, 4.8);
-  ctx.bezierCurveTo(-7.2, 3.3, -5.1, 1.6, -3.8, 2.8);
-  ctx.lineTo(-1.4, 5.1);
-  ctx.closePath();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fill();
-  ctx.strokeStyle = '#18181B';
-  ctx.lineWidth = 0.9;
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-  ctx.restore();
-}
-
 function makeSunrise(ctx: CanvasRenderingContext2D, _s: number) {
   ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(6, 32); ctx.lineTo(42, 32); ctx.stroke();
@@ -789,7 +746,6 @@ const ICON_DEFS: Array<{ key: string; label: string; category: 'health' | 'fitne
   { key: 'wind',          label: 'Wind',              category: 'weather',      draw: makeWind },
   { key: 'barometer',     label: 'Barometer',         category: 'weather',      draw: makeBarometer },
   { key: 'notification',  label: 'Notification',      category: 'system',       draw: makeNotification },
-  { key: 'shortcut',      label: 'Shortcut',          category: 'system',       draw: makeShortcut },
   { key: 'moon',          label: 'Moon Phase',        category: 'weather',      draw: makeMoon },
   { key: 'uvi',           label: 'UV Index',          category: 'weather',      draw: makeUvi },
   { key: 'aqi',           label: 'Air Quality',       category: 'weather',      draw: makeAqi },

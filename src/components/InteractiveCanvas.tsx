@@ -1352,6 +1352,48 @@ function applyFlickerOverlayWithMask(ctx: CanvasRenderingContext2D, invalidMask:
 
 // ─── Element Dispatcher ─────────────────────────────────────────────────────────
 
+function drawShortcutIcon(ctx: CanvasRenderingContext2D, element: WatchFaceElement) {
+  const { x, y, width, height } = element.bounds;
+  const scale = Math.max(0.2, Math.min(width, height) / 24);
+  ctx.save();
+  ctx.translate(x + width / 2, y + height / 2);
+  ctx.scale(scale, scale);
+  ctx.beginPath();
+  ctx.arc(0, 0, 11, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(9, 9, 11, 0.88)';
+  ctx.fill();
+  ctx.strokeStyle = '#E7BD69';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, -5.5, 3.6, Math.PI * 1.08, Math.PI * 1.92);
+  ctx.strokeStyle = '#E7BD69';
+  ctx.lineWidth = 1.25;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-1.4, 7.5);
+  ctx.lineTo(-1.4, -3.8);
+  ctx.bezierCurveTo(-1.4, -5.8, 1.6, -5.8, 1.6, -3.8);
+  ctx.lineTo(1.6, 1.3);
+  ctx.bezierCurveTo(2.1, 0.2, 4.2, 0.5, 4.2, 2.1);
+  ctx.bezierCurveTo(4.8, 1.1, 6.8, 1.6, 6.8, 3.1);
+  ctx.lineTo(6.8, 5.1);
+  ctx.bezierCurveTo(6.8, 8.3, 4.5, 10, 1.1, 10);
+  ctx.bezierCurveTo(-1.2, 10, -2.9, 9.1, -4.1, 7.5);
+  ctx.lineTo(-6.1, 4.8);
+  ctx.bezierCurveTo(-7.2, 3.3, -5.1, 1.6, -3.8, 2.8);
+  ctx.lineTo(-1.4, 5.1);
+  ctx.closePath();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.strokeStyle = '#18181B';
+  ctx.lineWidth = 0.9;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[], iconCache?: Map<string, HTMLImageElement>, digitCache?: Map<string, HTMLImageElement>, onIconLoaded?: () => void, handCache?: Map<string, Map<string, HTMLImageElement>>, customHands?: CustomHandRecord[], digitAssets?: Map<string, ElementImage>) {
   const sorted = [...elements].filter(e => e.visible).sort((a, b) => a.zIndex - b.zIndex);
 
@@ -1663,6 +1705,9 @@ function drawElements(ctx: CanvasRenderingContext2D, elements: WatchFaceElement[
         clearShadow(ctx);
         ctx.restore();
         break;
+      case 'SHORTCUT_ICON':
+        drawShortcutIcon(ctx, el);
+        break;
       case 'CIRCLE': {
         const { x, y, width: cw, height: ch } = el.bounds;
         const color = el.color ? parseZeppColor(el.color) : 'rgba(200,200,200,0.8)';
@@ -1761,9 +1806,9 @@ function getCachedImage(src: string, cache: Map<string, HTMLImageElement>, onLoa
 /** Max-digit mock values — always show widest realistic value so bounding box = tight fit */
 export function getMaxDigitMock(dataType: string | undefined, type: WatchFaceElement['type'], subtype?: string): string {
   if (type === 'IMG_TIME') {
-    if (subtype === 'minutes') return '58';
-    if (subtype === 'seconds') return '58';
-    return '10'; // hours
+    if (subtype === 'minutes') return '49';
+    if (subtype === 'seconds') return '15';
+    return '16'; // digital reference; analog hand rendering remains independent
   }
   if (type === 'IMG_WEEK') return 'WED';
   if (type === 'IMG_DATE') return '31';

@@ -39,6 +39,8 @@ import { isCompleteDayImageMode } from '@/lib/dateImageMode';
 import { composeLayeredPngGauge } from '@/lib/layeredPngGauge';
 import { estimateDataUrlBytes, generatePngArcFrames } from '@/lib/pngArcFrameGenerator';
 import { APP_SHORTCUTS, supportsAppShortcut } from '@/lib/appShortcuts';
+import { HexColorInput } from '@/components/HexColorInput';
+import { applyElementStyle, captureElementStyle, type ElementStyleClipboard } from '@/lib/elementStyleClipboard';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -70,7 +72,7 @@ export interface PropertyPanelProps {
 const WIDGET_TYPES: WatchFaceElement['type'][] = [
   'ARC_PROGRESS', 'TIME_POINTER', 'TIME_READING', 'GAUGE_POINTER', 'IMG_TIME', 'IMG_DATE', 'IMG_WEEK',
   'TEXT_IMG', 'IMG', 'TEXT',
-  'IMG_LEVEL', 'IMG_STATUS', 'CIRCLE', 'BUTTON',
+  'IMG_LEVEL', 'IMG_STATUS', 'SHORTCUT_ICON', 'CIRCLE', 'BUTTON',
 ];
 
 const TYPE_LABELS: Record<string, string> = {
@@ -85,22 +87,15 @@ const TYPE_LABELS: Record<string, string> = {
   IMG_WEEK: 'Week Image',
   IMG_LEVEL: 'Level Image',
   IMG_STATUS: 'Status Image',
+  SHORTCUT_ICON: 'Shortcut Icon',
   TEXT: 'Text',
   CIRCLE: 'Circle',
   BUTTON: 'Button',
 };
 
 // Module-level style clipboard — persists across element selections
-interface StyleClipboard {
-  color?: string;
-  fontSize?: number;
-  fontStyle?: string;
-  radius?: number;
-  lineWidth?: number;
-  startAngle?: number;
-  endAngle?: number;
-}
-let _styleClipboard: StyleClipboard | null = null;
+let _styleClipboard: ElementStyleClipboard | null = null;
+let _colorClipboard: string | null = null;
 
 type PanelTab = 'position' | 'style' | 'effects' | 'data' | 'layer';
 const PanelTabContext = createContext<PanelTab>('position');
@@ -163,6 +158,7 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
   const [iconSearch, setIconSearch] = useState('');
   const [fontSearch, setFontSearch] = useState('');
   const [clipboardHasData, setClipboardHasData] = useState(() => _styleClipboard !== null);
+  const [colorClipboardHasData, setColorClipboardHasData] = useState(() => _colorClipboard !== null);
   const [activeTab, setActiveTab] = useState<PanelTab>('position');
   const [gaugeMarkup, setGaugeMarkup] = useState('');
   const [switcherMarkup, setSwitcherMarkup] = useState('');
@@ -754,8 +750,8 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
               <input type="color" value={ef.fillColor}
                 onChange={e => updateFrame({ fillColor: e.target.value })}
                 className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
-              <Input value={ef.fillColor}
-                onChange={e => updateFrame({ fillColor: e.target.value })}
+              <HexColorInput value={ef.fillColor}
+                onChange={fillColor => updateFrame({ fillColor })}
                 className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white" />
             </div>
           )}
@@ -836,33 +832,31 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
   const setH = (v: number) => update({ bounds: { ...element.bounds, height: clamp(v, 1, canvasHeight) } });
 
   const handleCopyStyle = () => {
-    _styleClipboard = {
-      color: element.color,
-      fontSize: element.fontSize,
-      fontStyle: element.fontStyle,
-      radius: element.radius,
-      lineWidth: element.lineWidth,
-      startAngle: element.startAngle,
-      endAngle: element.endAngle,
-    };
+    _styleClipboard = captureElementStyle(element);
     setClipboardHasData(true);
     toast.success('Style copied!');
   };
 
   const handlePasteStyle = () => {
     if (!_styleClipboard) return;
-    const changes: Partial<WatchFaceElement> = {};
-    if (_styleClipboard.color !== undefined) changes.color = _styleClipboard.color;
-    if (_styleClipboard.fontSize !== undefined) changes.fontSize = _styleClipboard.fontSize;
-    if (_styleClipboard.fontStyle !== undefined) changes.fontStyle = _styleClipboard.fontStyle;
-    if (element.type === 'ARC_PROGRESS') {
-      if (_styleClipboard.radius !== undefined) changes.radius = _styleClipboard.radius;
-      if (_styleClipboard.lineWidth !== undefined) changes.lineWidth = _styleClipboard.lineWidth;
-      if (_styleClipboard.startAngle !== undefined) changes.startAngle = _styleClipboard.startAngle;
-      if (_styleClipboard.endAngle !== undefined) changes.endAngle = _styleClipboard.endAngle;
-    }
-    update(changes);
+    update(applyElementStyle(element, _styleClipboard));
     toast.success('Style pasted!');
+  };
+
+  const handleCopyColor = () => {
+    if (!element.color) {
+      toast.error('This element has no primary color to copy.');
+      return;
+    }
+    _colorClipboard = element.color;
+    setColorClipboardHasData(true);
+    toast.success('Color copied!');
+  };
+
+  const handlePasteColor = () => {
+    if (!_colorClipboard) return;
+    update({ color: _colorClipboard });
+    toast.success('Color pasted!');
   };
 
   const isCentered = element.type === 'ARC_PROGRESS' || element.type === 'TIME_POINTER';
@@ -885,11 +879,11 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
         </div>
       )}
       {/* Copy / Paste Style */}
-      <div className="flex gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
         <button
           onClick={handleCopyStyle}
           className="flex-1 h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/50 hover:border-cyan-500/40 hover:text-cyan-400 transition-colors"
-          title="Copy color, font size, arc shape"
+          title="Copy visual styling and edit effects"
         >
           Copy Style
         </button>
@@ -900,6 +894,22 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
             title="Paste copied style to this element"
           >
             Paste Style
+          </button>
+        )}
+        <button
+          onClick={handleCopyColor}
+          className="flex-1 h-6 rounded border border-white/10 bg-white/5 text-[10px] text-white/50 hover:border-amber-500/40 hover:text-amber-300 transition-colors"
+          title="Copy only the primary color"
+        >
+          Copy Color
+        </button>
+        {colorClipboardHasData && (
+          <button
+            onClick={handlePasteColor}
+            className="flex-1 h-6 rounded border border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-300 hover:bg-amber-500/20 transition-colors"
+            title="Paste only the copied primary color"
+          >
+            Paste Color
           </button>
         )}
       </div>
@@ -1077,9 +1087,9 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
               onChange={e => update({ color: e.target.value })}
               className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent"
             />
-            <Input
+            <HexColorInput
               value={toCssColor(element.color ?? '0x00CC88')}
-              onChange={e => update({ color: e.target.value })}
+              onChange={color => update({ color })}
               className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
             />
           </div>
@@ -2511,19 +2521,13 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
       )}
 
       {/* Preview test values — digit widgets */}
-      {(element.type === 'IMG_DATE' || element.type === 'IMG_TIME' || element.type === 'TEXT_IMG') && (
+      {element.type === 'TEXT_IMG' && (
         <Section label="Preview Test Value">
           <div className="space-y-2">
             <Input
               value={element.previewValue ?? ''}
               onChange={(e) => update({ previewValue: e.target.value })}
-              placeholder={
-                element.type === 'IMG_DATE'
-                  ? '31'
-                  : element.type === 'IMG_TIME'
-                    ? '10'
-                    : '888'
-              }
+              placeholder="888"
               className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white"
             />
             <div className="grid grid-cols-5 gap-1">
@@ -2671,8 +2675,8 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
                   <input type="color" value={ds.color}
                     onChange={e => updateShadow({ color: e.target.value })}
                     className="w-7 h-7 rounded cursor-pointer border-0 bg-transparent" />
-                  <Input value={ds.color}
-                    onChange={e => updateShadow({ color: e.target.value })}
+                  <HexColorInput value={ds.color}
+                    onChange={color => updateShadow({ color })}
                     className="h-7 text-xs font-mono bg-white/5 border-white/10 text-white flex-1" />
                   <span className="text-[10px] text-white/30 shrink-0">{Math.round(ds.opacity * 100)}%</span>
                 </div>

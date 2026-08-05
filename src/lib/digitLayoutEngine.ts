@@ -76,20 +76,21 @@ function resolveSpacing(widgetType: DigitWidgetType, hSpace?: number): number {
 
 function fallbackValue(widgetType: DigitWidgetType): string {
   if (widgetType === 'IMG_DATE') return '31';
-  if (widgetType === 'IMG_TIME') return '10';
+  if (widgetType === 'IMG_TIME') return '16';
   return '888';
 }
 
 // averageInkWidth removed by Spec 114 — layout now uses bitmap width directly
 
 export function getDigitPreviewValue(element: WatchFaceElement): string {
-  if (element.previewValue && element.previewValue.trim().length > 0) {
-    return element.previewValue.trim();
-  }
   if (element.type === 'IMG_DATE') return '31';
   if (element.type === 'IMG_TIME') {
-    if (element.subtype === 'minutes' || element.subtype === 'seconds') return '58';
-    return '10';
+    if (element.subtype === 'minutes') return '49';
+    if (element.subtype === 'seconds') return '15';
+    return '16';
+  }
+  if (element.previewValue && element.previewValue.trim().length > 0) {
+    return element.previewValue.trim();
   }
   if (element.type === 'TEXT_IMG') {
     return getNumericPreviewValue(element.dataType);
