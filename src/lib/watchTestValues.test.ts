@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WatchFaceElement } from '@/types';
-import { applyWatchTestDisplayValues, getWatchTestDisplayValue } from './watchTestValues';
+import { applyWatchTestCaptureValues, getWatchTestDisplayValue } from './watchTestValues';
 
 const widget = (type: WatchFaceElement['type'], dataType?: string, subtype?: string): WatchFaceElement => ({
   id: `${type}-${dataType ?? subtype ?? ''}`,
@@ -13,7 +13,7 @@ const widget = (type: WatchFaceElement['type'], dataType?: string, subtype?: str
   zIndex: 1,
 });
 
-describe('watch-test export values', () => {
+describe('watch-test canvas capture values', () => {
   it('assigns date, digital time, and approved numeric values', () => {
     expect(getWatchTestDisplayValue(widget('IMG_DATE'))).toBe('31');
     expect(getWatchTestDisplayValue(widget('IMG_TIME', undefined, 'hours'))).toBe('16');
@@ -26,10 +26,18 @@ describe('watch-test export values', () => {
   it('does not modify Time Reading values or the source objects', () => {
     const timeReading = widget('TIME_READING', 'SUN_RISE');
     const source = [timeReading, widget('TEXT_IMG', 'HEART')];
-    const result = applyWatchTestDisplayValues(source);
+    const result = applyWatchTestCaptureValues(source);
     expect(result[0]).toBe(timeReading);
-    expect(result[0].testDisplayValue).toBeUndefined();
-    expect(source[1].testDisplayValue).toBeUndefined();
-    expect(result[1].testDisplayValue).toBe('70');
+    expect(result[0].previewValue).toBeUndefined();
+    expect(source[1].previewValue).toBeUndefined();
+    expect(result[1].previewValue).toBe('70');
+  });
+
+  it('overrides only the derived capture view and preserves manual canvas samples', () => {
+    const source = [{ ...widget('IMG_DATE'), previewValue: '88' }];
+    const result = applyWatchTestCaptureValues(source);
+    expect(source[0].previewValue).toBe('88');
+    expect(result[0].previewValue).toBe('31');
+    expect(result[0]).not.toBe(source[0]);
   });
 });

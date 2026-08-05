@@ -149,8 +149,6 @@ export interface WatchFaceElement {
   alignH?: string;
   // Preview-only custom sample value for digit widgets (IMG_DATE / IMG_TIME / TEXT_IMG)
   previewValue?: string;
-  /** Export-only static value used by Create Watch Test; never persisted into the FVWF source. */
-  testDisplayValue?: string;
 
   // Layout-engine computed startX for digit widgets — set at ZPK build time by
   // regenerateDigitFilesFromElements so the code generator can consume it directly.

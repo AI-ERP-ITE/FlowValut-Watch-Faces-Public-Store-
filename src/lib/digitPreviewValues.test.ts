@@ -25,8 +25,4 @@ describe('digital preview values', () => {
     expect(getDigitPreviewValue({ ...widget('IMG_DATE'), previewValue: '88' })).toBe('88');
   });
 
-  it('uses export-only watch-test values ahead of canvas samples', () => {
-    expect(getDigitPreviewValue({ ...widget('IMG_TIME', 'hours'), previewValue: '88', testDisplayValue: '16' })).toBe('16');
-    expect(getDigitPreviewValue({ ...widget('IMG_DATE'), previewValue: '88', testDisplayValue: '31' })).toBe('31');
-  });
 });

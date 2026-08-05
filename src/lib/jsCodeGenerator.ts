@@ -32,38 +32,6 @@ function _weekAssetPrefix(element: WatchFaceElement): string {
   return `week_${_safeAssetId(element.id)}`;
 }
 
-function _staticTestText(value: string): string {
-  return value.replace(/°/g, 'u').replace(/[^0-9.u-]/g, '');
-}
-
-function _generateStaticDigitTextWidget(
-  element: WatchFaceElement,
-  value: string,
-  widgetKey: string,
-  showLevel: string,
-  x: number,
-  label: string,
-): string {
-  const images = element.fontArray ?? element.images;
-  const digits = Array.isArray(images) && images.length >= 10
-    ? images.slice(0, 10)
-    : Array.from({ length: 10 }, (_, index) => `time_digit_${index}.png`);
-  const fontArray = `[${digits.map((asset) => `'${asset}'`).join(', ')}]`;
-  return `
-                // ${element.name} - ${label} (static watch-test value)
-                let widget_${widgetKey} = hmUI.createWidget(hmUI.widget.TEXT_IMG, {
-                    x: px(${x}),
-                    y: px(${element.bounds.y}),
-                    w: px(${element.bounds.width || 100}),
-                    h: px(${element.bounds.height || 40}),
-                    font_array: ${fontArray},
-                    text: '${_staticTestText(value)}',
-                    h_space: ${Math.max(0, Math.round(element.hSpace ?? 0))},
-                    align_h: hmUI.align.LEFT,
-                    show_level: hmUI.show_level.${showLevel}
-                });`;
-}
-
 /** Compute extra canvas padding required to contain a drop shadow (mirrors StudioApp helper). */
 function _shadowPad(ds: NonNullable<WatchFaceElement['dropShadow']>): number {
   return dropShadowPaddingForBake(ds);
@@ -620,20 +588,6 @@ function generateIMGTimeWidget(hoursEl: WatchFaceElement | undefined, minutesEl:
   const minuteArrayStr = `[${minuteDigits.map((d) => `'${d}'`).join(', ')}]`;
   const secondArrayStr = `[${secondDigits.map((d) => `'${d}'`).join(', ')}]`;
 
-  if (hoursEl?.testDisplayValue || minutesEl?.testDisplayValue || secondsEl?.testDisplayValue) {
-    const parts: string[] = [];
-    const staticHours = hoursEl ?? refEl;
-    parts.push(_generateStaticDigitTextWidget(staticHours, hoursEl?.testDisplayValue ?? '16', `${widgetIndex}_test_hour`, showLevel, hx, 'Digital hour'));
-    const staticMinutes = minutesEl ?? (hoursEl?.subtype ? undefined : hoursEl);
-    if (staticMinutes) {
-      parts.push(_generateStaticDigitTextWidget(staticMinutes, minutesEl?.testDisplayValue ?? '49', `${widgetIndex}_test_minute`, showLevel, mx, 'Digital minute'));
-    }
-    if (secondsEl) {
-      parts.push(_generateStaticDigitTextWidget(secondsEl, secondsEl.testDisplayValue ?? '15', `${widgetIndex}_test_second`, showLevel, sx, 'Digital second'));
-    }
-    return parts.join('');
-  }
-  
   const secondParams = hasSeconds ? `
                     second_zero: 1,
                     second_startX: px(${sx}),
@@ -680,23 +634,6 @@ function generateIMGDateWidget(element: WatchFaceElement, widgetIndex: number, s
       : Array.from({ length: 10 }, (_, i) => `date_digit_${i}.png`);
   const imageArrayStr = `[${dayImages.map((d) => `'${d}'`).join(', ')}]`;
 
-  if (element.testDisplayValue) {
-    if (completeMode) {
-      const day = Math.min(31, Math.max(1, Number.parseInt(element.testDisplayValue, 10) || 31));
-      return `
-                // ${element.name} - Static watch-test day
-                let widget_${widgetIndex}_test_date = hmUI.createWidget(hmUI.widget.IMG, {
-                    x: px(${element.bounds.x}),
-                    y: px(${element.bounds.y}),
-                    w: px(${element.bounds.width || 100}),
-                    h: px(${element.bounds.height || 40}),
-                    src: '${dayImages[day - 1]}',
-                    show_level: hmUI.show_level.${showLevel}
-                });`;
-    }
-    return _generateStaticDigitTextWidget(element, element.testDisplayValue, `${widgetIndex}_test_date`, showLevel, x, 'Date day');
-  }
-  
   return `
                 // ${element.name} - IMG_DATE Widget
                 let widget_${widgetIndex} = hmUI.createWidget(hmUI.widget.IMG_DATE, {
@@ -1015,12 +952,10 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
     fontArrayStr = `[${arr.join(', ')}]`;
   }
 
-  // Watch-test snapshots provide static text, which intentionally disables live data binding.
-  const typeParam = element.testDisplayValue
-    ? `\n                    text: '${_staticTestText(element.testDisplayValue)}',`
-    : element.dataType
-      ? `\n                    type: hmUI.data_type.${element.dataType},`
-      : '';
+  // If dataType is specified, use type for auto-binding (e.g., BATTERY, STEP, HEART)
+  const typeParam = element.dataType
+    ? `\n                    type: hmUI.data_type.${element.dataType},`
+    : '';
 
   const hSpace = element.hSpace ?? 1;
   const alignH = normalizeHorizontalDigitAlign(element.alignH, 'CENTER_H');
@@ -1034,7 +969,7 @@ function generateTextImgWidget(element: WatchFaceElement, widgetIndex: number, s
                     imperial_unit_en: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',
                     imperial_unit_tc: '${element.degreeImage ?? TEMPERATURE_DEGREE_FALLBACK}',`
     : '';
-  const humidityResources = element.dataType === 'HUMIDITY' && !element.testDisplayValue
+  const humidityResources = element.dataType === 'HUMIDITY'
     ? `
                     unit_sc: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',
                     unit_en: '${element.percentImage ?? HUMIDITY_PERCENT_FALLBACK}',

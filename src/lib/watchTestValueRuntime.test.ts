@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WatchFaceConfig, WatchFaceElement } from '@/types';
 import { generateWatchFaceCode } from './jsCodeGenerator';
-import { applyWatchTestDisplayValues } from './watchTestValues';
+import { applyWatchTestCaptureValues } from './watchTestValues';
 
 const digit = (
   id: string,
@@ -36,8 +36,8 @@ function config(elements: WatchFaceElement[]): WatchFaceConfig {
   };
 }
 
-describe('watch-test static runtime generation', () => {
-  it('emits static date, time, and numeric values while leaving Time Reading live', () => {
+describe('watch-test capture-only runtime generation', () => {
+  it('keeps date, time, numeric values, and Time Reading live after capture derivation', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const source = [
       digit('hour', 'IMG_TIME', undefined, 'hours'),
@@ -49,24 +49,23 @@ describe('watch-test static runtime generation', () => {
       digit('temperature', 'TEXT_IMG', 'WEATHER_CURRENT'),
       digit('sunrise', 'TIME_READING', 'SUN_RISE'),
     ];
-    const code = generateWatchFaceCode(config(applyWatchTestDisplayValues(source))).watchfaceIndexJs;
+    applyWatchTestCaptureValues(source);
+    const code = generateWatchFaceCode(config(source)).watchfaceIndexJs;
 
-    for (const value of ['16', '49', '15', '31', '12000', '55', '24u']) {
-      expect(code).toContain(`text: '${value}'`);
-    }
-    expect(code).not.toContain('hmUI.widget.IMG_TIME');
-    expect(code).not.toContain('hmUI.widget.IMG_DATE');
-    expect(code).not.toContain('hmUI.data_type.STEP');
-    expect(code).not.toContain('hmUI.data_type.HUMIDITY');
+    expect(code).toContain('hmUI.widget.IMG_TIME');
+    expect(code).toContain('hmUI.widget.IMG_DATE');
+    expect(code).toContain('hmUI.data_type.STEP');
+    expect(code).toContain('hmUI.data_type.HUMIDITY');
     expect(code).toContain("unit_en: 'temperature_degree.png'");
     expect(code).toContain('day.sunrise');
     expect(code).toContain('setProperty(hmUI.prop.TEXT, hourText)');
   });
 
-  it('retains live bindings when the export-only marker is absent', () => {
+  it('contains no static watch-test generator path', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const code = generateWatchFaceCode(config([digit('steps', 'TEXT_IMG', 'STEP')])).watchfaceIndexJs;
     expect(code).toContain('type: hmUI.data_type.STEP');
     expect(code).not.toContain('static watch-test value');
+    expect(code).not.toContain("text: '12000'");
   });
 });

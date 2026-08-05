@@ -39,9 +39,9 @@ export function getWatchTestDisplayValue(element: WatchFaceElement): string | un
   return dataType ? WATCH_TEST_NUMERIC_VALUES[dataType] : undefined;
 }
 
-export function applyWatchTestDisplayValues(elements: WatchFaceElement[]): WatchFaceElement[] {
+export function applyWatchTestCaptureValues(elements: WatchFaceElement[]): WatchFaceElement[] {
   return elements.map((element) => {
-    const testDisplayValue = getWatchTestDisplayValue(element);
-    return testDisplayValue === undefined ? element : { ...element, testDisplayValue };
+    const previewValue = getWatchTestDisplayValue(element);
+    return previewValue === undefined ? element : { ...element, previewValue };
   });
 }

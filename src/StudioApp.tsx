@@ -110,7 +110,7 @@ import {
 import { getMissingHumidityAssets } from '@/lib/humidityNumericContract';
 import { withoutCanvasOnlyElements } from '@/lib/canvasOnlyElements';
 import { findDuplicateWidgetBindings } from '@/lib/zpkReadiness';
-import { applyWatchTestDisplayValues } from '@/lib/watchTestValues';
+import { applyWatchTestCaptureValues } from '@/lib/watchTestValues';
 // DigitBitmapMetrics import removed by Spec 114
 import type { PointerParityResult, PointerParityStage } from '@/types';
 
@@ -1042,21 +1042,23 @@ async function applyIconEffectsForZPK(
 }
 
 const BUILD_READINESS_ITEMS = [
-  { key: 'aod', label: 'Have you updated the AOD?' },
   { key: 'watchSize', label: 'Have you minimized the face to see how it looks on watch?' },
   { key: 'pointerShadows', label: 'Have you added or reviewed shadows on the pointers?' },
   { key: 'latestPointer', label: 'Is the Time Pointer the latest widget?' },
   { key: 'background', label: 'Have you reviewed and adjusted the background if needed?' },
+  { key: 'shortcutIcons', label: 'Did you add a Shortcut Icon to the shortcut widgets?' },
+  { key: 'aod', label: 'Have you updated the AOD?' },
 ] as const;
 
 type BuildReadinessKey = typeof BUILD_READINESS_ITEMS[number]['key'];
 type BuildReadinessState = Record<BuildReadinessKey, boolean>;
 const EMPTY_BUILD_READINESS: BuildReadinessState = {
-  aod: false,
   watchSize: false,
   pointerShadows: false,
   latestPointer: false,
   background: false,
+  shortcutIcons: false,
+  aod: false,
 };
 
 function hasDeterministicImageEffects(el: WatchFaceElement): boolean {
@@ -2199,6 +2201,7 @@ function StudioApp() {
   const [elementWarnings, setElementWarnings] = useState<ElementWarningsMap>({});
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [watchTestCaptureActive, setWatchTestCaptureActive] = useState(false);
   const [showAddElement, setShowAddElement] = useState(false);
   const [showBuildReadiness, setShowBuildReadiness] = useState(false);
   const [buildReadiness, setBuildReadiness] = useState<BuildReadinessState>({ ...EMPTY_BUILD_READINESS });
@@ -2237,16 +2240,25 @@ function StudioApp() {
     });
   }, [switcherDefinitions]);
   const canvasElements = useMemo(
-    () => resolveCanvasElements(editorMode === 'AOD' ? withoutCanvasOnlyElements(activeElements) : activeElements),
-    [activeElements, editorMode, resolveCanvasElements],
+    () => {
+      const elements = editorMode === 'AOD' ? withoutCanvasOnlyElements(activeElements) : activeElements;
+      return resolveCanvasElements(watchTestCaptureActive ? applyWatchTestCaptureValues(elements) : elements);
+    },
+    [activeElements, editorMode, resolveCanvasElements, watchTestCaptureActive],
   );
   const mainCaptureElements = useMemo(
-    () => resolveCanvasElements(state.watchFaceConfig?.elements ?? []),
-    [resolveCanvasElements, state.watchFaceConfig],
+    () => {
+      const elements = state.watchFaceConfig?.elements ?? [];
+      return resolveCanvasElements(watchTestCaptureActive ? applyWatchTestCaptureValues(elements) : elements);
+    },
+    [resolveCanvasElements, state.watchFaceConfig, watchTestCaptureActive],
   );
   const aodCaptureElements = useMemo(
-    () => resolveCanvasElements(withoutCanvasOnlyElements(aodElements ?? [])),
-    [aodElements, resolveCanvasElements],
+    () => {
+      const elements = withoutCanvasOnlyElements(aodElements ?? []);
+      return resolveCanvasElements(watchTestCaptureActive ? applyWatchTestCaptureValues(elements) : elements);
+    },
+    [aodElements, resolveCanvasElements, watchTestCaptureActive],
   );
   const duplicateWidgetBindings = useMemo(() => [
     ...findDuplicateWidgetBindings('MAIN', state.watchFaceConfig?.elements ?? []),
@@ -4013,6 +4025,7 @@ function StudioApp() {
       return;
     }
 
+    setWatchTestCaptureActive(true);
     // Deselect any selected element so the selection rectangle doesn't appear in the preview
     setSelectedElementId(null);
     setExtraSelectedIds([]);
@@ -4046,11 +4059,11 @@ function StudioApp() {
       previewDataUrl = state.backgroundImage;
       aodPreviewDataUrl = previewDataUrl;
       if (previewDataUrl) setPreviewImageUrl(previewDataUrl);
+    } finally {
+      setWatchTestCaptureActive(false);
+      if (gridWasOn) setShowGrid(true);
+      if (flickerWasOn) setFlickerOverlayEnabled(true);
     }
-
-    // Restore grid and flicker overlay after capture
-    if (gridWasOn) setShowGrid(true);
-    if (flickerWasOn) setFlickerOverlayEnabled(true);
 
     if (!state.watchFaceConfig) {
       console.log('[App] ERROR: Missing watchFaceConfig');
@@ -4106,11 +4119,9 @@ function StudioApp() {
     try {
       pointerParityMissingAssetsRef.current = [];
       // Canvas annotations remain in the editable project and store preview, but never enter watch asset/export stages.
-      const mainEditorElements = applyWatchTestDisplayValues(withoutCanvasOnlyElements(state.watchFaceConfig.elements));
+      const mainEditorElements = withoutCanvasOnlyElements(state.watchFaceConfig.elements);
       const storedAodElements = aodElements ?? state.watchFaceConfig.aodElements ?? null;
-      const aodEditorElements = storedAodElements
-        ? applyWatchTestDisplayValues(withoutCanvasOnlyElements(storedAodElements))
-        : null;
+      const aodEditorElements = storedAodElements ? withoutCanvasOnlyElements(storedAodElements) : null;
       const effectiveAodBackgroundMode: AodBackgroundMode = aodEditorElements ? aodBackgroundMode : 'USE_MAIN_BACKGROUND';
       let preparedAodBackgroundFile: File | null = null;
 

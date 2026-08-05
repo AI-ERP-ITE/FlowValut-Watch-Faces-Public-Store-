@@ -83,9 +83,6 @@ function fallbackValue(widgetType: DigitWidgetType): string {
 // averageInkWidth removed by Spec 114 — layout now uses bitmap width directly
 
 export function getDigitPreviewValue(element: WatchFaceElement): string {
-  if (element.testDisplayValue && element.testDisplayValue.trim().length > 0) {
-    return element.testDisplayValue.trim();
-  }
   if (element.previewValue && element.previewValue.trim().length > 0) {
     return element.previewValue.trim();
   }
