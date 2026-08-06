@@ -1,4 +1,5 @@
 import type { WatchFaceElement } from '@/types';
+import { isSurface3dEligible } from '@/lib/surface3dEffect';
 
 type EngraveFrame = NonNullable<WatchFaceElement['engraveFrame']>;
 type EngraveFrameVisualStyle = Pick<EngraveFrame,
@@ -13,7 +14,7 @@ export type ElementStyleClipboard = Partial<Pick<WatchFaceElement,
   'iconHue' | 'iconSaturation' | 'iconColorize' | 'iconColorizeOpacity' | 'iconPhotoEdit' |
   'handShadow' | 'handGlow' | 'handTrail' | 'handTint' |
   'pointerBrightness' | 'pointerContrast' | 'pointerSaturation' | 'pointerHue' | 'pointerOpacity' |
-  'dropShadow'
+  'dropShadow' | 'surface3d'
 >> & { engraveFrameStyle?: EngraveFrameVisualStyle };
 
 const STYLE_KEYS: (keyof Omit<ElementStyleClipboard, 'engraveFrameStyle'>)[] = [
@@ -21,7 +22,7 @@ const STYLE_KEYS: (keyof Omit<ElementStyleClipboard, 'engraveFrameStyle'>)[] = [
   'tickWidth', 'tickLength', 'tickColor', 'tickCount', 'hideStartEndTicks', 'alpha', 'watchSafeTextEdges',
   'iconHue', 'iconSaturation', 'iconColorize', 'iconColorizeOpacity', 'iconPhotoEdit',
   'handShadow', 'handGlow', 'handTrail', 'handTint', 'pointerBrightness', 'pointerContrast',
-  'pointerSaturation', 'pointerHue', 'pointerOpacity', 'dropShadow',
+  'pointerSaturation', 'pointerHue', 'pointerOpacity', 'dropShadow', 'surface3d',
 ];
 const ARC_STYLE_KEYS = new Set<keyof ElementStyleClipboard>([
   'radius', 'lineWidth', 'startAngle', 'endAngle', 'tickWidth', 'tickLength', 'tickColor', 'tickCount', 'hideStartEndTicks',
@@ -58,6 +59,7 @@ export function applyElementStyle(target: WatchFaceElement, style: ElementStyleC
   const changes: Partial<WatchFaceElement> = {};
   for (const key of STYLE_KEYS) {
     if (ARC_STYLE_KEYS.has(key) && target.type !== 'ARC_PROGRESS') continue;
+    if (key === 'surface3d' && !isSurface3dEligible(target)) continue;
     const value = style[key];
     if (value !== undefined) (changes as Record<string, unknown>)[key] = cloneValue(value);
   }

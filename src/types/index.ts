@@ -175,6 +175,27 @@ export interface WatchFaceElement {
     vignette?: number;    //    0..100
   };
 
+  /** Optional pixel-only material lighting baked into raster widget assets. */
+  surface3d?: {
+    enabled: boolean;
+    direction: 'raised' | 'recessed';
+    radius: number;
+    depth: number;
+    soften: number;
+    profile: 'soft-rounded' | 'matte-plastic' | 'polished-metal' | 'controlled-chrome' | 'recessed-engraved';
+    lightAzimuth: number;
+    lightElevation: number;
+    lightColor: string;
+    lightIntensity: number;
+    diffuse: number;
+    specular: number;
+    shininess: number;
+    fillOpacity: number;
+    effectOpacity: number;
+    scaleWithObject: true;
+    rendererVersion: 1;
+  };
+
   // Weather IMG_LEVEL style
   weatherStyle?: string;
 

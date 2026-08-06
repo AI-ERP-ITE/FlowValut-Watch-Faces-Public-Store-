@@ -1,3 +1,6 @@
+import type { WatchFaceElement } from '@/types';
+import { bakeSurface3dToCanvas } from '@/lib/surface3dEffect';
+
 interface ColorAdjustOptions {
   brightness?: number; // -100..100
   contrast?: number; // -100..100
@@ -5,6 +8,7 @@ interface ColorAdjustOptions {
   saturationMode?: 'delta' | 'percent';
   hueDeg?: number;
   opacity?: number; // 0..1
+  surface3d?: WatchFaceElement['surface3d'];
 }
 
 interface IconPhotoEdit {
@@ -19,6 +23,7 @@ interface IconBakeOptions {
   colorize?: string;
   colorizeOpacity?: number;
   photoEdit?: IconPhotoEdit;
+  surface3d?: WatchFaceElement['surface3d'];
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -141,7 +146,9 @@ export function bakeDeterministicColorAdjustments(
   }
 
   ctx.putImageData(imgData, 0, 0);
-  return out;
+  return options.surface3d?.enabled
+    ? bakeSurface3dToCanvas(out, w, h, options.surface3d)
+    : out;
 }
 
 export function bakeDeterministicIconEffects(
@@ -248,7 +255,11 @@ export function bakeDeterministicIconEffects(
     }
   }
 
-  if (!options.colorize) return base;
+  if (!options.colorize) {
+    return options.surface3d?.enabled
+      ? bakeSurface3dToCanvas(base, base.width, base.height, options.surface3d)
+      : base;
+  }
 
   const ctx = base.getContext('2d');
   if (!ctx) return base;
@@ -267,5 +278,7 @@ export function bakeDeterministicIconEffects(
   }
 
   ctx.putImageData(imgData, 0, 0);
-  return base;
+  return options.surface3d?.enabled
+    ? bakeSurface3dToCanvas(base, base.width, base.height, options.surface3d)
+    : base;
 }

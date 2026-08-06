@@ -41,6 +41,7 @@ import { estimateDataUrlBytes, generatePngArcFrames } from '@/lib/pngArcFrameGen
 import { APP_SHORTCUTS, supportsAppShortcut } from '@/lib/appShortcuts';
 import { HexColorInput } from '@/components/HexColorInput';
 import { applyElementStyle, captureElementStyle, type ElementStyleClipboard } from '@/lib/elementStyleClipboard';
+import { DEFAULT_SURFACE_3D, SURFACE_3D_PRESETS, isSurface3dEligible, normalizeSurface3d } from '@/lib/surface3dEffect';
 
 export interface PropertyPanelProps {
   element: WatchFaceElement | null;
@@ -109,6 +110,7 @@ function resolveSectionTab(label: string): PanelTab | null {
     || label === 'Hand Effects'
     || label === 'Pointer Image Effects'
     || label === 'Drop Shadow'
+    || label === '3D Surface'
     || label === 'Element Frame'
     || label === 'Mode'
     || label.startsWith('Depth')
@@ -2653,6 +2655,71 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
       )}
 
       {/* Drop Shadow — all types except TIME_POINTER (has handShadow) and engraveFrame elements */}
+      {isSurface3dEligible(element) && (() => {
+        const surface = normalizeSurface3d(element.surface3d);
+        const updateSurface = (patch: Partial<NonNullable<WatchFaceElement['surface3d']>>) =>
+          update({ surface3d: { ...surface, ...patch, scaleWithObject: true, rendererVersion: 1 } });
+        const percent = (value: number) => Math.round(value * 100);
+        const slider = (label: string, value: number, min: number, max: number, step: number, display: string, onChange: (value: number) => void) => (
+          <div className="flex items-center gap-2">
+            <span className="w-16 shrink-0 text-[10px] text-white/40">{label}</span>
+            <input type="range" min={min} max={max} step={step} value={value} onChange={event => onChange(Number(event.target.value))} className="h-1 flex-1 accent-cyan-500" />
+            <span className="w-10 text-right text-[10px] text-white/30">{display}</span>
+          </div>
+        );
+        return (
+          <Section label="3D Surface">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] text-white/65">Bake material lighting</p>
+                  <p className="text-[9px] text-white/30">Canvas and watch use the same PNG renderer.</p>
+                </div>
+                <Switch checked={surface.enabled}
+                  onCheckedChange={checked => update({ surface3d: checked ? { ...DEFAULT_SURFACE_3D, enabled: true } : undefined })}
+                  id={`surface3d-${element.id}`} />
+              </div>
+              {surface.enabled && (
+                <>
+                  <Select value={surface.profile} onValueChange={value => {
+                    const preset = SURFACE_3D_PRESETS.find(item => item.value === value);
+                    if (preset) updateSurface({ profile: preset.value, ...preset.settings });
+                  }}>
+                    <SelectTrigger className="h-7 w-full border-white/10 bg-zinc-800 text-xs text-white"><SelectValue /></SelectTrigger>
+                    <SelectContent>{SURFACE_3D_PRESETS.map(preset => <SelectItem key={preset.value} value={preset.value}>{preset.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <div className="grid grid-cols-2 gap-1">
+                    {(['raised', 'recessed'] as const).map(direction => (
+                      <button key={direction} type="button" onClick={() => updateSurface({ direction })}
+                        className={cn('h-7 rounded border text-[10px] capitalize', surface.direction === direction ? 'border-cyan-500 bg-cyan-500/15 text-white' : 'border-white/10 bg-white/5 text-white/45')}>
+                        {direction}
+                      </button>
+                    ))}
+                  </div>
+                  {slider('Radius', surface.radius, 1, 12, 1, `${surface.radius}px`, value => updateSurface({ radius: value }))}
+                  {slider('Depth', surface.depth, 0, 100, 1, `${Math.round(surface.depth)}%`, value => updateSurface({ depth: value }))}
+                  {slider('Soften', surface.soften, 0, 8, 1, `${surface.soften}px`, value => updateSurface({ soften: value }))}
+                  {slider('Azimuth', surface.lightAzimuth, 0, 359, 1, `${Math.round(surface.lightAzimuth)}°`, value => updateSurface({ lightAzimuth: value }))}
+                  {slider('Elevation', surface.lightElevation, 15, 75, 1, `${Math.round(surface.lightElevation)}°`, value => updateSurface({ lightElevation: value }))}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-[10px] text-white/40">Light</span>
+                    <input type="color" value={surface.lightColor} onChange={event => updateSurface({ lightColor: event.target.value })} className="h-7 w-7 cursor-pointer border-0 bg-transparent" />
+                    <HexColorInput value={surface.lightColor} onChange={lightColor => updateSurface({ lightColor })} className="h-7 flex-1 border-white/10 bg-white/5 font-mono text-xs text-white" />
+                  </div>
+                  {slider('Intensity', percent(surface.lightIntensity), 0, 100, 1, `${percent(surface.lightIntensity)}%`, value => updateSurface({ lightIntensity: value / 100 }))}
+                  {slider('Diffuse', percent(surface.diffuse), 0, 100, 1, `${percent(surface.diffuse)}%`, value => updateSurface({ diffuse: value / 100 }))}
+                  {slider('Specular', percent(surface.specular), 0, 75, 1, `${percent(surface.specular)}%`, value => updateSurface({ specular: value / 100 }))}
+                  {slider('Shininess', surface.shininess, 4, 64, 1, `${Math.round(surface.shininess)}`, value => updateSurface({ shininess: value }))}
+                  {slider('Fill', percent(surface.fillOpacity), 0, 100, 1, `${percent(surface.fillOpacity)}%`, value => updateSurface({ fillOpacity: value / 100 }))}
+                  {slider('Effect', percent(surface.effectOpacity), 0, 100, 1, `${percent(surface.effectOpacity)}%`, value => updateSurface({ effectOpacity: value / 100 }))}
+                  <p className="text-[9px] text-emerald-400/60">Pixel-only bake: geometry, pivots, data bindings, and ZPK structure stay unchanged.</p>
+                </>
+              )}
+            </div>
+          </Section>
+        );
+      })()}
+
       {!['TIME_POINTER'].includes(element.type) && !element.engraveFrame && (
         <Section label="Drop Shadow">
           <div className="flex items-center justify-between mb-2">

@@ -11,6 +11,7 @@ import { getCustomHandSourceKind, resolveCustomHandPack, type CustomHandRecord }
 import { normalizeEngraveFrameForParity, renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { hasNonDefaultPointerEffects, normalizePointerEffects } from '@/lib/pointerEffects';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
+import { bakeSurface3dToCanvas, isSurface3dEnabled } from '@/lib/surface3dEffect';
 import { normalizeDropShadowForBake, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import { analyzeFlicker } from '@/utils/flickerEngine';
 import { drawImageWithPhotoEdit, DEFAULT_PHOTO_EDIT } from '@/lib/photoEditUtils';
@@ -1012,6 +1013,7 @@ function drawImageWithDeterministicIconEffects(
     saturationPercent: el.iconSaturation ?? 100,
     colorize: el.iconColorize,
     colorizeOpacity: el.iconColorizeOpacity ?? 0.8,
+    surface3d: el.surface3d,
   });
   ctx.drawImage(baked, x, y, w, h);
 }
@@ -1869,14 +1871,24 @@ function drawDigitElement(
 
   // If digit images available, draw them
   const images = el.images ?? el.fontArray;
-  if (images && images.length > 0 && digitCache && (el.type === 'IMG_DATE' || el.type === 'IMG_TIME' || el.type === 'TEXT_IMG' || el.type === 'TIME_READING')) {
+  if (images && images.length > 0 && digitCache && (el.type === 'IMG_DATE' || el.type === 'IMG_TIME' || el.type === 'IMG_WEEK' || el.type === 'TEXT_IMG' || el.type === 'TIME_READING')) {
     const sampleText = getPlaceholderText(el);
+    const labelIndex = el.type === 'IMG_WEEK' ? 2 : el.type === 'IMG_DATE' && el.subtype === 'month' ? 3 : -1;
+    if (labelIndex >= 0 && images[labelIndex]) {
+      const img = getCachedImage(images[labelIndex], digitCache, onLoad);
+      if (img?.complete && img.naturalWidth > 0) {
+        const rendered = isSurface3dEnabled(el) ? bakeSurface3dToCanvas(img, w, h, el.surface3d) : img;
+        ctx.drawImage(rendered, x, y, w, h);
+        return;
+      }
+    }
     if (el.type === 'IMG_DATE' && el.subtype !== 'month' && isCompleteDayImageMode(el) && images.length >= 31) {
       const day = Math.min(31, Math.max(1, Number.parseInt(sampleText, 10) || 31));
       const src = images[day - 1];
       const img = src ? getCachedImage(src, digitCache, onLoad) : null;
       if (img?.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, x, y, w, h);
+        const rendered = isSurface3dEnabled(el) ? bakeSurface3dToCanvas(img, w, h, el.surface3d) : img;
+        ctx.drawImage(rendered, x, y, w, h);
         return;
       }
     }
@@ -1918,7 +1930,7 @@ function drawDigitElement(
       // After layout, reposition using totalWidth for correct alignment.
       const effectiveW = Math.max(w, renderH * 10);
       const layout = computeDigitBitmapLayout({
-        widgetType: el.type === 'TIME_READING' ? 'TEXT_IMG' : el.type,
+        widgetType: el.type === 'TIME_READING' || el.type === 'IMG_WEEK' ? 'TEXT_IMG' : el.type,
         bounds: { x, y: y + renderOffsetY, width: effectiveW, height: renderH },
         value: sampleText,
         alignH,
@@ -1941,7 +1953,10 @@ function drawDigitElement(
         if (!src) continue;
         const img = digitCache.get(src);
         if (!img?.complete || img.naturalWidth <= 0) continue;
-        ctx.drawImage(img, glyph.x + xShift, glyph.y, glyph.width, glyph.height);
+        const rendered = isSurface3dEnabled(el)
+          ? bakeSurface3dToCanvas(img, glyph.width, glyph.height, el.surface3d)
+          : img;
+        ctx.drawImage(rendered, glyph.x + xShift, glyph.y, glyph.width, glyph.height);
         drawn = true;
       }
       if (drawn) return;
@@ -1989,7 +2004,10 @@ function drawArc(
     const drawSource = (src: string | undefined) => {
       if (!src || !iconCache) return;
       const image = getCachedImage(src, iconCache, onIconLoaded);
-      if (image?.complete && image.naturalWidth > 0) ctx.drawImage(image, x, y, width, height);
+      if (image?.complete && image.naturalWidth > 0) {
+        const rendered = isSurface3dEnabled(el) ? bakeSurface3dToCanvas(image, width, height, el.surface3d) : image;
+        ctx.drawImage(rendered, x, y, width, height);
+      }
     };
     drawSource(el.arcPngTrackSrc);
     drawSource(selectPngArcFrame(el.arcPngFrames, el.dataType ? gaugeProgress(el) : 1));
@@ -2256,7 +2274,7 @@ function drawTimePointer(
       const drawPivotY = def.key === 'cover' ? drawH / 2 : (pivotY / baseH) * drawH;
 
       const angle = def.key === 'cover' ? 0 : angles[def.key];
-      const bakedBase = hasPointerEffects
+      const bakedBase = hasPointerEffects || isSurface3dEnabled(el)
         ? bakeDeterministicColorAdjustments(img, drawW, drawH, {
           brightness: pointerEffects.brightness,
           contrast: pointerEffects.contrast,
@@ -2264,6 +2282,7 @@ function drawTimePointer(
           hueDeg: pointerEffects.hue,
           saturationMode: 'delta',
           opacity: pointerEffects.opacity,
+          surface3d: el.surface3d,
         })
         : img;
 
@@ -2426,7 +2445,7 @@ function drawGaugePointer(
   ctx.rotate(degToRad(angleDeg));
 
   if (image) {
-    const base = hasPointerEffects
+    const base = hasPointerEffects || isSurface3dEnabled(el)
       ? bakeDeterministicColorAdjustments(image, width, height, {
         brightness: pointerEffects.brightness,
         contrast: pointerEffects.contrast,
@@ -2434,6 +2453,7 @@ function drawGaugePointer(
         hueDeg: pointerEffects.hue,
         saturationMode: 'delta',
         opacity: pointerEffects.opacity,
+        surface3d: el.surface3d,
       })
       : image;
     ctx.drawImage(base, -pivotX, -pivotY, width, height);

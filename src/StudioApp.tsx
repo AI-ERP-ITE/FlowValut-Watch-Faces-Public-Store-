@@ -67,6 +67,7 @@ import { createParityCaptureSession, isInvestigationModeEnabled } from '@/lib/pa
 import { normalizePointerEffects } from '@/lib/pointerEffects';
 import { normalizeEngraveFrameForParity, renderEngraveFrameEffect } from '@/lib/engraveFrameRenderer';
 import { bakeDeterministicColorAdjustments, bakeDeterministicIconEffects } from '@/lib/effectsBakeEngine';
+import { bakeSurface3dToCanvas, getSurface3dAssetNames, isSurface3dEnabled, replaceSurface3dAssetName } from '@/lib/surface3dEffect';
 import { dropShadowPaddingForBake, normalizeDropShadowForBake, pointerEffectPaddingFromIntensity, pointerShadowToDropShadow } from '@/lib/effectNormalization';
 import {
   DEFAULT_GAUGE_POINTER_FILENAME,
@@ -1067,7 +1068,8 @@ function hasDeterministicImageEffects(el: WatchFaceElement): boolean {
   return (el.iconHue ?? 0) !== 0
     || (el.iconSaturation ?? 100) !== 100
     || !!el.iconColorize
-    || hasPhotoEdit;
+    || hasPhotoEdit
+    || isSurface3dEnabled(el);
 }
 
 /**
@@ -1831,6 +1833,43 @@ async function dataUrlFromElementFile(
     reader.onerror = () => resolve(null);
     reader.readAsDataURL(existingFile.file);
   });
+}
+
+async function bakeSurface3dExportAssets(
+  elements: WatchFaceElement[],
+  elementFiles: Array<{ src: string; file: File }>,
+): Promise<void> {
+  const processedOriginals = new Set<string>();
+  for (const element of elements) {
+    if (!isSurface3dEnabled(element)) continue;
+    const sourceNames = getSurface3dAssetNames(element);
+    if (sourceNames.length === 0) {
+      throw new Error(`${element.name}: 3D Surface requires raster PNG assets, but none were generated.`);
+    }
+    const safeId = element.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+    for (let index = 0; index < sourceNames.length; index += 1) {
+      const sourceName = sourceNames[index];
+      const image = await imageFromElementFile(sourceName, elementFiles);
+      if (!image) throw new Error(`${element.name}: 3D Surface could not load '${sourceName}' for baking.`);
+      const width = Math.max(1, image.naturalWidth || image.width || element.bounds.width || 1);
+      const height = Math.max(1, image.naturalHeight || image.height || element.bounds.height || 1);
+      const baked = bakeSurface3dToCanvas(image, width, height, element.surface3d);
+      const replacementName = `surface3d_${safeId}_${String(index).padStart(2, '0')}.png`;
+      const bytes = await (await fetch(baked.toDataURL('image/png'))).arrayBuffer();
+      const replacement = { src: replacementName, file: new File([bytes], replacementName, { type: 'image/png' }) };
+      const existingIndex = elementFiles.findIndex((file) => file.src === replacementName);
+      if (existingIndex >= 0) elementFiles[existingIndex] = replacement;
+      else elementFiles.push(replacement);
+      replaceSurface3dAssetName(element, sourceName, replacementName);
+      processedOriginals.add(sourceName);
+    }
+  }
+
+  const stillReferenced = new Set(elements.flatMap(getSurface3dAssetNames));
+  for (let index = elementFiles.length - 1; index >= 0; index -= 1) {
+    const name = elementFiles[index].src;
+    if (processedOriginals.has(name) && !stillReferenced.has(name)) elementFiles.splice(index, 1);
+  }
 }
 
 /** Renders a FILL_RECT element with engraveFrame effect to a PNG data URL (for ZPK export). */
@@ -4407,7 +4446,7 @@ function StudioApp() {
       for (const el of allEditorElements) {
         const supportsIconEffects = el.type === 'IMG' || el.type === 'IMG_STATUS';
         if (!supportsIconEffects) continue;
-        const hasEffects = (el.iconHue ?? 0) !== 0 || (el.iconSaturation ?? 100) !== 100 || !!el.iconColorize || !!el.iconPhotoEdit;
+        const hasEffects = hasDeterministicImageEffects(el);
 
         if (el.iconKey) {
           const iconEntry = getIconByKey(el.iconKey);
@@ -4997,6 +5036,11 @@ function StudioApp() {
           }
         }
       }
+
+      // Spec 133: bake opt-in material lighting into ordinary PNG assets only.
+      // The export snapshot is isolated, so FVWF sources, widget geometry, pivots,
+      // Zepp bindings, and the ZPK packaging contract remain unchanged.
+      await bakeSurface3dExportAssets(exportCombinedElements, elementFiles);
 
       const zpkResult = await buildZPK({
         config: configForBuild,
