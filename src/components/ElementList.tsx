@@ -186,7 +186,7 @@ export function ElementList({
         Elements ({elements.length})
       </h4>
       
-      <div className="flex w-full min-w-0 max-h-[32rem] flex-col space-y-2 overflow-y-auto overflow-x-hidden pr-1">
+      <div className="flex w-full min-w-0 max-h-[32rem] flex-col space-y-2 overflow-y-auto overflow-x-hidden pr-1 xl:max-h-[calc(100vh-10rem)] xl:overscroll-contain">
         {sortedElements.map((element, index) => {
           const warning = elementWarnings?.[element.id];
           const hasWarning = !!warning?.hasFlickerRisk;

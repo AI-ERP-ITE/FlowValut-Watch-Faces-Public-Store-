@@ -990,7 +990,7 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
         ))}
       </div>
 
-      <div className="space-y-4 xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:pr-1 xl:pb-24">
+      <div className="space-y-4">
 
       {/* Widget Type */}
       <Section label="Widget Type">
