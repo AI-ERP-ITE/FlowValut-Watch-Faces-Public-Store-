@@ -1,6 +1,6 @@
 # Spec 133 — Watch-Safe 3D Surface Effects
 
-**Status:** Design approved; implementation postponed  
+**Status:** Implemented and software-validated; private deployment and physical-watch acceptance pending  
 **Created:** 2026-08-02  
 **Domain:** System A baked widget assets, canvas preview, FVWF, ZPK export
 
@@ -21,6 +21,14 @@ pixels for canvas preview and ZPK export.
 
 This is a 2D height-map lighting effect. It is not true mesh geometry, extrusion,
 perspective, refraction, or the existing bevel/emboss effect.
+
+## Approved Implementation Clarification — 2026-08-07
+
+The effect follows the same pixel-only architecture as hue, saturation, and
+brightness. It changes the baked PNG pixels only. It does not change widget
+types, coordinates, bounds, pivots, data bindings, Zepp runtime behavior, or the
+ZPK format. Safe edge handling therefore stays inside the original bitmap
+dimensions; no outward glow or geometry padding is introduced.
 
 ## Supported v1 Controls
 
@@ -98,7 +106,7 @@ The effect is available only when the visual representation is baked to PNG.
 4. Derive stable surface normals from the height field.
 5. Apply one directional light with diffuse and limited specular response.
 6. Blend lighting with original fill using independent fill/effect opacity.
-7. Expand bounds by deterministic safe padding before rendering.
+7. Keep the original bitmap dimensions and prevent all lighting from expanding beyond its alpha silhouette.
 8. Downsample exactly once using the approved high-quality path.
 9. Preserve an opaque interior core wherever the source has one.
 10. Clamp highlights and reject unsafe near-transparent edge colors.
@@ -111,8 +119,8 @@ math.
 
 ## Geometry and Runtime Safety
 
-- Padding must update exported element bounds without changing visual position.
-- TIME_POINTER and GAUGE_POINTER pivots must be translated by the exact padding.
+- Exported element bounds and visual position must remain unchanged.
+- TIME_POINTER and GAUGE_POINTER pivots must remain unchanged.
 - Grouped gauge siblings must retain their relative coordinates and z-order.
 - Frame/glyph families must use identical normalized settings and padding policy.
 - Source data URLs, custom libraries, and saved definitions must never be mutated.
@@ -134,7 +142,7 @@ so future improvements can preserve old output when necessary.
 | Canvas/watch mismatch | Critical | One shared deterministic renderer |
 | Pointer displacement | Critical | Padding-aware pivot translation tests |
 | Existing output changes | Critical | Disabled-by-default byte-equivalence tests |
-| Clipped lighting | High | Automatic padding and highlight clamps |
+| Clipped lighting | High | Alpha-contained lighting and highlight clamps |
 | Tiny-widget noise | High | Minimum-size eligibility and radius/depth clamps |
 | Frame-family inconsistency | High | Batch normalization and golden family tests |
 | ZPK bloat | High | No extra runtime frames except existing widget requirements |
@@ -148,7 +156,7 @@ so future improvements can preserve old output when necessary.
 4. Preview and exported PNGs match within the approved pixel tolerance.
 5. Opaque cores remain opaque and no pale/colored fringe survives finalization.
 6. Rectangular, tiny, transparent, and anti-aliased assets pass golden tests.
-7. Pointer and gauge pivots remain visually stationary after padded baking.
+7. Pointer and gauge pivots and geometry remain byte-identical before and after baking.
 8. Every switcher frame and glyph family receives identical settings.
 9. Native Arc remains unchanged and clearly directs users to PNG Arc for 3D.
 10. FVWF round-trip preserves settings without altering old projects.
@@ -156,10 +164,9 @@ so future improvements can preserve old output when necessary.
 
 ## Deployment
 
-Implementation is explicitly postponed. When later approved, System A must be
-implemented and verified first. Deploy private Studio/shared core only through:
+System A is implemented and software-validated. Deploy private Studio/shared
+core only through:
 
 ```text
 npm run deploy:full:private
 ```
-
