@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 
@@ -12,12 +12,6 @@ export function SearchBar({ compact = false }: SearchBarProps) {
   const [searchParams] = useSearchParams();
   const [value, setValue] = useState(searchParams.get('q') ?? '');
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Sync input value when navigating back to search page with different query
-  useEffect(() => {
-    const q = searchParams.get('q') ?? '';
-    setValue(q);
-  }, [searchParams]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,7 +37,7 @@ export function SearchBar({ compact = false }: SearchBarProps) {
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Search watchfaces…"
+          placeholder="Search timepieces…"
           className="
             w-52 pl-8 pr-8 py-1.5 text-sm rounded-lg
             vault-input
@@ -77,7 +71,7 @@ export function SearchBar({ compact = false }: SearchBarProps) {
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Search by name, hashtag, style…"
+        placeholder="Search by model, feature, or style…"
         className="
           w-full pl-11 pr-12 py-3 text-base rounded-xl
           vault-input

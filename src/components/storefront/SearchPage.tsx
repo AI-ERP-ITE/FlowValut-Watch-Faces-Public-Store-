@@ -14,8 +14,8 @@ export function SearchPage() {
 
   // Keep page title in sync with query
   useEffect(() => {
-    document.title = query ? `"${query}" — Flowvault` : 'Search — Flowvault';
-    return () => { document.title = 'Flowvault'; };
+    document.title = query ? `"${query}" — FlowVault` : 'Search — FlowVault';
+    return () => { document.title = 'FlowVault — Digital Timepieces'; };
   }, [query]);
 
   // Filter: match query terms against name + hashtags (AND logic)
@@ -113,7 +113,7 @@ export function SearchPage() {
         {!loading && !error && !query && (
           <div className="space-y-4">
             <p className="text-sm text-[#8E9196]">
-              Type in the search bar above to find watchfaces by name, hashtag, or style.
+              Search the collection by model name, hashtag, feature, or design character.
             </p>
             {suggestedTags.length > 0 && (
               <div>
