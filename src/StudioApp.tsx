@@ -5577,8 +5577,8 @@ function StudioApp() {
             {state.backgroundImage && state.watchFaceConfig && (
               <>
                 {/* Interactive canvas + property panel */}
-                <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(340px,400px)_minmax(0,1fr)]">
-                  <div className="flex flex-col items-center shrink-0 xl:sticky xl:top-4 self-start">
+                <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(340px,400px)_minmax(300px,1fr)_minmax(400px,560px)]">
+                  <div className="flex w-full min-w-0 flex-col items-center self-start">
                     <div className="w-full max-w-sm mb-3 rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-3">
                       <Label htmlFor="canvas-build-name" className="mb-1.5 block text-xs font-medium text-cyan-200">
                         Build Name
@@ -5993,8 +5993,8 @@ function StudioApp() {
                       )}
                     </div>
                   </div>
-                  <div className="grid min-w-0 self-stretch grid-cols-1 gap-4 xl:grid-cols-[minmax(300px,1fr)_minmax(400px,560px)]">
-                    <div className="min-w-0 space-y-3 xl:sticky xl:top-1/2 xl:self-start xl:-translate-y-1/2">
+                  <div className="contents">
+                    <div className="min-w-0 space-y-3 xl:sticky xl:top-4 xl:flex xl:h-[calc(100vh-2rem)] xl:flex-col xl:justify-center xl:self-start">
                       <h4 className="text-sm font-medium text-zinc-400">Properties</h4>
                       <PropertyPanel
                         className="xl:max-h-[calc(100vh-5rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-3"
@@ -6025,7 +6025,8 @@ function StudioApp() {
                         onFlipVertical={(mode) => handleFlipSelected('v', mode)}
                       />
                     </div>
-                    <div className="w-full min-w-0 min-h-[22rem] space-y-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-3 xl:sticky xl:top-1/2 xl:max-h-[calc(100vh-2rem)] xl:min-h-0 xl:self-start xl:-translate-y-1/2">
+                    <div className="min-w-0 xl:sticky xl:top-4 xl:flex xl:h-[calc(100vh-2rem)] xl:items-center xl:self-start">
+                    <div className="w-full min-w-0 min-h-[22rem] space-y-3 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02] p-3 xl:max-h-[calc(100vh-2rem)] xl:min-h-0">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <h4 className="text-sm font-medium text-zinc-400">Elements</h4>
                         <div className="flex items-center gap-2">
@@ -6089,6 +6090,7 @@ function StudioApp() {
                         }}
                         onDuplicateElement={handleDuplicateElement}
                       />
+                    </div>
                     </div>
                   </div>
                 </div>
