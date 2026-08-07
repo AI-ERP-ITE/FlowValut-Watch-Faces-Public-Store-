@@ -11,6 +11,7 @@ import {
   type PublicDesignModel,
   type StoreReadModel,
 } from '@/lib/storeReadModel';
+import { buildStorefrontCategoryGroups, collectionCategoryLabel } from '@/lib/storefrontCategoryPresentation';
 
 const journalStories = [
   { title: 'The Art of Digital Guilloché', category: 'Craftsmanship', number: '01' },
@@ -83,13 +84,10 @@ export function DesignModelHomePage() {
     };
   }, [data, featuredFaceId, filteredModels]);
 
-  const categoryLinks = useMemo(() => {
-    const labels = new Map<string, string>();
-    data?.designModels.forEach((model) => {
-      model.categories.forEach((category) => labels.set(category.toLowerCase(), category));
-    });
-    return Array.from(labels.entries()).slice(0, 8);
-  }, [data]);
+  const categoryGroups = useMemo(
+    () => buildStorefrontCategoryGroups(data?.designModels ?? []),
+    [data],
+  );
 
   if (loading) return <Status text="Preparing the collection…" />;
   if (error || !data) return <Status text={error ?? 'Store unavailable'} />;
@@ -140,11 +138,17 @@ export function DesignModelHomePage() {
           <p>Distinct design families, each governed by its own proportion, atmosphere, and character.</p>
         </div>
 
-        {categoryLinks.length > 0 && (
-          <nav className="maison-category-links" aria-label="Explore by category">
-            <span>Explore by character</span>
-            {categoryLinks.map(([slug, label]) => (
-              <Link key={slug} to={`/category/${slug}`}>{label}</Link>
+        {categoryGroups.length > 0 && (
+          <nav className="maison-category-groups" aria-label="Explore by category">
+            {categoryGroups.map((group) => (
+              <div key={group.label} className="maison-category-group">
+                <span>{group.label}</span>
+                <div>
+                  {group.links.map(({ slug, label }) => (
+                    <Link key={slug} to={`/category/${slug}`}>{label}</Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         )}
@@ -272,7 +276,7 @@ function CollectionEditorialCard({
       </div>
       <div className="maison-collection-copy">
         <div>
-          <p>{inferDesignDna(collection, models)}</p>
+          <p>{collectionCategoryLabel(models)}</p>
           <h3>{collection.name}</h3>
         </div>
         <span>{models.length} Model{models.length === 1 ? '' : 's'} <ArrowRight size={15} /></span>
@@ -294,15 +298,6 @@ function getModelPreview(store: StoreReadModel, model: PublicDesignModel): strin
 function assetUrl(path?: string | null): string | null {
   if (!path) return null;
   return /^(https?:)?\/\//i.test(path) || path.startsWith('/') ? path : `${import.meta.env.BASE_URL}${path}`;
-}
-
-function inferDesignDna(collection: PublicCollection, models: PublicDesignModel[]): string {
-  const identity = `${collection.name} ${collection.description ?? ''} ${models.flatMap((model) => [...model.categories, ...model.tags]).join(' ')}`.toLowerCase();
-  if (/sport|performance|racing|torque|forge|apex/.test(identity)) return 'Performance';
-  if (/dark|goth|revenant|obsidian|phantom/.test(identity)) return 'Nocturnal';
-  if (/classic|elegant|luxury|legacy|monarch|regent|sovereign/.test(identity)) return 'Classical';
-  if (/minimal|simple|gossamer/.test(identity)) return 'Essential';
-  return 'Signature';
 }
 
 function Status({ text }: { text: string }) {
