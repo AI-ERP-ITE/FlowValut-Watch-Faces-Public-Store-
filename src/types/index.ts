@@ -187,8 +187,11 @@ export interface WatchFaceElement {
     lightElevation: number;
     lightColor: string;
     lightIntensity: number;
+    ambientColor: string;
+    ambientIntensity: number;
     diffuse: number;
     specular: number;
+    specularColor: string;
     shininess: number;
     fillOpacity: number;
     effectOpacity: number;

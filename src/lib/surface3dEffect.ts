@@ -30,8 +30,11 @@ export const DEFAULT_SURFACE_3D: Surface3dConfig = {
   lightElevation: 42,
   lightColor: '#FFFFFF',
   lightIntensity: 0.72,
+  ambientColor: '#FFFFFF',
+  ambientIntensity: 0,
   diffuse: 0.72,
   specular: 0.16,
+  specularColor: '#FFFFFF',
   shininess: 18,
   fillOpacity: 1,
   effectOpacity: 1,
@@ -57,8 +60,13 @@ export function normalizeSurface3d(input?: Partial<Surface3dConfig> | null): Sur
     lightElevation: clamp(finiteNumber(source.lightElevation, DEFAULT_SURFACE_3D.lightElevation), 15, 75),
     lightColor: /^#[0-9a-f]{6}$/i.test(source.lightColor ?? '') ? source.lightColor! : DEFAULT_SURFACE_3D.lightColor,
     lightIntensity: clamp(finiteNumber(source.lightIntensity, DEFAULT_SURFACE_3D.lightIntensity), 0, 1),
+    ambientColor: /^#[0-9a-f]{6}$/i.test(source.ambientColor ?? '') ? source.ambientColor! : DEFAULT_SURFACE_3D.ambientColor,
+    ambientIntensity: clamp(finiteNumber(source.ambientIntensity, DEFAULT_SURFACE_3D.ambientIntensity), 0, 0.5),
     diffuse: clamp(finiteNumber(source.diffuse, DEFAULT_SURFACE_3D.diffuse), 0, 1),
     specular: clamp(finiteNumber(source.specular, DEFAULT_SURFACE_3D.specular), 0, 0.75),
+    specularColor: /^#[0-9a-f]{6}$/i.test(source.specularColor ?? '')
+      ? source.specularColor!
+      : (/^#[0-9a-f]{6}$/i.test(source.lightColor ?? '') ? source.lightColor! : DEFAULT_SURFACE_3D.specularColor),
     shininess: clamp(finiteNumber(source.shininess, DEFAULT_SURFACE_3D.shininess), 4, 64),
     fillOpacity: clamp(finiteNumber(source.fillOpacity, DEFAULT_SURFACE_3D.fillOpacity), 0, 1),
     effectOpacity: clamp(finiteNumber(source.effectOpacity, DEFAULT_SURFACE_3D.effectOpacity), 0, 1),
@@ -184,6 +192,8 @@ export function renderSurface3dPixels(
   const direction = config.direction === 'recessed' ? -1 : 1;
   const depthScale = direction * (config.depth / 100) * 5;
   const light = parseHex(config.lightColor);
+  const ambient = parseHex(config.ambientColor);
+  const specularLight = parseHex(config.specularColor);
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -207,10 +217,11 @@ export function renderSurface3dPixels(
       const sourceChannels = [input[offset], input[offset + 1], input[offset + 2]];
       for (let channel = 0; channel < 3; channel += 1) {
         const base = sourceChannels[channel] * config.fillOpacity;
+        const ambientBase = base + (ambient[channel] - base) * config.ambientIntensity;
         const diffuseValue = diffuseDelta >= 0
-          ? base + (light[channel] - base) * diffuseDelta
-          : base * (1 + diffuseDelta * 0.85);
-        const effected = diffuseValue + (light[channel] - diffuseValue) * specular;
+          ? ambientBase + (light[channel] - ambientBase) * diffuseDelta
+          : ambientBase * (1 + diffuseDelta * 0.85);
+        const effected = diffuseValue + (specularLight[channel] - diffuseValue) * specular;
         output[offset + channel] = Math.round(clamp(sourceChannels[channel] * (1 - config.effectOpacity) + effected * config.effectOpacity, 0, 255));
       }
       // Preserve the opaque core; remove only fringe pixels unsafe for the watch alpha pipeline.

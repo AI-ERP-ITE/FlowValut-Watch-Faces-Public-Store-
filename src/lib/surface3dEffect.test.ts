@@ -32,6 +32,7 @@ describe('watch-safe 3D surface effect', () => {
       depth: -3,
       soften: 30,
       lightElevation: 2,
+      ambientIntensity: 4,
       specular: 4,
       effectOpacity: 2,
       scaleWithObject: false as true,
@@ -43,6 +44,7 @@ describe('watch-safe 3D surface effect', () => {
       depth: 0,
       soften: 8,
       lightElevation: 15,
+      ambientIntensity: 0.5,
       specular: 0.75,
       effectOpacity: 1,
       scaleWithObject: true,
@@ -54,6 +56,17 @@ describe('watch-safe 3D surface effect', () => {
     const source = materialFixture();
     expect(renderSurface3dPixels(source, 7, 7)).toEqual(source);
     expect(renderSurface3dPixels(source, 7, 7, { ...DEFAULT_SURFACE_3D, enabled: false })).toEqual(source);
+  });
+
+  it('preserves legacy enabled lighting when the new color controls are absent', () => {
+    const source = materialFixture();
+    const { ambientColor: _ambientColor, ambientIntensity: _ambientIntensity, specularColor: _specularColor, ...legacy } = DEFAULT_SURFACE_3D;
+    const legacyResult = renderSurface3dPixels(source, 7, 7, { ...legacy, enabled: true, lightColor: '#D9E6FF' });
+    const expandedResult = renderSurface3dPixels(source, 7, 7, {
+      ...legacy, enabled: true, lightColor: '#D9E6FF',
+      ambientColor: '#FFFFFF', ambientIntensity: 0, specularColor: '#D9E6FF',
+    });
+    expect(legacyResult).toEqual(expandedResult);
   });
 
   it('renders deterministically while preserving opaque cores and removing unsafe fringe alpha', () => {
@@ -74,6 +87,30 @@ describe('watch-safe 3D surface effect', () => {
     expect(raised).not.toEqual(recessed);
     expect(raised.length).toBe(source.length);
     expect(recessed.length).toBe(source.length);
+  });
+
+  it('applies independent ambient and specular colors while preserving bitmap geometry', () => {
+    const source = materialFixture();
+    const ambientRed = renderSurface3dPixels(source, 7, 7, {
+      ...DEFAULT_SURFACE_3D, enabled: true, diffuse: 0, specular: 0,
+      ambientColor: '#FF0000', ambientIntensity: 0.5,
+    });
+    const ambientBlue = renderSurface3dPixels(source, 7, 7, {
+      ...DEFAULT_SURFACE_3D, enabled: true, diffuse: 0, specular: 0,
+      ambientColor: '#0000FF', ambientIntensity: 0.5,
+    });
+    const specularRed = renderSurface3dPixels(source, 7, 7, {
+      ...DEFAULT_SURFACE_3D, enabled: true, diffuse: 0, specular: 0.75, shininess: 4,
+      specularColor: '#FF0000',
+    });
+    const specularGreen = renderSurface3dPixels(source, 7, 7, {
+      ...DEFAULT_SURFACE_3D, enabled: true, diffuse: 0, specular: 0.75, shininess: 4,
+      specularColor: '#00FF00',
+    });
+    expect(ambientRed).not.toEqual(ambientBlue);
+    expect(specularRed).not.toEqual(specularGreen);
+    expect(ambientRed.length).toBe(source.length);
+    expect(specularRed.length).toBe(source.length);
   });
 
   it('limits controls to raster-backed widget families', () => {

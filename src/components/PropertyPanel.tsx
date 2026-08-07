@@ -2707,9 +2707,20 @@ export function PropertyPanel({ element, canvasWidth = 480, canvasHeight = 480, 
                     <HexColorInput value={surface.lightColor} onChange={lightColor => updateSurface({ lightColor })} className="h-7 flex-1 border-white/10 bg-white/5 font-mono text-xs text-white" />
                   </div>
                   {slider('Intensity', percent(surface.lightIntensity), 0, 100, 1, `${percent(surface.lightIntensity)}%`, value => updateSurface({ lightIntensity: value / 100 }))}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-[10px] text-white/40">Ambient</span>
+                    <input type="color" value={surface.ambientColor} onChange={event => updateSurface({ ambientColor: event.target.value })} className="h-7 w-7 cursor-pointer border-0 bg-transparent" />
+                    <HexColorInput value={surface.ambientColor} onChange={ambientColor => updateSurface({ ambientColor })} className="h-7 flex-1 border-white/10 bg-white/5 font-mono text-xs text-white" />
+                  </div>
+                  {slider('Ambient', percent(surface.ambientIntensity), 0, 50, 1, `${percent(surface.ambientIntensity)}%`, value => updateSurface({ ambientIntensity: value / 100 }))}
                   {slider('Diffuse', percent(surface.diffuse), 0, 100, 1, `${percent(surface.diffuse)}%`, value => updateSurface({ diffuse: value / 100 }))}
+                  <div className="flex items-center gap-2">
+                    <span className="w-16 shrink-0 text-[10px] text-white/40">Specular</span>
+                    <input type="color" value={surface.specularColor} onChange={event => updateSurface({ specularColor: event.target.value })} className="h-7 w-7 cursor-pointer border-0 bg-transparent" />
+                    <HexColorInput value={surface.specularColor} onChange={specularColor => updateSurface({ specularColor })} className="h-7 flex-1 border-white/10 bg-white/5 font-mono text-xs text-white" />
+                  </div>
                   {slider('Specular', percent(surface.specular), 0, 75, 1, `${percent(surface.specular)}%`, value => updateSurface({ specular: value / 100 }))}
-                  {slider('Shininess', surface.shininess, 4, 64, 1, `${Math.round(surface.shininess)}`, value => updateSurface({ shininess: value }))}
+                  {slider('Tightness', surface.shininess, 4, 64, 1, `${Math.round(surface.shininess)}`, value => updateSurface({ shininess: value }))}
                   {slider('Fill', percent(surface.fillOpacity), 0, 100, 1, `${percent(surface.fillOpacity)}%`, value => updateSurface({ fillOpacity: value / 100 }))}
                   {slider('Effect', percent(surface.effectOpacity), 0, 100, 1, `${percent(surface.effectOpacity)}%`, value => updateSurface({ effectOpacity: value / 100 }))}
                   <p className="text-[9px] text-emerald-400/60">Pixel-only bake: geometry, pivots, data bindings, and ZPK structure stay unchanged.</p>
