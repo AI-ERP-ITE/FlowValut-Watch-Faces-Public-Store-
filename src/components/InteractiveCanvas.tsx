@@ -1980,6 +1980,24 @@ function drawDigitElement(
   const fontSize = Math.max(10, maxFontSize);
   // Always render from bounds.y when fontSize is explicit (no centering math that can go negative)
   const textY = (el.fontSize && el.fontSize > 0) ? y + Math.round(el.fontSize / 2) : y + Math.round(h / 2);
+  if (isSurface3dEnabled(el)) {
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = Math.max(1, Math.round(w));
+    sourceCanvas.height = Math.max(1, Math.round(h));
+    const sourceCtx = sourceCanvas.getContext('2d');
+    if (sourceCtx) {
+      sourceCtx.fillStyle = color;
+      sourceCtx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+      sourceCtx.textAlign = alignH === 'CENTER_H' ? 'center' : alignH === 'RIGHT' ? 'right' : 'left';
+      sourceCtx.textBaseline = 'middle';
+      const localTextX = alignH === 'CENTER_H' ? sourceCanvas.width / 2 : alignH === 'RIGHT' ? sourceCanvas.width : 0;
+      const localTextY = (el.fontSize && el.fontSize > 0) ? Math.round(el.fontSize / 2) : Math.round(sourceCanvas.height / 2);
+      sourceCtx.fillText(text, localTextX, localTextY);
+      const rendered = bakeSurface3dToCanvas(sourceCanvas, sourceCanvas.width, sourceCanvas.height, el.surface3d);
+      ctx.drawImage(rendered, x, y, w, h);
+      return;
+    }
+  }
   ctx.save();
   ctx.fillStyle = color;
   ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
