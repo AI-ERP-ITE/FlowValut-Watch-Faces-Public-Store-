@@ -44,9 +44,12 @@ dimensions; no outward glow or geometry padding is introduced.
 | Light elevation | Safe minimum/maximum range |
 | Light color | RGB/hex color |
 | Light intensity | Clamped to prevent channel clipping |
+| Ambient color | Optional low-strength color cast over the original material base |
+| Ambient intensity | Clamped ambient contribution; legacy/default value is zero |
 | Diffuse | Matte surface response |
 | Specular | Limited highlight strength |
-| Shininess | Limited highlight concentration |
+| Specular color | Independent RGB/hex highlight color; legacy fallback follows light color |
+| Highlight tightness | Persisted through the existing `shininess` value; controls highlight concentration |
 | Fill opacity | Original artwork opacity without reducing lighting |
 | Effect opacity | Final 3D-lighting blend |
 | Scale with object | Always enabled |
