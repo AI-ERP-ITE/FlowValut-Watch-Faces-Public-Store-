@@ -21,12 +21,77 @@
  */
 
 import { execSync, spawnSync } from 'child_process';
-import { cpSync, mkdirSync, readFileSync, rmSync } from 'fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
+
+const PRIVATE_ROUTE_ALIASES = [
+  'login',
+  'admin',
+  'tools',
+  'studio/lab',
+  'studio/compiler',
+  'lab',
+  'labs',
+];
+
+const DEPLOYMENT_PATH_PREFIXES = [
+  'docs/',
+  'assets/',
+  'editable-watchfaces/',
+  'index.html',
+  'studio/',
+  'admin/',
+  'tools/',
+  'login/',
+  'lab/',
+  'labs/',
+];
+
+function gitLines(command) {
+  return execSync(command, { cwd: appRoot, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function assertNoPreStagedChanges() {
+  const staged = gitLines('git diff --cached --name-only');
+  if (staged.length > 0) {
+    throw new Error(
+      `Refusing to deploy with pre-staged changes. Commit or unstage them first:\n${staged.join('\n')}`,
+    );
+  }
+}
+
+function writePrivateRouteAliases() {
+  const docsHtml = readFileSync(path.join(appRoot, 'docs', 'index.html'), 'utf8');
+  for (const route of PRIVATE_ROUTE_ALIASES) {
+    for (const root of [appRoot, path.join(appRoot, 'docs')]) {
+      const destination = path.join(root, ...route.split('/'), 'index.html');
+      mkdirSync(path.dirname(destination), { recursive: true });
+      writeFileSync(destination, docsHtml, 'utf8');
+    }
+  }
+}
+
+function stagePrivateDeploymentPaths() {
+  execSync(
+    'git add -A -- docs assets editable-watchfaces index.html studio admin tools login lab labs',
+    { cwd: appRoot, stdio: 'inherit' },
+  );
+
+  const staged = gitLines('git diff --cached --name-only');
+  const unexpected = staged.filter(
+    (file) => !DEPLOYMENT_PATH_PREFIXES.some((prefix) => file === prefix || file.startsWith(prefix)),
+  );
+  if (unexpected.length > 0) {
+    throw new Error(`Unexpected paths were staged:\n${unexpected.join('\n')}`);
+  }
+}
 
 /**
  * Stage production HTML directly into git's index WITHOUT writing to the working tree.
@@ -89,6 +154,8 @@ function stageEditableWatchfacesRoute() {
 }
 
 async function main() {
+  assertNoPreStagedChanges();
+
   // ── Step 1: Build private ─────────────────────────────────────────────────
   run('npm run build:private', 'Building private bundle…');
 
@@ -104,13 +171,14 @@ async function main() {
     'Building standalone editable-watchfaces bundle…',
   );
   stageEditableWatchfacesRoute();
+  writePrivateRouteAliases();
   console.log('Standalone route staged at /Watch-Faces/editable-watchfaces/.');
 
   // deployDistToDocs --mirror-root copies assets to root/assets/ and writes root HTML,
   // then RESTORES root HTML to dev shell. Working tree stays clean for Vite.
 
   // ── Step 3: Commit + push origin (root = production bundle) ──────────────
-  run('git add -A', 'Staging private docs + root…');
+  stagePrivateDeploymentPaths();
   // Stage production HTML into git index WITHOUT touching working tree (Vite-safe).
   // git add -A staged the dev shell; stageProductionIndexInGit() swaps those staged
   // entries to production HTML via git plumbing — Vite never sees the production HTML.
