@@ -38,8 +38,8 @@
 - [x] T031 Implement short-lived order-bound delivery for browser and QR.
 - [x] T032 Preserve Spec 146 total download/regeneration limits.
 - [ ] T033 Add Storage and Firestore rule tests.
-- [ ] T034 Run red-team rules audit and achieve approved score/no critical findings.
-- [ ] T035 Prove direct read fails and entitled browser/Zepp delivery succeeds. Direct anonymous paid-object read fails and entitled browser ZPK delivery succeeds; physical Zepp QR installation remains owner-device acceptance.
+- [ ] T034 Run red-team rules audit and achieve approved score/no critical findings. The 2026-08-10 formal audit found no critical access-control bypass and scored the rules 4/5; emulator tests remain blocked by missing Java and owner-write size/type validation remains open.
+- [x] T035 Prove direct read fails and entitled browser/Zepp delivery succeeds. Direct anonymous paid-object read, entitled browser delivery, ranged QR transport, and owner-confirmed physical Zepp installation passed.
 
 ## Phase 4 — Spec 148 staging completion
 
@@ -48,7 +48,7 @@
 - [x] T042 Deploy targeted staging Functions/rules only.
 - [ ] T043 Execute all Spec 148 Sandbox cases.
 - [ ] T044 Verify no stacking and single completed redemption.
-- [ ] T045 Keep live VIP generation disabled.
+- [x] T045 Keep live VIP generation disabled. Production live checkout remains disabled and no production VIP generation endpoint was enabled.
 
 ## Phase 5 — Hosting and security headers
 
@@ -83,10 +83,10 @@
 
 - [x] T080 Deploy immutable staging candidate to preview channel (`spec149-launch`, expires 2026-08-17).
 - [ ] T081 Run full static/security/browser test matrix.
-- [ ] T082 Run successful and declined Sandbox checkouts. Successful $4.00 localized checkout passed; declined-card case remains.
-- [ ] T083 Verify webhook, email, QR, ZPK, limits, counters, refresh idempotency and recovery. Webhook, email Function, ZPK, and one-transfer counter passed; inbox receipt, physical QR, refresh UI, limits, and recovery remain.
-- [ ] T084 Run cross-project negative tests.
-- [ ] T085 Deploy exact production candidate to production preview channel.
+- [x] T082 Run successful and declined Sandbox checkouts. The previously accepted successful flow was not repeated; Paddle's official declined test card produced the expected bank-decline UI with no success/entitlement UI.
+- [x] T083 Verify webhook, email, QR, ZPK, limits, counters, refresh idempotency and recovery. Owner acceptance confirms the complete email, browser ZPK, physical Zepp QR, refresh, two-initial-transfer, one-recovery-transfer, and zero-reservation flow.
+- [x] T084 Run cross-project negative tests. The accepted staging order remained absent from production and automated project-identity tests pass.
+- [x] T085 Deploy exact production candidate to production preview channel (`spec149-production`, release `2fd309effd4e26af`, expires 2026-08-17).
 - [ ] T086 Open live Paddle Checkout without taking payment.
 - [ ] T087 Obtain owner go/no-go approval.
 
@@ -95,8 +95,8 @@
 - [ ] T090 Create separated implementation commits with explicit staged paths.
 - [ ] T091 Run staged-content secret scan before each commit.
 - [ ] T092 Push only to private `origin` and record commit hashes.
-- [ ] T093 Record current GitHub Pages release and DNS rollback values.
-- [ ] T094 Freeze, but do not delete, the public GitHub Pages artifact.
+- [ ] T093 Record current GitHub Pages release and DNS rollback values. Public artifact rollback commit `dd4a62a0` is recorded; the complete Namecheap zone export remains required.
+- [x] T094 Freeze, but do not delete, the public GitHub Pages artifact. No public-remote push occurred during preview preparation.
 
 ## Phase 10 — Domain and Paddle cutover
 
