@@ -1,4 +1,4 @@
-const PURCHASE_BASE_URL = (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+import { getFlowVaultConfig } from '@/config/flowVaultConfig';
 
 export interface PaddlePaidStartResponse {
   type: 'paid';
@@ -7,6 +7,7 @@ export interface PaddlePaidStartResponse {
   paddleTransactionId: string;
   checkoutUrl?: string | null;
   regenerationKey: string;
+  pricingMode?: 'CAMPAIGN' | 'VIP_STANDARD';
 }
 
 export interface SimulatedStartResponse {
@@ -42,14 +43,41 @@ export interface EntitlementFulfillmentResponse {
   packages: Array<{ packageId: string; skuId: string; revision: string; canonicalName: string; signedUrl: string }>;
 }
 
+export interface ConfirmOfferPaymentResponse {
+  status: 'pending' | 'paid_confirmed';
+  token?: string;
+}
+
+export const DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE = 'This purchase has used all three permitted transfers: two initial transfers and one final recovery transfer. The ZPK download and QR installation are no longer available.';
+
+const DOWNLOAD_ALLOWANCE_ERROR_CODES = new Set([
+  'DOWNLOAD_ALLOWANCE_EXHAUSTED',
+  'DOWNLOAD_LIMIT_REACHED',
+  'Download limit reached',
+  'Regeneration limit reached',
+]);
+
+function backendErrorMessage(payload: { error?: string; message?: string } | null, fallback: string): string {
+  if (payload?.error && DOWNLOAD_ALLOWANCE_ERROR_CODES.has(payload.error)) return DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE;
+  return payload?.message || payload?.error || fallback;
+}
+
+export function isDownloadAllowanceExhaustedError(error: unknown): boolean {
+  return error instanceof Error && error.message === DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE;
+}
+
 function requirePurchaseBaseUrl(): string {
-  if (!PURCHASE_BASE_URL) {
-    throw new Error('Purchase backend is not configured. Missing VITE_PURCHASE_FUNCTIONS_BASE_URL.');
+  return getFlowVaultConfig().purchaseFunctionsBaseUrl;
+}
+
+function requireCheckoutEnabled(): void {
+  if (!getFlowVaultConfig().checkoutEnabled) {
+    throw new Error('Purchasing is coming soon. Checkout is currently unavailable.');
   }
-  return PURCHASE_BASE_URL.replace(/\/$/, '');
 }
 
 export async function createPaddleCheckout(watchfaceId: string, email?: string): Promise<PurchaseStartResponse> {
+  requireCheckoutEnabled();
   const base = requirePurchaseBaseUrl();
 
   const endpoint = `${base}/createOrderOrCheckout`;
@@ -114,8 +142,21 @@ export async function createPaddleCheckout(watchfaceId: string, email?: string):
   throw new Error('Invalid checkout response from backend');
 }
 
-export async function createOfferCheckout(offerId: string, deviceId: string, email?: string): Promise<OfferCheckoutResponse> {
-  const response = await fetch(`${requirePurchaseBaseUrl()}/createOfferCheckout`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offerId, deviceId, ...(email ? { email } : {}) }) });
+export async function createOfferCheckout(offerId: string, deviceId: string, email?: string, pricingMode: 'CAMPAIGN' | 'VIP_STANDARD' = 'CAMPAIGN'): Promise<OfferCheckoutResponse> {
+  requireCheckoutEnabled();
+  const environment = getFlowVaultConfig().environment;
+  const endpoint = environment === 'staging' ? 'createSandboxOfferCheckout' : 'createLiveOfferCheckout';
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+  let response: Response;
+  try {
+    response = await fetch(`${requirePurchaseBaseUrl()}/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ offerId, deviceId, pricingMode, ...(email ? { email } : {}) }), signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw new Error('Checkout preparation timed out. Please try again.');
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
   const payload = await response.json().catch(() => null) as OfferCheckoutResponse | { error?: string } | null;
   if (!response.ok) throw new Error(payload && 'error' in payload && payload.error ? payload.error : `Offer checkout failed (${response.status})`);
   if (!payload || !('type' in payload) || !('offerSnapshot' in payload)) throw new Error('Invalid Offer checkout response');
@@ -124,10 +165,31 @@ export async function createOfferCheckout(offerId: string, deviceId: string, ema
 
 export async function fulfillEntitlement(token: string, deviceId: string): Promise<EntitlementFulfillmentResponse> {
   const response = await fetch(`${requirePurchaseBaseUrl()}/fulfillEntitlement`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, deviceId }) });
-  const payload = await response.json().catch(() => null) as EntitlementFulfillmentResponse | { error?: string } | null;
-  if (!response.ok) throw new Error(payload && 'error' in payload && payload.error ? payload.error : `Fulfillment failed (${response.status})`);
+  const payload = await response.json().catch(() => null) as EntitlementFulfillmentResponse | { error?: string; message?: string } | null;
+  if (!response.ok) throw new Error(backendErrorMessage(payload && !('packages' in payload) ? payload : null, `Fulfillment failed (${response.status})`));
   if (!payload || !('packages' in payload) || !Array.isArray(payload.packages)) throw new Error('Invalid fulfillment response');
   return payload;
+}
+
+export async function confirmOfferPayment(orderId: string): Promise<ConfirmOfferPaymentResponse> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetch(`${requirePurchaseBaseUrl()}/confirmSandboxOfferPayment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId }),
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => null) as ConfirmOfferPaymentResponse | { error?: string } | null;
+    if (!response.ok) throw new Error(payload && 'error' in payload && payload.error ? payload.error : `Payment confirmation failed (${response.status})`);
+    if (!payload || !('status' in payload) || (payload.status !== 'pending' && payload.status !== 'paid_confirmed')) {
+      throw new Error('Invalid payment confirmation response');
+    }
+    return payload;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export async function getOrderStatus(orderId: string): Promise<OrderStatusResponse> {
@@ -138,7 +200,7 @@ export async function getOrderStatus(orderId: string): Promise<OrderStatusRespon
 
   const payload = (await response.json().catch(() => null)) as
     | OrderStatusResponse
-    | { error?: string }
+    | { error?: string; message?: string }
     | null;
 
   if (!response.ok) {
@@ -214,10 +276,7 @@ export async function regenerateDownload(input: {
     | null;
 
   if (!response.ok) {
-    const message = payload && 'error' in payload && typeof payload.error === 'string'
-      ? payload.error
-      : `Capture request failed (${response.status})`;
-    throw new Error(message);
+    throw new Error(backendErrorMessage(payload && 'error' in payload ? payload : null, `Recovery request failed (${response.status})`));
   }
 
   if (!payload || typeof payload !== 'object' || !('token' in payload) || typeof payload.token !== 'string') {

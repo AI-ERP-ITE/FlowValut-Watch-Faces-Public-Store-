@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getFlowVaultConfig } from '@/config/flowVaultConfig';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
 import { offerCompatibleDevices, resolveLegacySku, skuOffer, skuPackages } from '@/lib/storeReadModel';
-import { confirmOfferPayment, createOfferCheckout, fulfillEntitlement, getOrderStatus, regenerateDownload } from '@/lib/purchaseApi';
+import { confirmOfferPayment, createOfferCheckout, DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE, fulfillEntitlement, getOrderStatus, isDownloadAllowanceExhaustedError, regenerateDownload } from '@/lib/purchaseApi';
 import { isPaddleCheckoutClosedError, openPaddleTransaction, PaddleCheckoutClosedError, preparePaddleCheckout, waitForPaddleCheckoutCompletion } from '@/lib/paddleCheckout';
 import { generateQRCode } from '@/lib/qrGenerator';
 
@@ -36,7 +36,30 @@ export function OfferBuyPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<PackageDelivery[]>([]);
+  const [deliveryToken, setDeliveryToken] = useState<string | null>(null);
+  const [deliveryExhausted, setDeliveryExhausted] = useState(false);
+  const [recoveryDelivery, setRecoveryDelivery] = useState(false);
   const downloadsRef = useRef<HTMLElement | null>(null);
+
+  async function showDeliveries(token: string, device: string, isRecovery: boolean) {
+    const result = await fulfillEntitlement(token, device);
+    setDownloads(await preparePackageDeliveries(result.packages));
+    setDeliveryToken(token);
+    setDeliveryExhausted(false);
+    setRecoveryDelivery(isRecovery);
+    setMessage(null);
+  }
+
+  function showDeliveryError(error: unknown) {
+    if (isDownloadAllowanceExhaustedError(error)) {
+      setDownloads([]);
+      setDeliveryToken(null);
+      setDeliveryExhausted(true);
+      setMessage(null);
+      return;
+    }
+    setMessage(error instanceof Error ? error.message : 'Purchase recovery failed');
+  }
 
   useEffect(() => {
     if (checkoutEnabled) void preparePaddleCheckout().catch(() => undefined);
@@ -56,11 +79,9 @@ export function OfferBuyPage() {
       void getOrderStatus(recovery.orderId)
         .then(async (status) => {
           if (status.status !== 'paid_confirmed') throw new Error('Payment confirmation is still pending.');
-          const result = await fulfillEntitlement(status.token, recovery.deviceId as string);
-          setDownloads(await preparePackageDeliveries(result.packages));
-          setMessage(null);
+          await showDeliveries(status.token, recovery.deviceId as string, false);
         })
-        .catch((err) => setMessage(err instanceof Error ? err.message : 'Purchase recovery failed'))
+        .catch(showDeliveryError)
         .finally(() => setBusy(false));
     } catch {
       window.sessionStorage.removeItem(`flowvault-order:${id}`);
@@ -73,18 +94,28 @@ export function OfferBuyPage() {
     setBusy(true);
     setMessage('Recovering your protected FlowVault delivery…');
     void regenerateDownload({ regenerationKey: recoveryKey })
-      .then(async ({ token }) => fulfillEntitlement(token, recoveryDeviceId))
-      .then(async (result) => {
-        setDownloads(await preparePackageDeliveries(result.packages));
-        setMessage(null);
-      })
-      .catch((err) => setMessage(err instanceof Error ? err.message : 'Purchase recovery failed'))
+      .then(async ({ token }) => showDeliveries(token, recoveryDeviceId, true))
+      .catch(showDeliveryError)
       .finally(() => setBusy(false));
   }, [recoveryDeviceId, recoveryKey]);
 
   useEffect(() => {
     if (downloads.length > 0) downloadsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [downloads]);
+
+  useEffect(() => {
+    if (!deliveryToken || !deviceId || downloads.length === 0) return;
+    let active = true;
+    const timer = window.setInterval(() => {
+      void fulfillEntitlement(deliveryToken, deviceId).catch((error) => {
+        if (active && isDownloadAllowanceExhaustedError(error)) showDeliveryError(error);
+      });
+    }, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [deliveryToken, deviceId, downloads.length]);
 
   if (loading) return <Status text="Loading Offer…" />;
   if (error || !data) return <Status text={error ?? 'Store unavailable'} />;
@@ -142,13 +173,10 @@ export function OfferBuyPage() {
         }
         if (checkoutClosed) throw new PaddleCheckoutClosedError();
         if (!token) throw new Error('Payment confirmation timed out. Your order remains recoverable.');
-        const result = await fulfillEntitlement(token, deviceId);
-        setDownloads(await preparePackageDeliveries(result.packages));
-        setMessage(null);
+        await showDeliveries(token, deviceId, false);
       } else {
         if (!checkout.token) throw new Error('Free order token is missing.');
-        const result = await fulfillEntitlement(checkout.token, deviceId);
-        setDownloads(await preparePackageDeliveries(result.packages));
+        await showDeliveries(checkout.token, deviceId, false);
       }
     } catch (err) {
       if (isPaddleCheckoutClosedError(err)) {
@@ -169,11 +197,9 @@ export function OfferBuyPage() {
     setMessage('Validating your original purchase…');
     try {
       const { token } = await regenerateDownload({ orderId: recoveryOrderId.trim(), email: recoveryEmail.trim() });
-      const result = await fulfillEntitlement(token, deviceId);
-      setDownloads(await preparePackageDeliveries(result.packages));
-      setMessage(null);
+      await showDeliveries(token, deviceId, true);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Purchase recovery failed');
+      showDeliveryError(err);
     } finally {
       setBusy(false);
     }
@@ -226,6 +252,12 @@ export function OfferBuyPage() {
         </> : (
           <div className="rounded-xl border border-[#4e674f] bg-[#17231b] p-4 text-center text-[#bfe2c3]">Payment confirmed</div>
         )}
+        {deliveryExhausted && (
+          <div role="alert" className="rounded-xl border border-[#9b5d46] bg-[#2a1713] p-4 text-sm leading-6 text-[#f0c2b4]">
+            <strong className="block text-[#f2d0c6]">Download allowance used</strong>
+            {DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE}
+          </div>
+        )}
         {message && <p className="text-sm text-[#e1b4a9]">{message}</p>}
         {downloads.length > 0 && purchaseOrderId && (
           <div className="rounded-xl border border-[#343b48] bg-[#11151d] p-3 text-xs text-[#aeb6c3]">
@@ -236,11 +268,12 @@ export function OfferBuyPage() {
         {downloads.length > 0 && (
           <section ref={downloadsRef} className="space-y-2" aria-live="polite">
             <h2 className="text-lg text-white">Your device packages</h2>
+            {recoveryDelivery && <p className="rounded-lg border border-[#7b673d] bg-[#211d13] p-3 text-sm text-[#e8d2a8]">Final recovery transfer: use either the QR installation or the ZPK download. Completing either one consumes the remaining allowance.</p>}
             {downloads.map((item) => (
               <div key={item.signedUrl} className="rounded-xl border border-[#343b48] p-4">
                 <img src={item.qrCodeDataUrl} alt={`Install ${item.canonicalName} with the Zepp app`} className="mx-auto h-56 w-56 rounded-lg bg-white p-2" />
                 <p className="mt-3 text-center text-xs text-[#9da6b5]">Scan with the Zepp app to install on your selected watch.</p>
-                <a href={item.signedUrl} className="mt-3 block rounded-lg border border-[#4a5362] p-3 text-center text-[#e8d2a8]">Download {item.canonicalName}.zpk</a>
+                <a href={item.signedUrl} onClick={() => { if (recoveryDelivery) setMessage('Your final recovery transfer is starting. This page will update when it is consumed.'); }} className="mt-3 block rounded-lg border border-[#4a5362] p-3 text-center text-[#e8d2a8]">Download {item.canonicalName}.zpk</a>
               </div>
             ))}
           </section>
