@@ -6,7 +6,7 @@
  *   2. Copy dist → docs/ + root/ (private bundle paths)
  *      deployDistToDocs --mirror-root copies assets to root/assets/ and writes root HTML,
  *      then IMMEDIATELY restores root HTML to dev shell. Working tree stays clean.
- *   3. git add -A  — stages everything; root index.html in staging area = dev shell
+ *   3. Stage only generated private deployment artifacts; unrelated work stays unstaged
  *   4. stageProductionIndexInGit() — REPLACES staged root HTML with production content
  *      using git hash-object + git update-index, WITHOUT touching the working tree.
  *      Vite dev server never sees production HTML → no hot-reload to broken hash path.
@@ -39,7 +39,18 @@ const PRIVATE_ROUTE_ALIASES = [
 ];
 
 const DEPLOYMENT_PATH_PREFIXES = [
-  'docs/',
+  'docs/assets/',
+  'docs/editable-watchfaces/',
+  'docs/index.html',
+  'docs/admin/',
+  'docs/tools/',
+  'docs/login/',
+  'docs/lab/',
+  'docs/labs/',
+  'docs/studio/index.html',
+  'docs/studio/parametric/index.html',
+  'docs/studio/lab/',
+  'docs/studio/compiler/',
   'assets/',
   'editable-watchfaces/',
   'index.html',
@@ -80,7 +91,7 @@ function writePrivateRouteAliases() {
 
 function stagePrivateDeploymentPaths() {
   execSync(
-    'git add -A -- docs assets editable-watchfaces index.html studio admin tools login lab labs',
+    'git add -A -- docs/assets docs/editable-watchfaces docs/index.html docs/admin docs/tools docs/login docs/lab docs/labs docs/studio/index.html docs/studio/parametric/index.html docs/studio/lab docs/studio/compiler assets editable-watchfaces index.html studio admin tools login lab labs',
     { cwd: appRoot, stdio: 'inherit' },
   );
 
@@ -180,7 +191,7 @@ async function main() {
   // ── Step 3: Commit + push origin (root = production bundle) ──────────────
   stagePrivateDeploymentPaths();
   // Stage production HTML into git index WITHOUT touching working tree (Vite-safe).
-  // git add -A staged the dev shell; stageProductionIndexInGit() swaps those staged
+  // Explicit staging placed the dev shell in the index; stageProductionIndexInGit() swaps it
   // entries to production HTML via git plumbing — Vite never sees the production HTML.
   const privateHash = stageProductionIndexInGit();
   console.log(`\n📦 Private bundle: ${privateHash}`);
