@@ -40,7 +40,7 @@ export interface OfferCheckoutResponse {
 
 export interface EntitlementFulfillmentResponse {
   orderId: string; offerId: string; deviceId: string; technicalTargetId: string; completeColorCollection: boolean;
-  packages: Array<{ packageId: string; skuId: string; revision: string; canonicalName: string; signedUrl: string }>;
+  packages: Array<{ packageId: string; skuId: string; revision: string; canonicalName: string; signedUrl: string; allowance: { initialUsed: number; initialLimit: number; recoveryUsed: number; recoveryLimit: number; totalUsed: number; totalLimit: number } }>;
 }
 
 export interface ConfirmOfferPaymentResponse {
@@ -49,6 +49,17 @@ export interface ConfirmOfferPaymentResponse {
 }
 
 export const DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE = 'This purchase has used all three permitted transfers: two initial transfers and one final recovery transfer. The ZPK download and QR installation are no longer available.';
+export const INITIAL_DOWNLOAD_ALLOWANCE_USED_MESSAGE = 'Your two initial transfers are complete. One final recovery transfer remains available for seven days. Use the protected link in your FlowVault email or Recover an existing purchase below. You do not need to purchase again.';
+
+export class DownloadAllowanceError extends Error {
+  readonly allowanceState: 'initial_used' | 'exhausted';
+
+  constructor(allowanceState: 'initial_used' | 'exhausted', message: string) {
+    super(message);
+    this.name = 'DownloadAllowanceError';
+    this.allowanceState = allowanceState;
+  }
+}
 
 const DOWNLOAD_ALLOWANCE_ERROR_CODES = new Set([
   'DOWNLOAD_ALLOWANCE_EXHAUSTED',
@@ -57,13 +68,22 @@ const DOWNLOAD_ALLOWANCE_ERROR_CODES = new Set([
   'Regeneration limit reached',
 ]);
 
-function backendErrorMessage(payload: { error?: string; message?: string } | null, fallback: string): string {
-  if (payload?.error && DOWNLOAD_ALLOWANCE_ERROR_CODES.has(payload.error)) return DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE;
-  return payload?.message || payload?.error || fallback;
+function backendError(payload: { error?: string; message?: string } | null, fallback: string): Error {
+  if (payload?.error === 'INITIAL_DOWNLOAD_ALLOWANCE_USED') {
+    return new DownloadAllowanceError('initial_used', INITIAL_DOWNLOAD_ALLOWANCE_USED_MESSAGE);
+  }
+  if (payload?.error && DOWNLOAD_ALLOWANCE_ERROR_CODES.has(payload.error)) {
+    return new DownloadAllowanceError('exhausted', DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE);
+  }
+  return new Error(payload?.message || payload?.error || fallback);
 }
 
 export function isDownloadAllowanceExhaustedError(error: unknown): boolean {
-  return error instanceof Error && error.message === DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE;
+  return error instanceof DownloadAllowanceError && error.allowanceState === 'exhausted';
+}
+
+export function isInitialDownloadAllowanceUsedError(error: unknown): boolean {
+  return error instanceof DownloadAllowanceError && error.allowanceState === 'initial_used';
 }
 
 function requirePurchaseBaseUrl(): string {
@@ -166,7 +186,7 @@ export async function createOfferCheckout(offerId: string, deviceId: string, ema
 export async function fulfillEntitlement(token: string, deviceId: string): Promise<EntitlementFulfillmentResponse> {
   const response = await fetch(`${requirePurchaseBaseUrl()}/fulfillEntitlement`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, deviceId }) });
   const payload = await response.json().catch(() => null) as EntitlementFulfillmentResponse | { error?: string; message?: string } | null;
-  if (!response.ok) throw new Error(backendErrorMessage(payload && !('packages' in payload) ? payload : null, `Fulfillment failed (${response.status})`));
+  if (!response.ok) throw backendError(payload && !('packages' in payload) ? payload : null, `Fulfillment failed (${response.status})`);
   if (!payload || !('packages' in payload) || !Array.isArray(payload.packages)) throw new Error('Invalid fulfillment response');
   return payload;
 }
@@ -276,7 +296,7 @@ export async function regenerateDownload(input: {
     | null;
 
   if (!response.ok) {
-    throw new Error(backendErrorMessage(payload && 'error' in payload ? payload : null, `Recovery request failed (${response.status})`));
+    throw backendError(payload && 'error' in payload ? payload : null, `Recovery request failed (${response.status})`);
   }
 
   if (!payload || typeof payload !== 'object' || !('token' in payload) || typeof payload.token !== 'string') {

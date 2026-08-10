@@ -3,13 +3,14 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getFlowVaultConfig } from '@/config/flowVaultConfig';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
 import { offerCompatibleDevices, resolveLegacySku, skuOffer, skuPackages } from '@/lib/storeReadModel';
-import { confirmOfferPayment, createOfferCheckout, DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE, fulfillEntitlement, getOrderStatus, isDownloadAllowanceExhaustedError, regenerateDownload } from '@/lib/purchaseApi';
+import { confirmOfferPayment, createOfferCheckout, DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE, fulfillEntitlement, getOrderStatus, INITIAL_DOWNLOAD_ALLOWANCE_USED_MESSAGE, isDownloadAllowanceExhaustedError, isInitialDownloadAllowanceUsedError, regenerateDownload } from '@/lib/purchaseApi';
 import { isPaddleCheckoutClosedError, openPaddleTransaction, PaddleCheckoutClosedError, preparePaddleCheckout, waitForPaddleCheckoutCompletion } from '@/lib/paddleCheckout';
 import { generateQRCode } from '@/lib/qrGenerator';
 
-type PackageDelivery = { canonicalName: string; signedUrl: string; qrCodeDataUrl: string };
+type PackageAllowance = { initialUsed: number; initialLimit: number; recoveryUsed: number; recoveryLimit: number; totalUsed: number; totalLimit: number };
+type PackageDelivery = { packageId: string; canonicalName: string; signedUrl: string; qrCodeDataUrl: string; allowance: PackageAllowance };
 
-async function preparePackageDeliveries(packages: Array<{ canonicalName: string; signedUrl: string }>): Promise<PackageDelivery[]> {
+async function preparePackageDeliveries(packages: Array<{ packageId: string; canonicalName: string; signedUrl: string; allowance: PackageAllowance }>): Promise<PackageDelivery[]> {
   return Promise.all(packages.map(async (item) => ({ ...item, qrCodeDataUrl: await generateQRCode(item.signedUrl) })));
 }
 
@@ -37,6 +38,7 @@ export function OfferBuyPage() {
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<PackageDelivery[]>([]);
   const [deliveryToken, setDeliveryToken] = useState<string | null>(null);
+  const [initialAllowanceUsed, setInitialAllowanceUsed] = useState(false);
   const [deliveryExhausted, setDeliveryExhausted] = useState(false);
   const [recoveryDelivery, setRecoveryDelivery] = useState(false);
   const downloadsRef = useRef<HTMLElement | null>(null);
@@ -45,15 +47,25 @@ export function OfferBuyPage() {
     const result = await fulfillEntitlement(token, device);
     setDownloads(await preparePackageDeliveries(result.packages));
     setDeliveryToken(token);
+    setInitialAllowanceUsed(false);
     setDeliveryExhausted(false);
     setRecoveryDelivery(isRecovery);
     setMessage(null);
   }
 
   function showDeliveryError(error: unknown) {
+    if (isInitialDownloadAllowanceUsedError(error)) {
+      setDownloads([]);
+      setDeliveryToken(null);
+      setInitialAllowanceUsed(true);
+      setDeliveryExhausted(false);
+      setMessage(null);
+      return;
+    }
     if (isDownloadAllowanceExhaustedError(error)) {
       setDownloads([]);
       setDeliveryToken(null);
+      setInitialAllowanceUsed(false);
       setDeliveryExhausted(true);
       setMessage(null);
       return;
@@ -107,9 +119,15 @@ export function OfferBuyPage() {
     if (!deliveryToken || !deviceId || downloads.length === 0) return;
     let active = true;
     const timer = window.setInterval(() => {
-      void fulfillEntitlement(deliveryToken, deviceId).catch((error) => {
-        if (active && isDownloadAllowanceExhaustedError(error)) showDeliveryError(error);
-      });
+      void fulfillEntitlement(deliveryToken, deviceId)
+        .then((result) => {
+          if (!active) return;
+          const allowanceByPackage = new Map(result.packages.map((item) => [item.packageId, item.allowance]));
+          setDownloads((current) => current.map((item) => ({ ...item, allowance: allowanceByPackage.get(item.packageId) ?? item.allowance })));
+        })
+        .catch((error) => {
+          if (active && (isInitialDownloadAllowanceUsedError(error) || isDownloadAllowanceExhaustedError(error))) showDeliveryError(error);
+        });
     }, 3000);
     return () => {
       active = false;
@@ -241,6 +259,7 @@ export function OfferBuyPage() {
           <button type="button" disabled={!checkoutEnabled || !deviceId || !email.trim() || !agreed || busy} onClick={start} className="w-full rounded-xl bg-[#bc9456] p-3 font-semibold text-[#17120a] disabled:cursor-not-allowed disabled:opacity-40">
             {!checkoutEnabled ? 'Coming Soon' : busy ? 'Preparing…' : price === 0 ? 'Get device package' : `Secure checkout — $${price.toFixed(2)}`}
           </button>
+          {offer.regularPrice > 0 && <p className="text-center text-xs leading-5 text-[#9da6b5]">Already purchased this exact watchface for this device? Use your FlowVault recovery email instead. Continuing creates a separate paid order with its own delivery allowance.</p>}
           {!checkoutEnabled && <p className="text-center text-xs text-[#9da6b5]">Purchasing is temporarily unavailable while FlowVault prepares for launch.</p>}
           <details className="rounded-xl border border-[#343b48] p-4 text-sm text-[#aeb6c3]">
             <summary className="cursor-pointer text-[#e8d2a8]">Recover an existing purchase</summary>
@@ -258,6 +277,12 @@ export function OfferBuyPage() {
             {DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE}
           </div>
         )}
+        {initialAllowanceUsed && (
+          <div role="status" className="rounded-xl border border-[#7b673d] bg-[#211d13] p-4 text-sm leading-6 text-[#e8d2a8]">
+            <strong className="block text-[#f0d9a8]">Initial transfers complete — recovery remains</strong>
+            {INITIAL_DOWNLOAD_ALLOWANCE_USED_MESSAGE}
+          </div>
+        )}
         {message && <p className="text-sm text-[#e1b4a9]">{message}</p>}
         {downloads.length > 0 && purchaseOrderId && (
           <div className="rounded-xl border border-[#343b48] bg-[#11151d] p-3 text-xs text-[#aeb6c3]">
@@ -273,6 +298,11 @@ export function OfferBuyPage() {
               <div key={item.signedUrl} className="rounded-xl border border-[#343b48] p-4">
                 <img src={item.qrCodeDataUrl} alt={`Install ${item.canonicalName} with the Zepp app`} className="mx-auto h-56 w-56 rounded-lg bg-white p-2" />
                 <p className="mt-3 text-center text-xs text-[#9da6b5]">Scan with the Zepp app to install on your selected watch.</p>
+                <p className="mt-2 text-center text-xs text-[#c4aa7a]">
+                  {recoveryDelivery
+                    ? `Final recovery transfers remaining: ${Math.max(0, item.allowance.recoveryLimit - item.allowance.recoveryUsed)}`
+                    : `Initial transfers remaining: ${Math.max(0, item.allowance.initialLimit - item.allowance.initialUsed)} · Final recovery reserved: ${Math.max(0, item.allowance.recoveryLimit - item.allowance.recoveryUsed)}`}
+                </p>
                 <a href={item.signedUrl} onClick={() => { if (recoveryDelivery) setMessage('Your final recovery transfer is starting. This page will update when it is consumed.'); }} className="mt-3 block rounded-lg border border-[#4a5362] p-3 text-center text-[#e8d2a8]">Download {item.canonicalName}.zpk</a>
               </div>
             ))}

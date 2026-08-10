@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createOfferCheckout, createPaddleCheckout, DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE, fulfillEntitlement, regenerateDownload } from './purchaseApi';
+import { createOfferCheckout, createPaddleCheckout, DOWNLOAD_ALLOWANCE_EXHAUSTED_MESSAGE, fulfillEntitlement, INITIAL_DOWNLOAD_ALLOWANCE_USED_MESSAGE, isInitialDownloadAllowanceUsedError, regenerateDownload } from './purchaseApi';
 
 function setProductionCheckoutDisabled() {
   vi.stubEnv('VITE_DEPLOY_ENVIRONMENT', 'production');
@@ -41,6 +41,19 @@ describe('production checkout kill switch', () => {
 });
 
 describe('download allowance errors', () => {
+  it('distinguishes completed initial transfers from lifetime exhaustion', async () => {
+    setStaging();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'INITIAL_DOWNLOAD_ALLOWANCE_USED',
+      recoveryAvailable: true,
+    }), { status: 403, headers: { 'Content-Type': 'application/json' } })));
+
+    const error = await fulfillEntitlement('token', 'device').catch((caught) => caught);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe(INITIAL_DOWNLOAD_ALLOWANCE_USED_MESSAGE);
+    expect(isInitialDownloadAllowanceUsedError(error)).toBe(true);
+  });
+
   it('turns an exhausted fulfillment response into customer-facing guidance', async () => {
     setStaging();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
