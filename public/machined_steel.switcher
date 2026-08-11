@@ -1,0 +1,432 @@
+{"id":"machined-steel-v1","name":"Machined Steel","dataType":"WEATHER_CURRENT","policyType":"FIXED_CODES","slotCount":29}
+===SLOT_0|Partly Cloudy|code:0|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Sun_Component">
+<g transform="translate(0, 15)"><circle cx="-20" cy="-30" r="45" fill="#050505"/><circle cx="-20" cy="-105" r="14" fill="#050505"/><circle cx="-20" cy="45" r="14" fill="#050505"/><circle cx="-95" cy="-30" r="14" fill="#050505"/><circle cx="55" cy="-30" r="14" fill="#050505"/><circle cx="-73" cy="-83" r="14" fill="#050505"/><circle cx="33" cy="-83" r="14" fill="#050505"/><circle cx="-73" cy="23" r="14" fill="#050505"/><circle cx="33" cy="23" r="14" fill="#050505"/></g>
+<g transform="translate(0, 8)"><circle cx="-20" cy="-30" r="45" fill="#1f2124"/><circle cx="-20" cy="-105" r="14" fill="#1f2124"/><circle cx="-20" cy="45" r="14" fill="#1f2124"/><circle cx="-95" cy="-30" r="14" fill="#1f2124"/><circle cx="55" cy="-30" r="14" fill="#1f2124"/><circle cx="-73" cy="-83" r="14" fill="#1f2124"/><circle cx="33" cy="-83" r="14" fill="#1f2124"/><circle cx="-73" cy="23" r="14" fill="#1f2124"/><circle cx="33" cy="23" r="14" fill="#1f2124"/></g>
+<g transform="translate(0, 0)"><circle cx="-20" cy="-30" r="45" fill="#4a4c50"/><circle cx="-20" cy="-105" r="14" fill="#4a4c50"/><circle cx="-20" cy="45" r="14" fill="#4a4c50"/><circle cx="-95" cy="-30" r="14" fill="#4a4c50"/><circle cx="55" cy="-30" r="14" fill="#4a4c50"/><circle cx="-73" cy="-83" r="14" fill="#4a4c50"/><circle cx="33" cy="-83" r="14" fill="#4a4c50"/><circle cx="-73" cy="23" r="14" fill="#4a4c50"/><circle cx="33" cy="23" r="14" fill="#4a4c50"/></g>
+<g transform="translate(-4, -6)"><circle cx="-20" cy="-30" r="45" fill="#d0d2d6"/><circle cx="-20" cy="-105" r="14" fill="#d0d2d6"/><circle cx="-20" cy="45" r="14" fill="#d0d2d6"/><circle cx="-95" cy="-30" r="14" fill="#d0d2d6"/><circle cx="55" cy="-30" r="14" fill="#d0d2d6"/><circle cx="-73" cy="-83" r="14" fill="#d0d2d6"/><circle cx="33" cy="-83" r="14" fill="#d0d2d6"/><circle cx="-73" cy="23" r="14" fill="#d0d2d6"/><circle cx="33" cy="23" r="14" fill="#d0d2d6"/></g>
+<g transform="translate(-2, -3)"><circle cx="-20" cy="-30" r="45" fill="#888a8f"/><circle cx="-20" cy="-105" r="14" fill="#888a8f"/><circle cx="-20" cy="45" r="14" fill="#888a8f"/><circle cx="-95" cy="-30" r="14" fill="#888a8f"/><circle cx="55" cy="-30" r="14" fill="#888a8f"/><circle cx="-73" cy="-83" r="14" fill="#888a8f"/><circle cx="33" cy="-83" r="14" fill="#888a8f"/><circle cx="-73" cy="23" r="14" fill="#888a8f"/><circle cx="33" cy="23" r="14" fill="#888a8f"/></g>
+</g>
+<g id="Cloud_Component">
+<g transform="translate(0, 15)"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z" fill="#050505"/></g>
+<g transform="translate(0, 8)"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z" fill="#1f2124"/></g>
+<g transform="translate(0, 0)"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z" fill="#4a4c50"/></g>
+<g transform="translate(-4, -6)"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z" fill="#d0d2d6"/></g>
+<g transform="translate(-2, -3)"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z" fill="#888a8f"/></g>
+</g>
+</g>
+</svg>
+===SLOT_1|Shower Rain|code:1|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Raindrops">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(-20, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(70, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(-20, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(70, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(-20, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(70, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(-20, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(70, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(-20, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(70, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_2|Snow|code:2|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Snowflakes">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(-10, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 105)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(60, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(-10, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 105)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(60, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(-10, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 105)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(60, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(-10, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 105)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(60, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(-10, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 105)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(60, 80)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_3|Thunder|code:3|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Lightning">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 10 40 L -15 100 L 15 100 L -5 150 L 45 90 L 15 90 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 10 40 L -15 100 L 15 100 L -5 150 L 45 90 L 15 90 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 10 40 L -15 100 L 15 100 L -5 150 L 45 90 L 15 90 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 10 40 L -15 100 L 15 100 L -5 150 L 45 90 L 15 90 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 10 40 L -15 100 L 15 100 L -5 150 L 45 90 L 15 90 Z"/></g>
+</g>
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_4|Sleet|code:4|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Sleet">
+<g transform="translate(-30, 80)" fill="#050505"><path d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-30, 73)" fill="#1f2124"><path d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-30, 65)" fill="#4a4c50"><path d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-34, 59)" fill="#d0d2d6"><path d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-32, 62)" fill="#888a8f"><path d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(30, 80)" fill="#050505"><path d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(30, 73)" fill="#1f2124"><path d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(30, 65)" fill="#4a4c50"><path d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(26, 59)" fill="#d0d2d6"><path d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(28, 62)" fill="#888a8f"><path d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_5|Light Rain|code:5|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Light_Rain">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(-5, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(45, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(-5, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(45, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(-5, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(45, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(-5, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(45, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(-5, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(45, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_6|Light Snow|code:6|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Light_Snow">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(5, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(45, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(5, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(45, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(5, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(45, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(5, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(45, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(5, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(45, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_7|Moderate Rain|code:7|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Moderate_Rain">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(-15, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(65, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(-15, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(65, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(-15, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(65, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(-15, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(65, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(-15, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(25, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(65, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_8|Moderate Snow|code:8|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Moderate_Snow">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(-15, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(-15, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(-15, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(-15, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(-15, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(25, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 85)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_9|Heavy Rain|code:9|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Heavy_Rain">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(-30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(0, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(60, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(-30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(0, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(60, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(-30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(0, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(60, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(-30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(0, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(60, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(-30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(0, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(30, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/><path transform="translate(60, 75)" d="M 0 0 L -8 16 A 8 8 0 0 0 8 16 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_10|Heavy Snow|code:10|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,160)">
+<g id="Cloud">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -50 60 A 40 40 0 0 1 -20 0 A 55 55 0 0 1 60 0 A 45 45 0 0 1 100 60 Z"/></g>
+</g>
+<g id="Heavy_Snow">
+<g transform="translate(0, 15)" fill="#050505"><path transform="translate(-25, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(5, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(35, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="translate(-25, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(5, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(35, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="translate(-25, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(5, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(35, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="translate(-25, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(5, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(35, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="translate(-25, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(5, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(35, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/><path transform="translate(65, 90)" d="M 0 -12 L 2 -3 L 10 -5 L 4 0 L 10 5 L 2 3 L 0 12 L -2 3 L -10 5 L -4 0 L -10 -5 L -2 -3 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_11|Sand Storm|code:11|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Sand_Storm">
+<g transform="translate(0, 15)" fill="#050505"><path transform="rotate(-15)" d="M -80 -20 L 80 -20 L 70 0 L -90 0 Z"/><path transform="rotate(0)" d="M -90 10 L 90 10 L 80 30 L -100 30 Z"/><path transform="rotate(15)" d="M -70 40 L 100 40 L 90 60 L -80 60 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path transform="rotate(-15)" d="M -80 -20 L 80 -20 L 70 0 L -90 0 Z"/><path transform="rotate(0)" d="M -90 10 L 90 10 L 80 30 L -100 30 Z"/><path transform="rotate(15)" d="M -70 40 L 100 40 L 90 60 L -80 60 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path transform="rotate(-15)" d="M -80 -20 L 80 -20 L 70 0 L -90 0 Z"/><path transform="rotate(0)" d="M -90 10 L 90 10 L 80 30 L -100 30 Z"/><path transform="rotate(15)" d="M -70 40 L 100 40 L 90 60 L -80 60 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path transform="rotate(-15)" d="M -80 -20 L 80 -20 L 70 0 L -90 0 Z"/><path transform="rotate(0)" d="M -90 10 L 90 10 L 80 30 L -100 30 Z"/><path transform="rotate(15)" d="M -70 40 L 100 40 L 90 60 L -80 60 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path transform="rotate(-15)" d="M -80 -20 L 80 -20 L 70 0 L -90 0 Z"/><path transform="rotate(0)" d="M -90 10 L 90 10 L 80 30 L -100 30 Z"/><path transform="rotate(15)" d="M -70 40 L 100 40 L 90 60 L -80 60 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_12|Fog|code:12|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Fog">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -90 -40 L 90 -40 L 80 -10 L -100 -10 Z"/><path d="M -100 0 L 100 0 L 90 30 L -110 30 Z"/><path d="M -90 40 L 90 40 L 80 70 L -100 70 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -90 -40 L 90 -40 L 80 -10 L -100 -10 Z"/><path d="M -100 0 L 100 0 L 90 30 L -110 30 Z"/><path d="M -90 40 L 90 40 L 80 70 L -100 70 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -90 -40 L 90 -40 L 80 -10 L -100 -10 Z"/><path d="M -100 0 L 100 0 L 90 30 L -110 30 Z"/><path d="M -90 40 L 90 40 L 80 70 L -100 70 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -90 -40 L 90 -40 L 80 -10 L -100 -10 Z"/><path d="M -100 0 L 100 0 L 90 30 L -110 30 Z"/><path d="M -90 40 L 90 40 L 80 70 L -100 70 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -90 -40 L 90 -40 L 80 -10 L -100 -10 Z"/><path d="M -100 0 L 100 0 L 90 30 L -110 30 Z"/><path d="M -90 40 L 90 40 L 80 70 L -100 70 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_13|Haze|code:13|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Haze">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -80 -30 L 80 -30 L 75 -15 L -85 -15 Z"/><path d="M -80 0 L 80 0 L 75 15 L -85 15 Z"/><path d="M -80 30 L 80 30 L 75 45 L -85 45 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -80 -30 L 80 -30 L 75 -15 L -85 -15 Z"/><path d="M -80 0 L 80 0 L 75 15 L -85 15 Z"/><path d="M -80 30 L 80 30 L 75 45 L -85 45 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -80 -30 L 80 -30 L 75 -15 L -85 -15 Z"/><path d="M -80 0 L 80 0 L 75 15 L -85 15 Z"/><path d="M -80 30 L 80 30 L 75 45 L -85 45 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -80 -30 L 80 -30 L 75 -15 L -85 -15 Z"/><path d="M -80 0 L 80 0 L 75 15 L -85 15 Z"/><path d="M -80 30 L 80 30 L 75 45 L -85 45 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -80 -30 L 80 -30 L 75 -15 L -85 -15 Z"/><path d="M -80 0 L 80 0 L 75 15 L -85 15 Z"/><path d="M -80 30 L 80 30 L 75 45 L -85 45 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_14|Windy|code:14|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Windy">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -80 -40 C -40 -60 20 -40 40 -40 C 60 -40 80 -60 80 -60 L 70 -50 C 60 -50 40 -30 40 -30 C 20 -30 -40 -50 -80 -30 Z"/><path d="M -90 10 C -50 -10 10 10 30 10 C 50 10 70 -10 70 -10 L 60 0 C 50 0 30 20 30 20 C 10 20 -50 0 -90 20 Z"/><path d="M -70 60 C -30 40 30 60 50 60 C 70 60 90 40 90 40 L 80 50 C 70 50 50 70 50 70 C 30 70 -30 50 -70 70 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -80 -40 C -40 -60 20 -40 40 -40 C 60 -40 80 -60 80 -60 L 70 -50 C 60 -50 40 -30 40 -30 C 20 -30 -40 -50 -80 -30 Z"/><path d="M -90 10 C -50 -10 10 10 30 10 C 50 10 70 -10 70 -10 L 60 0 C 50 0 30 20 30 20 C 10 20 -50 0 -90 20 Z"/><path d="M -70 60 C -30 40 30 60 50 60 C 70 60 90 40 90 40 L 80 50 C 70 50 50 70 50 70 C 30 70 -30 50 -70 70 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -80 -40 C -40 -60 20 -40 40 -40 C 60 -40 80 -60 80 -60 L 70 -50 C 60 -50 40 -30 40 -30 C 20 -30 -40 -50 -80 -30 Z"/><path d="M -90 10 C -50 -10 10 10 30 10 C 50 10 70 -10 70 -10 L 60 0 C 50 0 30 20 30 20 C 10 20 -50 0 -90 20 Z"/><path d="M -70 60 C -30 40 30 60 50 60 C 70 60 90 40 90 40 L 80 50 C 70 50 50 70 50 70 C 30 70 -30 50 -70 70 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -80 -40 C -40 -60 20 -40 40 -40 C 60 -40 80 -60 80 -60 L 70 -50 C 60 -50 40 -30 40 -30 C 20 -30 -40 -50 -80 -30 Z"/><path d="M -90 10 C -50 -10 10 10 30 10 C 50 10 70 -10 70 -10 L 60 0 C 50 0 30 20 30 20 C 10 20 -50 0 -90 20 Z"/><path d="M -70 60 C -30 40 30 60 50 60 C 70 60 90 40 90 40 L 80 50 C 70 50 50 70 50 70 C 30 70 -30 50 -70 70 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -80 -40 C -40 -60 20 -40 40 -40 C 60 -40 80 -60 80 -60 L 70 -50 C 60 -50 40 -30 40 -30 C 20 -30 -40 -50 -80 -30 Z"/><path d="M -90 10 C -50 -10 10 10 30 10 C 50 10 70 -10 70 -10 L 60 0 C 50 0 30 20 30 20 C 10 20 -50 0 -90 20 Z"/><path d="M -70 60 C -30 40 30 60 50 60 C 70 60 90 40 90 40 L 80 50 C 70 50 50 70 50 70 C 30 70 -30 50 -70 70 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_15|Sunny|code:15|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Sun">
+<g transform="translate(0, 15)" fill="#050505"><circle cx="0" cy="0" r="60"/><circle cx="0" cy="-90" r="15"/><circle cx="0" cy="90" r="15"/><circle cx="-90" cy="0" r="15"/><circle cx="90" cy="0" r="15"/><circle cx="-65" cy="-65" r="15"/><circle cx="65" cy="-65" r="15"/><circle cx="-65" cy="65" r="15"/><circle cx="65" cy="65" r="15"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><circle cx="0" cy="0" r="60"/><circle cx="0" cy="-90" r="15"/><circle cx="0" cy="90" r="15"/><circle cx="-90" cy="0" r="15"/><circle cx="90" cy="0" r="15"/><circle cx="-65" cy="-65" r="15"/><circle cx="65" cy="-65" r="15"/><circle cx="-65" cy="65" r="15"/><circle cx="65" cy="65" r="15"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><circle cx="0" cy="0" r="60"/><circle cx="0" cy="-90" r="15"/><circle cx="0" cy="90" r="15"/><circle cx="-90" cy="0" r="15"/><circle cx="90" cy="0" r="15"/><circle cx="-65" cy="-65" r="15"/><circle cx="65" cy="-65" r="15"/><circle cx="-65" cy="65" r="15"/><circle cx="65" cy="65" r="15"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><circle cx="0" cy="0" r="60"/><circle cx="0" cy="-90" r="15"/><circle cx="0" cy="90" r="15"/><circle cx="-90" cy="0" r="15"/><circle cx="90" cy="0" r="15"/><circle cx="-65" cy="-65" r="15"/><circle cx="65" cy="-65" r="15"/><circle cx="-65" cy="65" r="15"/><circle cx="65" cy="65" r="15"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><circle cx="0" cy="0" r="60"/><circle cx="0" cy="-90" r="15"/><circle cx="0" cy="90" r="15"/><circle cx="-90" cy="0" r="15"/><circle cx="90" cy="0" r="15"/><circle cx="-65" cy="-65" r="15"/><circle cx="65" cy="-65" r="15"/><circle cx="-65" cy="65" r="15"/><circle cx="65" cy="65" r="15"/></g>
+</g>
+</g>
+</svg>
+===SLOT_16|Clear Night|code:16|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Moon">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 35 -70 C -60 -70, -60 70, 35 70 C -10 40, -10 -40, 35 -70 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 35 -70 C -60 -70, -60 70, 35 70 C -10 40, -10 -40, 35 -70 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 35 -70 C -60 -70, -60 70, 35 70 C -10 40, -10 -40, 35 -70 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 35 -70 C -60 -70, -60 70, 35 70 C -10 40, -10 -40, 35 -70 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 35 -70 C -60 -70, -60 70, 35 70 C -10 40, -10 -40, 35 -70 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_17|Overcast|code:17|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Overcast">
+<g transform="translate(0, 15)" fill="#050505"><path d="M -45 30 C -90 30, -90 -30, -45 -30 C -45 -90, 45 -90, 45 -30 C 90 -30, 90 30, 45 30 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M -45 30 C -90 30, -90 -30, -45 -30 C -45 -90, 45 -90, 45 -30 C 90 -30, 90 30, 45 30 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M -45 30 C -90 30, -90 -30, -45 -30 C -45 -90, 45 -90, 45 -30 C 90 -30, 90 30, 45 30 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M -45 30 C -90 30, -90 -30, -45 -30 C -45 -90, 45 -90, 45 -30 C 90 -30, 90 30, 45 30 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M -45 30 C -90 30, -90 -30, -45 -30 C -45 -90, 45 -90, 45 -30 C 90 -30, 90 30, 45 30 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_18|Mostly Sunny|code:18|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Mostly_Sunny">
+<g transform="translate(0, 15)" fill="#050505"><circle cx="10" cy="0" r="48"/><circle cx="10" cy="-72" r="11"/><circle cx="10" cy="72" r="11"/><circle cx="-62" cy="0" r="11"/><circle cx="82" cy="0" r="11"/><circle cx="-41" cy="-51" r="11"/><circle cx="61" cy="-51" r="11"/><circle cx="-41" cy="51" r="11"/><circle cx="61" cy="51" r="11"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><circle cx="10" cy="0" r="48"/><circle cx="10" cy="-72" r="11"/><circle cx="10" cy="72" r="11"/><circle cx="-62" cy="0" r="11"/><circle cx="82" cy="0" r="11"/><circle cx="-41" cy="-51" r="11"/><circle cx="61" cy="-51" r="11"/><circle cx="-41" cy="51" r="11"/><circle cx="61" cy="51" r="11"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><circle cx="10" cy="0" r="48"/><circle cx="10" cy="-72" r="11"/><circle cx="10" cy="72" r="11"/><circle cx="-62" cy="0" r="11"/><circle cx="82" cy="0" r="11"/><circle cx="-41" cy="-51" r="11"/><circle cx="61" cy="-51" r="11"/><circle cx="-41" cy="51" r="11"/><circle cx="61" cy="51" r="11"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><circle cx="10" cy="0" r="48"/><circle cx="10" cy="-72" r="11"/><circle cx="10" cy="72" r="11"/><circle cx="-62" cy="0" r="11"/><circle cx="82" cy="0" r="11"/><circle cx="-41" cy="-51" r="11"/><circle cx="61" cy="-51" r="11"/><circle cx="-41" cy="51" r="11"/><circle cx="61" cy="51" r="11"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><circle cx="10" cy="0" r="48"/><circle cx="10" cy="-72" r="11"/><circle cx="10" cy="72" r="11"/><circle cx="-62" cy="0" r="11"/><circle cx="82" cy="0" r="11"/><circle cx="-41" cy="-51" r="11"/><circle cx="61" cy="-51" r="11"/><circle cx="-41" cy="51" r="11"/><circle cx="61" cy="51" r="11"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_19|Mostly Clear Night|code:19|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Mostly_Clear_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 50 -85 C -45 -85, -45 55, 50 55 C 5 25, 5 -55, 50 -85 Z"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 50 -85 C -45 -85, -45 55, 50 55 C 5 25, 5 -55, 50 -85 Z"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 50 -85 C -45 -85, -45 55, 50 55 C 5 25, 5 -55, 50 -85 Z"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 50 -85 C -45 -85, -45 55, 50 55 C 5 25, 5 -55, 50 -85 Z"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 50 -85 C -45 -85, -45 55, 50 55 C 5 25, 5 -55, 50 -85 Z"/><path d="M -25 70 C -65 70, -65 20, -25 20 C -25 -20, 35 -20, 35 20 C 65 20, 65 70, 15 70 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_20|Mostly Cloudy|code:20|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Mostly_Cloudy">
+<g transform="translate(0, 15)" fill="#050505"><circle cx="45" cy="-45" r="35"/><circle cx="45" cy="-95" r="9"/><circle cx="45" cy="5" r="9"/><circle cx="-5" cy="-45" r="9"/><circle cx="95" cy="-45" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="80" cy="-80" r="9"/><circle cx="10" cy="-10" r="9"/><circle cx="80" cy="-10" r="9"/><path d="M -40 40 C -90 40, -90 -20, -40 -20 C -40 -80, 40 -80, 40 -20 C 90 -20, 90 40, 40 40 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><circle cx="45" cy="-45" r="35"/><circle cx="45" cy="-95" r="9"/><circle cx="45" cy="5" r="9"/><circle cx="-5" cy="-45" r="9"/><circle cx="95" cy="-45" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="80" cy="-80" r="9"/><circle cx="10" cy="-10" r="9"/><circle cx="80" cy="-10" r="9"/><path d="M -40 40 C -90 40, -90 -20, -40 -20 C -40 -80, 40 -80, 40 -20 C 90 -20, 90 40, 40 40 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><circle cx="45" cy="-45" r="35"/><circle cx="45" cy="-95" r="9"/><circle cx="45" cy="5" r="9"/><circle cx="-5" cy="-45" r="9"/><circle cx="95" cy="-45" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="80" cy="-80" r="9"/><circle cx="10" cy="-10" r="9"/><circle cx="80" cy="-10" r="9"/><path d="M -40 40 C -90 40, -90 -20, -40 -20 C -40 -80, 40 -80, 40 -20 C 90 -20, 90 40, 40 40 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><circle cx="45" cy="-45" r="35"/><circle cx="45" cy="-95" r="9"/><circle cx="45" cy="5" r="9"/><circle cx="-5" cy="-45" r="9"/><circle cx="95" cy="-45" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="80" cy="-80" r="9"/><circle cx="10" cy="-10" r="9"/><circle cx="80" cy="-10" r="9"/><path d="M -40 40 C -90 40, -90 -20, -40 -20 C -40 -80, 40 -80, 40 -20 C 90 -20, 90 40, 40 40 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><circle cx="45" cy="-45" r="35"/><circle cx="45" cy="-95" r="9"/><circle cx="45" cy="5" r="9"/><circle cx="-5" cy="-45" r="9"/><circle cx="95" cy="-45" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="80" cy="-80" r="9"/><circle cx="10" cy="-10" r="9"/><circle cx="80" cy="-10" r="9"/><path d="M -40 40 C -90 40, -90 -20, -40 -20 C -40 -80, 40 -80, 40 -20 C 90 -20, 90 40, 40 40 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_21|Partly Cloudy Day|code:21|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Partly_Cloudy">
+<g transform="translate(0, 15)" fill="#050505"><circle cx="-30" cy="-40" r="40"/><circle cx="-30" cy="-96" r="9"/><circle cx="-30" cy="16" r="9"/><circle cx="-86" cy="-40" r="9"/><circle cx="26" cy="-40" r="9"/><circle cx="-70" cy="-80" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="-70" cy="0" r="9"/><circle cx="10" cy="0" r="9"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><circle cx="-30" cy="-40" r="40"/><circle cx="-30" cy="-96" r="9"/><circle cx="-30" cy="16" r="9"/><circle cx="-86" cy="-40" r="9"/><circle cx="26" cy="-40" r="9"/><circle cx="-70" cy="-80" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="-70" cy="0" r="9"/><circle cx="10" cy="0" r="9"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><circle cx="-30" cy="-40" r="40"/><circle cx="-30" cy="-96" r="9"/><circle cx="-30" cy="16" r="9"/><circle cx="-86" cy="-40" r="9"/><circle cx="26" cy="-40" r="9"/><circle cx="-70" cy="-80" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="-70" cy="0" r="9"/><circle cx="10" cy="0" r="9"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><circle cx="-30" cy="-40" r="40"/><circle cx="-30" cy="-96" r="9"/><circle cx="-30" cy="16" r="9"/><circle cx="-86" cy="-40" r="9"/><circle cx="26" cy="-40" r="9"/><circle cx="-70" cy="-80" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="-70" cy="0" r="9"/><circle cx="10" cy="0" r="9"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><circle cx="-30" cy="-40" r="40"/><circle cx="-30" cy="-96" r="9"/><circle cx="-30" cy="16" r="9"/><circle cx="-86" cy="-40" r="9"/><circle cx="26" cy="-40" r="9"/><circle cx="-70" cy="-80" r="9"/><circle cx="10" cy="-80" r="9"/><circle cx="-70" cy="0" r="9"/><circle cx="10" cy="0" r="9"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_22|Partly Clear Night|code:22|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Partly_Clear_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_23|Light Rain Night|code:23|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Light_Rain_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z M 35 65 C 25 85, 45 85, 35 65 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z M 35 65 C 25 85, 45 85, 35 65 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z M 35 65 C 25 85, 45 85, 35 65 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z M 35 65 C 25 85, 45 85, 35 65 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z M 35 65 C 25 85, 45 85, 35 65 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_24|Thunder Night|code:24|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Thunder_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 30 45 L 10 80 L 25 80 L 5 115 L 40 70 L 20 70 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 30 45 L 10 80 L 25 80 L 5 115 L 40 70 L 20 70 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 30 45 L 10 80 L 25 80 L 5 115 L 40 70 L 20 70 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 30 45 L 10 80 L 25 80 L 5 115 L 40 70 L 20 70 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 30 45 L 10 80 L 25 80 L 5 115 L 40 70 L 20 70 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_25|Sleet Night|code:25|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Sleet_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z"/><circle cx="35" cy="75" r="7"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z"/><circle cx="35" cy="75" r="7"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z"/><circle cx="35" cy="75" r="7"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z"/><circle cx="35" cy="75" r="7"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M 5 65 C -5 85, 15 85, 5 65 Z"/><circle cx="35" cy="75" r="7"/></g>
+</g>
+</g>
+</svg>
+===SLOT_26|Shower Night|code:26|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Shower_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -5 65 C -15 85, 5 85, -5 65 Z M 20 65 C 10 85, 30 85, 20 65 Z M 45 65 C 35 85, 55 85, 45 65 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -5 65 C -15 85, 5 85, -5 65 Z M 20 65 C 10 85, 30 85, 20 65 Z M 45 65 C 35 85, 55 85, 45 65 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -5 65 C -15 85, 5 85, -5 65 Z M 20 65 C 10 85, 30 85, 20 65 Z M 45 65 C 35 85, 55 85, 45 65 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -5 65 C -15 85, 5 85, -5 65 Z M 20 65 C 10 85, 30 85, 20 65 Z M 45 65 C 35 85, 55 85, 45 65 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -5 65 C -15 85, 5 85, -5 65 Z M 20 65 C 10 85, 30 85, 20 65 Z M 45 65 C 35 85, 55 85, 45 65 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_27|Heavy Rain Night|code:27|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Heavy_Rain_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -15 65 C -25 85, -5 85, -15 65 Z M 5 75 C -5 95, 15 95, 5 75 Z M 25 65 C 15 85, 35 85, 25 65 Z M 45 75 C 35 95, 55 95, 45 75 Z M 65 65 C 55 85, 75 85, 65 65 Z"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -15 65 C -25 85, -5 85, -15 65 Z M 5 75 C -5 95, 15 95, 5 75 Z M 25 65 C 15 85, 35 85, 25 65 Z M 45 75 C 35 95, 55 95, 45 75 Z M 65 65 C 55 85, 75 85, 65 65 Z"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -15 65 C -25 85, -5 85, -15 65 Z M 5 75 C -5 95, 15 95, 5 75 Z M 25 65 C 15 85, 35 85, 25 65 Z M 45 75 C 35 95, 55 95, 45 75 Z M 65 65 C 55 85, 75 85, 65 65 Z"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -15 65 C -25 85, -5 85, -15 65 Z M 5 75 C -5 95, 15 95, 5 75 Z M 25 65 C 15 85, 35 85, 25 65 Z M 45 75 C 35 95, 55 95, 45 75 Z M 65 65 C 55 85, 75 85, 65 65 Z"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -25 50 C -70 50, -70 -10, -25 -10 C -25 -70, 65 -70, 65 -10 C 110 -10, 110 50, 65 50 Z"/><path d="M -15 65 C -25 85, -5 85, -15 65 Z M 5 75 C -5 95, 15 95, 5 75 Z M 25 65 C 15 85, 35 85, 25 65 Z M 45 75 C 35 95, 55 95, 45 75 Z M 65 65 C 55 85, 75 85, 65 65 Z"/></g>
+</g>
+</g>
+</svg>
+===SLOT_28|Sand Storm Night|code:28|min:|max:===
+<svg width="350" height="350" viewBox="80 80 240 240" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+<g transform="translate(200,200)">
+<g id="Sand_Storm_Night">
+<g transform="translate(0, 15)" fill="#050505"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -60 10 C -20 -10, 40 -10, 80 10 C 40 20, -20 20, -60 10 Z"/><path d="M -80 40 C -40 20, 20 20, 60 40 C 20 50, -40 50, -80 40 Z"/><path d="M -50 70 C -10 50, 50 50, 90 70 C 50 80, -10 80, -50 70 Z"/><circle cx="-30" cy="-5" r="4"/><circle cx="20" cy="0" r="5"/><circle cx="65" cy="25" r="3"/><circle cx="-50" cy="30" r="4"/><circle cx="10" cy="45" r="5"/><circle cx="-20" cy="65" r="3"/><circle cx="40" cy="75" r="5"/></g>
+<g transform="translate(0, 8)" fill="#1f2124"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -60 10 C -20 -10, 40 -10, 80 10 C 40 20, -20 20, -60 10 Z"/><path d="M -80 40 C -40 20, 20 20, 60 40 C 20 50, -40 50, -80 40 Z"/><path d="M -50 70 C -10 50, 50 50, 90 70 C 50 80, -10 80, -50 70 Z"/><circle cx="-30" cy="-5" r="4"/><circle cx="20" cy="0" r="5"/><circle cx="65" cy="25" r="3"/><circle cx="-50" cy="30" r="4"/><circle cx="10" cy="45" r="5"/><circle cx="-20" cy="65" r="3"/><circle cx="40" cy="75" r="5"/></g>
+<g transform="translate(0, 0)" fill="#4a4c50"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -60 10 C -20 -10, 40 -10, 80 10 C 40 20, -20 20, -60 10 Z"/><path d="M -80 40 C -40 20, 20 20, 60 40 C 20 50, -40 50, -80 40 Z"/><path d="M -50 70 C -10 50, 50 50, 90 70 C 50 80, -10 80, -50 70 Z"/><circle cx="-30" cy="-5" r="4"/><circle cx="20" cy="0" r="5"/><circle cx="65" cy="25" r="3"/><circle cx="-50" cy="30" r="4"/><circle cx="10" cy="45" r="5"/><circle cx="-20" cy="65" r="3"/><circle cx="40" cy="75" r="5"/></g>
+<g transform="translate(-4, -6)" fill="#d0d2d6"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -60 10 C -20 -10, 40 -10, 80 10 C 40 20, -20 20, -60 10 Z"/><path d="M -80 40 C -40 20, 20 20, 60 40 C 20 50, -40 50, -80 40 Z"/><path d="M -50 70 C -10 50, 50 50, 90 70 C 50 80, -10 80, -50 70 Z"/><circle cx="-30" cy="-5" r="4"/><circle cx="20" cy="0" r="5"/><circle cx="65" cy="25" r="3"/><circle cx="-50" cy="30" r="4"/><circle cx="10" cy="45" r="5"/><circle cx="-20" cy="65" r="3"/><circle cx="40" cy="75" r="5"/></g>
+<g transform="translate(-2, -3)" fill="#888a8f"><path d="M 5 -100 C -90 -100, -90 40, 5 40 C -40 10, -40 -70, 5 -100 Z"/><path d="M -60 10 C -20 -10, 40 -10, 80 10 C 40 20, -20 20, -60 10 Z"/><path d="M -80 40 C -40 20, 20 20, 60 40 C 20 50, -40 50, -80 40 Z"/><path d="M -50 70 C -10 50, 50 50, 90 70 C 50 80, -10 80, -50 70 Z"/><circle cx="-30" cy="-5" r="4"/><circle cx="20" cy="0" r="5"/><circle cx="65" cy="25" r="3"/><circle cx="-50" cy="30" r="4"/><circle cx="10" cy="45" r="5"/><circle cx="-20" cy="65" r="3"/><circle cx="40" cy="75" r="5"/></g>
+</g>
+</g>
+</svg>
+===END===

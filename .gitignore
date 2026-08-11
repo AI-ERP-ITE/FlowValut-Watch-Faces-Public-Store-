@@ -20,7 +20,6 @@ system-b-editable/artifacts/
 .idea/
 *.swp
 *.swo
-*.sw*
 .DS_Store
 
 # Logs
