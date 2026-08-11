@@ -27,7 +27,7 @@
 
 - [ ] T030 Freeze the deployed staging release at Test Accepted.
 - [x] T031 Add configuration versioning and acceptance invalidation.
-- [ ] T032 Add idempotency and a per-Sync-ID operation lock.
+- [x] T032 Add idempotency and a per-Sync-ID operation lock.
 - [x] T033 Make Review retrieve the retained Firebase release package.
 - [x] T034 Make Preview mirror it with only fixed environment bindings.
 - [x] T035 Make Sync promote the accepted Preview without rebuilding.
@@ -55,5 +55,15 @@
 - Exactly 22 Functions are labeled as the `storefront` codebase. The remaining
   42 shared-project Functions are outside the frozen package and promotion
   boundary.
+- The corrected frozen backend contains one tree-shaken implementation bundle
+  generated from an explicit 24-function Public Store export list (22 Sandbox,
+  21 Live). It does not copy the monolithic compiled Functions directory.
+  Scans found zero Admin Sync, Image Switcher, Parametric, GitHub bridge,
+  Workshop, user-library, or ZPK-builder markers in the package.
+- Firebase parsed the corrected staging package successfully in a dry run and
+  discovered only the 22 expected Sandbox storefront endpoints.
+- Admin transitions now claim an atomic Firestore operation lock. A repeated
+  action in its active or completed state returns an idempotent result instead
+  of dispatching a duplicate operation; 75 backend tests passed.
 - An unauthenticated call to `adminDeploymentSync` returned HTTP 401.
 - No production deployment, DNS change, or real Paddle payment was attempted.
