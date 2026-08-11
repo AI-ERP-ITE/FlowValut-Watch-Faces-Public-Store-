@@ -33,19 +33,23 @@ jobs:
       PROMOTION_POLICY_HASH: ${{ inputs.policy_hash }}
       GOOGLE_CLOUD_PROJECT: flowvault-staging-2026
     steps:
-      - name: Checkout frozen backend
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.backend_commit }}
-          path: workspace
-          persist-credentials: false
-
-      - name: Checkout frozen application
+      - name: Checkout immutable repository object store
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.app_commit }}
-          path: workspace/app
+          path: source-repo
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Materialize frozen backend and application
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C source-repo cat-file -e "${PROMOTION_BACKEND_COMMIT}^{commit}"
+          git -C source-repo cat-file -e "${PROMOTION_APP_COMMIT}^{commit}"
+          git -C source-repo worktree add --detach "$GITHUB_WORKSPACE/workspace" "$PROMOTION_BACKEND_COMMIT"
+          rm -rf "$GITHUB_WORKSPACE/workspace/app"
+          git -C source-repo worktree add --detach "$GITHUB_WORKSPACE/workspace/app" "$PROMOTION_APP_COMMIT"
 
       - name: Authenticate to Google Cloud without a key
         uses: google-github-actions/auth@v2
