@@ -25,6 +25,7 @@ run(process.execPath, [path.join(firebaseRoot, 'scripts', 'createFrozenFirebaseR
 
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 run(npx, ['-y', 'firebase-tools@latest', 'deploy', '--config', 'firebase.storefront.staging.json', '--project', projectId, '--only', 'functions:storefront', '--non-interactive'], firebaseRoot);
+run(npx, ['-y', 'firebase-tools@latest', 'deploy', '--config', 'firebase.staging.json', '--project', projectId, '--only', 'functions:adminDeploymentSync', '--non-interactive'], firebaseRoot);
 run(npx, ['-y', 'firebase-tools@latest', 'deploy', '--config', 'firebase.staging.json', '--project', projectId, '--only', 'hosting', '--non-interactive'], firebaseRoot);
 
 const remote = await fetch('https://flowvault-staging-2026.web.app/flowvault-release.json', { headers: { 'cache-control': 'no-cache' } });
@@ -36,4 +37,3 @@ if (remoteManifest.releaseId !== manifest.releaseId || remoteManifest.artifactHa
 
 run(process.execPath, [path.join(firebaseRoot, 'scripts', 'registerFrozenRelease.mjs'), `--release-id=${manifest.releaseId}`], workspaceRoot);
 console.log(`Staging Firebase release ${manifest.releaseId} deployed and registered at https://flowvault-staging-2026.web.app`);
-
