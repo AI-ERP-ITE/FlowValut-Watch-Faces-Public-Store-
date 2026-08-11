@@ -9,7 +9,8 @@ const firebaseRoot = path.join(workspaceRoot, 'firebase');
 const projectId = 'flowvault-staging-2026';
 
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
+  const useWindowsCommandShell = process.platform === 'win32' && command.toLowerCase().endsWith('.cmd');
+  const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: useWindowsCommandShell });
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed with exit ${result.status}`);
 }
 
