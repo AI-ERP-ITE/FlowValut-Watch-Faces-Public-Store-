@@ -57,6 +57,15 @@ jobs:
           workload_identity_provider: projects/63546256310/locations/global/workloadIdentityPools/github-flowvault/providers/github
           service_account: flowvault-deploy-runner@zeppfaceloader-b0b106e9.iam.gserviceaccount.com
 
+      - name: Materialize versioned non-secret environment mappings
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp workspace/app/config/promotion/env.staging workspace/app/.env.staging
+          cp workspace/app/config/promotion/env.public workspace/app/.env.public
+          cp workspace/firebase/functions/config/promotion/env.staging workspace/firebase/functions/.env.flowvault-staging-2026
+          cp workspace/firebase/functions/config/promotion/env.production workspace/firebase/functions/.env.zeppfaceloader-b0b106e9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
