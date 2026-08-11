@@ -26,6 +26,14 @@ function listFiles(directory, prefix = '') {
   }).sort();
 }
 
+function isEnvironmentBinding(relativePath) {
+  return relativePath === 'flowvault-runtime-config.js'
+    || relativePath === 'robots.txt'
+    || relativePath === 'sitemap.xml'
+    || relativePath === '404.html'
+    || relativePath.endsWith('.html');
+}
+
 const files = listFiles(distRoot).map((relativePath) => {
   const absolute = path.join(distRoot, ...relativePath.split('/'));
   const bytes = readFileSync(absolute);
@@ -33,21 +41,29 @@ const files = listFiles(distRoot).map((relativePath) => {
     path: relativePath,
     size: statSync(absolute).size,
     sha256: createHash('sha256').update(bytes).digest('hex'),
+    treatment: isEnvironmentBinding(relativePath) ? 'ENVIRONMENT_BINDING' : 'INVARIANT',
   };
 });
 const artifactHash = createHash('sha256').update(JSON.stringify(files)).digest('hex');
+const invariantFiles = files.filter((file) => file.treatment === 'INVARIANT');
+const invariantHash = createHash('sha256').update(JSON.stringify(invariantFiles)).digest('hex');
 const appCommit = gitHead(appRoot);
 const backendCommit = gitHead(workspaceRoot);
-const syncId = `sync-${appCommit.slice(0, 8)}-${backendCommit.slice(0, 8)}-${artifactHash.slice(0, 12)}`;
+const releaseId = `fvrel-${invariantHash.slice(0, 24)}`;
+const syncId = `sync-v151-${invariantHash.slice(0, 24)}`;
 
 writeFileSync(path.join(distRoot, 'flowvault-release.json'), `${JSON.stringify({
-  schemaVersion: 1,
+  schemaVersion: 2,
+  policyVersion: 151,
+  releaseId,
   syncId,
   target,
   appCommit,
   backendCommit,
   artifactHash,
+  invariantHash,
   fileCount: files.length,
+  invariantFileCount: invariantFiles.length,
   files,
 }, null, 2)}\n`, 'utf8');
 

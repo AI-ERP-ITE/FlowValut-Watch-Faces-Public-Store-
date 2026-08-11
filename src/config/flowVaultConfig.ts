@@ -71,5 +71,16 @@ export function assertCheckoutConfigured(config: FlowVaultConfig): void {
 }
 
 export function getFlowVaultConfig(): FlowVaultConfig {
+  const runtime = getPublicRuntimeConfig();
+  if (runtime) {
+    return {
+      environment: runtime.environment,
+      checkoutEnabled: runtime.checkoutEnabled,
+      paddleEnvironment: runtime.paddleEnvironment,
+      purchaseFunctionsBaseUrl: runtime.purchaseFunctionsBaseUrl.replace(/\/$/, ''),
+      ...(runtime.paddleClientToken ? { paddleClientToken: runtime.paddleClientToken } : {}),
+    };
+  }
   return resolveFlowVaultConfig(import.meta.env);
 }
+import { getPublicRuntimeConfig } from './publicRuntimeConfig';

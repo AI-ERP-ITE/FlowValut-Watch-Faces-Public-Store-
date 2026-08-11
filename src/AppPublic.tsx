@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { CatalogProvider } from '@/context/CatalogContext';
 import { StorefrontLayout } from '@/components/storefront/StorefrontLayout';
 import { StoreReadModelProvider } from '@/context/StoreReadModelContext';
-import { storeArchitectureFlags } from '@/lib/storeArchitecture';
+import { publicStoreArchitectureFlags } from '@/lib/publicStoreArchitecture';
 
 const HomePage = lazy(() => import('@/components/storefront/HomePage').then((module) => ({ default: module.HomePage })));
 const ModelPage = lazy(() => import('@/components/storefront/ModelPage').then((module) => ({ default: module.ModelPage })));
@@ -41,15 +41,15 @@ export default function AppPublic() {
           </CatalogProvider>
         }
       >
-        <Route index element={storeArchitectureFlags.storefrontReadModel ? <DesignModelHomePage /> : <HomePage />} />
+        <Route index element={publicStoreArchitectureFlags.storefrontReadModel ? <DesignModelHomePage /> : <HomePage />} />
         <Route path="model/:slug" element={<ModelPage />} />
         <Route path="collection/:slug" element={<CollectionPage />} />
         <Route path="design/:slug" element={<DesignModelPage />} />
         <Route path="device/:slug" element={<DeviceCompatibilityPage />} />
         <Route path="category/:slug" element={<CategoryPage />} />
-        <Route path="face/:id" element={storeArchitectureFlags.storefrontReadModel ? <LegacyFaceResolver /> : <ProductPage />} />
+        <Route path="face/:id" element={publicStoreArchitectureFlags.storefrontReadModel ? <LegacyFaceResolver /> : <ProductPage />} />
         <Route path="legacy-face/:id" element={<ProductPage />} />
-        <Route path="buy/:id" element={storeArchitectureFlags.offerCheckout ? <OfferBuyPage /> : <BuyPage />} />
+        <Route path="buy/:id" element={publicStoreArchitectureFlags.offerCheckout ? <OfferBuyPage /> : <BuyPage />} />
         <Route path="success/:id" element={<SuccessPage />} />
         <Route path="search" element={<SearchPage />} />
 

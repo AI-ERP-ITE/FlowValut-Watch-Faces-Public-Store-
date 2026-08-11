@@ -1,15 +1,8 @@
 import type { CatalogEntry } from '@/context/CatalogContext';
-
-const PUBLIC_BASE_URL =
-  (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-  (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-  (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+import { getPublicFunctionsBaseUrl } from '@/config/publicRuntimeConfig';
 
 function requirePublicBaseUrl(): string {
-  if (!PUBLIC_BASE_URL) {
-    throw new Error('Catalog backend is not configured. Missing VITE_PURCHASE_FUNCTIONS_BASE_URL.');
-  }
-  return PUBLIC_BASE_URL.replace(/\/$/, '');
+  return getPublicFunctionsBaseUrl();
 }
 
 export async function fetchPublicConfig<T>(file: 'models' | 'specGroups'): Promise<T> {

@@ -41,6 +41,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: buildTarget === 'public' ? publicBase : privateBase,
+    // Public Store releases are assembled from an explicit allowlist by
+    // prepareFirebaseHosting.mjs. Never let Vite copy the shared creator
+    // public/ directory into a customer-facing build.
+    publicDir: buildTarget === 'public' ? false : 'public',
     build: {
       sourcemap: false,
       rollupOptions: {

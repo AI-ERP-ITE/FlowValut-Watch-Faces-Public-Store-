@@ -6,6 +6,7 @@ import { SortControls } from './SortControls';
 import { WatchfaceGrid } from './WatchfaceGrid';
 import { EmptyState } from './EmptyState';
 import { fetchStorefrontConfigFromFirebase } from '@/lib/publicStoreApi';
+import { getPublicFunctionsBaseUrl } from '@/config/publicRuntimeConfig';
 
 // ── Category metadata ──────────────────────────────────────────────────────
 
@@ -95,10 +96,8 @@ export function HomePage() {
 
     async function loadStoreConfig() {
       try {
-        const backendBase =
-          (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-          (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-          (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+        let backendBase = '';
+        try { backendBase = getPublicFunctionsBaseUrl(); } catch { backendBase = ''; }
 
         if (backendBase) {
           const cfg = await fetchStorefrontConfigFromFirebase();

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { StoreReadModel } from '@/lib/storeReadModel';
+import { getPublicFunctionsBaseUrl } from '@/config/publicRuntimeConfig';
 
 const Context = createContext<{ data: StoreReadModel | null; loading: boolean; error: string | null; globalDeviceId: string; setGlobalDeviceId: (id: string) => void }>({ data: null, loading: true, error: null, globalDeviceId: '', setGlobalDeviceId: () => {} });
 
@@ -13,8 +14,9 @@ export function StoreReadModelProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const base = ((import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined) || (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined) || '').replace(/\/$/, '');
-    if (!base) { setError('Store hierarchy service is unavailable.'); setLoading(false); return; }
+    let base: string;
+    try { base = getPublicFunctionsBaseUrl(); }
+    catch { setError('Store hierarchy service is unavailable.'); setLoading(false); return; }
     
     Promise.all([
       fetch(`${base}/publicStoreHierarchy`).then(res => { if (!res.ok) throw new Error(`Store hierarchy request failed (${res.status})`); return res.json(); }),

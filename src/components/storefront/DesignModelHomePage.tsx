@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
+import { getPublicFunctionsBaseUrl } from '@/config/publicRuntimeConfig';
 import { DesignModelCard } from './DesignModelCard';
 import {
   compatibleModelIds,
@@ -29,10 +30,8 @@ export function DesignModelHomePage() {
     let cancelled = false;
     async function loadStoreConfig() {
       try {
-        const backendBase =
-          (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-          (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-          (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+        let backendBase = '';
+        try { backendBase = getPublicFunctionsBaseUrl(); } catch { backendBase = ''; }
 
         if (backendBase) {
           const { fetchStorefrontConfigFromFirebase } = await import('@/lib/publicStoreApi');

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react';
 import { fetchCatalogFromFirebase, fetchPublicConfig } from '@/lib/publicStoreApi';
+import { getPublicFunctionsBaseUrl } from '@/config/publicRuntimeConfig';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -186,10 +187,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     async function fetchAll() {
       try {
         let backendCatalogEntries: CatalogEntry[] = [];
-        const backendBase =
-          (import.meta.env.VITE_FIREBASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-          (import.meta.env.VITE_PURCHASE_FUNCTIONS_BASE_URL as string | undefined)?.trim() ||
-          (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
+        let backendBase = '';
+        try { backendBase = getPublicFunctionsBaseUrl(); } catch { backendBase = ''; }
 
         if (backendBase) {
           try {
