@@ -1,11 +1,12 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   GoogleAuthProvider,
-  browserLocalPersistence,
+  browserSessionPersistence,
   getAuth,
   onAuthStateChanged,
   setPersistence,
   signInWithPopup,
+  reauthenticateWithPopup,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -36,8 +37,17 @@ export function subscribeStagingCommerceAuth(listener: (user: User | null) => vo
 
 export async function connectStagingCommerceAdmin(): Promise<void> {
   const auth = stagingAuth();
-  await setPersistence(auth, browserLocalPersistence);
+  await setPersistence(auth, browserSessionPersistence);
   await signInWithPopup(auth, new GoogleAuthProvider());
+}
+
+export async function confirmStagingLaunchController(): Promise<void> {
+  const auth = stagingAuth();
+  const user = auth.currentUser;
+  if (!user) throw new Error('Connect the Staging Commerce account first.');
+  await setPersistence(auth, browserSessionPersistence);
+  await reauthenticateWithPopup(user, new GoogleAuthProvider());
+  await user.getIdToken(true);
 }
 
 export async function disconnectStagingCommerceAdmin(): Promise<void> {
@@ -56,7 +66,7 @@ export async function stagingAdminEndpointFetch<T>(endpoint: 'adminVipPromoCodes
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${await user.getIdToken()}`,
+      Authorization: `Bearer ${await user.getIdToken(true)}`,
       ...(init.headers || {}),
     },
   });

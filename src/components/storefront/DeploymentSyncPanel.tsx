@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   connectStagingCommerceAdmin,
+  confirmStagingLaunchController,
   stagingAdminEndpointFetch,
   subscribeStagingCommerceAuth,
 } from '@/lib/stagingCommerceAdminClient';
@@ -44,6 +45,8 @@ interface SyncResponse {
   protectedConfig: Record<string, unknown>;
   syncs: SyncRow[];
   discoveryError: string | null;
+  promotionRunnerEnabled: boolean;
+  promotionPaused: boolean;
 }
 
 const stepDefinitions: Array<{ action: PromotionAction; label: string; allowed: PromotionState[] }> = [
@@ -98,6 +101,7 @@ export function DeploymentSyncPanel() {
     if (action === 'SYNC_TO_LIVE' && !window.confirm(`Sync ${selected.syncId} to production Hosting? This does not change DNS and does not run a real Paddle payment.`)) return;
     setBusyAction(action);
     try {
+      if (action === 'PREVIEW_ACCEPTED' || action === 'SYNC_TO_LIVE') await confirmStagingLaunchController();
       await stagingAdminEndpointFetch('adminDeploymentSync', { method: 'POST', body: JSON.stringify({ action, syncId: selected.syncId }) });
       toast.success(`${action.replaceAll('_', ' ')} recorded for ${selected.syncId}.`);
       await load();
@@ -128,6 +132,7 @@ export function DeploymentSyncPanel() {
     }
     setSavingConfig(true);
     try {
+      await confirmStagingLaunchController();
       await stagingAdminEndpointFetch('adminDeploymentSync', {
         method: 'POST',
         body: JSON.stringify({ action: 'UPDATE_PROTECTED_CONFIG', values }),
@@ -138,6 +143,22 @@ export function DeploymentSyncPanel() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not save protected production configuration.');
     } finally { setSavingConfig(false); }
+  }
+
+  async function setPromotionPaused(paused: boolean) {
+    if (!paused && !window.confirm('Resume production promotion actions?')) return;
+    setLoading(true);
+    try {
+      if (!paused) await confirmStagingLaunchController();
+      await stagingAdminEndpointFetch('adminDeploymentSync', {
+        method: 'POST',
+        body: JSON.stringify({ action: paused ? 'EMERGENCY_STOP_PROMOTION' : 'RESUME_PROMOTION' }),
+      });
+      toast.success(paused ? 'Production promotion stopped.' : 'Production promotion resumed.');
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not change promotion availability.');
+    } finally { setLoading(false); }
   }
 
   async function syncLiveCatalog() {
@@ -194,6 +215,11 @@ export function DeploymentSyncPanel() {
         <div className="rounded-lg border border-[#303846] p-3"><span className="text-[#7f8a9c]">Staging project</span><p className="mt-1 font-mono text-[#dce4ef]">{data.environmentMap.stagingProjectId}</p></div>
         <div className="rounded-lg border border-[#303846] p-3"><span className="text-[#7f8a9c]">Production project</span><p className="mt-1 font-mono text-[#dce4ef]">{data.environmentMap.productionProjectId}</p></div>
         <div className="rounded-lg border border-[#303846] p-3"><span className="text-[#7f8a9c]">Policy</span><p className="mt-1 font-mono text-[#dce4ef]">v{data.policyVersion} · {data.policyHash.slice(0, 12)}</p></div>
+      </div>}
+
+      {data && <div className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-xs ${data.promotionRunnerEnabled && !data.promotionPaused ? 'border-emerald-900 bg-emerald-950/20 text-emerald-200' : 'border-red-900 bg-red-950/20 text-red-200'}`}>
+        <span>{!data.promotionRunnerEnabled ? 'Production runner is disabled at the server.' : data.promotionPaused ? 'Emergency stop is active.' : 'Launch Controller is enabled. Sensitive actions require fresh Google confirmation.'}</span>
+        {data.promotionRunnerEnabled && <Button onClick={() => void setPromotionPaused(!data.promotionPaused)} disabled={loading || busyAction !== null} variant="outline">{data.promotionPaused ? 'Resume promotion' : 'Emergency stop'}</Button>}
       </div>}
 
       {data?.syncs.length ? <>
