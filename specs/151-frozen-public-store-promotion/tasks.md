@@ -62,6 +62,12 @@
   Workshop, user-library, or ZPK-builder markers in the package.
 - Firebase parsed the corrected staging package successfully in a dry run and
   discovered only the 22 expected Sandbox storefront endpoints.
+- The corrected backend and Admin controller were deployed to staging. The
+  registered private archive SHA-256 is
+  `ac95755cd46f8369a853f381a57dc9c1d9f8f0ace5e47a53e45d097a356bdfe0`.
+- Post-deploy checks again returned HTTP 200 for catalog, hierarchy, and
+  storefront configuration; Firebase reported 22 `storefront` Functions and
+  the unauthenticated Admin controller check returned HTTP 401.
 - Admin transitions now claim an atomic Firestore operation lock. A repeated
   action in its active or completed state returns an idempotent result instead
   of dispatching a duplicate operation; 75 backend tests passed.
