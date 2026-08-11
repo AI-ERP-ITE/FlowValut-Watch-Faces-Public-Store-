@@ -1,7 +1,7 @@
 export const REFUNDS_CONTENT = `
 # Refund Policy
 
-**Version:** 1.0 · **Effective Date:** June 18, 2026 · **Last Updated:** June 18, 2026
+**Version:** 1.1 · **Effective Date:** June 18, 2026 · **Last Updated:** August 9, 2026
 
 ## 1. Merchant of Record
 
@@ -10,6 +10,8 @@ All financial transactions, payment processing, and taxation obligations for pre
 ## 2. Digital Product Refund Policy
 
 Due to the immediately downloadable, non-returnable, and replicable nature of our digital software, digital watchfaces, and future digital assets, Flow Vault enforces a strict default policy: **no refunds are provided after a product has been downloaded or activated**. All completed sales are considered final once the digital fulfillment process has commenced.
+
+Temporary connectivity, electricity, browser, phone, or smartwatch interruptions should first be handled through the automated delivery allowance: two initial successful transfers and one final regenerated transfer within seven (7) days, up to three successful transfers per purchased ZPK package. A page refresh or displayed link does not itself begin fulfillment.
 
 ## 3. Consumer Law Exceptions
 

@@ -2,11 +2,14 @@ import { useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCatalog } from '@/context/CatalogContext';
 import { getStorePreviewPaths } from '@/lib/storePreview';
+import { getFlowVaultConfig } from '@/config/flowVaultConfig';
+import { storefrontCategorySlug } from '@/lib/storefrontCategoryPresentation';
 
 export function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getById, models, specGroups, baseUrl, loading, error } = useCatalog();
+  const checkoutEnabled = getFlowVaultConfig().checkoutEnabled;
 
   const entry = id ? getById(id) : null;
   const [previewMode, setPreviewMode] = useState<'MAIN' | 'AOD'>('MAIN');
@@ -56,6 +59,7 @@ export function ProductPage() {
   }
 
   function handleAction() {
+    if (!checkoutEnabled) return;
     // Unified backend-authoritative flow starts in buy page for free and paid.
     navigate(`/buy/${entry!.id}`);
   }
@@ -77,7 +81,7 @@ export function ProductPage() {
           {entry.categories[0] && (
             <>
               <Link
-                to={`/category/${entry.categories[0]}`}
+                to={`/category/${storefrontCategorySlug(entry.categories[0])}`}
                 className="hover:text-[#E1E4EA] transition-colors capitalize"
               >
                 {entry.categories[0]}
@@ -165,16 +169,24 @@ export function ProductPage() {
             {/* CTA button */}
             <button
               onClick={handleAction}
+              disabled={!checkoutEnabled}
               className={`
                 w-full py-3 rounded-xl font-semibold text-sm transition-all
-                ${isFree
+                ${!checkoutEnabled
+                  ? 'cursor-not-allowed border border-[#66583f] bg-[#242017] text-[#b9a57f] opacity-80'
+                  : isFree
                   ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20'
                   : 'bg-[#bc9456] hover:bg-[#d2af78] text-[#17120a] shadow-lg shadow-[#c7a86f]/30'
                 }
               `}
             >
-              {isFree ? 'Get for Free' : `Buy for $${entry.price.toFixed(2)}`}
+              {!checkoutEnabled ? 'Coming Soon' : isFree ? 'Get for Free' : `Buy for $${entry.price.toFixed(2)}`}
             </button>
+            {!checkoutEnabled && (
+              <p className="text-center text-xs text-[#8E9196]">
+                Purchasing is temporarily unavailable while FlowVault prepares for launch.
+              </p>
+            )}
 
             {/* Compatible models */}
             <div>
@@ -240,7 +252,7 @@ export function ProductPage() {
                   {entry.categories.map((cat) => (
                     <Link
                       key={cat}
-                      to={`/category/${cat}`}
+                      to={`/category/${storefrontCategorySlug(cat)}`}
                       className="px-2.5 py-1 rounded-full text-xs bg-[#121418] border border-[#2f3743] text-[#8E9196] hover:text-[#E8D2A8] hover:border-[#C7A86F]/45 transition-colors capitalize"
                     >
                       {cat}

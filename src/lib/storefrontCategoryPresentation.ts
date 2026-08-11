@@ -29,12 +29,16 @@ const CATEGORY_GROUPS = [
   },
 ] as const;
 
+export function storefrontCategorySlug(value: string): string {
+  return value.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
+}
+
 export function buildStorefrontCategoryGroups(models: PublicDesignModel[]): StorefrontCategoryGroup[] {
   const active = new Map<string, string>();
   models.forEach((model) => {
     model.categories.forEach((category) => {
       const label = category.trim();
-      if (label) active.set(label.toLowerCase(), label);
+      if (label) active.set(storefrontCategorySlug(label), label);
     });
   });
 

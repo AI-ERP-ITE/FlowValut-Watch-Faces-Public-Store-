@@ -7,6 +7,8 @@ export function SupportPage() {
     <LegalLayout
       title="Support Policy"
       description="How to get help, our response commitments, and what we support."
+      version="1.1"
+      lastUpdated="August 9, 2026"
       content={SUPPORT_CONTENT}
     >
       <LegalMarkdown content={SUPPORT_CONTENT} />

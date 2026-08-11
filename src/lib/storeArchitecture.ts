@@ -160,6 +160,26 @@ export const technicalPackageSchema = z.object({
   createdAt: isoDateSchema,
 });
 
+export const paddleCatalogSyncStatusSchema = z.enum(['NOT_SYNCED', 'SYNCING', 'SYNCED', 'OUT_OF_SYNC', 'ERROR', 'ARCHIVED']);
+
+const paddleCatalogMappingSchema = (environment: 'sandbox' | 'production') => z.object({
+  environment: z.literal(environment).optional(),
+  productId: z.string().trim().min(1).optional(),
+  priceId: z.string().trim().min(1).optional(),
+  standardPriceId: z.string().trim().min(1).optional(),
+  promotionalPriceId: z.string().trim().min(1).optional(),
+  activePriceId: z.string().trim().min(1).optional(),
+  syncStatus: paddleCatalogSyncStatusSchema.optional(),
+  syncError: z.object({ code: z.string().trim().min(1), message: z.string().trim().min(1), retryable: z.boolean() }).nullable().optional(),
+  lastSyncHash: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  lastSyncedAt: z.unknown().optional(),
+  lastReconciledAt: z.unknown().optional(),
+}).superRefine((mapping, context) => {
+  if (!mapping.productId && !mapping.syncStatus) {
+    context.addIssue({ code: 'custom', path: ['syncStatus'], message: 'An incomplete Paddle mapping requires synchronization status' });
+  }
+});
+
 export const offerSchema = z.object({
   id: idSchema,
   type: z.enum(['SKU', 'BUNDLE']),
@@ -168,6 +188,10 @@ export const offerSchema = z.object({
   regularPrice: z.number().nonnegative(),
   campaignPrice: z.number().nonnegative().optional(),
   currency: z.literal('USD'),
+  paddle: z.object({
+    sandbox: paddleCatalogMappingSchema('sandbox').optional(),
+    production: paddleCatalogMappingSchema('production').optional(),
+  }).optional(),
   state: z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'ARCHIVED']),
 }).superRefine((offer, context) => {
   if (offer.type === 'SKU' && offer.includedSkuIds.length !== 1) {

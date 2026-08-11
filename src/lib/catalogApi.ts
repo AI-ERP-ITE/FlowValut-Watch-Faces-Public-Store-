@@ -1,5 +1,5 @@
 import { uploadToGitHub, type GitHubConfig } from './githubApi';
-import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
+import { fetchPublicConfig } from '@/lib/publicStoreApi';
 import type { CatalogEntry, ModelEntry, SpecGroup } from '@/context/CatalogContext';
 import {
   bridgeReadContent,

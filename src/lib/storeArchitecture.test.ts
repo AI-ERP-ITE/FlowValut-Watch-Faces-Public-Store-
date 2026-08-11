@@ -70,6 +70,13 @@ describe('store architecture validation', () => {
       state: 'ACTIVE',
     }).success).toBe(false);
   });
+
+  it('accepts legacy and explicit environment-separated Paddle catalog mappings', () => {
+    const base = { id: 'offer-1', type: 'SKU', name: 'Offer', includedSkuIds: ['sku-1'], regularPrice: 8, campaignPrice: 4, currency: 'USD', state: 'ACTIVE' } as const;
+    expect(offerSchema.safeParse({ ...base, paddle: { sandbox: { productId: 'pro_old', priceId: 'pri_old' } } }).success).toBe(true);
+    expect(offerSchema.safeParse({ ...base, paddle: { sandbox: { environment: 'sandbox', productId: 'pro_new', standardPriceId: 'pri_standard', promotionalPriceId: 'pri_promo', activePriceId: 'pri_promo', syncStatus: 'SYNCED', lastSyncHash: 'a'.repeat(64) } } }).success).toBe(true);
+    expect(offerSchema.safeParse({ ...base, paddle: { sandbox: { environment: 'production', productId: 'pro_bad', activePriceId: 'pri_bad' } } }).success).toBe(false);
+  });
 });
 
 describe('store architecture paths and flags', () => {

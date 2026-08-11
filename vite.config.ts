@@ -24,7 +24,11 @@ export default defineConfig(({ mode }) => {
     }
   };
 
-  const buildTargetFromMode = mode === 'public' || mode === 'private' ? mode : undefined;
+  const buildTargetFromMode = mode === 'public' || mode === 'staging'
+    ? 'public'
+    : mode === 'private'
+      ? 'private'
+      : undefined;
   const buildTarget = (buildTargetFromMode || process.env.VITE_BUILD_TARGET || 'private').toLowerCase();
   const buildVersion = resolveBuildVersion();
   const routeModule = buildTarget === 'public' ? './src/AppPublic.tsx' : './src/AppPrivate.tsx';
@@ -39,6 +43,13 @@ export default defineConfig(({ mode }) => {
     base: buildTarget === 'public' ? publicBase : privateBase,
     build: {
       sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            paddle: ['@paddle/paddle-js'],
+          },
+        },
+      },
     },
     define: {
       'import.meta.env.VITE_BUILD_TARGET': JSON.stringify(buildTarget),

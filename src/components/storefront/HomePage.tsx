@@ -5,7 +5,7 @@ import { FilterSidebar } from './FilterSidebar';
 import { SortControls } from './SortControls';
 import { WatchfaceGrid } from './WatchfaceGrid';
 import { EmptyState } from './EmptyState';
-import { fetchStorefrontConfigFromFirebase } from '@/lib/studioFirebasePublishApi';
+import { fetchStorefrontConfigFromFirebase } from '@/lib/publicStoreApi';
 
 // ── Category metadata ──────────────────────────────────────────────────────
 
@@ -209,7 +209,7 @@ export function HomePage() {
                     {featuredFace?.name ?? 'No watchface for current selection'}
                   </p>
                   <p className="text-[10px] text-[#9ca3af] mt-1">
-                    Manage from /admin
+                    Catalog updates are managed privately
                   </p>
                 </div>
                 <div className="absolute top-8 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E8D2A8]" />

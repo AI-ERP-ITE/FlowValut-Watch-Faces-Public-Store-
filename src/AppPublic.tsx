@@ -1,32 +1,36 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { CatalogProvider } from '@/context/CatalogContext';
 import { StorefrontLayout } from '@/components/storefront/StorefrontLayout';
-import { HomePage } from '@/components/storefront/HomePage';
-import { ModelPage } from '@/components/storefront/ModelPage';
-import { CategoryPage } from '@/components/storefront/CategoryPage';
-import { ProductPage } from '@/components/storefront/ProductPage';
-import { SearchPage } from '@/components/storefront/SearchPage';
-import { BuyPage } from '@/components/storefront/BuyPage';
-import { OfferBuyPage } from '@/components/storefront/OfferBuyPage';
-import { SuccessPage } from '@/components/storefront/SuccessPage';
-import { TermsPage } from '@/components/storefront/legal/TermsPage';
-import { PrivacyPage } from '@/components/storefront/legal/PrivacyPage';
-import { EulaPage } from '@/components/storefront/legal/EulaPage';
-import { RefundsPage } from '@/components/storefront/legal/RefundsPage';
-import { AcceptableUsePage } from '@/components/storefront/legal/AcceptableUsePage';
-import { CopyrightPage } from '@/components/storefront/legal/CopyrightPage';
-import { SupportPage } from '@/components/storefront/legal/SupportPage';
-import { CookiesPage } from '@/components/storefront/legal/CookiesPage';
-import { LegalIndexPage } from '@/components/storefront/legal/LegalIndexPage';
 import { StoreReadModelProvider } from '@/context/StoreReadModelContext';
 import { storeArchitectureFlags } from '@/lib/storeArchitecture';
-import { DesignModelHomePage } from '@/components/storefront/DesignModelHomePage';
-import { CollectionPage } from '@/components/storefront/CollectionPage';
-import { DesignModelPage, LegacyFaceResolver } from '@/components/storefront/DesignModelPage';
-import { DeviceCompatibilityPage } from '@/components/storefront/DeviceCompatibilityPage';
+
+const HomePage = lazy(() => import('@/components/storefront/HomePage').then((module) => ({ default: module.HomePage })));
+const ModelPage = lazy(() => import('@/components/storefront/ModelPage').then((module) => ({ default: module.ModelPage })));
+const CategoryPage = lazy(() => import('@/components/storefront/CategoryPage').then((module) => ({ default: module.CategoryPage })));
+const ProductPage = lazy(() => import('@/components/storefront/ProductPage').then((module) => ({ default: module.ProductPage })));
+const SearchPage = lazy(() => import('@/components/storefront/SearchPage').then((module) => ({ default: module.SearchPage })));
+const BuyPage = lazy(() => import('@/components/storefront/BuyPage').then((module) => ({ default: module.BuyPage })));
+const OfferBuyPage = lazy(() => import('@/components/storefront/OfferBuyPage').then((module) => ({ default: module.OfferBuyPage })));
+const SuccessPage = lazy(() => import('@/components/storefront/SuccessPage').then((module) => ({ default: module.SuccessPage })));
+const DesignModelHomePage = lazy(() => import('@/components/storefront/DesignModelHomePage').then((module) => ({ default: module.DesignModelHomePage })));
+const CollectionPage = lazy(() => import('@/components/storefront/CollectionPage').then((module) => ({ default: module.CollectionPage })));
+const DesignModelPage = lazy(() => import('@/components/storefront/DesignModelPage').then((module) => ({ default: module.DesignModelPage })));
+const LegacyFaceResolver = lazy(() => import('@/components/storefront/DesignModelPage').then((module) => ({ default: module.LegacyFaceResolver })));
+const DeviceCompatibilityPage = lazy(() => import('@/components/storefront/DeviceCompatibilityPage').then((module) => ({ default: module.DeviceCompatibilityPage })));
+const TermsPage = lazy(() => import('@/components/storefront/legal/TermsPage').then((module) => ({ default: module.TermsPage })));
+const PrivacyPage = lazy(() => import('@/components/storefront/legal/PrivacyPage').then((module) => ({ default: module.PrivacyPage })));
+const EulaPage = lazy(() => import('@/components/storefront/legal/EulaPage').then((module) => ({ default: module.EulaPage })));
+const RefundsPage = lazy(() => import('@/components/storefront/legal/RefundsPage').then((module) => ({ default: module.RefundsPage })));
+const AcceptableUsePage = lazy(() => import('@/components/storefront/legal/AcceptableUsePage').then((module) => ({ default: module.AcceptableUsePage })));
+const CopyrightPage = lazy(() => import('@/components/storefront/legal/CopyrightPage').then((module) => ({ default: module.CopyrightPage })));
+const SupportPage = lazy(() => import('@/components/storefront/legal/SupportPage').then((module) => ({ default: module.SupportPage })));
+const CookiesPage = lazy(() => import('@/components/storefront/legal/CookiesPage').then((module) => ({ default: module.CookiesPage })));
+const LegalIndexPage = lazy(() => import('@/components/storefront/legal/LegalIndexPage').then((module) => ({ default: module.LegalIndexPage })));
 
 export default function AppPublic() {
   return (
+    <Suspense fallback={<div className="min-h-screen bg-[#090b0f] text-[#e8d2a8] grid place-items-center">Preparing FlowVault…</div>}>
     <Routes>
       <Route path="/store" element={<Navigate to="/" replace />} />
 
@@ -63,6 +67,7 @@ export default function AppPublic() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }
 

@@ -4,9 +4,17 @@ import { Search } from 'lucide-react';
 import { SearchBar } from './SearchBar';
 import { CookieConsentBanner } from './legal/CookieConsentBanner';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
+import { getFlowVaultConfig } from '@/config/flowVaultConfig';
 
 function DeviceFilter() {
   const { data, globalDeviceId, setGlobalDeviceId } = useStoreReadModel();
+
+  useEffect(() => {
+    const clear = () => setGlobalDeviceId('');
+    window.addEventListener('flowvault:clear-device', clear);
+    return () => window.removeEventListener('flowvault:clear-device', clear);
+  }, [setGlobalDeviceId]);
+
   if (!data || data.devices.length === 0) return null;
 
   return (
@@ -38,6 +46,8 @@ const primaryNavigation = [
 export function StorefrontLayout() {
   const location = useLocation();
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
+  const config = getFlowVaultConfig();
+  const isStaging = config.environment === 'staging';
 
   useEffect(() => {
     if (!location.pathname.startsWith('/search')) {
@@ -45,8 +55,28 @@ export function StorefrontLayout() {
     }
   }, [location.pathname]);
 
+  useEffect(() => {
+    const selector = 'meta[name="robots"][data-flowvault-environment]';
+    const existing = document.head.querySelector<HTMLMetaElement>(selector);
+    if (!isStaging) {
+      existing?.remove();
+      return;
+    }
+    const meta = existing ?? document.createElement('meta');
+    meta.name = 'robots';
+    meta.content = 'noindex, nofollow, noarchive';
+    meta.dataset.flowvaultEnvironment = 'staging';
+    if (!existing) document.head.appendChild(meta);
+    return () => meta.remove();
+  }, [isStaging]);
+
   return (
     <div className="storefront-maison min-h-screen flex flex-col">
+      {isStaging && (
+        <div className="border-b border-amber-400/40 bg-amber-300 px-3 py-1.5 text-center text-[11px] font-bold uppercase tracking-[0.22em] text-black">
+          Sandbox / Test Mode — No real payments
+        </div>
+      )}
       <header className="maison-header">
         <div className="maison-header-main">
           <Link to="/" className="maison-brand" aria-label="FlowVault home">

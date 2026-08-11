@@ -35,6 +35,7 @@ import { execSync, spawnSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync, cpSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { scanDirectoryForSecrets } from './scanPublicBuildForSecrets.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
@@ -131,6 +132,8 @@ function ensurePublicCNAME() {
 async function main() {
   // ── Step 1: Build public ─────────────────────────────────────────────────
   run('npm run build:public', 'Building public bundle…');
+  scanDirectoryForSecrets(path.join(appRoot, 'dist'));
+  console.log('Public build credential scan passed.');
 
   // ── Step 2: Write public bundle to docs/ + assets at root ───────────────
   run(

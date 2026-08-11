@@ -1,11 +1,30 @@
 export interface PublicCollection { id: string; name: string; slug: string; description?: string }
-export interface PublicDesignModel { id: string; collectionId: string; name: string; slug: string; description?: string; designStory?: string; categories: string[]; tags: string[] }
+export interface PublicDesignModel { id: string; collectionId: string; name: string; slug: string; description?: string; designStory?: string; categories: string[]; tags: string[]; downloads?: number; releasedAt?: string }
 export interface PublicSku { id: string; productModelId: string; canonicalName: string; variant: { id: string; name: string; code: string; swatch?: string; material?: string }; edition?: { id: string; name: string; code: string } | null }
 export interface PublicTechnicalPackage { id: string; skuId: string; technicalTargetId: string; revision: string; releasedZpkPath?: string; canonicalName: string; mainPreviewPath?: string | null; aodPreviewPath?: string | null }
-export interface PublicOffer { id: string; type: 'SKU' | 'BUNDLE'; name: string; includedSkuIds: string[]; regularPrice: number; campaignPrice?: number | null; currency: 'USD' }
+export interface PublicPaddleCatalogMapping { environment?: 'sandbox' | 'production'; productId?: string; priceId?: string; standardPriceId?: string; promotionalPriceId?: string; activePriceId?: string; syncStatus?: 'NOT_SYNCED' | 'SYNCING' | 'SYNCED' | 'OUT_OF_SYNC' | 'ERROR' | 'ARCHIVED'; lastSyncHash?: string }
+export interface PublicOffer { id: string; type: 'SKU' | 'BUNDLE'; name: string; includedSkuIds: string[]; regularPrice: number; campaignPrice?: number | null; currency: 'USD'; paddle?: { sandbox?: PublicPaddleCatalogMapping; production?: PublicPaddleCatalogMapping } }
 export interface PublicTechnicalTarget { id: string; name?: string; specGroup?: string; resolution?: string; shape?: string }
 export interface PublicDevice { id: string; name: string; brand: string; technicalTargetId: string }
 export interface StoreReadModel { collections: PublicCollection[]; designModels: PublicDesignModel[]; skus: PublicSku[]; technicalPackages: PublicTechnicalPackage[]; offers: PublicOffer[]; technicalTargets: PublicTechnicalTarget[]; devices: PublicDevice[]; legacyMappings: Array<{ legacyWatchfaceId: string; productModelId: string; skuId: string }>; metrics: { uniqueDesignModels: number; sellableSkus: number } }
+
+export function compatibleModelIds(model: StoreReadModel, deviceId: string): Set<string> {
+  if (!deviceId) return new Set(model.designModels.map((item) => item.id));
+  const device = model.devices.find((item) => item.id === deviceId);
+  if (!device) return new Set();
+  const compatibleSkuIds = new Set(model.technicalPackages
+    .filter((item) => item.technicalTargetId === device.technicalTargetId)
+    .map((item) => item.skuId));
+  return new Set(model.skus.filter((item) => compatibleSkuIds.has(item.id)).map((item) => item.productModelId));
+}
+
+export function modelPrice(model: StoreReadModel, productModelId: string): number | null {
+  const prices = model.skus
+    .filter((sku) => sku.productModelId === productModelId)
+    .flatMap((sku) => skuOffers(model, sku.id))
+    .map((offer) => offer.campaignPrice ?? offer.regularPrice);
+  return prices.length ? Math.min(...prices) : null;
+}
 
 export function modelSkus(model: StoreReadModel, productModelId: string) { return model.skus.filter((sku) => sku.productModelId === productModelId); }
 export function skuOffers(model: StoreReadModel, skuId: string) { return model.offers.filter((offer) => offer.includedSkuIds.includes(skuId)); }

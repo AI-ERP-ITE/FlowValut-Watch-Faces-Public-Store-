@@ -45,10 +45,14 @@ export async function disconnectStagingCommerceAdmin(): Promise<void> {
 }
 
 export async function stagingCommerceAdminFetch<T>(init: RequestInit): Promise<T> {
+  return stagingAdminEndpointFetch<T>('adminVipPromoCodes', init);
+}
+
+export async function stagingAdminEndpointFetch<T>(endpoint: 'adminVipPromoCodes' | 'adminDeploymentSync', init: RequestInit): Promise<T> {
   const user = stagingAuth().currentUser;
   if (!user) throw new Error('Connect the Staging Commerce account first.');
 
-  const response = await fetch(`${STAGING_FUNCTIONS_BASE_URL}/adminVipPromoCodes`, {
+  const response = await fetch(`${STAGING_FUNCTIONS_BASE_URL}/${endpoint}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { modelSkus, skuOffer, skuPackages, type PublicDesignModel, type StoreReadModel } from '@/lib/storeReadModel';
 
@@ -47,6 +47,7 @@ export function DesignModelCard({ model, store }: { model: PublicDesignModel; st
         )}
         <div className="maison-model-meta">
           <span>{offer ? `From $${(offer.campaignPrice ?? offer.regularPrice).toFixed(2)}` : 'Discover'}</span>
+          <span><Download size={12} /> {(model.downloads ?? 0).toLocaleString()} downloads</span>
           <span>Discover <ArrowRight size={14} /></span>
         </div>
       </div>

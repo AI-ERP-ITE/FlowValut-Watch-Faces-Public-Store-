@@ -7,10 +7,13 @@ import {
   regenerateDownload,
   requestDownload,
 } from '@/lib/purchaseApi';
+import { getFlowVaultConfig } from '@/config/flowVaultConfig';
+import { openPaddleTransaction } from '@/lib/paddleCheckout';
 
 export function BuyPage() {
   const { id } = useParams<{ id: string }>();
   const { getById, baseUrl, loading, error } = useCatalog();
+  const checkoutEnabled = getFlowVaultConfig().checkoutEnabled;
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const [startingCheckout, setStartingCheckout] = useState(false);
   const [pollingStatus, setPollingStatus] = useState(false);
@@ -131,6 +134,10 @@ export function BuyPage() {
 
   async function handleContinue() {
     if (!entry) return;
+    if (!checkoutEnabled) {
+      setActionError('Purchasing is coming soon. Checkout is currently unavailable.');
+      return;
+    }
 
     try {
       setStartingCheckout(true);
@@ -157,8 +164,8 @@ export function BuyPage() {
 
       if (result.checkoutUrl) {
         setCheckoutUrl(result.checkoutUrl);
-        window.open(result.checkoutUrl, '_blank', 'noopener,noreferrer');
       }
+      await openPaddleTransaction(result.paddleTransactionId);
       setPollingStatus(true);
       setStartingCheckout(false);
     } catch (err) {
@@ -268,16 +275,24 @@ export function BuyPage() {
           <button
             type="button"
             onClick={handleContinue}
-            disabled={startingCheckout || !allAgreed}
+            disabled={!checkoutEnabled || startingCheckout || !allAgreed}
             className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#bc9456] text-[#17120a] font-semibold text-sm hover:bg-[#d2af78] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {startingCheckout
+            {!checkoutEnabled
+              ? 'Coming Soon'
+              : startingCheckout
               ? 'Starting...'
               : isFree
                 ? 'Download Now'
                 : 'Continue to Paddle'}
             <ExternalLink className="h-4 w-4" />
           </button>
+        )}
+
+        {!checkoutEnabled && !orderId && (
+          <p className="text-center text-xs text-[#8E9196]">
+            Purchasing is temporarily unavailable while FlowVault prepares for launch.
+          </p>
         )}
 
         {orderId && !token && (

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
 import { DesignModelCard } from './DesignModelCard';
 import {
+  compatibleModelIds,
   modelSkus,
   resolveFeaturedSelection,
   skuPackages,
@@ -34,7 +35,7 @@ export function DesignModelHomePage() {
           (import.meta.env.VITE_GITHUB_FUNCTIONS_BASE_URL as string | undefined)?.trim();
 
         if (backendBase) {
-          const { fetchStorefrontConfigFromFirebase } = await import('@/lib/studioFirebasePublishApi');
+          const { fetchStorefrontConfigFromFirebase } = await import('@/lib/publicStoreApi');
           const config = await fetchStorefrontConfigFromFirebase();
           if (!cancelled) setFeaturedFaceId(config.featuredFaceId ?? null);
           return;
@@ -54,26 +55,16 @@ export function DesignModelHomePage() {
 
   const filteredModels = useMemo(() => {
     if (!data || !globalDeviceId) return data?.designModels ?? [];
-    const device = data.devices.find((item) => item.id === globalDeviceId);
-    if (!device) return data.designModels;
-    const compatibleSkuIds = new Set(
-      data.technicalPackages
-        .filter((item) => item.technicalTargetId === device.technicalTargetId)
-        .map((item) => item.skuId),
-    );
-    const compatibleModelIds = new Set(
-      data.skus
-        .filter((item) => compatibleSkuIds.has(item.id))
-        .map((item) => item.productModelId),
-    );
-    return data.designModels.filter((item) => compatibleModelIds.has(item.id));
+    const ids = compatibleModelIds(data, globalDeviceId);
+    return data.designModels.filter((item) => ids.has(item.id));
   }, [data, globalDeviceId]);
 
   const featuredData = useMemo(() => {
     if (!data) return null;
-    const configured = featuredFaceId ? resolveFeaturedSelection(data, featuredFaceId) : null;
+    const configuredCandidate = featuredFaceId ? resolveFeaturedSelection(data, featuredFaceId) : null;
+    const configured = configuredCandidate && filteredModels.some((model) => model.id === configuredCandidate.model.id) ? configuredCandidate : null;
     if (configured) return configured;
-    const firstModel = filteredModels[0] ?? data.designModels[0];
+    const firstModel = filteredModels[0] ?? (!globalDeviceId ? data.designModels[0] : undefined);
     if (!firstModel) return null;
     const firstSku = modelSkus(data, firstModel.id)[0];
     if (!firstSku) return null;
@@ -82,15 +73,27 @@ export function DesignModelHomePage() {
       sku: firstSku,
       pkg: skuPackages(data, firstSku.id).find((item) => item.mainPreviewPath) ?? skuPackages(data, firstSku.id)[0],
     };
-  }, [data, featuredFaceId, filteredModels]);
+  }, [data, featuredFaceId, filteredModels, globalDeviceId]);
 
   const categoryGroups = useMemo(
-    () => buildStorefrontCategoryGroups(data?.designModels ?? []),
-    [data],
+    () => buildStorefrontCategoryGroups(filteredModels),
+    [filteredModels],
   );
 
   if (loading) return <Status text="Preparing the collection…" />;
   if (error || !data) return <Status text={error ?? 'Store unavailable'} />;
+
+  const selectedDevice = data.devices.find((item) => item.id === globalDeviceId);
+  if (globalDeviceId && filteredModels.length === 0) {
+    return (
+      <section className="maison-section maison-empty-state" aria-live="polite">
+        <p className="maison-eyebrow">Device compatibility</p>
+        <h1>Coming soon for {selectedDevice?.name ?? 'this watch'}</h1>
+        <p>No FlowVault timepieces currently have a released ZPK package compatible with this watch.</p>
+        <button type="button" className="maison-button maison-button-primary" onClick={() => window.dispatchEvent(new CustomEvent('flowvault:clear-device'))}>Browse all timepieces</button>
+      </section>
+    );
+  }
 
   const heroImage = assetUrl(featuredData?.pkg?.mainPreviewPath);
   const heroCollection = featuredData
@@ -154,11 +157,12 @@ export function DesignModelHomePage() {
         )}
 
         <div className="maison-collection-grid">
-          {data.collections.map((collection, index) => (
+          {data.collections.filter((collection) => filteredModels.some((model) => model.collectionId === collection.id)).map((collection, index) => (
             <CollectionEditorialCard
               key={collection.id}
               collection={collection}
               store={data}
+              allowedModelIds={new Set(filteredModels.map((model) => model.id))}
               index={index}
             />
           ))}
@@ -260,12 +264,14 @@ function CollectionEditorialCard({
   collection,
   store,
   index,
+  allowedModelIds,
 }: {
   collection: PublicCollection;
   store: StoreReadModel;
   index: number;
+  allowedModelIds: Set<string>;
 }) {
-  const models = store.designModels.filter((item) => item.collectionId === collection.id);
+  const models = store.designModels.filter((item) => item.collectionId === collection.id && allowedModelIds.has(item.id));
   const previewModel = models.find((model) => getModelPreview(store, model)) ?? models[0];
   const preview = previewModel ? getModelPreview(store, previewModel) : null;
   return (

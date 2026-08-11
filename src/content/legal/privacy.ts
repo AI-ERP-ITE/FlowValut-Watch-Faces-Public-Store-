@@ -1,7 +1,7 @@
 export const PRIVACY_CONTENT = `
 # Privacy Policy
 
-**Version:** 1.0 · **Effective Date:** June 18, 2026 · **Last Updated:** June 18, 2026
+**Version:** 1.1 · **Effective Date:** June 18, 2026 · **Last Updated:** August 9, 2026
 
 ## 1. Introduction
 
@@ -10,6 +10,8 @@ This Privacy Policy outlines how Flow Vault ("Company," "We," "Us") collects, pr
 ## 2. Information We Collect
 
 To provide licensing verification, technical support, and marketplace improvements, Flow Vault collects specific technical and transactional information. The data we may collect includes your email address, IP address, hardware and device information, cryptographic license information, download statistics, and telemetry/usage analytics.
+
+For purchase delivery, the original checkout email is associated with the payment order and package entitlement. We record successful and failed transfer events, recovery usage, the selected device package, and whether delivery used a browser link or QR installation. Public storefront counts are aggregate statistics and do not disclose purchaser emails, order identifiers, or download credentials.
 
 ## 3. Purpose of Collection
 

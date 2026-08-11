@@ -14,7 +14,7 @@ import {
   type StorageMaintenanceReport,
   writeStorefrontConfigToFirebase,
 } from '@/lib/studioFirebasePublishApi';
-import { fetchStoreHierarchy, type SkuHierarchyOption, type TechnicalPackageOption } from '@/lib/storeHierarchyApi';
+import { fetchDownloadMetrics, fetchStoreHierarchy, type DownloadMetricRow, type SkuHierarchyOption, type TechnicalPackageOption } from '@/lib/storeHierarchyApi';
 import { Button } from '@/components/ui/button';
 import { isFirebaseAuthConfigured } from '@/lib/firebaseAuthClient';
 import type { SpecGroup } from '@/context/CatalogContext';
@@ -32,6 +32,7 @@ import {
 import { formatStorageBytes } from '@/lib/catalogLifecycle';
 import { ReleaseWizard } from '@/components/ReleaseWizard';
 import { applyLegacyMigration, auditLegacyZpkPage, dryRunLegacyMigration, fetchLegacyClassificationQueue, type LegacyClassificationEntry, type LegacyMigrationReport, type LegacyZpkAuditEntry } from '@/lib/legacyMigrationApi';
+import { DeploymentSyncPanel } from '@/components/storefront/DeploymentSyncPanel';
 
 function WorkshopPreviewImage({ projectId, buildId, kind, fallbackLabel }: { projectId: string; buildId: string; kind: 'mainPreview' | 'aodPreview'; fallbackLabel: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -105,8 +106,17 @@ export function AdminOpsPage() {
   const [migrationBusy, setMigrationBusy] = useState(false);
   const [zpkAudit, setZpkAudit] = useState<LegacyZpkAuditEntry[]>([]);
   const [zpkAuditCursor, setZpkAuditCursor] = useState<string | null | undefined>(undefined);
+  const [downloadMetrics, setDownloadMetrics] = useState<DownloadMetricRow[]>([]);
+  const [loadingDownloadMetrics, setLoadingDownloadMetrics] = useState(false);
 
   const canRun = Boolean(backendMode);
+
+  async function loadDownloadMetrics() {
+    setLoadingDownloadMetrics(true);
+    try { setDownloadMetrics((await fetchDownloadMetrics()).rows); }
+    catch (error) { toast.error(error instanceof Error ? error.message : 'Download analytics failed'); }
+    finally { setLoadingDownloadMetrics(false); }
+  }
 
   async function loadWorkshop() {
     if (!canRun) return;
@@ -756,6 +766,11 @@ export function AdminOpsPage() {
           </p>
         </div>
 
+        <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4">
+          <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-medium text-[#dce3ee]">Download analytics</p><p className="text-xs text-[#8f9aac]">Completed ZPK transfers and unique purchasing orders.</p></div><Button onClick={loadDownloadMetrics} disabled={!canRun || loadingDownloadMetrics} variant="outline">{loadingDownloadMetrics ? 'Loading…' : 'Refresh'}</Button></div>
+          {downloadMetrics.length > 0 && <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-xs"><thead className="text-[#8f9aac]"><tr><th className="p-2">Timepiece</th><th className="p-2">Downloads</th><th className="p-2">Orders</th><th className="p-2">Repeats</th></tr></thead><tbody>{downloadMetrics.map((row) => <tr key={row.packageId} className="border-t border-[#2d3542] text-[#dce3ee]"><td className="p-2">{row.name}</td><td className="p-2">{row.successfulTransfers}</td><td className="p-2">{row.uniqueFulfilledOrders}</td><td className="p-2">{Math.max(0, row.successfulTransfers - row.uniqueFulfilledOrders)}</td></tr>)}</tbody></table></div>}
+        </div>
+
         <div className="mt-6 rounded-xl border border-[#2d3542] bg-[#0d1117] p-4 space-y-3">
           <div className="flex items-center gap-2 text-[#dce3ee] text-sm font-medium">
             <Database className="h-4 w-4 text-[#d2b37a]" />
@@ -863,6 +878,8 @@ export function AdminOpsPage() {
           )}
         </div>
       </div>
+
+      <DeploymentSyncPanel />
 
       {storeArchitectureFlags.productHierarchy && <details className="rounded-2xl border border-[#343946] bg-[#0d1117] p-6 space-y-3">
         <summary className="cursor-pointer text-sm font-semibold text-[#9ba6b8]">Legacy tools — one-time recovery and diagnostics only</summary>

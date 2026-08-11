@@ -21,6 +21,7 @@ interface LegalLayoutProps {
   description: string;
   version?: string;
   effectiveDate?: string;
+  lastUpdated?: string;
   /** Markdown content string — used to build ToC */
   content?: string;
   children: ReactNode;
@@ -31,6 +32,7 @@ export function LegalLayout({
   description,
   version = '1.0',
   effectiveDate = 'June 18, 2026',
+  lastUpdated,
   content = '',
   children,
 }: LegalLayoutProps) {
@@ -99,7 +101,7 @@ export function LegalLayout({
               {description && (
                 <p className="mt-3 text-[#8f9aac] text-sm leading-relaxed max-w-2xl">{description}</p>
               )}
-              <LegalVersionBadge version={version} effectiveDate={effectiveDate} />
+              <LegalVersionBadge version={version} effectiveDate={effectiveDate} lastUpdated={lastUpdated} />
             </header>
 
             {/* Page content */}

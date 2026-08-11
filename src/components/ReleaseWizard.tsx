@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { deleteAbandonedTechnicalPackage, fetchStoreHierarchy, releaseVerifiedPackage, submitReleaseClassification, type HierarchyOption, type HierarchySnapshot } from '@/lib/storeHierarchyApi';
+import { archivePaddleCatalogOffer, deleteAbandonedTechnicalPackage, fetchStoreHierarchy, getPaddleCatalogStatus, reconcilePaddleCatalogOffer, releaseVerifiedPackage, runPaddleCatalogBatch, submitReleaseClassification, syncPaddleCatalogOffer, type HierarchyOption, type HierarchySnapshot, type PaddleCatalogBatchResult } from '@/lib/storeHierarchyApi';
 import { findNormalizedConflict, nextRevision, releaseWizardPreview, type ReleaseWizardDraft } from '@/lib/releaseWizard';
 import { fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
 import { resolveUniqueTargetByResolution, type TechnicalTargetDefinition } from '@/lib/watchModelTarget';
@@ -35,6 +35,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
   const [modelId, setModelId] = useState(NEW);
   const [skuId, setSkuId] = useState(NEW);
   const [configuredTargets, setConfiguredTargets] = useState<Record<string, TechnicalTargetDefinition>>({});
+  const [catalogDryRun, setCatalogDryRun] = useState<PaddleCatalogBatchResult[] | null>(null);
 
   const collections = useMemo(() => snapshot?.collections.filter((item) => dnaId !== NEW && item.parentId === dnaId) ?? [], [dnaId, snapshot]);
   const models = useMemo(() => snapshot?.productModels.filter((item) => collectionId !== NEW && item.parentId === collectionId) ?? [], [collectionId, snapshot]);
@@ -58,6 +59,7 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
     }
     return [...options.entries()].map(([id, label]) => ({ id, label }));
   }, [configuredTargets, draft.technicalTargetId, snapshot]);
+  const selectedOffer = useMemo(() => snapshot?.offers.find((offer) => offer.includedSkuIds?.includes(skuId)) ?? null, [skuId, snapshot]);
 
   useEffect(() => {
     void fetchStoreHierarchy().then((result) => {
@@ -143,8 +145,11 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
         selectedSkuId: skuId === NEW ? undefined : skuId,
       });
       if (action === 'RELEASE' && result.packageState !== 'CURRENT') {
-        await releaseVerifiedPackage(result.packageId);
+        const release = await releaseVerifiedPackage(result.packageId);
         toast.success(`${result.canonicalName} released with verified ZPK parity.`);
+        if (release.catalogSync.status === 'SYNCED') toast.success('Paddle Sandbox catalog synchronized automatically.');
+        else if (release.catalogSync.status === 'ERROR') toast.warning(`Release is safe; automatic Paddle sync failed (${release.catalogSync.code ?? 'unknown'}). Use Retry sync before checkout.`);
+        else if (release.catalogSync.status === 'DEFERRED') toast.warning('Package released, but Paddle sync is deferred until the complete Offer becomes active.');
       } else if (action === 'RELEASE') toast.success(`${result.canonicalName} is already released.`);
       else toast.success(`${result.canonicalName} saved as Ready.`);
       const newSnapshot = await fetchStoreHierarchy();
@@ -170,6 +175,48 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
       toast.success('Abandoned release classification removed. Workshop artifacts were preserved.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to remove abandoned release classification');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runCatalogAction(action: 'SYNC' | 'REFRESH' | 'RECONCILE' | 'ARCHIVE') {
+    if (!selectedOffer) return toast.error('Select an existing Offer first.');
+    if (action === 'ARCHIVE' && !window.confirm(`Archive Paddle Sandbox catalog objects for ${selectedOffer.name}?\n\nFlowVault QR/ZPK files and prior orders remain untouched.`)) return;
+    setBusy(true);
+    try {
+      if (action === 'SYNC') await syncPaddleCatalogOffer(selectedOffer.id);
+      else if (action === 'REFRESH') await getPaddleCatalogStatus(selectedOffer.id);
+      else if (action === 'RECONCILE') await reconcilePaddleCatalogOffer(selectedOffer.id);
+      else await archivePaddleCatalogOffer(selectedOffer.id);
+      setSnapshot(await fetchStoreHierarchy());
+      toast.success(`Paddle Sandbox ${action.toLowerCase()} completed.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Paddle catalog action failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runAllCatalogBatches(action: 'DRY_RUN' | 'BULK_SYNC') {
+    setBusy(true);
+    try {
+      const all: PaddleCatalogBatchResult[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await runPaddleCatalogBatch(action, cursor, 10);
+        all.push(...page.results);
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+      if (action === 'DRY_RUN') setCatalogDryRun(all);
+      else {
+        setCatalogDryRun(null);
+        setSnapshot(await fetchStoreHierarchy());
+      }
+      const errors = all.filter((item) => item.status === 'ERROR').length;
+      toast[errors ? 'warning' : 'success'](`${action === 'DRY_RUN' ? 'Dry run' : 'Bulk sync'} finished: ${all.length} Offers, ${errors} errors.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Bulk Paddle catalog action failed');
     } finally {
       setBusy(false);
     }
@@ -235,6 +282,14 @@ export function ReleaseWizard({ projectId, buildId, defaultTarget = '', buildRes
             <Button disabled={busy} onClick={() => discardAbandonedPackage(item.id)} variant="outline" className="h-8 border-red-900 text-red-300">Discard abandoned classification</Button>
           </div>
         ))}
+      {selectedOffer && <div className="rounded border border-cyan-900/60 bg-cyan-950/10 p-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold text-cyan-200">Paddle Sandbox</p><p className="text-[#8fa3b8]">{selectedOffer.commercialCheckoutReady ? 'Checkout ready' : 'Checkout not ready'} · {selectedOffer.paddle?.sandbox?.syncStatus ?? 'NOT_SYNCED'}</p></div><span className="rounded bg-cyan-950 px-2 py-1 text-[10px] text-cyan-300">PAYMENT ONLY</span></div>
+        <div className="mt-2 grid gap-1 font-mono text-[10px] text-[#92a0b2]"><span>Product: {selectedOffer.paddle?.sandbox?.productId ?? '—'}</span><span>Standard: {selectedOffer.paddle?.sandbox?.standardPriceId ?? '—'}</span><span>Promotion: {selectedOffer.paddle?.sandbox?.promotionalPriceId ?? '—'}</span><span>Active: {selectedOffer.paddle?.sandbox?.activePriceId ?? '—'}</span></div>
+        {selectedOffer.paddle?.sandbox?.syncError && <div className="mt-2 rounded border border-red-900/60 bg-red-950/20 p-2 text-[10px] text-red-200"><p className="font-semibold">Sync error · {selectedOffer.paddle.sandbox.syncError.code}</p><p>{selectedOffer.paddle.sandbox.syncError.message}</p><p>{selectedOffer.paddle.sandbox.syncError.retryable ? 'Retry is available.' : 'Review configuration before retrying.'}</p></div>}
+        <div className="mt-3 flex flex-wrap gap-2"><Button disabled={busy} onClick={() => runCatalogAction('SYNC')} className="h-8 bg-cyan-800 hover:bg-cyan-700">Sync</Button><Button disabled={busy} onClick={() => runCatalogAction('REFRESH')} variant="outline" className="h-8">Refresh</Button><Button disabled={busy} onClick={() => runCatalogAction('RECONCILE')} variant="outline" className="h-8">Reconcile</Button><Button disabled={busy || !selectedOffer.paddle?.sandbox?.productId} onClick={() => runCatalogAction('ARCHIVE')} variant="outline" className="h-8 border-red-900 text-red-300">Archive</Button></div>
+        <div className="mt-3 border-t border-cyan-950 pt-3"><div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={() => runAllCatalogBatches('DRY_RUN')} variant="outline" className="h-8">Dry run full catalog</Button><Button disabled={busy || !catalogDryRun || catalogDryRun.some((item) => item.status === 'ERROR')} onClick={() => runAllCatalogBatches('BULK_SYNC')} className="h-8 bg-cyan-800 hover:bg-cyan-700">Sync {catalogDryRun?.length ?? 0} reviewed Offers</Button></div>{catalogDryRun && <><p className="mt-2 text-[10px] text-cyan-200">Reviewed: {catalogDryRun.length} · Create: {catalogDryRun.filter((item) => item.action === 'CREATE').length} · Reconcile: {catalogDryRun.filter((item) => item.action === 'RECONCILE').length} · Errors: {catalogDryRun.filter((item) => item.status === 'ERROR').length}</p>{catalogDryRun.filter((item) => item.status === 'ERROR').length > 0 && <div className="mt-2 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[10px] text-amber-200"><p className="font-semibold">Requires catalog mapping review</p>{catalogDryRun.filter((item) => item.status === 'ERROR').map((item) => <p key={item.offerId} className="font-mono">{item.offerId} · {item.code ?? 'UNKNOWN'}</p>)}</div>}</>}</div>
+        <p className="mt-2 text-[10px] text-[#748399]">Paddle confirms payment only. FlowVault retains all QR, ZPK, entitlement, download, and installation responsibility.</p>
+      </div>}
       <div className="flex gap-2"><Button disabled={busy || !preview || !draft.technicalTargetId || activeConflictsCount > 0} onClick={() => submit('READY')} variant="outline">Save as Ready</Button><Button disabled={busy || !preview || !draft.technicalTargetId || activeConflictsCount > 0} onClick={() => submit('RELEASE')} className="bg-violet-700 hover:bg-violet-600">Release to Store</Button></div>
       <p className="text-[10px] text-[#747c90]">Release reuses the approved physical-test ZPK and rewrites only allowlisted name metadata. Failed or interrupted releases can be resumed safely.</p>
     </div>

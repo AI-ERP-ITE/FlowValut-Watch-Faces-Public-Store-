@@ -1,0 +1,131 @@
+name: FlowVault production promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        required: true
+        type: choice
+        options: [RUN_REVIEW, CREATE_PREVIEW, SYNC_TO_LIVE]
+      sync_id: { required: true, type: string }
+      app_commit: { required: true, type: string }
+      backend_commit: { required: true, type: string }
+      artifact_hash: { required: true, type: string }
+      policy_hash: { required: true, type: string }
+      preview_channel: { required: false, type: string }
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: flowvault-production-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PROMOTION_APP_COMMIT: ${{ inputs.app_commit }}
+      PROMOTION_BACKEND_COMMIT: ${{ inputs.backend_commit }}
+      PROMOTION_ARTIFACT_HASH: ${{ inputs.artifact_hash }}
+      PROMOTION_POLICY_HASH: ${{ inputs.policy_hash }}
+      GOOGLE_CLOUD_PROJECT: flowvault-staging-2026
+    steps:
+      - name: Checkout frozen backend
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.backend_commit }}
+          path: workspace
+          persist-credentials: false
+
+      - name: Checkout frozen application
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.app_commit }}
+          path: workspace/app
+          persist-credentials: false
+
+      - name: Authenticate to Google Cloud without a key
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/63546256310/locations/global/workloadIdentityPools/github-flowvault/providers/github
+          service_account: flowvault-deploy-runner@zeppfaceloader-b0b106e9.iam.gserviceaccount.com
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            workspace/app/package-lock.json
+            workspace/firebase/functions/package-lock.json
+
+      - name: Install frozen dependencies
+        working-directory: workspace
+        run: |
+          npm ci --prefix app
+          npm ci --prefix firebase/functions
+
+      - name: Validate authorized immutable transition
+        working-directory: workspace
+        run: node firebase/scripts/reportPromotionRunner.mjs --action=PRECHECK --requested-action=${{ inputs.action }} --sync-id=${{ inputs.sync_id }} --preview-channel=${{ inputs.preview_channel }}
+
+      - name: Build and verify frozen candidate
+        working-directory: workspace
+        run: |
+          npm --prefix firebase/functions test
+          cd app
+          npx vitest run src/config/flowVaultConfig.test.ts src/lib/storeArchitecture.test.ts
+          cd ..
+          npm --prefix app run verify:environment-separation
+          npm --prefix app run prepare:hosting:production
+          node app/scripts/scanPublicBuildForSecrets.mjs firebase/.production-hosting
+
+      - name: Validate rules without release
+        working-directory: workspace
+        run: npx -y firebase-tools@latest deploy --only firestore:rules,storage --project flowvault-staging-2026 --config firebase/firebase.staging.json --dry-run --non-interactive
+
+      - name: Record completed review
+        if: inputs.action == 'RUN_REVIEW'
+        working-directory: workspace
+        run: node firebase/scripts/reportPromotionRunner.mjs --action=RUN_REVIEW --sync-id=${{ inputs.sync_id }}
+
+      - name: Create isolated production preview
+        if: inputs.action == 'CREATE_PREVIEW'
+        id: preview
+        working-directory: workspace
+        shell: bash
+        run: |
+          CHANNEL_ID="fv-${{ inputs.sync_id }}"
+          CHANNEL_ID="${CHANNEL_ID:0:38}"
+          OUTPUT="$(npx -y firebase-tools@latest hosting:channel:deploy "$CHANNEL_ID" --project zeppfaceloader-b0b106e9 --config firebase/firebase.production.json --expires 7d --non-interactive)"
+          PREVIEW_URL="$(printf '%s' "$OUTPUT" | grep -oE 'https://zeppfaceloader-b0b106e9--[a-z0-9-]+\.web\.app' | tail -1)"
+          test -n "$PREVIEW_URL"
+          echo "channel=$CHANNEL_ID" >> "$GITHUB_OUTPUT"
+          echo "url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Record production preview
+        if: inputs.action == 'CREATE_PREVIEW'
+        working-directory: workspace
+        run: node firebase/scripts/reportPromotionRunner.mjs --action=CREATE_PREVIEW --sync-id=${{ inputs.sync_id }} --preview-channel=${{ steps.preview.outputs.channel }} --preview-url=${{ steps.preview.outputs.url }}
+
+      - name: Deploy compatible production backend
+        if: inputs.action == 'SYNC_TO_LIVE'
+        working-directory: workspace
+        run: npx -y firebase-tools@latest deploy --only firestore:rules,firestore:indexes,storage,functions --project zeppfaceloader-b0b106e9 --config firebase/firebase.production.json --non-interactive
+
+      - name: Promote accepted preview artifact to live Hosting
+        if: inputs.action == 'SYNC_TO_LIVE'
+        working-directory: workspace
+        run: npx -y firebase-tools@latest hosting:clone zeppfaceloader-b0b106e9:${{ inputs.preview_channel }} zeppfaceloader-b0b106e9:live --non-interactive
+
+      - name: Record completed production synchronization
+        if: inputs.action == 'SYNC_TO_LIVE'
+        working-directory: workspace
+        run: node firebase/scripts/reportPromotionRunner.mjs --action=SYNC_TO_LIVE --sync-id=${{ inputs.sync_id }} --preview-channel=${{ inputs.preview_channel }}
+
+      - name: Record trusted runner failure
+        if: failure()
+        working-directory: workspace
+        run: node firebase/scripts/reportPromotionRunner.mjs --action=FAILED --requested-action=${{ inputs.action }} --sync-id=${{ inputs.sync_id }} || true

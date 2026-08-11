@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react';
-import { fetchCatalogFromFirebase, fetchPublicConfig } from '@/lib/studioFirebasePublishApi';
+import { fetchCatalogFromFirebase, fetchPublicConfig } from '@/lib/publicStoreApi';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

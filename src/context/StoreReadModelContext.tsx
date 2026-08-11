@@ -18,7 +18,7 @@ export function StoreReadModelProvider({ children }: { children: ReactNode }) {
     
     Promise.all([
       fetch(`${base}/publicStoreHierarchy`).then(res => { if (!res.ok) throw new Error(`Store hierarchy request failed (${res.status})`); return res.json(); }),
-      import('@/lib/studioFirebasePublishApi').then(m => m.fetchPublicConfig<Record<string, { name: string; specGroup: string; brand?: string }>>('models').catch(() => ({})))
+      import('@/lib/publicStoreApi').then(m => m.fetchPublicConfig<Record<string, { name: string; specGroup: string; brand?: string }>>('models').catch(() => ({})))
     ])
     .then(([hierarchyData, modelsMap]) => {
       // Re-apply old logic: if backend devices are empty, fill it using public models map
