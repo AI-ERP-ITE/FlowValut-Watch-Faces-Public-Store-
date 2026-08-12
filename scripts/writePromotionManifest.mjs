@@ -19,6 +19,7 @@ function gitHead(cwd) {
 
 function listFiles(directory, prefix = '') {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.name.toLowerCase() === 'desktop.ini') return [];
     const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (relative === 'flowvault-release.json') return [];
     const absolute = path.join(directory, entry.name);
@@ -31,6 +32,7 @@ function isEnvironmentBinding(relativePath) {
     || relativePath === 'robots.txt'
     || relativePath === 'sitemap.xml'
     || relativePath === '404.html'
+    || ['catalog.json', 'models.json', 'specGroups.json', 'storeConfig.json'].includes(relativePath)
     || relativePath.endsWith('.html');
 }
 
@@ -49,14 +51,16 @@ const invariantFiles = files.filter((file) => file.treatment === 'INVARIANT');
 const invariantHash = createHash('sha256').update(JSON.stringify(invariantFiles)).digest('hex');
 const appCommit = gitHead(appRoot);
 const backendCommit = gitHead(workspaceRoot);
-const releaseId = `fvrel-${invariantHash.slice(0, 24)}`;
-const syncId = `sync-v151-${invariantHash.slice(0, 24)}`;
+// This is a Hosting-component identity only. The frozen-release packager
+// replaces it with the final identity derived from Hosting, backend, rules,
+// indexes, public content and the versioned environment map.
+const releaseId = `fvrel-${artifactHash.slice(0, 24)}`;
 
 writeFileSync(path.join(distRoot, 'flowvault-release.json'), `${JSON.stringify({
-  schemaVersion: 2,
-  policyVersion: 151,
+  schemaVersion: 4,
+  policyVersion: 153,
   releaseId,
-  syncId,
+  identityStatus: 'HOSTING_COMPONENT',
   target,
   appCommit,
   backendCommit,
@@ -67,4 +71,4 @@ writeFileSync(path.join(distRoot, 'flowvault-release.json'), `${JSON.stringify({
   files,
 }, null, 2)}\n`, 'utf8');
 
-console.log(`Promotion manifest ${syncId} written for ${target} (${files.length} files).`);
+console.log(`Hosting component manifest ${releaseId} written for ${target} (${files.length} files).`);
