@@ -138,6 +138,14 @@ Live non-destructive Admin acceptance then passed:
 
 No upload, save, patch, release, lifecycle mutation, delete, permanent-delete, migration apply, QR regeneration or Sync control was invoked during acceptance.
 
+## F023 — Complete Admin feature-contract review and final missing endpoint
+
+A post-recovery review compared every endpoint referenced by the current Admin, Studio, Workshop, Parametric, GitHub bridge and user-library clients against the live production inventory. The contract contained 38 private endpoints; 37 were present. The sole missing endpoint was `adminPaddleCatalog`, which Spec 152 explicitly deleted and the current Release Wizard still invokes for its visible Paddle Sandbox status/sync/reconcile/archive and dry-run controls. This proves the function is required by the current Admin surface and satisfies the earlier gate that Sandbox-payment functions remain excluded unless separately proven necessary.
+
+The exact preserved implementation was restored as only `private-admin:adminPaddleCatalog`, Node.js 20. The complete backend suite passed 77/77 before deployment. The existing enabled `PADDLE_SANDBOX_API_KEY` Secret Manager version 2 was bound without reading, regenerating or changing its payload. No other Function, Hosting target, rule, data, public-store surface or Sync controller was deployed. Post-deploy metadata shows `ACTIVE`, codebase `private-admin`, Node.js 20, the expected secret name/version, and the standard `allUsers` transport invoker binding while Firebase Admin authorization remains enforced. CORS preflight from the private GitHub Pages origin returns HTTP 204 with `GET,POST,OPTIONS` and authorization headers.
+
+The final non-destructive Admin review passed with no authorization error: 14 Workshop projects, 38 catalog entries, hierarchy/SKU rows loaded, all 14 project-delete controls disabled while builds remain, and Storage dry-run completed with 648 managed objects / 781.8 MB / zero possible orphans. Write, release, lifecycle, archive, deletion, upload, patch, QR regeneration and Sync actions were not executed.
+
 ## Action ledger
 
 | Time | Action | Mutation | Result |
@@ -168,3 +176,6 @@ No upload, save, patch, release, lifecycle mutation, delete, permanent-delete, m
 | 2026-08-12 | Tested authenticated Workshop read | Read-only | Handler reached; HTTP 403 because no preserved Admin claim/allowlist is active |
 | 2026-08-12 | Restored sole production owner's Admin claim | Firebase Auth claim only | Existing claims preserved; `admin: true` independently verified |
 | 2026-08-12 | Ran non-destructive Admin acceptance | Read-only | Workshop 14; catalog 38; SKUs 24; analytics completed; Storage dry-run 648 objects / 781.8 MB / 0 orphans |
+| 2026-08-12 | Audited complete private frontend/function contract | Read-only | 37/38 present; only `adminPaddleCatalog` missing and proven required by current Release Wizard |
+| 2026-08-12 | Restored `adminPaddleCatalog` | Production Function only | ACTIVE; Node.js 20; existing Sandbox secret v2; CORS/IAM verified; total private contract 38/38 |
+| 2026-08-12 | Re-ran quick Admin feature review | Read-only | No auth errors; Workshop/catalog/hierarchy/Storage passed; destructive and Sync controls not invoked |
