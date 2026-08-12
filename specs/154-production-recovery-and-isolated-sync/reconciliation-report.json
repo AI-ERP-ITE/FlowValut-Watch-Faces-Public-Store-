@@ -1,0 +1,27 @@
+{
+  "auditedAt": "2026-08-12T01:53:28.682Z",
+  "recoveryDocumentCount": 752,
+  "identicalCount": 188,
+  "missingCount": 564,
+  "conflictCount": 0,
+  "restoredByRoot": {
+    "commercialAudit": 97,
+    "deletionAudit": 180,
+    "downloadEntitlements": 1,
+    "downloadMetricOrders": 1,
+    "downloadMetrics": 1,
+    "downloadTokens": 9,
+    "legacyMigrationReports": 2,
+    "orders": 15,
+    "skuEntitlements": 9,
+    "userParametricLibraries": 1,
+    "userParametricProgress": 1,
+    "userParametricThemes": 1,
+    "users": 92,
+    "webhookEvents": 9,
+    "workshopProjects": 145
+  },
+  "conflictsByRoot": {},
+  "conflicts": [],
+  "policy": "Read-only comparison; no writes and no deletions."
+}
