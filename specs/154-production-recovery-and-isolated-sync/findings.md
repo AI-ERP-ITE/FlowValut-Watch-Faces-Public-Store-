@@ -146,6 +146,16 @@ The exact preserved implementation was restored as only `private-admin:adminPadd
 
 The final non-destructive Admin review passed with no authorization error: 14 Workshop projects, 38 catalog entries, hierarchy/SKU rows loaded, all 14 project-delete controls disabled while builds remain, and Storage dry-run completed with 648 managed objects / 781.8 MB / zero possible orphans. Write, release, lifecycle, archive, deletion, upload, patch, QR regeneration and Sync actions were not executed.
 
+## F024 — Staging release generated and Sync discovery repaired
+
+The canonical `npm run deploy:staging` workflow was executed after environment separation passed and backend tests passed 77/77. The first attempt stopped before Hosting publication because Windows `desktop.ini` metadata entered the generated release inventory and disappeared before frozen-package attestation. Release inventory walkers now consistently exclude only case-insensitive `desktop.ini`; application files and policy treatments are unchanged.
+
+The complete retry succeeded. Live staging Hosting returns HTTP 200 with hashed bundle `/assets/index-BbEfX7wK.js`, no `/src/main.tsx`, and a complete Spec 153 manifest for release `fvrel-8595533e3096781da0d8e0a4` containing 148 files. All 38 staging Functions are `ACTIVE`.
+
+Sync discovery then reported `PROMOTION_RELEASE_NOT_REGISTERED`. The cause was the post-isolation registration script still writing `deploymentReleases` into staging Firestore while the isolated controller reads its own `flowvault-sync-control-154` Firestore. Registration now targets the isolated control project. The already attested release was registered there without transferring storefront data, files, Auth users, secrets, Paddle records, products, prices, customers or transactions.
+
+After **Refresh Sync IDs**, the private Admin displays `sync-v153-b394248a9d877e15d0547ef7` in `DISCOVERED` state. Only **1. Test Accepted** is enabled; steps 2–5 remain locked. No Sync workflow action was executed.
+
 ## Action ledger
 
 | Time | Action | Mutation | Result |
@@ -179,3 +189,6 @@ The final non-destructive Admin review passed with no authorization error: 14 Wo
 | 2026-08-12 | Audited complete private frontend/function contract | Read-only | 37/38 present; only `adminPaddleCatalog` missing and proven required by current Release Wizard |
 | 2026-08-12 | Restored `adminPaddleCatalog` | Production Function only | ACTIVE; Node.js 20; existing Sandbox secret v2; CORS/IAM verified; total private contract 38/38 |
 | 2026-08-12 | Re-ran quick Admin feature review | Read-only | No auth errors; Workshop/catalog/hierarchy/Storage passed; destructive and Sync controls not invoked |
+| 2026-08-12 | Deployed canonical isolated staging release | Staging only | Release `fvrel-8595533e3096781da0d8e0a4`; Hosting HTTP 200; 38/38 Functions ACTIVE |
+| 2026-08-12 | Fixed release discovery registration target | Sync control metadata only | Registered in `flowvault-sync-control-154`; zero tenant data/secrets transferred |
+| 2026-08-12 | Verified Sync panel readiness | Read-only | Sync `sync-v153-b394248a9d877e15d0547ef7` DISCOVERED; only step 1 enabled; no action run |
