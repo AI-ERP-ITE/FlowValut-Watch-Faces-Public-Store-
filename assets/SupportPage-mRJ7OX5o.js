@@ -1,4 +1,4 @@
-import{j as e}from"./index-DrkmS9U2.js";import{L as i,a}from"./LegalLayout-CDUTckfu.js";const t=`
+import{j as e}from"{0}?v=checkout-aa8906f";import{L as i,a}from"{0}?v=checkout-aa8906f";const t=`
 # Support Policy
 
 **Version:** 1.1 · **Effective Date:** June 18, 2026 · **Last Updated:** August 9, 2026

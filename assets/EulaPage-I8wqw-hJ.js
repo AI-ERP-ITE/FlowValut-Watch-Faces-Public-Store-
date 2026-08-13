@@ -1,4 +1,4 @@
-import{j as e}from"./index-DrkmS9U2.js";import{L as t,a as r}from"./LegalLayout-CDUTckfu.js";const i=`
+import{j as e}from"{0}?v=checkout-aa8906f";import{L as t,a as r}from"{0}?v=checkout-aa8906f";const i=`
 # End User License Agreement (EULA)
 
 **Version:** 1.0 · **Effective Date:** June 18, 2026 · **Last Updated:** June 18, 2026
