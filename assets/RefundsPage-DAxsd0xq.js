@@ -1,4 +1,4 @@
-import{j as e}from"{0}?v=checkout-aa8906f";import{L as t,a as n}from"{0}?v=checkout-aa8906f";const a=`
+import{j as e}from"./index-DrkmS9U2.js?v=checkout-92ef0ea";import{L as t,a as n}from"./LegalLayout-CDUTckfu.js?v=checkout-92ef0ea";const a=`
 # Refund Policy
 
 **Version:** 1.1 · **Effective Date:** June 18, 2026 · **Last Updated:** August 9, 2026

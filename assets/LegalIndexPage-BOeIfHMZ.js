@@ -1,4 +1,4 @@
-import{j as e,L as o}from"{0}?v=checkout-aa8906f";import{L as r,b as i,a as n}from"{0}?v=checkout-aa8906f";const t=`
+import{j as e,L as o}from"./index-DrkmS9U2.js?v=checkout-92ef0ea";import{L as r,b as i,a as n}from"./LegalLayout-CDUTckfu.js?v=checkout-92ef0ea";const t=`
 # Legal Notices / Company Information
 
 **Version:** 1.0 · **Effective Date:** June 18, 2026 · **Last Updated:** June 18, 2026
