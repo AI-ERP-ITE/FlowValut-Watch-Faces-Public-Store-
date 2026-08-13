@@ -1,0 +1,1 @@
+window.__FLOWVAULT_RUNTIME_CONFIG__ = Object.freeze({"schemaVersion":1,"environment":"production","checkoutEnabled":true,"paddleEnvironment":"production","purchaseFunctionsBaseUrl":"https://us-central1-zeppfaceloader-b0b106e9.cloudfunctions.net","paddleClientToken":"test_5f54c4b45589d6ebc099d9b379e"});
