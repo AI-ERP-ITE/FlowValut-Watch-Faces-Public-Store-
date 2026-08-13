@@ -36,7 +36,6 @@ import { readFileSync, writeFileSync, existsSync, cpSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { scanDirectoryForSecrets } from './scanPublicBuildForSecrets.mjs';
-import { writePublicRuntimeConfig } from './writePublicRuntimeConfig.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, '..');
@@ -133,7 +132,6 @@ function ensurePublicCNAME() {
 async function main() {
   // ── Step 1: Build public ─────────────────────────────────────────────────
   run('npm run build:public', 'Building public bundle…');
-  writePublicRuntimeConfig({ appRoot, distRoot: path.join(appRoot, 'dist'), target: 'production' });
   scanDirectoryForSecrets(path.join(appRoot, 'dist'));
   console.log('Public build credential scan passed.');
 
