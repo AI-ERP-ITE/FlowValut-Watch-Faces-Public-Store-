@@ -100,6 +100,9 @@ async function main() {
   const docsStudioIndex = path.join(docsDir, 'studio', 'index.html');
   const docsStudioParametricIndex = path.join(docsDir, 'studio', 'parametric', 'index.html');
   const distIndex = path.join(distDir, 'index.html');
+  const distRuntimeConfig = path.join(distDir, 'flowvault-runtime-config.js');
+  const docsRuntimeConfig = path.join(docsDir, 'flowvault-runtime-config.js');
+  const rootRuntimeConfig = path.join(appRoot, 'flowvault-runtime-config.js');
 
   const distHtml = await readText(distIndex);
   assertNoSourceEntry(distHtml, 'dist/index.html');
@@ -115,6 +118,11 @@ async function main() {
   await writeText(docsIndex, distHtml);
   await writeText(docsStudioIndex, distHtml);
   await writeText(docsStudioParametricIndex, distHtml);
+  if (target === 'public') {
+    await fs.copyFile(distRuntimeConfig, docsRuntimeConfig);
+  } else {
+    await fs.rm(docsRuntimeConfig, { force: true });
+  }
 
   const [docsHtml, studioHtml, studioParametricHtml] = await Promise.all([
     readText(docsIndex),
@@ -138,6 +146,11 @@ async function main() {
     const rootAssets = path.join(appRoot, 'assets');
     await copyDirContents(distAssets, rootAssets);
     await removeStaleFiles(rootAssets, distAssets);
+    if (target === 'public') {
+      await fs.copyFile(distRuntimeConfig, rootRuntimeConfig);
+    } else {
+      await fs.rm(rootRuntimeConfig, { force: true });
+    }
 
     // Root HTML files are intentionally NOT written here.
     // Both deployPrivateFull.mjs and deployPublicFull.mjs use stageProductionIndexInGit()
