@@ -1,0 +1,806 @@
+{
+  "schemaVersion": 1,
+  "syncId": "sync-600cac67-b29c8b3d-708ba812ad6d",
+  "target": "production",
+  "appCommit": "600cac67873d32a582f2be4d8397d95e70ccb930",
+  "backendCommit": "b29c8b3d828363b2c6374a2e3fcefa256664187b",
+  "artifactHash": "708ba812ad6ddebae24e60fe4776cf6f8ef0ddce8baf8d10a8eb34054a786abc",
+  "fileCount": 159,
+  "files": [
+    {
+      "path": "404.html",
+      "size": 1476,
+      "sha256": "bbb16e974fec7cdecac3865c4c6ff2c1d89cc980b8be4fcba3343fe12683b0e4"
+    },
+    {
+      "path": "CNAME",
+      "size": 20,
+      "sha256": "5faa3857c4bd9925408da2caa53bde98ab199b938a83087bc83437a454472bdd"
+    },
+    {
+      "path": "acceptable-use/index.html",
+      "size": 1922,
+      "sha256": "2c7e7a741fac57e7eea2408813de7d6f38e1cd4bab9d821c92a2c678d804d835"
+    },
+    {
+      "path": "assets/AcceptableUsePage-R0nZ3t6h.js",
+      "size": 3186,
+      "sha256": "c6ac97b8d77a3a6a7caa2bcb99fb2a8e670388070ef6544147054a94e940415e"
+    },
+    {
+      "path": "assets/BuyPage-D6bHV9xB.js",
+      "size": 7710,
+      "sha256": "da24c5b6792c1ebc286f8264c126c6e4a079188f9ec71c8f211f6301e9c26089"
+    },
+    {
+      "path": "assets/CategoryPage-BVcNp87f.js",
+      "size": 1601,
+      "sha256": "c28233dcd96b1af4563fea9cae9ba99ecacca9a4cb83ffe7c9ac460054d7a0e7"
+    },
+    {
+      "path": "assets/CollectionPage-Dr9Y2qLe.js",
+      "size": 2488,
+      "sha256": "051fb79199063ab250fb103a64689ab404d0d3546a76241471b99cb90fe2d83f"
+    },
+    {
+      "path": "assets/CookiesPage-DDdGoVHb.js",
+      "size": 3326,
+      "sha256": "8d0b008976c9da0056317329fa2011df899c881f720db2012560d3a92a991eee"
+    },
+    {
+      "path": "assets/CopyrightPage-BdL0Z8Hh.js",
+      "size": 2967,
+      "sha256": "7108fd68daebebe32923c8364234ee3a0209739627bd4943e5f0c4a98f17cc85"
+    },
+    {
+      "path": "assets/DesignModelCard-Booz6Y6z.js",
+      "size": 1836,
+      "sha256": "fdfccc5ece34d1e71505d7510d35f0071d5f3f1532918c87c5a8b3eb3ac7f85d"
+    },
+    {
+      "path": "assets/DesignModelHomePage-GE0rH480.js",
+      "size": 10667,
+      "sha256": "6b65eb9d72e091ea0af244c2306fa4e7b72fb074793b805d3d1952e97766ae05"
+    },
+    {
+      "path": "assets/DesignModelPage-DrkRHdr6.js",
+      "size": 7045,
+      "sha256": "5b12cabc0f20398494171f9c62e51ed0b9ef614ecdee890a26185dbf7ce695bb"
+    },
+    {
+      "path": "assets/DeviceCompatibilityPage-DXXCCc71.js",
+      "size": 1391,
+      "sha256": "9bc5d273d7eec21c39b60655835d67750d502b773930920c5844a87ecac52f14"
+    },
+    {
+      "path": "assets/EmptyState-BJ3twDed.js",
+      "size": 2918,
+      "sha256": "36dae7e2d976b6c37663c29826649579e05d7330f77482135f5993b4e6dbcbf1"
+    },
+    {
+      "path": "assets/EulaPage-I8wqw-hJ.js",
+      "size": 4402,
+      "sha256": "76a3ff770c472adc4ccb0fa29100746b7bed57ff92c5a417b4845016c3af0741"
+    },
+    {
+      "path": "assets/HomePage-_H_89meb.js",
+      "size": 11698,
+      "sha256": "53801d1aac9bc6c41efe6c8eb2283d99156a685f6fb42bc57a7798750bdf0f46"
+    },
+    {
+      "path": "assets/LegalIndexPage-BOeIfHMZ.js",
+      "size": 3059,
+      "sha256": "af639191b4b9ec73f36a8ad8e4a253a9697a2e416e4a9d49a2246b8e49ae116c"
+    },
+    {
+      "path": "assets/LegalLayout-CDUTckfu.js",
+      "size": 166708,
+      "sha256": "dd76131fd3cc375b4d6359c86548885131cea344a2cadae92fe5ceb3a35b70d6"
+    },
+    {
+      "path": "assets/ModelPage-DMLv3D8A.js",
+      "size": 2833,
+      "sha256": "2fe6ac6ba0947f20d4dad5b622b3c932b951168ab6cb71267deacdd9a2b8a8c5"
+    },
+    {
+      "path": "assets/OfferBuyPage-DYD9Tent.js",
+      "size": 37257,
+      "sha256": "1baa4f72ff4a6d450d69a20be793acf09f9c3b670b081df8cf3efeb4ae61cccb"
+    },
+    {
+      "path": "assets/PrivacyPage-C98nEbDn.js",
+      "size": 3975,
+      "sha256": "ee495258bd53759cdef4738db6f15aaca5c0df6bcfe923318a90dfc0784c9dc6"
+    },
+    {
+      "path": "assets/ProductPage-C2W_AT5h.js",
+      "size": 6666,
+      "sha256": "16b3fc51c64cef27b23e7e56c7f544265cbde48f6d84b88860edbe5795e388a6"
+    },
+    {
+      "path": "assets/RefundsPage-DAxsd0xq.js",
+      "size": 2599,
+      "sha256": "50f2f7f71fa026bd332dd4c43fbf8980e54fce9128053096279a1375f921e887"
+    },
+    {
+      "path": "assets/SearchPage-BRE4A5qP.js",
+      "size": 3166,
+      "sha256": "00e826c098b09ad1f6045b383a28ebdfe6bfb65dfdbc635bef1e20a402e40fda"
+    },
+    {
+      "path": "assets/SuccessPage-D6FE546d.js",
+      "size": 3568,
+      "sha256": "1188842b0c1183a2608aeb4e0e6e7bcae3c3c111fbe558fe9f47b288fb41b011"
+    },
+    {
+      "path": "assets/SupportPage-mRJ7OX5o.js",
+      "size": 3054,
+      "sha256": "e6f4d5663cdbb951494114c3312d88e920373812d070791049637e52d9853c78"
+    },
+    {
+      "path": "assets/TermsPage-2wHwA-QC.js",
+      "size": 7965,
+      "sha256": "8161d894b2d8ae510a8f77ae31ad96215a0e97c7cd3cc727a5e3b41911ea4e29"
+    },
+    {
+      "path": "assets/arrow-left-BfgjyKWT.js",
+      "size": 161,
+      "sha256": "186ded414d5e602b84eb901328c554c649d65aca312710b0ba0eec5e8e750362"
+    },
+    {
+      "path": "assets/arrow-right-BDb4sWzK.js",
+      "size": 166,
+      "sha256": "f7675067fa2609b5cb6859d844bcfea9b2ba23c4143624fa9755de0a8135660e"
+    },
+    {
+      "path": "assets/download-Cn1yWcK3.js",
+      "size": 233,
+      "sha256": "1d8f6136c6086d111dd3769ebc851f5ed091bb065ac222853b5d94811fc50a43"
+    },
+    {
+      "path": "assets/index-DrkmS9U2.js",
+      "size": 384510,
+      "sha256": "cd9eb22cfde3f5d88fc084589cc4cfb20b6cd2d2b79dfa14a726dfa901553bee"
+    },
+    {
+      "path": "assets/index-DwombBhU.css",
+      "size": 122861,
+      "sha256": "ee01a06299b4f2966678c333329697d3a9f6cb49f10d54c90ef8a34db5348833"
+    },
+    {
+      "path": "assets/paddle-NlnVx5jx.js",
+      "size": 11883,
+      "sha256": "3bc4c9ca2406c70666bd315b382bc74bf7945e987b4448bee41bbf414f046dc7"
+    },
+    {
+      "path": "assets/paddleCheckout-zQSLnCcc.js",
+      "size": 7298,
+      "sha256": "53f9c09f6ca6087da5235fc11d4dba9ae93a9eab5d9d85df31a40aafab861b8b"
+    },
+    {
+      "path": "assets/storeReadModel-2z5ttqHQ.js",
+      "size": 1728,
+      "sha256": "226994cfae996ad7498a5ecc95fb60571df3b4bf3ebaaf3658e8fc5f0652742f"
+    },
+    {
+      "path": "assets/storefrontCategoryPresentation-CGukjaZs.js",
+      "size": 980,
+      "sha256": "90d40134fcb9996b61dd319f5eff8de721e322654cdef2a6cb02f845474a9654"
+    },
+    {
+      "path": "buy/offer-dark-revenant-memento-mori-01-gothic-cobalt-moon-phase-comprehensive/index.html",
+      "size": 3051,
+      "sha256": "d05f55814ecaff8b4af5d26914e4dd2db77612f589343c173678e474e758ea45"
+    },
+    {
+      "path": "buy/offer-dark-revenant-memento-mori-01-gothic-teal-moon-phase-comprehensive/index.html",
+      "size": 3021,
+      "sha256": "3b6f9918c708a1063bf4cb290544411ddaf36f504e46251ec90deef67cd1a7b7"
+    },
+    {
+      "path": "buy/offer-dark-revenant-memento-mori-01-gothic-violet-moon-phase-comprehensive/index.html",
+      "size": 3059,
+      "sha256": "b9d826ef09d870f3c615d308bef84933cd427b7c8e24c79e0899bc343732075f"
+    },
+    {
+      "path": "buy/offer-legacy-legacy-01-basic-black-basic/index.html",
+      "size": 2725,
+      "sha256": "10c99069abcf77706de08b8db353d80a06c90f189bcd98e9b8e84c6f0e55af12"
+    },
+    {
+      "path": "buy/offer-performance-torque-torque-01-steel-informative-comprehensive/index.html",
+      "size": 2915,
+      "sha256": "bf952487ff61279dd4e87e32fd041acb2ac11b05fa3756882e7697a89add5e74"
+    },
+    {
+      "path": "buy/offer-performance-torque-torque-02-steel-informative-comprehensive-short-cut/index.html",
+      "size": 3041,
+      "sha256": "6c127ee7caa3778bc4a972aabcf56cf6dcc78312b9a7bfe6c9e0d6d391d21669"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-gossamer-nocturne-01-basic-flame-basic/index.html",
+      "size": 2792,
+      "sha256": "067d10ef5fd7a46246cb73268be2d2fdbfcf0d39b15d1ed0c29cea152f7417ac"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-legacy-legacy-02-basic-black-basic/index.html",
+      "size": 2764,
+      "sha256": "415edd244bbc4926cf1ac4f1411fb9186aeab2c419ea2f0a62eaf455a80f7d72"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-legacy-legacy-03-basic-black-basic/index.html",
+      "size": 2764,
+      "sha256": "d2ea0e6c1fdd08474ce990ced72e662911e7d23139b936b3d846644f40c58e37"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-legacy-legacy-03-basic-champagne-pearl-basic/index.html",
+      "size": 2874,
+      "sha256": "946f0030ac9aa6adaa0c07c7928924cb509550586c23ea8d54ac77e11796692e"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-legacy-legacy-04-basic-copper-date/index.html",
+      "size": 2764,
+      "sha256": "0db0ff5e05a964fbc5565f7efc60a2789f8d28c700fff9c7e16966ded1ea9abb"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-legacy-legacy-04-basic-dark-date/index.html",
+      "size": 2742,
+      "sha256": "aad06f7e8125f033ac4ad355ae7f2f551a75081889943abb8ff9a02401b79a21"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-legacy-legacy-04-basic-dark-silver-hands-date/index.html",
+      "size": 2885,
+      "sha256": "119828cc4e7f2370476cd74d8d2d1ce5f2b856df0631ff78951ed9bd868c12bf"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-legacy-legacy-04-basic-white-date/index.html",
+      "size": 2753,
+      "sha256": "4426d41db5d08896d14d7e74d1f7d57e2df4c272c1a66d76b4c6483458ed4dc0"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-monarch-monarch-01-basic-bordeaux-velvet-comprehensive/index.html",
+      "size": 2976,
+      "sha256": "af3eaea4461437995980ff9b205aa772dd212009c4f69f922e5501661ec8ded1"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-monarch-monarch-01-basic-celeste-blue-comprehensive/index.html",
+      "size": 2959,
+      "sha256": "414b8bba23717b7fd5f2fb72e054f106e72e35220cbab8cb31232d391c79e80f"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-monarch-monarch-01-basic-champaign-comprehensive/index.html",
+      "size": 2910,
+      "sha256": "eb68747935194bd2ed4e7485ff1302464efa76764b6591dba793e5f382ce144d"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-monarch-monarch-01-basic-emerald-green-comprehensive/index.html",
+      "size": 2954,
+      "sha256": "94e1d152b16d51dd7801a692e35ae0661db1d2d17d13f557d276c7258a16d637"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-regent-forge-01-graphite-blue-informative/index.html",
+      "size": 2841,
+      "sha256": "0eca94a964a982965771cb38ea2ac34e035f17f73f21652aa05f066d942b5fab"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-regent-forge-01-graphite-brown-informative/index.html",
+      "size": 2852,
+      "sha256": "02b52f6d1cb2b4ed872610f8b9e5722dbb773aee75be53eb9e4b8a90d4c1688e"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-regent-forge-01-graphite-champaign-informative/index.html",
+      "size": 2896,
+      "sha256": "0de0405875824ee4e534875eb01bf3457e85b031923f56af5dc1c5b9bd4b5a8e"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-regent-forge-01-graphite-green-informative/index.html",
+      "size": 2852,
+      "sha256": "64e0b580ca5eace57d772c44254c3f21b3ed8154642acfa0f6e55bee8dc125d8"
+    },
+    {
+      "path": "buy/offer-swiss-luxury-regent-forge-01-graphite-grey-informative/index.html",
+      "size": 2841,
+      "sha256": "16d9a0533e75081df1c83f05044b9fc80042cd048332f2973dff8fdab85ba3e3"
+    },
+    {
+      "path": "catalog.json",
+      "size": 7,
+      "sha256": "50056c08ce479cc2f54c4d6595a4264bdf32bf84f2995d59ff3bd513897ab414"
+    },
+    {
+      "path": "category/analog/index.html",
+      "size": 2012,
+      "sha256": "3c082dce81e21239b8d8284c4a313fd0730880cd1149dcf0d691bba84b5d75e1"
+    },
+    {
+      "path": "category/artistic/index.html",
+      "size": 2032,
+      "sha256": "9f48df1fbac2b811066816d135d4b04f5558a8db93ad8e9e17ca404608dadfc6"
+    },
+    {
+      "path": "category/business/index.html",
+      "size": 2032,
+      "sha256": "25ddaddb5f67b3162a7c300478a64b9fa4fa7e7f7a6b7041e0e5b4ba9bcfbece"
+    },
+    {
+      "path": "category/classic/index.html",
+      "size": 2022,
+      "sha256": "f2ab58b570d971d9969b7801c5a4b9da33c8340b51cfa451185e96846f98728b"
+    },
+    {
+      "path": "category/dark-luxury/index.html",
+      "size": 2062,
+      "sha256": "4111b43126d9e3d9e27f7a51a4557f16b24cb8e17c68fe8f994ff208f300c9da"
+    },
+    {
+      "path": "category/dark/index.html",
+      "size": 1992,
+      "sha256": "5f399d546bacfbeee81a1075c1175331a31f4b19204f4e91000451ef3e5d5a64"
+    },
+    {
+      "path": "category/data-rich/index.html",
+      "size": 2042,
+      "sha256": "435cd1cf28d40d9dca01a4a1250410d6ea185e4bcac47fbb79fc435dc75c50b6"
+    },
+    {
+      "path": "category/dress-watch/index.html",
+      "size": 2062,
+      "sha256": "46980419455a60365aacc65cdd3ef4ad1649d6f7c2141cc3e975e289343dc99b"
+    },
+    {
+      "path": "category/elegant/index.html",
+      "size": 2022,
+      "sha256": "8487f349dc2c43324572cbacded2dbf579b336db43174e72746d8e874da0e09d"
+    },
+    {
+      "path": "category/executive/index.html",
+      "size": 2042,
+      "sha256": "5cdf698ef2cf9154d799bc80ab7a833ce837bd8164ab5483ee2920523f7089f2"
+    },
+    {
+      "path": "category/floral/index.html",
+      "size": 2012,
+      "sha256": "d109d771945d57f03e13d28838611e257f0dd3814b0a61531b20093b60ac3177"
+    },
+    {
+      "path": "category/formal/index.html",
+      "size": 2012,
+      "sha256": "2a78233210ab373878b2c2d5f410c60efc229d8ed882d38406bd50b7fc503318"
+    },
+    {
+      "path": "category/gothic/index.html",
+      "size": 2012,
+      "sha256": "ae91bb4993ba9a53534b0b6482bacc523e00af3e58f8e53b1ec762d820ef2334"
+    },
+    {
+      "path": "category/industrial/index.html",
+      "size": 2052,
+      "sha256": "76d5b2847a7e4a97861e4636ee6ce0f84ab30986d4effb4f75ce5f007d93ee26"
+    },
+    {
+      "path": "category/informative/index.html",
+      "size": 2062,
+      "sha256": "de6a37964d614ec7b3d324e12e3b7af21a18f7f49adee094256fd9baa7d19e87"
+    },
+    {
+      "path": "category/jewelry-inspired/index.html",
+      "size": 2112,
+      "sha256": "6ed82732e30346bad55d59308127ab7a7ea6d773572c479311b4809b7d13c085"
+    },
+    {
+      "path": "category/luxury/index.html",
+      "size": 2012,
+      "sha256": "fb60780cb8c999c8e4b45f92332d72b6c8a0da5e4f2fddfc664fc48a0a70b77d"
+    },
+    {
+      "path": "category/mechanical/index.html",
+      "size": 2052,
+      "sha256": "726a385b88e9990dcc5530fa339ed09858936c8238f80dd3623f310daca5d4cf"
+    },
+    {
+      "path": "category/minimal-luxury/index.html",
+      "size": 2092,
+      "sha256": "f0ab2d6c24a47906109980784680e5ebd82eca82c2bbc96c1e90bb3b1f582e09"
+    },
+    {
+      "path": "category/motorcycle/index.html",
+      "size": 2052,
+      "sha256": "89955539ba699fcb65d7fcb438a123bdc689af6b60d33f03112246cbc8d7e587"
+    },
+    {
+      "path": "category/motorsport/index.html",
+      "size": 2052,
+      "sha256": "23413c435b92eeb8a6bde3d74321a39c13f378ee936e05c3339c57693a95cc00"
+    },
+    {
+      "path": "category/open-heart/index.html",
+      "size": 2052,
+      "sha256": "d86b809501c4a832f8b335644b1176632109e78dee626236fee0f51e65d2669d"
+    },
+    {
+      "path": "category/ornamental/index.html",
+      "size": 2052,
+      "sha256": "c2d021d5dfaf2d5a710b4c4dd2c0f92ab9c431c4ea0a280d038a01276ee5e2e6"
+    },
+    {
+      "path": "category/performance/index.html",
+      "size": 2062,
+      "sha256": "c717156c6ad2501c93c1dc760102e7436c7a610342896b627e3fd406e70c1a8b"
+    },
+    {
+      "path": "category/premium/index.html",
+      "size": 2022,
+      "sha256": "12c679c8724cd80f66983d70de6d1c07dcb9e926164c8454d1287107850426bc"
+    },
+    {
+      "path": "category/rugged/index.html",
+      "size": 2012,
+      "sha256": "31895812566f2a5b0dbae6030748e66bc1b8e418dbd4aba635f6a3159d3144a4"
+    },
+    {
+      "path": "category/supernatural/index.html",
+      "size": 2072,
+      "sha256": "b70e20ecef13c8af77af0793fac15fd36916c1af3a700f230b6150e1d7d6d844"
+    },
+    {
+      "path": "category/swiss-luxury/index.html",
+      "size": 2072,
+      "sha256": "488d42cb8dc98c1ef69c5e2dda50b5e4ac751bd3e3086bc5ef76ae4618fbc1f4"
+    },
+    {
+      "path": "category/technical/index.html",
+      "size": 2042,
+      "sha256": "1009470b2aa6c588fe63828bf1d252064b74bd18d1b1afdde911da12bfc9a0e3"
+    },
+    {
+      "path": "collection/gossamer/index.html",
+      "size": 2015,
+      "sha256": "dfb057c37e716ca6cb383c40d8bc98be82d62dbc68dea7d92d73bbf36903d5e9"
+    },
+    {
+      "path": "collection/legacy/index.html",
+      "size": 2028,
+      "sha256": "5ef1b1105b99522498efa6b786f7d839ac179b8664d02b6efe57e6fb45a311fc"
+    },
+    {
+      "path": "collection/monarch/index.html",
+      "size": 2005,
+      "sha256": "4e7b879937dcf8a0194fa87782be418fa829bfa84b4d582018b384355355b16d"
+    },
+    {
+      "path": "collection/regent/index.html",
+      "size": 1994,
+      "sha256": "3154a441c5b503e0402a06527aa4d884427f4c0b7bb77efd447647bf47230daf"
+    },
+    {
+      "path": "collection/revenant/index.html",
+      "size": 2019,
+      "sha256": "ed33c7c37c635458673e43c5eaec880a0d8c21df3fd507886df70d0b8eebde17"
+    },
+    {
+      "path": "collection/torque/index.html",
+      "size": 2006,
+      "sha256": "7874034b7a936fd9dbe4049de382964ad3c066044c36392dae23fff71cb6d08c"
+    },
+    {
+      "path": "cookies/index.html",
+      "size": 1872,
+      "sha256": "4a3de9e348be88fcfa16d1829f0b37a740fc8bda2b851bad43e7c95e240d85d8"
+    },
+    {
+      "path": "copyright/index.html",
+      "size": 1872,
+      "sha256": "47605de2257aae243c90a5eca38eb1287c52e5d43ca9564b2514f47b8f2222f8"
+    },
+    {
+      "path": "design/forge-01/index.html",
+      "size": 4381,
+      "sha256": "317ab3d0614c388dafe2a5a7faba888cf849b7b276f05f548b5b7fc548e7fcae"
+    },
+    {
+      "path": "design/legacy-01/index.html",
+      "size": 3567,
+      "sha256": "3a9091f0dd7b11c4ac81f82d4cab379e32b86ec23207c0e5a40937c18ac1cc09"
+    },
+    {
+      "path": "design/legacy-02/index.html",
+      "size": 3745,
+      "sha256": "377d39d9c7773ebe44cd93b5c0055959ddbb0b2dd2914cf8ed01f3e875abe829"
+    },
+    {
+      "path": "design/legacy-03/index.html",
+      "size": 3830,
+      "sha256": "0af1fb5de5c751737f7dc9017ecbc26dc088626ff04b91fbca53539719c3826a"
+    },
+    {
+      "path": "design/legacy-04/index.html",
+      "size": 3994,
+      "sha256": "2ab6ea6baae2878e77023a1a02441764e7d1373f9b1ee5ed80dcf31265eba9a1"
+    },
+    {
+      "path": "design/memento-mori-01/index.html",
+      "size": 4199,
+      "sha256": "0c0715f20d952d0b20a1fa661e109c4a67b04c499fb67bbcfd61b4bcaedc082e"
+    },
+    {
+      "path": "design/monarch-01/index.html",
+      "size": 4185,
+      "sha256": "6d8738479b5f42a644d9b291fdf6d31ef7ba2d496d728283d6d846d22495b236"
+    },
+    {
+      "path": "design/nocturne-01/index.html",
+      "size": 3623,
+      "sha256": "2ced2bd6a1852328a80a3005d8720ade561903f71255a452d706d8d3de79a18c"
+    },
+    {
+      "path": "design/torque-01/index.html",
+      "size": 3833,
+      "sha256": "54c388e9499d3275eba2451192b52d01c86138aef058958c8fef3acf73b4d67e"
+    },
+    {
+      "path": "design/torque-02/index.html",
+      "size": 4057,
+      "sha256": "325202ff09121ead752d82e7b298548668d408bef600d4538baaf333593854d4"
+    },
+    {
+      "path": "email/flowvault-logo.png",
+      "size": 1026812,
+      "sha256": "421283a21942e785f18d082cd812729a553d1b0cbe93676e2ae7b0966c672f43"
+    },
+    {
+      "path": "eula/index.html",
+      "size": 1970,
+      "sha256": "8ddcee387161f3bbc2452bee921d8574b2be04817cee975011fd3c97223b3e0a"
+    },
+    {
+      "path": "fonts/CascadiaCode.ttf",
+      "size": 387948,
+      "sha256": "cfb6a8d474018fe46d53a427e5fbee44b998822d0d3d8772914bd712cfc55ac4"
+    },
+    {
+      "path": "fonts/CascadiaMono.ttf",
+      "size": 371352,
+      "sha256": "0e141cb99609f6f10ad05313fd1807d5cc9e28658dcbb35ab162e52ff67dc718"
+    },
+    {
+      "path": "fonts/Montserrat-Italic-VariableFont_wght.ttf",
+      "size": 404112,
+      "sha256": "57015d2cf846fcfd170a9fcf718264f85a2f1098a8c7d15191a7d0b00bf1e356"
+    },
+    {
+      "path": "fonts/Montserrat-Medium.ttf",
+      "size": 330872,
+      "sha256": "cd161cba3a3cdcf68ad721920fcd164c87e7b7cc9e6bad510278c3fa378d91d2"
+    },
+    {
+      "path": "fonts/Montserrat-SemiBold.ttf",
+      "size": 333988,
+      "sha256": "9c4db3814875410e7d64fdc8e69676c3b84968bb15bf3ace8b3944c59fbc56b6"
+    },
+    {
+      "path": "fonts/Montserrat-VariableFont_wght.ttf",
+      "size": 394140,
+      "sha256": "a4fe82b4bfd40c71320ab0f1daca8ba2f230b55a56ffa94d5d1b349675b70d73"
+    },
+    {
+      "path": "fonts/THEBOLDFONT.ttf",
+      "size": 36752,
+      "sha256": "2874ddbd5856adb83714249b42174b798d0d3234672119427c41a85f775a8573"
+    },
+    {
+      "path": "fonts/texgyretermes-bold.otf",
+      "size": 139480,
+      "sha256": "2fb3e952065fa153c7e4e64e04b98b9d79225739b6025aa3f0f0782d299ff61e"
+    },
+    {
+      "path": "fonts/texgyretermes-italic.otf",
+      "size": 141324,
+      "sha256": "6dd103a1672e50568cd2f8a706ccd48443d44d7d073a59d2286f4e6f746575d6"
+    },
+    {
+      "path": "fonts/texgyretermes-regular.otf",
+      "size": 140932,
+      "sha256": "cc3fe7c707b81428d23d54df3eadd9228a2bf6a4d43125d94df56f5f63134659"
+    },
+    {
+      "path": "index.html",
+      "size": 2337,
+      "sha256": "9f4a1b8d2c5e338b4f816e585263190258cb250c8166ec3315691c1ce98c083c"
+    },
+    {
+      "path": "legal/index.html",
+      "size": 1944,
+      "sha256": "8ecdcb484426e717bfd692faada5cd566b2ecd433a90a2edcb0a7a4c691a19c8"
+    },
+    {
+      "path": "logo.png",
+      "size": 683366,
+      "sha256": "76e76def28185414dbb9a78c6512745d7446089d22209f723d4c4f10411300ed"
+    },
+    {
+      "path": "machined_steel.switcher",
+      "size": 61803,
+      "sha256": "ecc84b12b363725bd7e9dea78cc50a6600a1f68cd1257417ec9f9238262ea751"
+    },
+    {
+      "path": "model/active-2-round/index.html",
+      "size": 2194,
+      "sha256": "3f37417c467c0999cf550769492f03b2651711e47bab658383b6f1534b439cf3"
+    },
+    {
+      "path": "model/active-2-square/index.html",
+      "size": 2204,
+      "sha256": "ea646d4d1ddc435cf806f6feb7935dd059bd781dc112bcb728e31a2dc5daa3f0"
+    },
+    {
+      "path": "model/active-3-premium/index.html",
+      "size": 2198,
+      "sha256": "0105fbc1073b987055d55720e45eb65d09b74d4107942376be0e6e42a80c8921"
+    },
+    {
+      "path": "model/active-edge/index.html",
+      "size": 2148,
+      "sha256": "28b61fd575b07e567811794d2bebf8da3ba9b346d2262e850de3675c6293cb66"
+    },
+    {
+      "path": "model/active-max/index.html",
+      "size": 2138,
+      "sha256": "97046616fc0b1909597fbb05b9a746f900ff7fbd840a811eb654f7224f3cf042"
+    },
+    {
+      "path": "model/active/index.html",
+      "size": 2098,
+      "sha256": "44c7b7e0ea19b09ec942e131abc1ae63048b7f24e99b11e0c1c98ed3fee5a9e9"
+    },
+    {
+      "path": "model/balance-2/index.html",
+      "size": 2128,
+      "sha256": "ae973cd5ace718ad18b49938ded081224c456d73e68dd2d2b8bfadeb3b3cd10d"
+    },
+    {
+      "path": "model/balance-3/index.html",
+      "size": 2128,
+      "sha256": "c3d77180ec6625b70765a34aa26667564f7074a4c5974be8c701ba153fd5ef3a"
+    },
+    {
+      "path": "model/balance-ultra/index.html",
+      "size": 2168,
+      "sha256": "a54e606a0ef2b56ea9fd0f8ddb11bc1bb34ce9a3b8e89dbd8c496e526d0d6bf0"
+    },
+    {
+      "path": "model/balance/index.html",
+      "size": 2108,
+      "sha256": "8911a2cafefec10defd312865ec74fed523e4bd468ba945db3fed8a4ead8dcb6"
+    },
+    {
+      "path": "model/bip-5-unity/index.html",
+      "size": 2148,
+      "sha256": "19a8194deebf36e3a45628396df5080f663c37745320433e2022976e923c6c58"
+    },
+    {
+      "path": "model/bip-5/index.html",
+      "size": 2088,
+      "sha256": "e2a2f033753d123d591bebf68ed96bc3273742a47fc7b6bccea4cdd2c7ec8ad1"
+    },
+    {
+      "path": "model/bip-6/index.html",
+      "size": 2088,
+      "sha256": "10f1bea47b76edfca98eb160c186a802106a266666694a36222758face654824"
+    },
+    {
+      "path": "model/cheetah-pro/index.html",
+      "size": 2148,
+      "sha256": "88146452b09588d12604eb526dc451ca520cbd8ca1ac37a9d4bab7e1fa1c0c63"
+    },
+    {
+      "path": "model/cheetah-round/index.html",
+      "size": 2184,
+      "sha256": "85b0a4a4e2008c1a524b826a90d549b57039b198abb0a64ddc6995434c7303b2"
+    },
+    {
+      "path": "model/cheetah-square/index.html",
+      "size": 2194,
+      "sha256": "9aa91d53ab9555b77357b6fa2542aebb99a2338ff916c09eb54eacdcfef6a790"
+    },
+    {
+      "path": "model/falcon/index.html",
+      "size": 2098,
+      "sha256": "de8f62a5674fb0a395d2de44fd69bad819691c96fea6c64097e3808201ad5b81"
+    },
+    {
+      "path": "model/gtr-4/index.html",
+      "size": 2088,
+      "sha256": "53ba01ab06d35ac43f89ad2cc92a36935388dc9581cd3e1085ba30744785d414"
+    },
+    {
+      "path": "model/gtr-mini/index.html",
+      "size": 2118,
+      "sha256": "fe00522bfcc8452d9a5ade37e67bf0393e92d60b2789fb1d54e6118c0f90ffee"
+    },
+    {
+      "path": "model/gts-4/index.html",
+      "size": 2088,
+      "sha256": "466b226cef8148dfb3e735d8887982541820f233a7f5910020417a0966d45f53"
+    },
+    {
+      "path": "model/t-rex-2/index.html",
+      "size": 2108,
+      "sha256": "8b9accb722a09f697d53b13ed442669acf2160f2a3a3892762375868ed135ef9"
+    },
+    {
+      "path": "model/t-rex-3-pro-44mm/index.html",
+      "size": 2214,
+      "sha256": "7a25e2806433adf4d44cc2645a0f99d2b443a00a3fb16a5be7f9ed4acf01d9eb"
+    },
+    {
+      "path": "model/t-rex-3-pro-48mm/index.html",
+      "size": 2214,
+      "sha256": "d1f0b8293f299868df6f76b79de49da6c0a8d3d9813d34c7f72a086005437123"
+    },
+    {
+      "path": "model/t-rex-3/index.html",
+      "size": 2108,
+      "sha256": "f813396e0812f96e41f1e5f0a616f3f4c72b52139e78cc35497765623269acd4"
+    },
+    {
+      "path": "model/t-rex-ultra-2/index.html",
+      "size": 2168,
+      "sha256": "aa6aefe0cc4905e15409e7cc578b28a783b193fe44159229a2a83edff7b29a79"
+    },
+    {
+      "path": "model/t-rex-ultra/index.html",
+      "size": 2148,
+      "sha256": "553f763e39aebfeff417095186ef85605d5959b1cf7e770b5ba56c521632cbe2"
+    },
+    {
+      "path": "models.json",
+      "size": 4260,
+      "sha256": "94fdd17cfe90a46651b6fd1f78c48a337873565ed82012fc8ecbdc805b7c75e5"
+    },
+    {
+      "path": "privacy/index.html",
+      "size": 1880,
+      "sha256": "83f3615e6d8dec398f3ac16a2ee93459f2564a9794270fc0004720b237c4251b"
+    },
+    {
+      "path": "refunds/index.html",
+      "size": 1872,
+      "sha256": "3fb060990b6bb5dbbcab2ae1d916ba4a1ec326121b014741a858604c6179b9a3"
+    },
+    {
+      "path": "robots.txt",
+      "size": 73,
+      "sha256": "b9d34df8125e5933f07b2b9e109acfdc18d8f74443967e60180dc37939ca902e"
+    },
+    {
+      "path": "search/index.html",
+      "size": 1878,
+      "sha256": "f35ed048c33e323fe03050dcfc1fcef4fbe8aa5c0cd74c0d3784d1fa94329e6c"
+    },
+    {
+      "path": "sitemap.xml",
+      "size": 11641,
+      "sha256": "7d558f6f80c6a3a51adbb291104e18d18e71c18208b71ad7d9d5bde114ec5504"
+    },
+    {
+      "path": "specGroups.json",
+      "size": 1106,
+      "sha256": "14d4b69850558f084624595ca834ecde2e3d9c206a6b1deabf90e781afe81757"
+    },
+    {
+      "path": "storeConfig.json",
+      "size": 42,
+      "sha256": "c444290391411d9e50d0829e83eb5df65efaffe37b82440771b54441380bb64b"
+    },
+    {
+      "path": "support/index.html",
+      "size": 2040,
+      "sha256": "dc5980aeff9bba8407063f182c0645d217015ea94faa7c09d537dff1746b37d0"
+    },
+    {
+      "path": "terms/index.html",
+      "size": 1924,
+      "sha256": "a50660a537e04dd3a366d65969195cc9f493f2cfe69d82fee0b475fe0576faa2"
+    }
+  ]
+}
