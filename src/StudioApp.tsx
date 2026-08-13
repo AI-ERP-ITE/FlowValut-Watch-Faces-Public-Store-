@@ -4434,6 +4434,15 @@ function StudioApp() {
         resolvedImgLevelFrames.set(scopedElementKey(elementScope, el.id), runtimeFrames);
       }
 
+      // Linked definitions are materialized above into normalized `imglvl_*` files.
+      // Do not also ship their original (often very large) source PNGs: they are no
+      // longer referenced by the runtime and can multiply the final ZPK size.
+      for (let i = elementFiles.length - 1; i >= 0; i -= 1) {
+        if (linkedSwitcherNames.has(elementFiles[i].src)) {
+          elementFiles.splice(i, 1);
+        }
+      }
+
       // Pre-warm Tabler icon cache so getIconByKey works synchronously for tabler:* keys
       if (allEditorElements.some(el => el.iconKey?.startsWith('tabler:'))) {
         dispatch(actions.setLoadingMessage('Warming icon cache...'));
@@ -4727,9 +4736,20 @@ function StudioApp() {
           if (imgEl) bakeResult = renderImgWithShadowToPng(el, imgEl);
         } else if ((el.type === 'IMG_LEVEL' || el.type === 'IMG_PROGRESS') && Array.isArray(el.images) && el.images.length > 0) {
           const bakedFrames: string[] = [];
+          const bakedFrameBySource = new Map<string, string>();
+          let switcherShadowPad = 0;
           for (let i = 0; i < el.images.length; i += 1) {
             const src = el.images[i];
             if (typeof src !== 'string' || src.trim().length === 0) continue;
+
+            // Range-backed switchers can intentionally reference the same source
+            // many times (for example one frame per value from 0 through 100).
+            // Bake each distinct PNG once and reuse its filename in image_array.
+            const existingBakedName = bakedFrameBySource.get(src);
+            if (existingBakedName) {
+              bakedFrames.push(existingBakedName);
+              continue;
+            }
 
             const imgEl = await imageFromElementFile(src, elementFiles);
             if (!imgEl) {
@@ -4738,16 +4758,29 @@ function StudioApp() {
             }
 
             const frameBake = renderImgWithShadowToPng(el, imgEl);
+            switcherShadowPad = frameBake.pad;
             const bakedName = `shadow_${safeName}_${i}.png`;
             const { bytes } = decodeDataUrlToBytes(frameBake.dataUrl, `Drop shadow image ${bakedName}`);
             const newFile = { src: bakedName, file: new File([bytes], bakedName, { type: 'image/png' }) };
             const existingIndex = elementFiles.findIndex((f) => f.src === bakedName);
             if (existingIndex >= 0) elementFiles[existingIndex] = newFile;
             else elementFiles.push(newFile);
+            bakedFrameBySource.set(src, bakedName);
             bakedFrames.push(bakedName);
           }
           if (bakedFrames.length > 0) {
             el.images = bakedFrames;
+            // The baked bitmap is larger on every side. Anchor that padding outside
+            // the editor bounds so the original artwork remains at the exact canvas
+            // position instead of moving right/down and appearing oversized.
+            if (switcherShadowPad > 0) {
+              el.bounds = {
+                x: el.bounds.x - switcherShadowPad,
+                y: el.bounds.y - switcherShadowPad,
+                width: el.bounds.width + switcherShadowPad * 2,
+                height: el.bounds.height + switcherShadowPad * 2,
+              };
+            }
           }
         } else if (el.type === 'FILL_RECT' && !el.engraveFrame) {
           bakeResult = renderFillRectWithShadowToPng(el);
