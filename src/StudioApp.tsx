@@ -4423,7 +4423,8 @@ function StudioApp() {
           elementFiles.push({ src: frameName, file: new File([bytes], frameName, { type: 'image/png' }) });
         }
 
-        const runtimeFrames = (el.dataType === 'HUMIDITY' || el.dataType === 'BIO_CHARGE') && el.imageSwitcherDefinitionId
+        const runtimeFrames = (el.dataType === 'BATTERY' || el.dataType === 'HUMIDITY' || el.dataType === 'BIO_CHARGE')
+          && el.imageSwitcherDefinitionId
           ? expandAbsoluteRangeFrames(
               normalizedFrames,
               exportSwitcherDefinitions.get(el.id)?.ranges ?? [],
