@@ -16,14 +16,15 @@ export function writePublicRuntimeConfig({ appRoot, distRoot, target }) {
   const values = {
     ...parseEnvFile(path.join(appRoot, `.env.${mode}`)),
     ...parseEnvFile(path.join(appRoot, `.env.${mode}.local`)),
+    ...process.env,
   };
   const environment = target;
   const paddleEnvironment = target === 'production' ? 'production' : 'sandbox';
   const purchaseFunctionsBaseUrl = (values.VITE_PURCHASE_FUNCTIONS_BASE_URL || values.VITE_FIREBASE_FUNCTIONS_BASE_URL || '').replace(/\/$/, '');
-  const checkoutEnabled = target === 'production' ? false : values.VITE_CHECKOUT_ENABLED === 'true';
+  const checkoutEnabled = values.VITE_CHECKOUT_ENABLED === 'true';
   const paddleClientToken = (values.VITE_PADDLE_CLIENT_TOKEN || '').trim();
   if (!purchaseFunctionsBaseUrl) throw new Error(`Missing ${target} Public Store Functions origin`);
-  if (checkoutEnabled && !paddleClientToken) throw new Error('Staging checkout is enabled but its browser token is missing');
+  if (checkoutEnabled && !paddleClientToken) throw new Error(`${target} checkout is enabled but its browser token is missing`);
   const config = {
     schemaVersion: 1,
     environment,
