@@ -139,7 +139,7 @@ export function DesignModelPage() {
           <div className="maison-trust-row">
             <span className="maison-trust-item">⚡ Instant Delivery</span>
             <span className="maison-trust-item">🔒 Secure Paddle Checkout</span>
-            <span className="maison-trust-item">♾️ Lifetime Updates</span>
+            <span className="maison-trust-item">♾️ Product Support & Updates</span>
           </div>
 
           <p className="maison-purchase-note mt-3">Compatibility is confirmed for your selected watch before fulfillment.</p>

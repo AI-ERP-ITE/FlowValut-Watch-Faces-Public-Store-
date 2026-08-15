@@ -1,4 +1,4 @@
-export const SUPPORT_CONTENT = `
+import{j as e}from"./index-CmS46SXb.js";import{L as a,a as o}from"./LegalLayout-MrRJ8KNw.js";const t=`
 # Customer Support Policy
 
 **Version:** 1.2 · **Effective Date:** June 18, 2026 · **Last Updated:** August 15, 2026
@@ -26,4 +26,4 @@ FlowVault Watch Faces is under no obligation to continue selling, updating, or s
 Business Email: [business@fvwatchfaces.com](mailto:business@fvwatchfaces.com)
 
 Support Email: [support@fvwatchfaces.com](mailto:support@fvwatchfaces.com)
-`;
+`;function i(){return e.jsx(a,{title:"Support Policy",description:"How to get help, our response commitments, and what we support.",version:"1.1",lastUpdated:"August 9, 2026",content:t,children:e.jsx(o,{content:t})})}export{i as SupportPage};
