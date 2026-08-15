@@ -129,10 +129,10 @@ export function StorefrontLayout() {
           </div>
 
           <FooterColumn title="Maison">
-            <Link to="/#collections">Collections</Link>
-            <Link to="/#new-releases">New Releases</Link>
-            <Link to="/#philosophy">Philosophy</Link>
-            <Link to="/#journal">Journal</Link>
+            <Link to="/collections">Collections</Link>
+            <Link to="/search">New Releases</Link>
+            <Link to="/philosophy">Philosophy</Link>
+            <Link to="/journal">Journal</Link>
           </FooterColumn>
 
           <FooterColumn title="Client Services">
@@ -152,7 +152,7 @@ export function StorefrontLayout() {
         </div>
 
         <div className="maison-footer-bottom">
-          <p>© {new Date().getFullYear()} FlowVault. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Flow Vault Tech LLC, operating under the FlowVault Watch Faces brand. All rights reserved.</p>
           <p>Designed as a digital watchmaking maison.</p>
         </div>
       </footer>
