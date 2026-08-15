@@ -1,4 +1,5 @@
-import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, LayoutGrid, List } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
 import { modelSkus, skuPackages } from '@/lib/storeReadModel';
@@ -7,6 +8,7 @@ import { DesignModelCard } from './DesignModelCard';
 export function CollectionPage() {
   const { slug } = useParams();
   const { data, loading, error, globalDeviceId } = useStoreReadModel();
+  const [viewMode, setViewMode] = useState<'grid' | 'row'>('grid');
 
   if (loading) return <Status text="Preparing the collection…" />;
   if (error || !data) return <Status text={error ?? 'Store unavailable'} />;
@@ -45,9 +47,28 @@ export function CollectionPage() {
       </header>
 
       <section className="maison-section">
-        <div className="maison-section-heading">
+        <div className="maison-section-heading flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div><p className="maison-eyebrow">The Collection</p><h2>Discover the Models</h2></div>
-          <p>{globalDeviceId ? 'Showing designs compatible with your selected watch.' : 'Choose a model, then explore its available colors and editions.'}</p>
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-[#12151c] border border-[#3a3528]/40" role="group" aria-label="Layout view mode">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              aria-label="Grid view"
+              aria-pressed={viewMode === 'grid'}
+              className={`p-2 rounded cursor-pointer transition-colors ${viewMode === 'grid' ? 'bg-[#28231c] text-[#e8d2a8]' : 'text-[#8e8778] hover:text-[#e8d2a8]'}`}
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('row')}
+              aria-label="Row list view"
+              aria-pressed={viewMode === 'row'}
+              className={`p-2 rounded cursor-pointer transition-colors ${viewMode === 'row' ? 'bg-[#28231c] text-[#e8d2a8]' : 'text-[#8e8778] hover:text-[#e8d2a8]'}`}
+            >
+              <List size={16} />
+            </button>
+          </div>
         </div>
         {models.length > 0 ? (
           <div className="maison-model-grid">

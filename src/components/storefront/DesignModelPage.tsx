@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
 import {
   compatibleDevices,
@@ -10,14 +10,29 @@ import {
   skuPackages,
 } from '@/lib/storeReadModel';
 import { DesignModelCard } from './DesignModelCard';
+import { ShareButton } from './ShareButton';
+
+function assetUrl(path?: string | null): string {
+  if (!path) return '';
+  if (/^(https?:)?\/\//i.test(path) || path.startsWith('/')) return path;
+  return `${import.meta.env.BASE_URL}${path}`;
+}
 
 export function DesignModelPage() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
   const { data, loading, error } = useStoreReadModel();
   const model = data?.designModels.find((item) => item.slug === slug || item.id === slug) ?? null;
   const skus = useMemo(() => data && model ? modelSkus(data, model.id) : [], [data, model]);
   const [skuId, setSkuId] = useState('');
   const [mode, setMode] = useState<'MAIN' | 'AOD'>('MAIN');
+
+  useEffect(() => {
+    const urlSku = searchParams.get('sku');
+    if (urlSku && skus.some((s) => s.id === urlSku)) {
+      setSkuId(urlSku);
+    }
+  }, [searchParams, skus]);
 
   if (loading) return <Status text="Preparing the timepiece…" />;
   if (error || !data) return <Status text={error ?? 'Store unavailable'} />;
@@ -52,13 +67,16 @@ export function DesignModelPage() {
             {preview ? <img src={preview} alt={`${sku.canonicalName} ${mode === 'AOD' ? 'always-on' : 'main'} preview`} /> : <div className="maison-image-fallback" />}
             <span>{mode === 'AOD' ? 'Always-On Display' : 'Main Display'}</span>
           </div>
-          <div className="maison-preview-switch" aria-label="Preview mode">
-            <button type="button" aria-pressed={mode === 'MAIN'} onClick={() => setMode('MAIN')}>
-              {mainPreview && <img src={mainPreview} alt="" />}<span>Main</span>
-            </button>
-            <button type="button" aria-pressed={mode === 'AOD'} onClick={() => setMode('AOD')} disabled={!aodPreview}>
-              {aodPreview && <img src={aodPreview} alt="" />}<span>AOD</span>
-            </button>
+          <div className="maison-preview-switch flex items-center justify-between gap-3 mt-4 w-full max-w-[380px]" aria-label="Preview mode">
+            <div className="flex gap-2">
+              <button type="button" aria-pressed={mode === 'MAIN'} onClick={() => setMode('MAIN')}>
+                {mainPreview && <img src={mainPreview} alt="" />}<span>Main</span>
+              </button>
+              <button type="button" aria-pressed={mode === 'AOD'} onClick={() => setMode('AOD')} disabled={!aodPreview}>
+                {aodPreview && <img src={aodPreview} alt="" />}<span>AOD</span>
+              </button>
+            </div>
+            <ShareButton title={`${model.name} (${sku.variant.name})`} text={model.description || ''} variant="button" />
           </div>
         </div>
 
@@ -70,20 +88,31 @@ export function DesignModelPage() {
             <p className="maison-product-lede">{model.description || 'A finished digital timepiece composed for clarity, character, and everyday intelligence.'}</p>
           </div>
 
-          <fieldset className="maison-variant-selector">
-            <legend>Color / Material and Edition</legend>
-            <div>
+          <fieldset className="maison-variant-selector mt-6">
+            <legend className="mb-2 text-xs uppercase tracking-widest text-[#a09a8e]">Color / Edition</legend>
+            <div className="flex flex-wrap gap-2 items-center p-2.5 rounded-xl border border-[#3a3528]/40 bg-[#12151c]/60">
               {skus.map((item) => {
                 const itemMedia = skuPackages(data, item.id).find((pkg) => pkg.mainPreviewPath);
                 const itemPreview = assetUrl(itemMedia?.mainPreviewPath);
                 const selected = sku.id === item.id;
                 return (
-                  <button key={item.id} type="button" onClick={() => { setSkuId(item.id); setMode('MAIN'); }} aria-pressed={selected}>
-                    <span className="maison-variant-preview">
-                      {itemPreview ? <img src={itemPreview} alt="" /> : <i style={{ background: item.variant.swatch || '#28231c' }} />}
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => { setSkuId(item.id); setMode('MAIN'); }}
+                    aria-pressed={selected}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-all cursor-pointer ${
+                      selected
+                        ? 'border-[#e8d2a8] bg-[#e8d2a8]/10 text-[#f4e8d1] shadow-[0_0_12px_rgba(232,210,168,0.15)] font-semibold'
+                        : 'border-[#3a3528]/40 bg-[#12151c] text-[#a09a8e] hover:border-[#e8d2a8]/40 hover:text-[#f4e8d1]'
+                    }`}
+                    title={`${item.variant.name}${item.edition?.name ? ` · ${item.edition.name}` : ''}`}
+                  >
+                    <span className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0 border border-black/40">
+                      {itemPreview ? <img src={itemPreview} alt="" className="w-full h-full object-cover" /> : <i style={{ background: item.variant.swatch || '#28231c' }} className="w-full h-full block" />}
                     </span>
-                    <span><strong>{item.variant.name}</strong><small>{item.edition?.name || item.variant.material || 'Signature edition'}</small></span>
-                    {selected && <Check size={15} />}
+                    <span>{item.variant.name}</span>
+                    {selected && <Check size={13} className="text-[#e8d2a8]" />}
                   </button>
                 );
               })}
@@ -107,7 +136,13 @@ export function DesignModelPage() {
             </div>
           )}
 
-          <p className="maison-purchase-note">Compatibility is confirmed for your selected watch before fulfillment.</p>
+          <div className="maison-trust-row">
+            <span className="maison-trust-item">⚡ Instant Delivery</span>
+            <span className="maison-trust-item">🔒 Secure Paddle Checkout</span>
+            <span className="maison-trust-item">♾️ Lifetime Updates</span>
+          </div>
+
+          <p className="maison-purchase-note mt-3">Compatibility is confirmed for your selected watch before fulfillment.</p>
         </aside>
       </section>
 
@@ -177,11 +212,6 @@ export function LegacyFaceResolver() {
   return model
     ? <Navigate to={`/design/${model.slug || model.id}`} replace />
     : <Navigate to={`/legacy-face/${id ?? ''}`} replace />;
-}
-
-function assetUrl(path?: string | null): string | null {
-  if (!path) return null;
-  return /^(https?:)?\/\//i.test(path) || path.startsWith('/') ? path : `${import.meta.env.BASE_URL}${path}`;
 }
 
 function Status({ text }: { text: string }) {

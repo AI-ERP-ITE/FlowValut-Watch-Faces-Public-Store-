@@ -319,6 +319,7 @@ export interface WatchFaceConfig {
   /** Optional AOD background transform state. */
   aodBackgroundTransform?: BackgroundTransform | null;
   watchModel: string;
+  configVersion?: string;
 }
 
 export interface GeneratedCode {

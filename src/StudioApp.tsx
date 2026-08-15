@@ -4229,12 +4229,14 @@ function StudioApp() {
           }
           def.ranges.forEach((slot, i) => {
             const slotName = `switcher_${el.id}_slot_${String(i).padStart(2, '0')}.png`;
-            switcherSlotImages.push({
-              name: slotName,
-              dataUrl: slot.dataUrl!,
-              bounds: { x: 0, y: 0, width: el.bounds.width, height: el.bounds.height },
-              type: 'IMG_LEVEL',
-            });
+            if (!switcherSlotImages.some((img) => img.name === slotName)) {
+              switcherSlotImages.push({
+                name: slotName,
+                dataUrl: slot.dataUrl!,
+                bounds: { x: 0, y: 0, width: el.bounds.width, height: el.bounds.height },
+                type: 'IMG_LEVEL',
+              });
+            }
           });
         }
       }
@@ -4340,8 +4342,12 @@ function StudioApp() {
           : Array.isArray(el.images)
             ? el.images.map((name) => (typeof name === 'string' ? name.trim() : '')).filter((name) => name.length > 0)
             : [];
-        const explicitCount = el.imageSwitcherFrameCount
-          ?? (configuredFrames.length > 0 ? configuredFrames.length : undefined);
+        const linkedSwitcherDef = el.imageSwitcherDefinitionId
+          ? exportSwitcherDefinitions.get(el.id) ?? switcherDefinitions.find((d) => d.id === el.imageSwitcherDefinitionId)
+          : null;
+        const explicitCount = linkedSwitcherDef
+          ? linkedSwitcherDef.ranges.length
+          : (el.imageSwitcherFrameCount ?? (configuredFrames.length > 0 ? configuredFrames.length : undefined));
         const policy = resolveImageSwitcherFrameCount(el.dataType, { explicitCount });
         const elementScope: 'main' | 'aod' = aodEditorElementSet.has(el) ? 'aod' : 'main';
 

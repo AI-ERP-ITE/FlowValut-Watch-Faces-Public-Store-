@@ -1,3 +1,4 @@
+import { ArrowLeft, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
@@ -46,17 +47,67 @@ export function SearchPage() {
   if (error || !data) return <Status text={error ?? 'Store unavailable'} />;
   const selectedDevice = data.devices.find((item) => item.id === globalDeviceId);
 
-  return <main className="maison-section">
-    <Link to="/" className="maison-back-link">Browse /</Link>
-    <div className="maison-section-heading"><div><p className="maison-eyebrow">Discover</p><h1>{query ? `Results for “${query}”` : 'Search all timepieces'}</h1></div><p>{results.length} result{results.length === 1 ? '' : 's'}{selectedDevice ? ` for ${selectedDevice.name}` : ''}</p></div>
-    <div className="mb-6 flex flex-wrap gap-3">
-      <select aria-label="Sort and filter results" value={sort} onChange={(event) => setSort(event.target.value as DiscoverySort)} className="rounded-lg border border-[#343b48] bg-[#11151d] p-3 text-white">
-        <option value="latest">Latest</option><option value="most-downloaded">Most downloaded</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="free-only">Free only</option><option value="paid-only">Paid only</option>
-      </select>
-      {tags.map((tag) => <button key={tag} type="button" onClick={() => setParams({ q: tag })} className="rounded-full border border-[#343b48] px-3 text-[#c8b58e]">#{tag}</button>)}
+  return (
+    <div className="maison-collection-page">
+      <header className="maison-collection-hero">
+        <div className="maison-collection-hero-shade" />
+        <div className="maison-collection-hero-copy">
+          <Link to="/" className="maison-back-link"><ArrowLeft size={14} /> Back to Browse</Link>
+          <p className="maison-eyebrow">Discover Timepieces</p>
+          <h1>{query ? `Results for “${query}”` : 'Search All Timepieces'}</h1>
+          <p>{results.length} result{results.length === 1 ? '' : 's'}{selectedDevice ? ` compatible with ${selectedDevice.name}` : ''}. Filter by tag or sort options below.</p>
+          <span>{results.length} Model{results.length === 1 ? '' : 's'}</span>
+        </div>
+      </header>
+
+      <section className="maison-section">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-[#3a3528]/40 bg-[#12151c]/70">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-widest text-[#a09a8e] mr-2 flex items-center gap-1.5"><Search size={14} /> Popular Tags:</span>
+            {tags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setParams({ q: tag })}
+                className="text-xs px-3 py-1 rounded-full border border-[#3a3528]/40 bg-[#1f2633] text-[#e8d2a8] hover:border-[#e8d2a8]/60 transition-all cursor-pointer"
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#a09a8e]">Sort by:</span>
+            <select
+              aria-label="Sort and filter results"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as DiscoverySort)}
+              className="rounded-lg border border-[#3a3528]/60 bg-[#090b0f] px-3 py-1.5 text-xs text-[#f4e8d1] focus:outline-none focus:border-[#e8d2a8]"
+            >
+              <option value="latest">Latest Releases</option>
+              <option value="most-downloaded">Most Popular</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="free-only">Free Only</option>
+              <option value="paid-only">Paid Only</option>
+            </select>
+          </div>
+        </div>
+
+        {results.length ? (
+          <div className="maison-model-grid">
+            {results.map((model) => <DesignModelCard key={model.id} model={model} store={data} />)}
+          </div>
+        ) : (
+          <div className="maison-empty-state">
+            <h2 className="text-xl text-[#f4e8d1] mb-2">{selectedDevice ? `Coming soon for ${selectedDevice.name}` : 'No matching timepieces'}</h2>
+            <p className="text-xs text-[#a09a8e]">Try another search query or return to all collections.</p>
+            <Link to="/" className="inline-block mt-4 text-xs text-[#e8d2a8] underline">Return to Collections</Link>
+          </div>
+        )}
+      </section>
     </div>
-    {results.length ? <div className="maison-model-grid">{results.map((model) => <DesignModelCard key={model.id} model={model} store={data} />)}</div> : <div className="maison-empty-state"><h2>{selectedDevice ? `Coming soon for ${selectedDevice.name}` : 'No matching timepieces'}</h2><p>Try another search or choose All Watches.</p></div>}
-  </main>;
+  );
 }
 
 function Status({ text }: { text: string }) { return <div className="maison-status">{text}</div>; }

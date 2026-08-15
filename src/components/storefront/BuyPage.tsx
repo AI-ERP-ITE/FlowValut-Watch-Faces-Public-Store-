@@ -267,6 +267,9 @@ export function BuyPage() {
                 </span>
               </label>
             ))}
+            <p className="mt-3 text-[11px] text-[#7a8899] leading-relaxed border-t border-[#1e2530] pt-2.5">
+              By checking the boxes above, <strong>I request immediate delivery of the digital product after payment and understand that, where permitted by applicable law, beginning the download or use may cause me to lose any statutory withdrawal right.</strong>
+            </p>
           </div>
         )}
 

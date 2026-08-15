@@ -120,6 +120,9 @@ for (const offer of model.offers) {
 
 const staticRoutes = [
   ['search', 'Search FlowVault', 'Search premium FlowVault watch faces.'],
+  ['collections', 'FlowVault Collections — Design Families', 'Distinct design families, each governed by its own proportion, atmosphere, and character.'],
+  ['journal', 'FlowVault Journal — Stories of Digital Horology', 'Notes on proportion, craft, collection identity, and the evolving language of time.'],
+  ['philosophy', 'FlowVault Philosophy — Digital Watchmaking', 'Swiss watchmaking principles meet digital craftsmanship: emotional design, exact proportion, and functional intelligence.'],
   ['terms', 'Terms and Conditions — FlowVault', 'FlowVault terms and conditions.'],
   ['privacy', 'Privacy Policy — FlowVault', 'FlowVault privacy policy.'],
   ['cookies', 'Cookie Policy — FlowVault', 'FlowVault cookie policy.'],

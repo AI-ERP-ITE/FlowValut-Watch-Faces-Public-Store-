@@ -252,9 +252,11 @@ export function OfferBuyPage() {
             Email
             <input disabled={busy} required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-2 w-full rounded-lg border border-[#343b48] bg-[#11151d] p-3 text-white disabled:opacity-50" />
           </label>
-          <label className="flex gap-2 text-xs text-[#9da6b5]">
-            <input disabled={busy} type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
-            I agree to the <Link to="/terms" className="underline">Terms, Privacy Policy, EULA, and Refund Policy</Link>.
+          <label className="flex items-start gap-2 text-xs text-[#9da6b5]">
+            <input disabled={busy} type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-0.5 shrink-0" />
+            <span>
+              I agree to the <Link to="/terms" className="underline">Terms, Privacy Policy, EULA, and Refund Policy</Link>, and <strong>I request immediate delivery of the digital product after payment and understand that, where permitted by applicable law, beginning the download or use may cause me to lose any statutory withdrawal right.</strong>
+            </span>
           </label>
           <button type="button" disabled={!checkoutEnabled || !deviceId || !email.trim() || !agreed || busy} onClick={start} className="w-full rounded-xl bg-[#bc9456] p-3 font-semibold text-[#17120a] disabled:cursor-not-allowed disabled:opacity-40">
             {!checkoutEnabled ? 'Coming Soon' : busy ? 'Preparing…' : price === 0 ? 'Get device package' : `Secure checkout — $${price.toFixed(2)}`}

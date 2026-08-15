@@ -1,7 +1,5 @@
 import { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Search } from 'lucide-react';
-import { SearchBar } from './SearchBar';
 import { CookieConsentBanner } from './legal/CookieConsentBanner';
 import { useStoreReadModel } from '@/context/StoreReadModelContext';
 import { getFlowVaultConfig } from '@/config/flowVaultConfig';
@@ -37,10 +35,10 @@ function DeviceFilter() {
 }
 
 const primaryNavigation = [
-  { to: '/#collections', label: 'Collections' },
-  { to: '/#new-releases', label: 'New Releases' },
-  { to: '/#philosophy', label: 'Philosophy' },
-  { to: '/#journal', label: 'Journal' },
+  { to: '/#all-models', label: 'Timepieces' },
+  { to: '/collections', label: 'Collections' },
+  { to: '/philosophy', label: 'Philosophy' },
+  { to: '/journal', label: 'Journal' },
 ];
 
 export function StorefrontLayout() {
@@ -48,6 +46,20 @@ export function StorefrontLayout() {
   const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
   const config = getFlowVaultConfig();
   const isStaging = config.environment === 'staging';
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const element = document.getElementById(id);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+        return;
+      }
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [location.pathname, location.search, location.hash]);
 
   useEffect(() => {
     if (!location.pathname.startsWith('/search')) {
@@ -88,15 +100,10 @@ export function StorefrontLayout() {
             {primaryNavigation.map((item) => (
               <MaisonNavLink key={item.to} {...item} currentPath={location.pathname} />
             ))}
-            <MaisonNavLink to="/search" label="Search" currentPath={location.pathname} />
           </nav>
 
           <div className="maison-header-tools">
             <DeviceFilter />
-            <div className="hidden xl:block"><SearchBar key={location.search} compact /></div>
-            <Link to="/search" className="maison-search-button xl:hidden" aria-label="Search timepieces">
-              <Search size={17} strokeWidth={1.5} />
-            </Link>
           </div>
         </div>
 
@@ -104,7 +111,6 @@ export function StorefrontLayout() {
           {primaryNavigation.map((item) => (
             <MaisonNavLink key={item.to} {...item} currentPath={location.pathname} />
           ))}
-          <MaisonNavLink to="/search" label="Search" currentPath={location.pathname} />
         </nav>
       </header>
 

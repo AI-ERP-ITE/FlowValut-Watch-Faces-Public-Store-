@@ -27,6 +27,9 @@ const CopyrightPage = lazy(() => import('@/components/storefront/legal/Copyright
 const SupportPage = lazy(() => import('@/components/storefront/legal/SupportPage').then((module) => ({ default: module.SupportPage })));
 const CookiesPage = lazy(() => import('@/components/storefront/legal/CookiesPage').then((module) => ({ default: module.CookiesPage })));
 const LegalIndexPage = lazy(() => import('@/components/storefront/legal/LegalIndexPage').then((module) => ({ default: module.LegalIndexPage })));
+const JournalIndexPage = lazy(() => import('@/components/storefront/JournalIndexPage').then((module) => ({ default: module.JournalIndexPage })));
+const PhilosophyPage = lazy(() => import('@/components/storefront/PhilosophyPage').then((module) => ({ default: module.PhilosophyPage })));
+const CollectionsIndexPage = lazy(() => import('@/components/storefront/CollectionsIndexPage').then((module) => ({ default: module.CollectionsIndexPage })));
 
 export default function AppPublic() {
   return (
@@ -43,16 +46,18 @@ export default function AppPublic() {
       >
         <Route index element={publicStoreArchitectureFlags.storefrontReadModel ? <DesignModelHomePage /> : <HomePage />} />
         <Route path="model/:slug" element={<ModelPage />} />
+        <Route path="collections" element={<CollectionsIndexPage />} />
         <Route path="collection/:slug" element={<CollectionPage />} />
         <Route path="design/:slug" element={<DesignModelPage />} />
         <Route path="device/:slug" element={<DeviceCompatibilityPage />} />
         <Route path="category/:slug" element={<CategoryPage />} />
+        <Route path="journal" element={<JournalIndexPage />} />
+        <Route path="philosophy" element={<PhilosophyPage />} />
         <Route path="face/:id" element={publicStoreArchitectureFlags.storefrontReadModel ? <LegacyFaceResolver /> : <ProductPage />} />
         <Route path="legacy-face/:id" element={<ProductPage />} />
         <Route path="buy/:id" element={publicStoreArchitectureFlags.offerCheckout ? <OfferBuyPage /> : <BuyPage />} />
         <Route path="success/:id" element={<SuccessPage />} />
         <Route path="search" element={<SearchPage />} />
-
         {/* ── Legal pages ─────────────────────────────────────── */}
         <Route path="terms"          element={<TermsPage />} />
         <Route path="privacy"        element={<PrivacyPage />} />

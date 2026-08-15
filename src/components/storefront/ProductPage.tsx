@@ -98,7 +98,7 @@ export function ProductPage() {
           {/* ── Left: Preview ───────────────────────────────────────── */}
           <div className="space-y-4">
             {/* Main preview */}
-            <div className="aspect-square rounded-2xl overflow-hidden bg-[#121418] border border-[#2f3743] flex items-center justify-center">
+            <div className="aspect-square max-w-[380px] mx-auto rounded-2xl overflow-hidden bg-[#121418] border border-[#2f3743] flex items-center justify-center p-4">
               {selectedPreviewPath ? (
                 <img
                   src={assetUrl(selectedPreviewPath)}

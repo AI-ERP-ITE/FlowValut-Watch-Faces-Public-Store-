@@ -1,15 +1,15 @@
 export const PRIVACY_CONTENT = `
 # Privacy Policy
 
-**Version:** 1.1 · **Effective Date:** June 18, 2026 · **Last Updated:** August 9, 2026
+**Version:** 1.2 · **Effective Date:** June 18, 2026 · **Last Updated:** August 15, 2026
 
 ## 1. Introduction
 
-This Privacy Policy outlines how Flow Vault ("Company," "We," "Us") collects, processes, and protects your personal data when you interact with the FVWatchFaces marketplace and our related digital services. This document should be read in conjunction with our [Terms of Service](/terms).
+This Privacy Policy outlines how **Flow Vault Tech LLC, operating under the FlowVault Watch Faces brand** ("Company," "We," "Us"), collects, processes, and protects your personal data when you interact with the FlowVault Watch Faces storefront and our related digital services. This document should be read in conjunction with our [Terms of Service](/terms).
 
 ## 2. Information We Collect
 
-To provide licensing verification, technical support, and marketplace improvements, Flow Vault collects specific technical and transactional information. The data we may collect includes your email address, IP address, hardware and device information, cryptographic license information, download statistics, and telemetry/usage analytics.
+To provide licensing verification, technical support, and storefront improvements, FlowVault Watch Faces collects specific technical and transactional information. The data we may collect includes your email address, IP address, hardware and device information, cryptographic license information, download statistics, and telemetry/usage analytics.
 
 For purchase delivery, the original checkout email is associated with the payment order and package entitlement. We record successful and failed transfer events, recovery usage, the selected device package, and whether delivery used a browser link or QR installation. Public storefront counts are aggregate statistics and do not disclose purchaser emails, order identifiers, or download credentials.
 
@@ -19,7 +19,7 @@ We collect and process this data to fulfill our contractual obligations to you, 
 
 ## 4. Third-Party Infrastructure and Processors
 
-Flow Vault leverages industry-leading infrastructure providers to deliver our Services securely globally. We do not process payments directly; all financial data is securely handled by our Merchant of Record, Paddle. Additionally, we utilize Firebase for database operations and authentication, and Cloudflare for content delivery (CDN) and security routing. These third-party processors adhere to stringent international data protection standards.
+FlowVault Watch Faces leverages industry-leading infrastructure providers to deliver our Services securely globally. We do not process payments directly; all financial data is securely handled by our Merchant of Record, Paddle. Additionally, we utilize Firebase for database operations and authentication, and Cloudflare for content delivery (CDN) and security routing. These third-party processors adhere to stringent international data protection standards.
 
 ## 5. Cookies and Tracking Technologies
 
@@ -35,7 +35,7 @@ Depending on your jurisdiction of residence, you may possess the legal right to 
 
 ## 8. Future Services Expansion
 
-This Privacy Policy is designed to scale with our platform. As Flow Vault introduces future features—including user accounts, creator marketplaces, mobile applications, cloud storage, desktop software, and AI-powered tools—this policy will universally govern the data processing associated with those new Services.
+This Privacy Policy is designed to scale with our platform. As FlowVault Watch Faces introduces future features—including user accounts, mobile applications, cloud storage, desktop software, and AI-powered tools—this policy will universally govern the data processing associated with those new Services.
 
 ---
 
