@@ -32,6 +32,8 @@ yarn-error.log*
 # Temp files
 *.tmp
 .tmp/
+.tmp*/
+.tmp-*/
 .audit/
 temp/
 temp_validation_*/

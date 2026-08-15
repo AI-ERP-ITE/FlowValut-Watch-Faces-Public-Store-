@@ -155,7 +155,7 @@ async function main() {
   const publicHash = stageProductionIndexInGit();
   console.log(`\n📦 Public bundle: ${publicHash}`);
   run(`git commit -m "Deploy: public build ${publicHash}"`, 'Committing public build…');
-  run('git push public main', 'Pushing to public remote…');
+  run('git push public main --force', 'Pushing to public remote…');
   console.log(`\n✅ Public push done. Bundle: ${publicHash}`);
   console.log('Root index.html unchanged in working tree (dev shell preserved — Vite safe).');
 
